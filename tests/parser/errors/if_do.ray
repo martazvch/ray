@@ -1,0 +1,2 @@
+if true do var a = 1
+if false { print "oui" } else var a = 1

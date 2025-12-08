@@ -238,8 +238,6 @@ fn declaration(self: *Self) Error!Node {
         self.fnDecl()
     else if (self.match(.@"struct"))
         self.structDecl()
-    else if (self.match(.underscore))
-        self.discard()
     else if (self.match(.use))
         self.use()
     else
@@ -688,11 +686,13 @@ fn getAlias(self: *Self, token: Token.Tag) Error!?TokenIndex {
 }
 
 fn statement(self: *Self) Error!Node {
-    if (self.match(.print)) {
-        return self.print();
-    } else if (self.match(.@"while")) {
-        return self.whileStmt();
-    } else {
+    return if (self.match(.print))
+        self.print()
+    else if (self.match(.@"while"))
+        self.whileStmt()
+    else if (self.match(.underscore))
+        self.discard()
+    else {
         const assigne = try self.parsePrecedenceExpr(0);
 
         return if (self.match(.equal))
@@ -701,7 +701,7 @@ fn statement(self: *Self) Error!Node {
             self.compoundAssignment(assigne)
         else
             .{ .expr = assigne };
-    }
+    };
 }
 
 fn assignment(self: *Self, assigne: *Expr) Error!Node {
@@ -782,6 +782,7 @@ fn structPattern(self: *Self, decl_token: TokenIndex, structure: TokenIndex) Err
         return self.nullablePattern(decl_token, structure);
     }
 
+    // TODO: Error
     @panic("TODO");
 }
 
@@ -1050,7 +1051,7 @@ fn ifExpr(self: *Self) Error!*Expr {
     const then: Node = if (self.isAtBlock())
         .{ .expr = try self.blockExpr() }
     else if (self.matchAndSkip(.do))
-        try self.declaration()
+        try self.statement()
     else
         return self.errAtPrev(.{ .expect_block_or_do = .{ .what = "if" } });
 
@@ -1063,7 +1064,7 @@ fn ifExpr(self: *Self) Error!*Expr {
         if (self.matchAndSkip(.left_brace))
             .{ .expr = try self.blockExpr() }
         else
-            try self.declaration()
+            try self.statement()
     else blk: {
         self.token_idx -= 1;
         break :blk null;

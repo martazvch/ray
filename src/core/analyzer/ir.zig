@@ -1,9 +1,7 @@
 pub const Scope = enum { builtin, global, local };
 pub const Type = enum(u2) { float, int };
-pub const RcAction = enum { increment, cow, none };
 
 pub const Index = usize;
-pub const IndexVoid = @import("std").math.maxInt(Index);
 
 pub const TypeId = @import("types.zig").TypeId;
 pub const SymbolIndex = usize;
