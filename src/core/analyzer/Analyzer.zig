@@ -625,6 +625,7 @@ fn expectAssignableValue(self: *Self, expr: *const Ast.Expr, ctx: *Context) Resu
     return value_res orelse self.err(.assign_type, span);
 }
 
+/// Wraps the instruction inside `incr_rc` if `heap` is true
 fn checkWrap(self: *Self, instr: *InstrIndex, heap: bool) void {
     if (heap) {
         instr.* = self.irb.wrapInstr(.incr_rc, instr.*);
@@ -810,8 +811,8 @@ fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Contex
         .maybe => {},
         .symbol => if (!res.ti.is_sym) return error.NotSymbol,
         // Should be unreachable because the `.none` information is used by blocks
-        // to declare a value-returning ob block or not.
-        .none => unreachable,
+        // to declare a value-returning block or not.
+        .none => return self.err(.expect_statement, self.ast.getSpan(expr)),
     }
 
     if (self.scope.isGlobal() and !res.ti.comp_time) {

@@ -26,6 +26,7 @@ pub const AnalyzerMsg = union(enum) {
     enum_lit_non_enum: struct { found: []const u8 },
     enum_tag_access,
     enum_unknown_decl: struct { @"enum": []const u8, field: []const u8 },
+    expect_statement,
     expect_value_found_type: struct { found: []const u8 },
     float_equal,
     fn_expect_value: struct { expect: []const u8 },
@@ -109,6 +110,7 @@ pub const AnalyzerMsg = union(enum) {
             .enum_lit_non_enum => |e| writer.print("expect an enum but found '{s}'", .{e.found}),
             .enum_tag_access => writer.writeAll("can't access enum's tag at runtime"),
             .enum_unknown_decl => |e| writer.print("enum '{s}' have no declaration '{s}'", .{ e.@"enum", e.field }),
+            .expect_statement => writer.writeAll("did not expect an expression in this context"),
             .expect_value_found_type => |e| writer.print("expect a value found type '{s}'", .{e.found}),
             .float_equal => writer.writeAll("floating-point values equality is unsafe"),
             .fn_expect_value => |e| writer.print("no value returned from function expecting '{s}'", .{e.expect}),
@@ -183,6 +185,7 @@ pub const AnalyzerMsg = union(enum) {
             .enum_lit_non_enum => writer.writeAll("this enum literal don't match any enum"),
             .enum_tag_access => writer.writeAll("this is one of the enum's tag"),
             .enum_unknown_decl => writer.writeAll("this name is unknown"),
+            .expect_statement => writer.writeAll("this is an expression"),
             .expect_value_found_type => writer.writeAll("this is not a runtime value"),
             .float_equal => writer.writeAll("both sides are 'floats'"),
             .fn_expect_value => writer.writeAll("last expression didn't return a value"),
@@ -266,6 +269,10 @@ pub const AnalyzerMsg = union(enum) {
                 \\with an 'if' statement like: 'if foo == .a {}' or with pattern matching via 'match'.
             ),
             .enum_unknown_decl => writer.writeAll("refer to enum's declaration to see available tags and declarations"),
+            .expect_statement => writer.writeAll(
+                \\expressions are allowed inside declarations: functions' bodies, ...
+                \\you might be trying to put an expression in global scope for example
+            ),
             .expect_value_found_type => writer.writeAll("types can't be used as a runtime value"),
             .float_equal => writer.writeAll(
                 \\floating-point values are approximations to infinitly precise real numbers. 
