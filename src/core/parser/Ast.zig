@@ -109,6 +109,7 @@ pub const VarDecl = struct {
     name: TokenIndex,
     typ: ?*Type,
     value: ?*Expr,
+    is_const: bool = true,
 
     meta: Meta = .{},
 

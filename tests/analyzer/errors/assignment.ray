@@ -9,4 +9,7 @@ fn main() {
 
     var noval: int
     noval = 1.4
+
+    let cte = 5
+    cte = 7
 }

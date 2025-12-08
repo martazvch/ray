@@ -2,7 +2,8 @@
     "var_decl": {
         "name": "a",
         "type": "any",
-        "value": {}
+        "value": {},
+        "const": "false"
     },
     "assignment": {
         "assigne": {

@@ -14,6 +14,7 @@
     "var_decl": {
         "name": "clr",
         "type": "tools.image.Color",
-        "value": {}
+        "value": {},
+        "const": "false"
     }
 }

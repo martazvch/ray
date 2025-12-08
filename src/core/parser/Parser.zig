@@ -230,7 +230,7 @@ fn synchronize(self: *Self) void {
 }
 
 fn declaration(self: *Self) Error!Node {
-    return if (self.match(.@"var"))
+    return if (self.match(.@"var") or self.match(.let))
         self.varDecl()
     else if (self.match(.@"enum"))
         self.enumDecl()
@@ -462,11 +462,13 @@ fn containerFnDecls(self: *Self, kind: []const u8) Error![]Ast.FnDecl {
 }
 
 fn varDecl(self: *Self) Error!Node {
+    const is_const = self.prev(.tag) == .let;
     const name = self.token_idx;
     try self.expect(.identifier, .{ .expect_name = .{ .kind = "variable" } });
 
-    if (self.check(.comma))
-        return self.multiVarDecl(name);
+    if (self.check(.comma)) {
+        return self.multiVarDecl(name, is_const);
+    }
 
     const typ = try self.expectTypeOrEmpty();
 
@@ -479,10 +481,15 @@ fn varDecl(self: *Self) Error!Node {
         return self.errAt(name, .expect_type_or_value_in_decl);
     }
 
-    return .{ .var_decl = .{ .name = name, .typ = typ, .value = value } };
+    return .{ .var_decl = .{
+        .name = name,
+        .typ = typ,
+        .value = value,
+        .is_const = is_const,
+    } };
 }
 
-fn multiVarDecl(self: *Self, first_name: usize) Error!Node {
+fn multiVarDecl(self: *Self, first_name: usize, is_const: bool) Error!Node {
     var count: usize = 1;
     var decls: ArrayList(Ast.VarDecl) = .empty;
     var variables: ArrayList(usize) = .empty;
@@ -500,12 +507,12 @@ fn multiVarDecl(self: *Self, first_name: usize) Error!Node {
         null;
 
     // First declaration
-    decls.appendAssumeCapacity(.{ .name = first_name, .typ = typ, .value = first_value });
+    decls.appendAssumeCapacity(.{ .name = first_name, .typ = typ, .value = first_value, .is_const = is_const });
 
     // If only one value
     if (!self.check(.comma)) {
         for (variables.items) |var_idx| {
-            decls.appendAssumeCapacity(.{ .name = var_idx, .typ = typ, .value = first_value });
+            decls.appendAssumeCapacity(.{ .name = var_idx, .typ = typ, .value = first_value, .is_const = is_const });
         }
     } else while (self.match(.comma)) : (count += 1) {
         if (count > variables.items.len) {
@@ -517,6 +524,7 @@ fn multiVarDecl(self: *Self, first_name: usize) Error!Node {
             .name = variables.items[count - 1],
             .typ = typ,
             .value = try self.parsePrecedenceExpr(0),
+            .is_const = is_const,
         });
     }
 

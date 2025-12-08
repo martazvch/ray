@@ -6,14 +6,16 @@
         "var_decl": {
             "name": "a",
             "type": "float",
-            "value": {}
+            "value": {},
+            "const": "false"
         }
     ],
     "block": [
         "var_decl": {
             "name": "a",
             "type": "int",
-            "value": {}
+            "value": {},
+            "const": "false"
         },
         "assignment": {
             "assigne": {

@@ -130,7 +130,8 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
         },
         .var_decl => |*n| {
             try self.openKey("var_decl", .block);
-            try self.renderNameTypeValue(n, false);
+            try self.renderNameTypeValue(n, true);
+            try self.pushKeyValue("const", if (n.is_const) "true" else "false", false);
             try self.closeKey(.block, comma);
         },
         .@"while" => |*n| {

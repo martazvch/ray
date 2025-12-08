@@ -2,3 +2,4 @@ assign_to_constant, a
 undeclared_var, add
 invalid_assign_target
 type_mismatch, int, float
+assign_to_constant, cte

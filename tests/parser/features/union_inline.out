@@ -2,11 +2,13 @@
     "var_decl": {
         "name": "a",
         "type": "int|bool|str",
-        "value": {}
+        "value": {},
+        "const": "false"
     },
     "var_decl": {
         "name": "b",
         "type": "bool|[]Vec2|fn(int) -> float",
-        "value": {}
+        "value": {},
+        "const": "false"
     }
 }

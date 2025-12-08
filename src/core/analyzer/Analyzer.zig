@@ -652,7 +652,7 @@ fn varDeclaration(self: *Self, node: *const Ast.VarDecl, ctx: *Context) StmtResu
         checked_type,
         node.meta.captured,
         value_res != null,
-        false,
+        node.is_const,
         if (value_res) |v| v.ti.comp_time else false,
         if (value_res) |v| v.ti.ext_mod else null,
         span,
@@ -810,8 +810,7 @@ fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Contex
         },
         .maybe => {},
         .symbol => if (!res.ti.is_sym) return error.NotSymbol,
-        // Should be unreachable because the `.none` information is used by blocks
-        // to declare a value-returning block or not.
+        // Either used by blocks or asked by top level statement but blocks consume `.none`
         .none => return self.err(.expect_statement, self.ast.getSpan(expr)),
     }
 

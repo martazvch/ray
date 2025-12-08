@@ -182,6 +182,7 @@
                     "literal": "10"
                 }
             }
-        }
+        },
+        "const": "false"
     }
 }
