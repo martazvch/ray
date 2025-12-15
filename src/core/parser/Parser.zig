@@ -1150,7 +1150,10 @@ fn matchExpr(self: *Self) Error!*Expr {
 }
 
 fn matchArm(self: *Self) Error!Ast.Match.Arm {
-    const expr = try self.parsePrecedenceExpr(0);
+    const expr: Ast.Match.Arm.Kind = if (self.match(.underscore))
+        .{ .wildcard = self.token_idx - 1 }
+    else
+        .{ .expr = try self.parsePrecedenceExpr(0) };
     const alias = try self.getAlias(.at);
     try self.expect(.arrow_big, .expect_arrow_before_pm_arm_body);
 

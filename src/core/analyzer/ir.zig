@@ -165,7 +165,8 @@ pub const Instruction = struct {
         arms: []const Arm,
         is_expr: bool,
 
-        pub const Arm = struct { expr: Index, body: Index };
+        pub const Kind = union(enum) { instr: Index, wildcard: void };
+        pub const Arm = struct { expr: Kind, body: Index };
     };
     pub const MultiVarDecl = struct { decls: []const Index };
     pub const Return = struct { value: ?Index };

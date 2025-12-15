@@ -109,3 +109,14 @@
                     [Break depth: 0]
                         [Constant 17]
                             [Int 3]
+    [Match]
+    - expression:
+        [Variable index: 0, scope: local]
+    - arms:
+        - expr:
+            [Constant 11]
+        - body:
+            [Block pop count: 0, is_expr: false]
+        - wildcard
+        - body:
+            [Block pop count: 0, is_expr: false]

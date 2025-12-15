@@ -780,24 +780,31 @@ const Compiler = struct {
         var exit_jumps = ArrayList(usize).initCapacity(self.manager.allocator, data.arms.len) catch oom();
 
         for (data.arms) |arm| {
-            self.writeOp(.dup);
-            try self.tagId(arm.expr);
-            self.writeOp(.eq_int);
+            switch (arm.expr) {
+                .instr => |i| {
+                    self.writeOp(.dup);
+                    try self.tagId(i);
+                    self.writeOp(.eq_int);
 
-            const arm_jump = self.emitJump(.jump_false);
-            // Pops the condition
-            self.writeOp(.pop);
+                    const arm_jump = self.emitJump(.jump_false);
+                    // Pops the condition
+                    self.writeOp(.pop);
+                    // Arm body
+                    try self.compileInstr(arm.body);
 
-            // Arm body
-            try self.compileInstr(arm.body);
+                    // Exits the when after arm body
+                    exit_jumps.appendAssumeCapacity(self.emitJump(.jump));
 
-            // Exits the when after arm body
-            exit_jumps.appendAssumeCapacity(self.emitJump(.jump));
-
-            // Skips to next arm
-            try self.patchJump(arm_jump);
-            // Pops the condition in case of false
-            self.writeOp(.pop);
+                    // Skips to next arm
+                    try self.patchJump(arm_jump);
+                    // Pops the condition in case of false
+                    self.writeOp(.pop);
+                },
+                .wildcard => {
+                    // Arm body
+                    try self.compileInstr(arm.body);
+                },
+            }
         }
 
         for (exit_jumps.items) |jump| {

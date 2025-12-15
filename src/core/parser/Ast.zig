@@ -229,9 +229,14 @@ pub const Match = struct {
     arms: []Arm,
 
     pub const Arm = struct {
-        expr: *Expr,
+        expr: Kind,
         alias: ?TokenIndex,
         body: Node,
+
+        pub const Kind = union(enum) {
+            expr: *Expr,
+            wildcard: TokenIndex,
+        };
     };
 };
 
@@ -359,6 +364,10 @@ pub fn getSpan(self: *const Self, anynode: anytype) Span {
         Match => .{
             .start = self.token_spans[node.kw].start,
             .end = self.getSpan(node.expr).end,
+        },
+        Match.Arm.Kind => switch (node) {
+            .expr => |e| self.getSpan(e),
+            .wildcard => |e| self.token_spans[e],
         },
         Pattern => switch (node) {
             .value => |e| if (e.alias) |alias|

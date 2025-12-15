@@ -381,6 +381,9 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
     sym.type = interned_type;
     ctx.fn_type = interned_type;
 
+    ctx.decl_type = fn_type.return_type;
+    defer ctx.decl_type = null;
+
     const body_instrs, const returns = try self.fnBody(node.body.nodes, &fn_type, span, ctx);
     _ = self.scope.close();
 
@@ -638,6 +641,7 @@ fn varDeclaration(self: *Self, node: *const Ast.VarDecl, ctx: *Context) StmtResu
     var checked_type = try self.checkAndGetType(node.typ, ctx);
 
     ctx.decl_type = if (!checked_type.is(.void)) checked_type else null;
+    defer ctx.decl_type = null;
 
     const value_res = if (node.value) |value| v: {
         var value_res = try self.expectAssignableValue(value, ctx);
@@ -1777,12 +1781,15 @@ fn literal(self: *Self, expr: *const Ast.Literal, ctx: *Context) Result {
 fn match(self: *Self, expr: *const Ast.Match, expect: ExprResKind, ctx: *Context) Result {
     const value = try self.analyzeExpr(expr.expr, .value, ctx);
 
-    // TODO: error
-    const value_type = value.type.as(.@"enum") orelse @panic("Match on anything else than enum not implemented yet");
-    var proto = value_type.proto(self.allocator);
+    // Sets current type (for enum literals for example)
+    const prev_decl_type = ctx.setAndGetPrevious(.decl_type, value.type);
+    defer ctx.decl_type = prev_decl_type;
 
-    const types, const arms = try self.matchArms(expr.arms, value.type, &proto, expect, ctx);
-    try self.matchValidation(&proto, self.ast.getSpan(expr.kw));
+    // TODO: error
+    const types, const arms = switch (value.type.*) {
+        .@"enum" => try self.matchEnum(expr, value.type, expect, ctx),
+        else => @panic("Match on anything else than enum not implemented yet"),
+    };
 
     return .{
         .type = self.mergeTypes(types),
@@ -1790,7 +1797,7 @@ fn match(self: *Self, expr: *const Ast.Match, expect: ExprResKind, ctx: *Context
             .{ .match = .{
                 .expr = value.instr,
                 .arms = arms,
-                .is_expr = expect == .value,
+                .is_expr = expect != .none and expect != .maybe,
             } },
             self.ast.getSpan(expr).start,
         ),
@@ -1799,51 +1806,54 @@ fn match(self: *Self, expr: *const Ast.Match, expect: ExprResKind, ctx: *Context
 
 const MatchArms = struct { []const *const Type, []const Instruction.Match.Arm };
 
-fn matchArms(
-    self: *Self,
-    arm_exprs: []const Ast.Match.Arm,
-    ty: *const Type,
-    proto: *Type.Enum.Proto,
-    expect: ExprResKind,
-    ctx: *Context,
-) Error!MatchArms {
+fn matchEnum(self: *Self, expr: *const Ast.Match, ty: *const Type, expect: ExprResKind, ctx: *Context) Error!MatchArms {
     var had_err = false;
+    var has_wildcard = false;
     var types: Set(*const Type) = .empty;
-    var arms = ArrayList(Instruction.Match.Arm).initCapacity(self.allocator, arm_exprs.len) catch oom();
+    var arms = ArrayList(Instruction.Match.Arm).initCapacity(self.allocator, expr.arms.len) catch oom();
+    var proto = ty.@"enum".proto(self.allocator);
 
-    for (arm_exprs) |*arm| {
+    for (expr.arms, 0..) |*arm, i| {
         const arm_span = self.ast.getSpan(arm.expr);
 
-        // For enum literals
-        const prev_decl_type = ctx.setAndGetPrevious(.decl_type, ty);
-        defer ctx.decl_type = prev_decl_type;
+        const pat: ir.Instruction.Match.Kind = pat: switch (arm.expr) {
+            .expr => |expression| {
+                const tag, const pat = switch (expression.*) {
+                    .enum_lit => |e| .{ e, try self.enumLit(e, ctx) },
+                    .field => |*e| .{ e.field, try self.field(e, ctx) },
+                    else => return self.err(.match_enum_invalid_pat, arm_span),
+                };
 
-        // TODO: error
-        const tag, const pat = switch (arm.expr.*) {
-            .enum_lit => |e| .{ e, try self.enumLit(e, ctx) },
-            .field => |*e| .{ e.field, try self.field(e, ctx) },
-            else => @panic("Should pat match enums with either full name or enum lit"),
+                if (proto.getPtr(self.interner.intern(self.ast.toSource(tag)))) |found| {
+                    if (found.*) {
+                        return self.err(.{ .match_duplicate_arm = .{ .name = self.ast.toSource(tag) } }, arm_span);
+                    }
+                    found.* = true;
+                }
+
+                if (pat.type != ty) return self.err(
+                    .{ .match_arm_type_mismatch = .{ .expect = self.typeName(ty), .found = self.typeName(pat.type) } },
+                    arm_span,
+                );
+
+                break :pat .{ .instr = pat.instr };
+            },
+            .wildcard => {
+                if (i != expr.arms.len - 1) {
+                    return self.err(.match_wildcard_not_last, arm_span);
+                }
+
+                check: {
+                    for (proto.values()) |val| {
+                        if (!val) break :check;
+                    }
+                    return self.err(.match_wildcard_exhaustive, arm_span);
+                }
+                has_wildcard = true;
+
+                break :pat .{ .wildcard = {} };
+            },
         };
-
-        if (pat.type != ty) return self.err(
-            .{ .match_arm_type_mismatch = .{ .expect = self.typeName(ty), .found = self.typeName(pat.type) } },
-            arm_span,
-        );
-
-        if (proto.getPtr(self.interner.intern(self.ast.toSource(tag)))) |found| {
-            found.* = true;
-        }
-
-        // Implicit scope for aliases
-        // self.scope.open(self.allocator, null, false, expect == .value);
-        // defer _ = self.scope.close();
-
-        // alias: {
-        //     const alias = arm.alias orelse break :alias;
-        //     const binding = try self.internIfNotInCurrentScope(alias);
-        //     _ = binding; // autofix
-        //     // _ = try self.declareVariable(binding, resolved_ty, false, true, true, false, self.ast.getSpan(alias));
-        // }
 
         const body = self.analyzeNode(&arm.body, expect, ctx) catch {
             had_err = true;
@@ -1851,8 +1861,10 @@ fn matchArms(
         };
 
         types.add(self.allocator, body.type) catch oom();
-        arms.appendAssumeCapacity(.{ .expr = pat.instr, .body = body.instr });
+        arms.appendAssumeCapacity(.{ .expr = pat, .body = body.instr });
     }
+
+    if (!has_wildcard) try self.matchValidation(&proto, self.ast.getSpan(expr.kw));
 
     return if (had_err) error.Err else .{ types.toOwned(), arms.toOwnedSlice(self.allocator) catch oom() };
 }
@@ -1871,7 +1883,7 @@ fn matchValidation(self: *Self, proto: *const Type.Enum.Proto, span: Span) Error
     }
 
     if (missing.items.len > 0) return self.err(
-        .{ .pattern_match_non_exhaustive = .{ .kind = "match", .missing = missing.toOwnedSlice(self.allocator) catch oom() } },
+        .{ .match_non_exhaustive = .{ .kind = "match", .missing = missing.toOwnedSlice(self.allocator) catch oom() } },
         span,
     );
 }
@@ -2151,7 +2163,7 @@ fn whenValidation(self: *Self, proto: *const Type.Union.Proto, span: Span) Error
     }
 
     if (missing.items.len > 0) return self.err(
-        .{ .pattern_match_non_exhaustive = .{ .kind = "when", .missing = missing.toOwnedSlice(self.allocator) catch oom() } },
+        .{ .match_non_exhaustive = .{ .kind = "when", .missing = missing.toOwnedSlice(self.allocator) catch oom() } },
         span,
     );
 }

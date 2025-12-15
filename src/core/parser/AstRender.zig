@@ -362,7 +362,10 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
             try self.openKey("arms", .list);
             for (n.arms, 0..) |arm, i| {
                 try self.openAnonKey(.block);
-                try self.renderSingleExpr("expr", arm.expr, .block, true);
+                switch (arm.expr) {
+                    .expr => |e| try self.renderSingleExpr("expr", e, .block, true),
+                    .wildcard => try self.pushKeyValue("expr", "wildcard", true),
+                }
                 if (arm.alias) |alias| {
                     try self.pushKeyValue("alias", self.ast.toSource(alias), true);
                 }

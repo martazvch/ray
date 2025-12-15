@@ -13,6 +13,7 @@
             [Load symbol 0 module 0]
             - tag
             1
+
 [Function declaration markerStuff]
     - default params
     [Constant 3]
@@ -21,6 +22,7 @@
         [Field access 1]
             [Variable index: 0, scope: local]
         [Invoke symbol 1]
+
 [Function declaration markerStuff2]
     - default params
     [Constant 5]
@@ -34,6 +36,11 @@
         [Field access 1]
             [Variable index: 0, scope: local]
         [Invoke symbol 1]
+
+[Function declaration getMarker, returns]
+    [Return]
+        [Constant 7]
+
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
         [Constant 8]

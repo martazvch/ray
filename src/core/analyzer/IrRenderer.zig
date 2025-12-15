@@ -51,7 +51,6 @@ fn indent(self: *Self) void {
 
 pub fn renderIr(self: *Self, file_name: []const u8, roots: []const usize) Error![]const u8 {
     self.writer = self.tree.writer(self.allocator);
-    // TODO: remove the comment
     try self.writer.print("//-- {s} --\n", .{file_name});
 
     for (roots) |root| {
@@ -387,10 +386,15 @@ fn match(self: *Self, data: *const Instruction.Match) void {
     self.indent_level += 1;
     defer self.indent_level -= 1;
     for (data.arms) |arm| {
-        self.indentAndAppendSlice("- expr:");
-        self.indent_level += 1;
-        self.parseInstr(arm.expr);
-        self.indent_level -= 1;
+        switch (arm.expr) {
+            .instr => |i| {
+                self.indentAndAppendSlice("- expr:");
+                self.indent_level += 1;
+                self.parseInstr(i);
+                self.indent_level -= 1;
+            },
+            .wildcard => self.indentAndAppendSlice("- wildcard"),
+        }
         self.indentAndAppendSlice("- body:");
         self.indent_level += 1;
         self.parseInstr(arm.body);

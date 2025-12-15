@@ -23,6 +23,10 @@ fn markerStuff2(m = Marker.circle) {
     print m.toString()
 }
 
+fn getMarker() -> Marker {
+    return .circle
+}
+
 fn main() {
     var marker: Marker = .none
     print marker

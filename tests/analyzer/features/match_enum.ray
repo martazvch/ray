@@ -31,5 +31,10 @@ fn main() {
             break 3
         }
     }
+
+    match marker {
+        .circle => {}
+        _ => {}
+    }
 }
 

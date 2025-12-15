@@ -6,6 +6,10 @@ enum Marker {
 
 enum Bar{a}
 
+fn getMarker() -> Marker {
+    return .cross
+}
+
 fn main() {
     var marker: Marker = .cross
     var bar: Bar = .a
@@ -31,5 +35,28 @@ fn main() {
         }
     }
 
+    match marker {
+        .circle => {}
+        .circle => {}
+    }
+
+    match marker {
+        .circle => {}
+        getMarker() => {}
+    }
+
+    match marker {
+        .circle => {}
+        .cross => {}
+        .none => {}
+        _ => {}
+    }
+
+    match marker {
+        .circle => {}
+        _ => {}
+        .cross => {}
+        .none => {}
+    }
 }
 

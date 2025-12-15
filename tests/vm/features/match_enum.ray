@@ -35,5 +35,15 @@ fn main() {
     }
 
     print foo
+
+    let a = match marker {
+        .circle => "circle"
+        _ => "any other"
+    }
+    print a
+
+     print match marker {
+        _ => "all cases"
+    }
 }
 
