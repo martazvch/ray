@@ -49,11 +49,11 @@ pub fn main() !u8 {
     }
     const allocator = gpa.allocator();
 
-    var iter = try std.process.ArgIterator.initWithAllocator(allocator);
-    defer iter.deinit();
+    const args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
 
     var diag: clarg.Diag = undefined;
-    const parsed = clarg.parse("tester", Args, &iter, &diag, .{}) catch |e| {
+    const parsed = clarg.parse(Args, args, &diag, .{}) catch |e| {
         try diag.reportToFile(.stderr());
         return e;
     };
