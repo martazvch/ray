@@ -806,6 +806,8 @@ const Assoc = enum { left, none };
 const Rule = struct { prec: i8, assoc: Assoc = .left };
 
 const rules = std.enums.directEnumArrayDefault(Token.Tag, Rule, .{ .prec = -1 }, 0, .{
+    .question_mark = .{ .prec = 10 },
+
     .@"and" = .{ .prec = 20 },
     .@"or" = .{ .prec = 20 },
 
@@ -826,7 +828,7 @@ const rules = std.enums.directEnumArrayDefault(Token.Tag, Rule, .{ .prec = -1 },
 
 fn parsePrecedenceExpr(self: *Self, prec_min: i8) Error!*Expr {
     self.advance();
-    var node = try self.parseExpr();
+    var left = try self.parseExpr();
 
     var banned_prec: i8 = -1;
 
@@ -841,23 +843,30 @@ fn parsePrecedenceExpr(self: *Self, prec_min: i8) Error!*Expr {
         }
 
         // Here, we can safely use it
+        var expr: *Expr = undefined;
+
         self.advance();
         const op = self.prev(.tag);
-        const rhs = try self.parsePrecedenceExpr(next_rule.prec + 1);
 
-        const expr = self.allocator.create(Expr) catch oom();
-        expr.* = .{ .binop = .{
-            .lhs = node,
-            .rhs = rhs,
-            .op = op,
-        } };
+        switch (op) {
+            // TODO: handle question mark on next line
+            .question_mark => expr = try self.ternary(left),
+            else => {
+                expr = self.allocator.create(Expr) catch oom();
+                expr.* = .{ .binop = .{
+                    .lhs = left,
+                    .rhs = try self.parsePrecedenceExpr(next_rule.prec + 1),
+                    .op = op,
+                } };
+            },
+        }
 
-        node = expr;
+        left = expr;
 
         if (next_rule.assoc == .none) banned_prec = next_rule.prec;
     }
 
-    return node;
+    return left;
 }
 
 /// Parses expressions (prefix + sufix)
@@ -1391,4 +1400,19 @@ fn structLiteral(self: *Self, expr: *Expr) Error!*Expr {
     } };
 
     return struct_lit;
+}
+
+fn ternary(self: *Self, expr: *Expr) Error!*Expr {
+    const then = try self.parsePrecedenceExpr(0);
+    try self.expect(.colon, .expect_ternary_colon);
+    const @"else" = try self.parsePrecedenceExpr(0);
+
+    const ternary_expr = self.allocator.create(Expr) catch oom();
+    ternary_expr.* = .{ .ternary = .{
+        .condition = expr,
+        .then = then,
+        .@"else" = @"else",
+    } };
+
+    return ternary_expr;
 }

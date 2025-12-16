@@ -140,6 +140,7 @@ pub const Expr = union(enum) {
     pattern: Pattern,
     @"return": Return,
     struct_literal: StructLiteral,
+    ternary: Ternary,
     unary: Unary,
     when: When,
 };
@@ -216,6 +217,12 @@ pub const Return = struct {
 pub const StructLiteral = struct {
     structure: *Expr,
     fields: []FieldAndValue,
+};
+
+pub const Ternary = struct {
+    condition: *Expr,
+    then: *Expr,
+    @"else": *Expr,
 };
 
 pub const FieldAndValue = struct {
@@ -381,6 +388,10 @@ pub fn getSpan(self: *const Self, anynode: anytype) Span {
         },
         Return => self.token_spans[node.kw],
         StructLiteral => self.getSpan(node.structure),
+        Ternary => .{
+            .start = self.getSpan(node.condition).start,
+            .end = self.getSpan(node.@"else").end,
+        },
         Unary => .{
             .start = self.token_spans[node.op].start,
             .end = self.getSpan(node.expr).end,

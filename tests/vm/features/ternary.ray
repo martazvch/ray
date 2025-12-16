@@ -1,0 +1,13 @@
+fn getVal(v=4) -> int {
+    return v > 5 ? v*2 : 0
+}
+
+fn main() {
+    print (true or false) ? 1 : 0
+    print getVal(3)
+    print getVal(6)
+
+    fn get8() -> int { return 8 }
+    print true and true ? get8() : 0
+    print true ? true or false ? 89 : 9 : 1
+}

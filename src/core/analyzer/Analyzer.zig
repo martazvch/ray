@@ -794,6 +794,7 @@ fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Contex
         .pattern => |e| self.pattern(e, ctx),
         .@"return" => |*e| self.returnExpr(e, ctx),
         .struct_literal => |*e| self.structLiteral(e, ctx),
+        .ternary => |*e| self.ternary(e, ctx),
         .unary => |*e| self.unary(e, ctx),
         .when => |*e| self.when(e, expect, ctx),
     };
@@ -1928,6 +1929,31 @@ fn nullablePattern(self: *Self, pat: Ast.Pattern.Nullable, ctx: *Context) Result
     };
 }
 
+fn returnExpr(self: *Self, expr: *const Ast.Return, ctx: *Context) Result {
+    const span = self.ast.getSpan(expr);
+    const fn_type = ctx.fn_type orelse return self.err(.return_outside_fn, span);
+    const ty = fn_type.function.return_type;
+
+    const exp = expr.expr orelse return .{
+        .type = self.ti.getCached(.never),
+        .cf = .@"return",
+        .instr = self.irb.addInstr(.{ .@"return" = .{ .value = null } }, span.start),
+    };
+
+    var value_res = try self.analyzeExpr(exp, .value, ctx);
+
+    if (ty != value_res.type) {
+        const err_span = if (expr.expr) |e| self.ast.getSpan(e) else span;
+        value_res.type = try self.performTypeCoercion(ty, value_res.type, true, err_span);
+    }
+
+    return .{
+        .type = value_res.type,
+        .cf = .@"return",
+        .instr = self.irb.addInstr(.{ .@"return" = .{ .value = value_res.instr } }, span.start),
+    };
+}
+
 fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Result {
     const span = self.ast.getSpan(expr.structure);
     const struct_res = self.analyzeExpr(expr.structure, .symbol, ctx) catch |e| switch (e) {
@@ -2005,28 +2031,28 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
     };
 }
 
-fn returnExpr(self: *Self, expr: *const Ast.Return, ctx: *Context) Result {
-    const span = self.ast.getSpan(expr);
-    const fn_type = ctx.fn_type orelse return self.err(.return_outside_fn, span);
-    const ty = fn_type.function.return_type;
+fn ternary(self: *Self, expr: *const Ast.Ternary, ctx: *Context) Result {
+    const condition = try self.analyzeExpr(expr.condition, .value, ctx);
 
-    const exp = expr.expr orelse return .{
-        .type = self.ti.getCached(.never),
-        .cf = .@"return",
-        .instr = self.irb.addInstr(.{ .@"return" = .{ .value = null } }, span.start),
-    };
+    if (!condition.type.is(.bool)) {
+        std.debug.print("Found: {any}", .{condition.type.*});
+        @panic("Condition must be a bool");
+    }
 
-    var value_res = try self.analyzeExpr(exp, .value, ctx);
+    const then = try self.analyzeExpr(expr.then, .value, ctx);
+    const @"else" = try self.analyzeExpr(expr.@"else", .value, ctx);
 
-    if (ty != value_res.type) {
-        const err_span = if (expr.expr) |e| self.ast.getSpan(e) else span;
-        value_res.type = try self.performTypeCoercion(ty, value_res.type, true, err_span);
+    if (then.type != @"else".type) {
+        std.debug.print("Found then: {any} and else: {any}", .{ then.type.*, @"else".type.* });
+        @panic("Must be same type");
     }
 
     return .{
-        .type = value_res.type,
-        .cf = .@"return",
-        .instr = self.irb.addInstr(.{ .@"return" = .{ .value = value_res.instr } }, span.start),
+        .type = then.type,
+        .instr = self.irb.addInstr(
+            .{ .@"if" = .{ .cond = condition.instr, .then = then.instr, .@"else" = @"else".instr } },
+            self.ast.getSpan(expr).start,
+        ),
     };
 }
 

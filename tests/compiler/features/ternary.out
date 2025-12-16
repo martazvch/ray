@@ -1,0 +1,16 @@
+-- main --
+push_true
+jump_true 1 -> 6
+pop
+push_false
+jump_false 6 -> 15
+pop
+load_constant index 3, value 1
+jump 12 -> 18
+pop
+load_constant index 4, value 0
+print
+ret_naked
+
+-- global scope --
+call_sym index 0, arity 0, <function main>

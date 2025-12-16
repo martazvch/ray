@@ -31,6 +31,7 @@ pub const ParserMsg = union(enum) {
     expect_paren_after_fn_name,
     expect_paren_after_fn_params,
     expect_struct_name,
+    expect_ternary_colon,
     expect_type_name,
     expect_type_or_value_in_decl,
     import_alias_with_items,
@@ -90,6 +91,7 @@ pub const ParserMsg = union(enum) {
             .expect_paren_after_fn_name => writer.writeAll("expect opening parenthesis '(' after function's name"),
             .expect_paren_after_fn_params => writer.writeAll("expect closing parenthesis ')' after function's parameters"),
             .expect_struct_name => writer.writeAll("expect structure name"),
+            .expect_ternary_colon => writer.writeAll("expect a ':' after 'then' branch of ternary expression"),
             .expect_type_name => writer.writeAll("expect type name"),
             .expect_type_or_value_in_decl => writer.writeAll("expect either a value or a type in varibale declaration"),
             .import_alias_with_items => writer.writeAll("can't use a module alias when importing specific items"),
@@ -157,6 +159,7 @@ pub const ParserMsg = union(enum) {
             .expect_expr,
             .expect_new_line,
             .expect_new_line_pm_arm,
+            .expect_ternary_colon,
             .self_as_non_first_param,
             => writer.writeAll("here"),
             .expect_fn_name, .expect_type_name, .expect_name => writer.writeAll("this is not an identifier"),
@@ -183,6 +186,7 @@ pub const ParserMsg = union(enum) {
             ),
             .enum_lit_non_ident => writer.writeAll("enum literal syntax is: '.enum_tag'"),
             .expect_arrow_before_fn_type => writer.writeAll("add an arrow '->' between function's arguments list and type"),
+            // TODO: check if true
             .expect_arrow_before_pm_arm_body => writer.writeAll(
                 "Syntax is: <pattern> => <body> with optional binding like <pattern> :: binding => <body>",
             ),
@@ -195,7 +199,7 @@ pub const ParserMsg = union(enum) {
             .expect_brace_after_struct_lit => writer.writeAll("add an openning brace '{'"),
             .expect_block_or_do => writer.writeAll("open a block (labelled or not) with ':label {' or use 'do' keyword before statement"),
             .expect_closing_pipe => writer.writeAll("add a closing '|' to end closure's parameters list"),
-            .expect_colon_before_type => writer.writeAll("add ':' bofre type name"),
+            .expect_colon_before_type => writer.writeAll("add ':' before type name"),
             .expect_comma_array_values => writer.writeAll(
                 "values must be separated with commas in array declaration. Maybe you just forgot to close the declaration with ']'?",
             ),
@@ -207,9 +211,10 @@ pub const ParserMsg = union(enum) {
             .expect_field_type_or_default => writer.writeAll("add a type to the field like: 'field: type' or add a default value like: 'field = value'"),
             .expect_fn_in_container => |e| writer.print("a {s} must declare its fields first followed by its methods, nothing more", .{e.kind}),
             .expect_fn_name, .expect_type_name, .expect_name, .expect_struct_name => writer.writeAll("define an identifier"),
-            .expect_type_or_value_in_decl => writer.writeAll("provide either a default value so that the compiler can infer the type or a type"),
             .expect_name_after_dot => writer.writeAll("field access syntax is: 'Structure.field'"),
             .expect_new_line_pm_arm => writer.writeAll("each arm of pattern matching construct (match and when) have to be on their own line"),
+            .expect_ternary_colon => writer.writeAll("ternary expression syntaxe is: <condition> ? <then> : <else>"),
+            .expect_type_or_value_in_decl => writer.writeAll("provide either a default value so that the compiler can infer the type or a type"),
             .import_alias_with_items => writer.writeAll(
                 "you can either alias the whole module without importing specific items or alias each specific items",
             ),

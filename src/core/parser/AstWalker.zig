@@ -243,6 +243,11 @@ fn captureFromExpr(self: *Self, expr: *Ast.Expr, ctx: *CaptureCtx) void {
                 if (f.value) |val| self.captureFromExpr(val, ctx);
             }
         },
+        .ternary => |e| {
+            self.captureFromExpr(e.condition, ctx);
+            self.captureFromExpr(e.then, ctx);
+            self.captureFromExpr(e.@"else", ctx);
+        },
         .unary => |e| self.captureFromExpr(e.expr, ctx),
         .when => |*e| {
             self.captureFromExpr(e.expr, ctx);

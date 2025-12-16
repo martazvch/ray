@@ -1,0 +1,28 @@
+{
+    "ternary": {
+        "condition": {
+            "grouping": {
+                "binop": {
+                    "lhs": {
+                        "literal": "true"
+                    },
+                    "rhs": {
+                        "literal": "false"
+                    },
+                    "op": "or"
+                }
+            }
+        },
+        "then": {
+            "literal": "1"
+        },
+        "else": {
+            "fn_call": {
+                "callee": {
+                    "literal": "getValue"
+                },
+                "args": []
+            }
+        }
+    }
+}
