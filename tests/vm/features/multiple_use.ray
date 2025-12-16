@@ -2,10 +2,10 @@ use .data.math
 use .data.geom
 
 fn main() {
-    var middle = geom.Point { x = 1, y = 90 }
+    var middle = geom.Point { x: 1, y: 90 }
     middle.display()
     
-    var square = geom.Square { side = 10, middle }
+    var square = geom.Square { side: 10, middle }
     print square.middle.x
     print square.middle.y
 

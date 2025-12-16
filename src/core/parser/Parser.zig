@@ -1113,7 +1113,7 @@ fn leftParenExprStart(self: *Self) Error!*Expr {
     }
     // Tuple
     else if (self.match(.comma)) {
-        unreachable;
+        @panic("Not yet implemented");
     } else return self.errAt(start, .unclosed_paren);
 
     return expr;
@@ -1317,16 +1317,19 @@ fn finishCall(self: *Self, expr: *Expr) Error!*Expr {
         self.skipNewLines();
         if (self.check(.eof)) return self.errAtPrev(.expect_paren_after_fn_args);
 
-        if (args.items.len == 255)
+        if (args.items.len == 255) {
             return self.errAtCurrent(.{ .too_many_fn_args = .{ .what = "argument" } });
+        }
 
-        const param_name, const param_expr = if (self.check(.identifier) and self.token_tags[self.token_idx + 1] == .equal) b: {
-            named_started = true;
-            self.token_idx += 2;
-            break :b .{ self.token_idx - 2, try self.parsePrecedenceExpr(0) };
-        } else b: {
-            if (named_started) return self.errAtCurrent(.positional_after_default_param);
-            break :b .{ null, try self.parsePrecedenceExpr(0) };
+        const param_name, const param_expr = b: {
+            if (self.check(.identifier) and self.token_tags[self.token_idx + 1] == .colon) {
+                named_started = true;
+                self.token_idx += 2;
+                break :b .{ self.token_idx - 2, try self.parsePrecedenceExpr(0) };
+            } else {
+                if (named_started) return self.errAtCurrent(.positional_after_default_param);
+                break :b .{ null, try self.parsePrecedenceExpr(0) };
+            }
         };
 
         args.appendAssumeCapacity(.{ .name = param_name, .value = param_expr });
@@ -1366,14 +1369,14 @@ fn structLiteral(self: *Self, expr: *Expr) Error!*Expr {
         const ident = self.token_idx - 1;
         self.skipNewLines();
 
-        if (!self.check(.equal) and !self.check(.comma) and !self.check(.right_brace)) {
-            return self.errAt(ident, .expect_equal_struct_lit);
+        if (!self.check(.colon) and !self.check(.comma) and !self.check(.right_brace)) {
+            return self.errAt(ident, .expect_colon_struct_lit);
         }
 
         // Either: { x = 3 }  or { x }
         fields_values.append(self.allocator, .{
             .name = self.token_idx - 1,
-            .value = if (self.match(.equal)) try self.parsePrecedenceExpr(0) else null,
+            .value = if (self.match(.colon)) try self.parsePrecedenceExpr(0) else null,
         }) catch oom();
 
         self.skipNewLines();

@@ -6,7 +6,7 @@ struct Poly {
     pt: Point,
 
     fn clone(self) -> Self {
-        return Poly{pt=Point{x=1, y=2}}
+        return Poly{pt: Point{x: 1, y: 2}}
     }
 }
 
@@ -18,9 +18,9 @@ struct Structure {
 fn testFn(pt: Point, poly: Poly, structure: Structure) {}
 
 fn main() {
-    var pt = Point{x=2, y=6}
+    var pt = Point{x: 2, y: 6}
     var poly = Poly{pt}
-    var structure = Structure{poly, polys=[poly]}
+    var structure = Structure{poly, polys: [poly]}
 
     var noRef1 = structure.polys[0].pt.x
 

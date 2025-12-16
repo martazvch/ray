@@ -5,7 +5,7 @@ fn main() {
         x: int, y: int,
 
         fn getPt(self) -> Point {
-            return Point { x = self.x }
+            return Point { x: self.x }
         }
 
         fn new(x: int, y: int) -> Vec2 {
@@ -13,14 +13,14 @@ fn main() {
         }
     }
 
-    var pt = Point { x = 1 }
+    var pt = Point { x: 1 }
     print pt.x
 
     var v = Vec2.new(3456, 98)
     print v.getPt().x
 
     fn local() -> Point {
-        return Point { x = 3456 }
+        return Point { x: 3456 }
     }
     
     print local().x == v.getPt().x

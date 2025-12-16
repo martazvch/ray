@@ -10,7 +10,7 @@ struct Bar {
     a: []bool
 
     fn init() -> Self {
-        return Self {a=[true]}
+        return Self {a: [true]}
     }
 }
 
@@ -21,7 +21,7 @@ fn main() {
         flag = true
         
         fn init() -> Self {
-            return Self {flag=false}
+            return Self {flag: false}
         }
     }
 

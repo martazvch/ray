@@ -8,6 +8,6 @@ fn default(c: str, a, b = 7, d, e: bool=false) {}
 
 
 fn main() {
-    default(a=8, e=true)
-    default("blob", bad=6)
+    default(a: 8, e: true)
+    default("blob", bad: 6)
 }

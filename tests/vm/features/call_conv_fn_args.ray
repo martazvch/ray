@@ -28,7 +28,7 @@ fn argsCallConv(arg1: fn(bool)->int, arg2: fn(bool)->int, arg3: fn(bool)->int) {
 
 fn main() {
     var bar = Bar{}
-    var foo = Foo{function=copy}
+    var foo = Foo{function: copy}
 
     argsCallConv(copy, math.getInt2, foo.function)
     argsCallConv(Bar.static, bar.method, bar.importFuncFromMethod())

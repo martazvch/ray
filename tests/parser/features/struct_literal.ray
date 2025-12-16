@@ -2,6 +2,6 @@ A{x, y, z, }
 
 B {}
 
-C { x = x, y, z = 12 + add() }
+C { x: x, y, z: 12 + add() }
 
-math.Vec2 { x = 1, y }
+math.Vec2 { x: 1, y }

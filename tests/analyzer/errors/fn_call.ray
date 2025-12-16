@@ -23,7 +23,7 @@ fn main() {
     foo.staticFn(5)
     Foo.method()
 
-    defaults(a=1, a=2)
+    defaults(a: 1, a: 2)
 
     callFoo(Foo)
 }

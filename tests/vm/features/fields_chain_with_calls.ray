@@ -6,7 +6,7 @@ struct Vec2 {
     x: int,
 
     fn getPt(self) -> Point {
-        return Point { x = 9 }
+        return Point { x: 9 }
     }
 }
 
@@ -15,7 +15,7 @@ fn getVec(x: int) -> Vec2 {
 }
 
 fn main() {
-    var v = Vec2 { x = 1 }
+    var v = Vec2 { x: 1 }
     print v.getPt().x
     print getVec(5).x
 }

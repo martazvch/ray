@@ -20,8 +20,8 @@ fn copy(a = 5) -> int {
 fn default(c: str, a, b = 7, d, e: bool=false) { }
 
 fn main() {
-    default("abcd", a=8)
-    default(e=true, a=8, c="abcd")
+    default("abcd", a: 8)
+    default(e: true, a: 8, c: "abcd")
 
     var foo = Foo{}
 

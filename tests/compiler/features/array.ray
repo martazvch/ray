@@ -9,7 +9,7 @@ fn getIdx() -> int {
 fn main() {
     var arr: []int = [1, 2, 3,]
     var arr2 = [1, 2,]
-    var foo = Foo{arr=[6, 7, getIdx()]}
+    var foo = Foo{arr: [6, 7, getIdx()]}
 
     // Access
     print arr[1]

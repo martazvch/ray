@@ -15,7 +15,7 @@ struct Data {
     second: []int,
 
     fn init() -> Self {
-        return Self{ first=[], second=[] }
+        return Self{ first: [], second: [] }
     }
 
     fn initWithData(first: []int, second: []int) -> Self {
@@ -23,7 +23,7 @@ struct Data {
     }
 
     fn iterator(self, cat: str) -> Iterator {
-        return Iterator{ items=if cat == "first" do self.first else self.second, len=3 }
+        return Iterator{ items: if cat == "first" do self.first else self.second, len: 3 }
     }
 }
 
@@ -62,7 +62,7 @@ fn main() {
     }
 
     print "Test 5"
-    data = Data.initWithData(second=[120, 340, 560], first=[780, 910, 230])
+    data = Data.initWithData(second: [120, 340, 560], first: [780, 910, 230])
     it = data.iterator("first")
     while let v = it.next() {
         print v // expect 780, 910, 230 

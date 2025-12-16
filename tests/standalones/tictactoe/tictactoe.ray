@@ -32,7 +32,7 @@ struct Grid {
 
     fn init(dim=3) -> Self {
         return Self{
-            cells=[
+            cells: [
                 [Cell{}, Cell{}, Cell{}],
                 [Cell{}, Cell{}, Cell{}],
                 [Cell{}, Cell{}, Cell{}],
@@ -89,7 +89,7 @@ fn main() {
     grid.playAt(1, 0, .circle, true)
     grid.display()
 
-    grid.playAt(1, 1, .cross, method=true)
+    grid.playAt(1, 1, .cross, method: true)
     grid.display()
 }
 

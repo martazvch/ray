@@ -23,7 +23,7 @@ fn copy() -> int {
 fn main() {
     var bar = Bar{}
 
-    var foo = Foo{function=copy}
+    var foo = Foo{function: copy}
     print foo.function()
 
     foo.function = Bar.static

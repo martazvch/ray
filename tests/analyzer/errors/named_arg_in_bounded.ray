@@ -5,6 +5,6 @@ struct Foo {
 fn main() {
     var foo = Foo{}
     var bound = foo.method
-    bound(a=2)
+    bound(a: 2)
 }
 
