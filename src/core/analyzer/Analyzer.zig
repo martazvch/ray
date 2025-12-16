@@ -2034,21 +2034,16 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
 fn ternary(self: *Self, expr: *const Ast.Ternary, ctx: *Context) Result {
     const condition = try self.analyzeExpr(expr.condition, .value, ctx);
 
-    if (!condition.type.is(.bool)) {
-        std.debug.print("Found: {any}", .{condition.type.*});
-        @panic("Condition must be a bool");
-    }
+    if (!condition.type.is(.bool)) return self.err(
+        .{ .ternary_cond_non_bool = .{ .found = self.typeName(condition.type) } },
+        self.ast.getSpan(expr.condition),
+    );
 
     const then = try self.analyzeExpr(expr.then, .value, ctx);
     const @"else" = try self.analyzeExpr(expr.@"else", .value, ctx);
 
-    if (then.type != @"else".type) {
-        std.debug.print("Found then: {any} and else: {any}", .{ then.type.*, @"else".type.* });
-        @panic("Must be same type");
-    }
-
     return .{
-        .type = then.type,
+        .type = self.mergeTypes(&.{ then.type, @"else".type }),
         .instr = self.irb.addInstr(
             .{ .@"if" = .{ .cond = condition.instr, .then = then.instr, .@"else" = @"else".instr } },
             self.ast.getSpan(expr).start,
