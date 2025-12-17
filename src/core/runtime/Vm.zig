@@ -337,13 +337,12 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             .gt_float => self.stack.push(Value.makeBool(self.stack.pop().float < self.stack.pop().float)),
             .gt_int => self.stack.push(Value.makeBool(self.stack.pop().int < self.stack.pop().int)),
             .incr_ref => self.stack.peekRef(0).obj.ref_count += 1,
-            .is_bool => self.stack.peekRef(0).* = .makeBool(self.stack.peek(0) == .bool),
-            .is_float => self.stack.peekRef(0).* = .makeBool(self.stack.peek(0) == .float),
-            .is_int => self.stack.peekRef(0).* = .makeBool(self.stack.peek(0) == .int),
+            .is_bool => self.stack.push(.makeBool(self.stack.peek(0) == .bool)),
+            .is_float => self.stack.push(.makeBool(self.stack.peek(0) == .float)),
+            .is_int => self.stack.push(.makeBool(self.stack.peek(0) == .int)),
             .is_str => {
                 const top = self.stack.peekRef(0);
-                if (top.* != .obj) top.* = .false_;
-                self.stack.peekRef(0).* = .makeBool(top.obj.kind == .string);
+                self.stack.push(.makeBool(if (top.asObj()) |o| o.kind == .string else false));
             },
             .is_type => {
                 const type_id = frame.readByte();

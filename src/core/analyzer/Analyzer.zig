@@ -774,6 +774,10 @@ const ExprResKind = enum {
     maybe,
     symbol,
     none,
+
+    pub fn expects(self: ExprResKind) bool {
+        return self == .any or self == .value or self == .symbol;
+    }
 };
 
 fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Context) Result {
@@ -1798,7 +1802,7 @@ fn match(self: *Self, expr: *const Ast.Match, expect: ExprResKind, ctx: *Context
             .{ .match = .{
                 .expr = value.instr,
                 .arms = arms,
-                .is_expr = expect != .none and expect != .maybe,
+                .is_expr = expect.expects(),
             } },
             self.ast.getSpan(expr).start,
         ),
@@ -2093,7 +2097,10 @@ fn when(self: *Self, expr: *const Ast.When, expect: ExprResKind, ctx: *Context) 
 
     return .{
         .type = self.mergeTypes(types),
-        .instr = self.irb.addInstr(.{ .when = .{ .expr = value.instr, .arms = arms, .is_expr = expect == .value } }, self.ast.getSpan(expr).start),
+        .instr = self.irb.addInstr(
+            .{ .when = .{ .expr = value.instr, .arms = arms, .is_expr = expect.expects() } },
+            self.ast.getSpan(expr).start,
+        ),
     };
 }
 

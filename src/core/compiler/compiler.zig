@@ -922,7 +922,7 @@ const Compiler = struct {
                     0 => .is_float,
                     1 => .is_int,
                     2 => .is_bool,
-                    4 => .is_str,
+                    3 => .is_str,
                     else => unreachable,
                 });
             } else if (arm.type_id < std.math.maxInt(u8)) {
