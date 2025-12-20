@@ -225,8 +225,22 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             },
             .call => {
                 const args_count = frame.readByte();
-                frame = try self.frame_stack.newKeepMod();
-                frame.runtimeCall(self.stack.peekRef(args_count).obj, &self.stack, args_count, self.modules);
+                const callee = self.stack.peekRef(args_count).obj;
+
+                switch (callee.kind) {
+                    .native_fn => {
+                        const native = callee.as(Obj.NativeFunction).function;
+                        const result = native(self, (self.stack.top - args_count)[0..args_count]);
+
+                        self.stack.top -= args_count + 1;
+                        if (result) |res| self.stack.push(res);
+                    },
+                    else => {
+                        @branchHint(.likely);
+                        frame = try self.frame_stack.newKeepMod();
+                        frame.runtimeCall(callee, &self.stack, args_count, self.modules);
+                    },
+                }
             },
             .call_sym => {
                 const index = frame.readByte();

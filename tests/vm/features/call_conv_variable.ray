@@ -40,4 +40,13 @@ fn main() {
     print tmp()
     bound = tmp()
     print bound()
+
+    // Builtins
+    let bind = int
+    print bind(5.6)
+    print bind(-92.123)
+
+    let bind2 = float
+    print bind2(1)
+    print bind2(10)
 }

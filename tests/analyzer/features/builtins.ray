@@ -3,4 +3,7 @@ fn main() {
     a = int(5)
     var b: float = float(6)
     b = float(6.4)
+
+    let bind = int
+    print bind(5.6)
 }

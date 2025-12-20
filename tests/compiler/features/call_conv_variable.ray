@@ -41,4 +41,8 @@ fn main() {
     print tmp()
     bound = tmp()
     print bound()
+                    
+    // Builtins
+    let bind = int
+    print bind(5.6)
 }

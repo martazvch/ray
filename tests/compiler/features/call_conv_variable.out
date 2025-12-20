@@ -93,6 +93,14 @@ set_local index 1
 get_local index 1
 call index 0
 print
+
+// Builtins
+load_builtin index 0
+get_local index 3
+load_constant index 6, value 5.6
+call index 1
+print
+
 ret_naked
 
 -- global scope --

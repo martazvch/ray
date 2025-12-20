@@ -214,35 +214,32 @@ fn floatInstr(self: *Self, value: f64) void {
 }
 
 fn fnCall(self: *Self, data: *const Instruction.Call) void {
-    callee: {
-        switch (self.instrs[data.callee]) {
-            .field => |f| {
-                if (f.kind == .function) {
-                    self.parseInstr(data.callee);
+    switch (self.instrs[data.callee]) {
+        .field => |f| {
+            if (f.kind == .function) {
+                self.parseInstr(data.callee);
 
-                    if (data.ext_mod) |mod| {
-                        self.indentAndPrintSlice("[Invoke symbol {} module {}]", .{ f.index, mod });
-                    } else {
-                        self.indentAndPrintSlice("[Invoke symbol {}]", .{f.index});
-                    }
-                    break :callee;
-                }
-            },
-            .load_symbol => |sym| {
                 if (data.ext_mod) |mod| {
-                    self.indentAndPrintSlice("[Call symbol {} module {}]", .{ sym.symbol_index, mod });
+                    self.indentAndPrintSlice("[Invoke symbol {} module {}]", .{ f.index, mod });
                 } else {
-                    self.indentAndPrintSlice("[Call symbol {}]", .{sym.symbol_index});
+                    self.indentAndPrintSlice("[Invoke symbol {}]", .{f.index});
                 }
-                break :callee;
-            },
-            else => {},
-        }
-
-        self.indentAndAppendSlice(if (data.native) "[Native fn call]" else "[Fn call]");
-        self.indent_level += 1;
-        defer self.indent_level -= 1;
-        self.parseInstr(data.callee);
+            }
+        },
+        .load_symbol => |sym| {
+            if (data.ext_mod) |mod| {
+                self.indentAndPrintSlice("[Call symbol {} module {}]", .{ sym.symbol_index, mod });
+            } else {
+                self.indentAndPrintSlice("[Call symbol {}]", .{sym.symbol_index});
+            }
+        },
+        .load_builtin, .identifier => {
+            self.indentAndAppendSlice(if (data.native) "[Native fn call]" else "[Fn call]");
+            self.indent_level += 1;
+            defer self.indent_level -= 1;
+            self.parseInstr(data.callee);
+        },
+        else => unreachable,
     }
 
     self.indent_level += 1;

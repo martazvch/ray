@@ -23,3 +23,11 @@
         [Constant 6]
             [Float 6.4]
     [Assignment index: 1, scope: local]
+
+    [Variable declaration index: 2, scope: local]
+        [Builtin symbol: 0]
+    [Print]
+        [Fn call]
+            [Variable index: 2, scope: local]
+            - args
+            [Constant 3]
