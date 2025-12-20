@@ -54,6 +54,9 @@ pub const CompilationUnit = struct {
     line: usize,
     compiled_constants: misc.Set(usize),
 
+    // For disassembler
+    native_funcs: []const Value,
+
     const Self = @This();
     const Error = error{ Err, TooManyConst } || std.posix.WriteError;
     const CompilerReport = GenReport(CompilerMsg);
@@ -68,6 +71,7 @@ pub const CompilationUnit = struct {
         global_count: usize,
         symbol_count: usize,
         constants_count: usize,
+        native_funcs: []const Value,
     ) Self {
         return .{
             .allocator = allocator,
@@ -81,6 +85,7 @@ pub const CompilationUnit = struct {
             .module = .init(allocator, name, global_count, symbol_count, constants_count),
             .line = 0,
             .compiled_constants = .empty,
+            .native_funcs = native_funcs,
         };
     }
 
@@ -284,6 +289,7 @@ const Compiler = struct {
             var dis = Disassembler.init(
                 &self.function.chunk,
                 &self.manager.module,
+                self.manager.native_funcs,
                 self.manager.render_mode,
             );
             dis.disChunk(&alloc_writer.writer, self.function.name);
@@ -622,13 +628,16 @@ const Compiler = struct {
     fn fnCall(self: *Self, data: *const Instruction.Call) Error!void {
         switch (self.at(data.callee)) {
             .field => |f| {
-                // If we call a method / static function
+                // If we call a method / static function, calling a field holding a function is another call conv
                 if (f.kind == .function) {
                     return self.invoke(data, f);
                 }
             },
             .load_symbol => |sym| {
-                return self.callSymbol(data.args, 0, sym.symbol_index, sym.module_index);
+                return self.callSymbol(data, 0, sym.symbol_index, sym.module_index);
+            },
+            .load_builtin => |b| {
+                return self.callSymbol(data, 0, b, null);
             },
             else => {},
         }
@@ -637,23 +646,25 @@ const Compiler = struct {
         try self.compileInstr(data.callee);
         try self.compileArgs(data.args);
         // TODO: protect cast
-        self.writeOpAndByte(if (data.native) .call_native else .call, @intCast(data.args.len));
+        self.writeOpAndByte(.call, @intCast(data.args.len));
     }
 
     fn invoke(self: *Self, data: *const Instruction.Call, callee: Instruction.Field) Error!void {
         try self.compileInstr(callee.structure);
-        try self.callSymbol(data.args, 1, callee.index, data.ext_mod);
+        try self.callSymbol(data, 1, callee.index, data.ext_mod);
     }
 
-    fn callSymbol(self: *Self, args: []const Instruction.Arg, arity_offset: usize, sym_index: usize, sym_mod: ?usize) Error!void {
-        try self.compileArgs(args);
+    fn callSymbol(self: *Self, data: *const Instruction.Call, arity_offset: usize, sym_index: usize, sym_mod: ?usize) Error!void {
+        try self.compileArgs(data.args);
         if (sym_mod) |mod| {
             self.writeOpAndByte(.call_sym_ext, @intCast(sym_index));
             self.writeByte(@intCast(mod));
+        } else if (data.native) {
+            self.writeOpAndByte(.call_native, @intCast(sym_index));
         } else {
             self.writeOpAndByte(.call_sym, @intCast(sym_index));
         }
-        self.writeByte(@intCast(args.len + arity_offset));
+        self.writeByte(@intCast(data.args.len + arity_offset));
     }
 
     fn compileArgs(self: *Self, args: []const Instruction.Arg) Error!void {

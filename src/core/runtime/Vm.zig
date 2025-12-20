@@ -119,7 +119,7 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
         }
 
         if (comptime options.print_instr) {
-            var dis = Disassembler.init(&frame.function.chunk, frame.module, .normal);
+            var dis = Disassembler.init(&frame.function.chunk, frame.module, self.natives, .normal);
             const instr_nb = self.instructionNb();
             _ = dis.disInstruction(stdout, instr_nb);
         }
@@ -242,11 +242,12 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
                 frame.call(self.modules[module].symbols[index].obj.as(Obj.Function), &self.stack, arity, self.modules);
             },
             .call_native => {
+                const index = frame.readByte();
                 const args_count = frame.readByte();
-                const native = self.stack.peekRef(args_count).obj.as(Obj.NativeFunction).function;
+                const native = self.natives[index].obj.as(Obj.NativeFunction).function;
                 const result = native(self, (self.stack.top - args_count)[0..args_count]);
 
-                self.stack.top -= args_count + 1;
+                self.stack.top -= args_count;
                 if (result) |res| self.stack.push(res);
             },
             .closure => {

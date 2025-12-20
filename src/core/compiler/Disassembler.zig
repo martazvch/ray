@@ -13,6 +13,7 @@ chunk: *const Chunk,
 globals: []const Value,
 symbols: []const Value,
 constants: []const Value,
+natives: []const Value,
 render_mode: RenderMode,
 
 prev_line: usize = 0,
@@ -20,13 +21,14 @@ prev_line: usize = 0,
 const Self = @This();
 pub const RenderMode = enum { none, normal, @"test" };
 
-pub fn init(chunk: *const Chunk, module: *const Module, render_mode: RenderMode) Self {
+pub fn init(chunk: *const Chunk, module: *const Module, natives: []const Value, render_mode: RenderMode) Self {
     return .{
         .chunk = chunk,
         .globals = module.globals,
         .symbols = module.symbols,
         .constants = module.constants,
         .render_mode = render_mode,
+        .natives = natives,
     };
 }
 
@@ -71,7 +73,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, offset: usize) usize {
         .call => self.indexInstruction(writer, "call", offset),
         .call_sym => self.callSym(writer, offset),
         .call_sym_ext => self.callExtSym(writer, offset),
-        .call_native => self.indexInstruction(writer, "call_native", offset),
+        .call_native => self.callNativeSym(writer, offset),
         .closure => self.indexInstruction(writer, "closure", offset),
         .def_global => self.indexInstruction(writer, "def_global", offset),
         .div_float => self.simpleInstruction(writer, "div_float", offset),
@@ -308,6 +310,24 @@ fn callExtSym(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
     }
 
     return offset + 4;
+}
+
+fn callNativeSym(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
+    const text = "call_sym_native";
+    const index = self.chunk.code.items[offset + 1];
+    const arity = self.chunk.code.items[offset + 2];
+
+    if (self.render_mode == .@"test") {
+        try writer.print("{s} index {}, arity {}, ", .{ text, index, arity });
+    } else {
+        try writer.print("{s:<20} index {:>4}, arity {:>4}, ", .{ text, index, arity });
+    }
+
+    const symbol = self.natives[index];
+    symbol.print(writer);
+    try writer.print("\n", .{});
+
+    return offset + 3;
 }
 
 fn structLiteral(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {

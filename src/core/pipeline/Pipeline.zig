@@ -79,12 +79,12 @@ pub fn run(self: *Self, file_name: []const u8, path: []const u8, source: [:0]con
         analyzer.scope.current.variables.count(),
         analyzer.scope.symbol_count,
         analyzer.irb.constants.constants.count(),
+        self.state.native_reg.funcs.items,
     );
 
     const entry_point, const compiled_module = try compiler.compile(
         analyzer.irb.instructions.items(.data)[self.instr_count..],
         analyzer.irb.roots.items[self.instr_count..],
-        // analyzer.irb.constants.constants.values(),
         analyzer.irb.computeLineFromOffsets(source)[self.instr_count..],
         analyzer.main,
         self.state.module_interner.compiled.count(),
