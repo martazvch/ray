@@ -67,6 +67,13 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
             try self.renderFnDecls(n.functions);
             try self.closeKey(.block, comma);
         },
+        .for_loop => |n| {
+            try self.openKey(@tagName(node.*), .block);
+            try self.pushKeyValue("name", self.ast.toSource(n.binding), true);
+            try self.renderSingleExpr("value", n.expr, .block, true);
+            try self.renderSingleExpr("body", n.body, .block, false);
+            try self.closeKey(.block, comma);
+        },
         .fn_decl => |*n| try self.renderFnDecl(self.ast.toSource(n.name), n, comma),
         .multi_var_decl => |n| {
             try self.openKey(@tagName(node.*), .list);

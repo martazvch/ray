@@ -18,6 +18,7 @@ pub const Node = union(enum) {
     discard: *Expr,
     enum_decl: EnumDecl,
     fn_decl: FnDecl,
+    for_loop: For,
     multi_var_decl: MultiVarDecl,
     print: *Expr,
     struct_decl: StructDecl,
@@ -63,6 +64,13 @@ pub const FnDecl = struct {
         pub const Captures = AutoArrayHashMapUnmanaged(InternerIndex, Capture);
         pub const Capture = struct { index: usize, is_local: bool };
     };
+};
+
+pub const For = struct {
+    for_tk: TokenIndex,
+    binding: TokenIndex,
+    expr: *Expr,
+    body: *Expr,
 };
 
 pub const MultiVarDecl = struct {
@@ -310,6 +318,10 @@ pub fn getSpan(self: *const Self, anynode: anytype) Span {
             self.token_spans[name]
         else
             self.token_spans[node.tk],
+        For => .{
+            .start = self.token_spans[node.for_tk].start,
+            .end = self.getSpan(node.body).end,
+        },
         FnDecl, StructDecl, VarDecl => self.token_spans[node.name],
         MultiVarDecl => .{
             .start = self.getSpan(node.decls[0]).start,

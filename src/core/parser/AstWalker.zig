@@ -162,6 +162,10 @@ fn captureFromNode(self: *Self, node: *Ast.Node, ctx: *CaptureCtx) void {
         },
         .discard => |e| self.captureFromExpr(e, ctx),
         .enum_decl => {},
+        .for_loop => |n| {
+            self.captureFromExpr(n.expr, ctx);
+            self.captureFromExpr(n.body, ctx);
+        },
         .fn_decl => |*n| self.functionCaptures(n, ctx),
         .multi_var_decl => |*n| {
             for (n.decls) |decl| if (decl.value) |val| {

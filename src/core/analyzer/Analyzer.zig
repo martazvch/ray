@@ -203,6 +203,7 @@ fn analyzeNode(self: *Self, node: *const Node, expect: ExprResKind, ctx: *Contex
         .assignment => |*n| try self.assignment(n, ctx),
         .discard => |n| try self.discard(n, ctx),
         .enum_decl => |*n| try self.enumDeclaration(n, ctx),
+        .for_loop => |*n| try self.forLoop(n, ctx),
         .fn_decl => |*n| (try self.fnDeclaration(n, ctx)).instr,
         .multi_var_decl => |*n| try self.multiVarDecl(n, ctx),
         .print => |n| try self.print(n, ctx),
@@ -345,6 +346,13 @@ fn containerFnDecls(
     }
 
     return func_instrs.toOwnedSlice(self.allocator) catch oom();
+}
+
+fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) Error!InstrIndex {
+    _ = self; // autofix
+    _ = node; // autofix
+    _ = ctx; // autofix
+    @panic("Not implemented yet");
 }
 
 const FnDeclRes = struct { instr: usize, sym: LexScope.Symbol };

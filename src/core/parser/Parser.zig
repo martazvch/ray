@@ -633,12 +633,6 @@ fn parseType(self: *Self) Error!*Ast.Type {
     return ty;
 }
 
-fn discard(self: *Self) Error!Node {
-    try self.expect(.equal, .invalid_discard);
-
-    return .{ .discard = try self.parsePrecedenceExpr(0) };
-}
-
 fn use(self: *Self) Error!Node {
     var names: ArrayList(usize) = .empty;
 
@@ -694,7 +688,9 @@ fn getAlias(self: *Self, token: Token.Tag) Error!?TokenIndex {
 }
 
 fn statement(self: *Self) Error!Node {
-    return if (self.match(.print))
+    return if (self.match(.@"for"))
+        self.forLoop()
+    else if (self.match(.print))
         self.print()
     else if (self.match(.@"while"))
         self.whileStmt()
@@ -737,6 +733,34 @@ fn compoundAssignment(self: *Self, assigne: *Expr) Error!Node {
     } };
 
     return .{ .assignment = .{ .assigne = assigne, .value = binop } };
+}
+
+fn discard(self: *Self) Error!Node {
+    try self.expect(.equal, .invalid_discard);
+
+    return .{ .discard = try self.parsePrecedenceExpr(0) };
+}
+
+fn forLoop(self: *Self) Error!Node {
+    const for_tk = self.token_idx - 1;
+
+    try self.expect(.identifier, .expect_identifier_for_binding);
+    const binding = self.token_idx - 1;
+
+    try self.expect(.in, .expect_in);
+    const save_cond = self.ctx.setAndGetPrevious(.in_cond, true);
+    defer self.ctx.in_cond = save_cond;
+    const expr = try self.parsePrecedenceExpr(0);
+
+    try self.expect(.left_brace, .expect_brace_before_for_body);
+    const body, _ = try self.block(null);
+
+    return .{ .for_loop = .{
+        .for_tk = for_tk,
+        .binding = binding,
+        .expr = expr,
+        .body = body,
+    } };
 }
 
 fn print(self: *Self) Error!Node {
@@ -1052,9 +1076,7 @@ fn ifExpr(self: *Self) Error!*Expr {
 
     const pat = pat: {
         const save_cond = self.ctx.setAndGetPrevious(.in_cond, true);
-        defer {
-            self.ctx.in_cond = save_cond;
-        }
+        defer self.ctx.in_cond = save_cond;
 
         break :pat try self.pattern();
     };

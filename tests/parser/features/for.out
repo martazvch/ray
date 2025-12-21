@@ -1,0 +1,34 @@
+{
+    "fn_decl": {
+        "name": "main",
+        "params": [],
+        "return_type": "void",
+        "block": [
+            "var_decl": {
+                "name": "arr",
+                "type": {},
+                "value": {
+                    "array": [
+                        "literal": "1",
+                        "literal": "2",
+                        "literal": "3"
+                    ]
+                },
+                "const": "true"
+            },
+            "for_loop": {
+                "name": "v",
+                "value": {
+                    "literal": "arr"
+                },
+                "body": {
+                    "block": [
+                        "print": {
+                            "literal": "v"
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+}
