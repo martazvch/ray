@@ -73,7 +73,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .box => |data| self.indexInstr("Box", data),
         .bound_method => |data| self.boundMethod(data),
         .@"break" => |data| self.breakInstr(data),
-        .call => |*data| self.fnCall(data),
+        .call => |*data| self.call(data),
         .constant => |data| self.constant(data),
         .discard => |index| self.indexInstr("Discard", index),
         .enum_create => |data| self.enumCreate(data),
@@ -90,6 +90,8 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .match => |*data| self.match(data),
         .multiple_var_decl => |*data| self.multipleVarDecl(data),
         .null => self.indentAndAppendSlice("[Null]"),
+        // Accessed only via `call`
+        .obj_func => unreachable,
         .pat_nullable => |index| self.indexInstr("Nullable pattern", index),
         .pop => |index| self.indexInstr("Pop", index),
         .print => |index| self.indexInstr("Print", index),
@@ -213,7 +215,7 @@ fn floatInstr(self: *Self, value: f64) void {
     self.indentAndPrintSlice("[Float {d}]", .{value});
 }
 
-fn fnCall(self: *Self, data: *const Instruction.Call) void {
+fn call(self: *Self, data: *const Instruction.Call) void {
     switch (self.instrs[data.callee]) {
         .field => |f| {
             if (f.kind == .function) {
@@ -221,6 +223,8 @@ fn fnCall(self: *Self, data: *const Instruction.Call) void {
 
                 if (data.ext_mod) |mod| {
                     self.indentAndPrintSlice("[Invoke symbol {} module {}]", .{ f.index, mod });
+                } else if (data.native) {
+                    self.indentAndPrintSlice("[Invoke native symbol {}]", .{f.index});
                 } else {
                     self.indentAndPrintSlice("[Invoke symbol {}]", .{f.index});
                 }
@@ -238,6 +242,12 @@ fn fnCall(self: *Self, data: *const Instruction.Call) void {
             self.indent_level += 1;
             defer self.indent_level -= 1;
             self.parseInstr(data.callee);
+        },
+        .obj_func => |obj_data| {
+            self.indentAndPrintSlice("[Call {s} function {}]", .{ @tagName(obj_data.kind), obj_data.fn_index });
+            self.indent_level += 1;
+            self.parseInstr(obj_data.obj);
+            self.indent_level -= 1;
         },
         else => unreachable,
     }
@@ -294,12 +304,7 @@ fn enumDecl(self: *Self, data: *const Instruction.EnumDecl) void {
 }
 
 fn getField(self: *Self, data: Instruction.Field, cow: bool) void {
-    // if (data.kind == .field) {
     self.indentAndPrintSlice("[Field access {}{s}]", .{ data.index, if (cow) ", cow" else "" });
-    // } else {
-    //     self.indentAndPrintSlice("[Invoke symbol {}{s}]", .{ data.index, if (cow) ", cow" else "" });
-    // }
-
     self.indent_level += 1;
     defer self.indent_level -= 1;
     self.parseInstr(data.structure);

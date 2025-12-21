@@ -17,19 +17,19 @@
     - expression:
         [Variable index: 0, scope: local]
     - arms:
-    [Types id: 10]
+    [Types id: 13]
         [Block pop count: 0, is_expr: false]
-    [Types id: 12]
+    [Types id: 15]
         [Block pop count: 0, is_expr: false]
     [When]
     - expression:
         [Variable index: 0, scope: local]
     - arms:
-    [Types id: 10]
+    [Types id: 13]
         [Field access 1]
             [Variable index: 1, scope: local]
         [Invoke symbol 1]
-    [Types id: 12]
+    [Types id: 15]
         [Field access 3]
             [Variable index: 1, scope: local]
         [Invoke symbol 3]
@@ -38,9 +38,9 @@
         - expression:
             [Variable index: 0, scope: local]
         - arms:
-        [Types id: 10]
+        [Types id: 13]
             [Constant 5]
                 [Int 1]
-        [Types id: 12]
+        [Types id: 15]
             [Constant 6]
                 [Int 2]

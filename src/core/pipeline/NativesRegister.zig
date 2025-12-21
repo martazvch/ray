@@ -16,11 +16,9 @@ const Interner = misc.Interner;
 const oom = misc.oom;
 
 /// Native functions used at runtime
-// funcs: ArrayList(struct { name: []const u8, func: ffi.ZigFn }),
 funcs: ArrayList(Value),
 /// Native functions translated to Ray's type system for compilation
 funcs_meta: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
-
 /// Native structures used at runtime
 structs: ArrayList(struct { name: []const u8, func: Value }),
 /// Native structures translated to Ray's type system for compilation
@@ -53,7 +51,7 @@ pub fn register(self: *Self, allocator: Allocator, interner: *Interner, ti: *Typ
     }
 
     inline for (mod.functions) |func| {
-        self.registerFn(allocator, &func, interner, ti);
+        _ = self.registerFn(allocator, &func, interner, ti);
     }
 }
 
@@ -81,13 +79,14 @@ fn registerStruct(self: *Self, allocator: Allocator, S: type, interner: *Interne
     self.scratch_structs.put(allocator, interner.intern(@typeName(S)), ty) catch oom();
 
     inline for (zig_struct.functions) |*func| {
-        const f = self.fnZigToRay(allocator, func, interner, ti);
         const interned_name = interner.intern(func.name);
         if (ty.structure.functions.contains(interned_name)) {
             // TODO: error
             @panic("Already declared function");
         }
-        ty.structure.functions.putAssumeCapacity(interned_name, f);
+
+        const index, const fn_type = self.registerFn(allocator, func, interner, ti);
+        ty.structure.functions.putAssumeCapacity(interned_name, .{ .index = index, .type = fn_type });
     }
 
     // TODO: use assume capacity (check all the 'put')
@@ -95,11 +94,14 @@ fn registerStruct(self: *Self, allocator: Allocator, S: type, interner: *Interne
 }
 
 // We can use pointers here because we refer to comptime declarations in Module
-fn registerFn(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMeta, interner: *Interner, ti: *TypeInterner) void {
-    self.funcs_meta.put(allocator, interner.intern(func.name), self.fnZigToRay(allocator, func, interner, ti)) catch oom();
+fn registerFn(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMeta, interner: *Interner, ti: *TypeInterner) struct { usize, *const Type } {
+    const fn_type = self.fnZigToRay(allocator, func, interner, ti);
+    self.funcs_meta.put(allocator, interner.intern(func.name), fn_type) catch oom();
     const value = Value.makeObj(Obj.NativeFunction.create(allocator, func.name, func.function).asObj());
 
     self.funcs.append(allocator, value) catch oom();
+
+    return .{ self.funcs.items.len - 1, fn_type };
 }
 
 fn fnZigToRay(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMeta, interner: *Interner, ti: *TypeInterner) *const Type {

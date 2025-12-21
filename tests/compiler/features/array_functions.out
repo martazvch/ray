@@ -1,0 +1,19 @@
+//---- test.ray ----
+
+-- main --
+load_constant index 3, value 1
+load_constant index 4, value 2
+array_new index 2
+get_local index 0
+load_constant index 5, value 5
+call_array_fn index 0, arity 1
+get_local index 0
+call_array_fn index 2, arity 0
+print
+get_local index 0
+call_array_fn index 1, arity 0
+print
+ret_naked
+
+-- global scope --
+call_sym index 0, arity 0, <function main>

@@ -1,7 +1,10 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const TypeInterner = @import("../analyzer/types.zig").TypeInterner;
+const type_mod = @import("../analyzer/types.zig");
+const TypeInterner = type_mod.TypeInterner;
+const ObjFns = type_mod.ObjFns;
+const Obj = @import("../runtime/Obj.zig");
 const ModuleInterner = @import("ModuleInterner.zig");
 const NativeRegister = @import("NativesRegister.zig");
 
@@ -15,6 +18,8 @@ type_interner: TypeInterner,
 path_builder: Sb,
 module_interner: ModuleInterner,
 native_reg: NativeRegister,
+array_fns: ObjFns,
+string_fns: ObjFns,
 
 const Self = @This();
 
@@ -26,6 +31,8 @@ pub fn new(allocator: Allocator, config: Config) Self {
         .path_builder = .empty,
         .module_interner = .init(allocator),
         .native_reg = .empty,
+        .array_fns = Obj.Array.getFns(allocator),
+        .string_fns = Obj.String.getFns(allocator),
     };
     ctx.type_interner.cacheFrequentTypes();
 

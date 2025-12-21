@@ -317,7 +317,7 @@ const Compiler = struct {
             .box => |index| self.wrappedInstr(.box, index),
             .bound_method => |data| self.boundMethod(data),
             .@"break" => |data| self.breakInstr(data),
-            .call => |*data| self.fnCall(data),
+            .call => |*data| self.call(data),
 
             .constant => |data| self.constant(data, true),
             .discard => |index| self.wrappedInstr(.pop, index),
@@ -334,6 +334,9 @@ const Compiler = struct {
             .load_symbol => |*data| self.loadSymbol(data),
             .match => |*data| self.match(data),
             .multiple_var_decl => |*data| self.multipleVarDecl(data),
+
+            // Used in `call`, not meant to be accessed directly
+            .obj_func => unreachable,
 
             // In case of nullable pattern, we don't replace top of stack with the bool result of
             // comparison because if it's true, it's gonna be popped and so last value on stack
@@ -549,83 +552,7 @@ const Compiler = struct {
         self.block_stack.add(self.manager.allocator, self.emitJump(.jump), data.depth);
     }
 
-    // TODO: protect cast
-    fn capture(self: *Self, data: *const Instruction.FnDecl.Capture) Error!void {
-        self.writeOpAndByte(if (data.local) .get_capt_local else .get_capt_frame, @intCast(data.index));
-    }
-
-    fn cast(self: *Self, typ: ir.Type) Error!void {
-        switch (typ) {
-            .float => self.writeOp(.cast_to_float, self.getLineNumber()),
-            .int => unreachable,
-        }
-    }
-
-    fn constant(self: *Self, data: Instruction.Constant, load: bool) Error!void {
-        if (data.index == std.math.maxInt(CompilationUnit.ConstIndex) + 1) {
-            return error.TooManyConst;
-        }
-
-        const gop = self.manager.compiled_constants.getOrPut(self.manager.allocator, data.index) catch oom();
-
-        if (!gop.found_existing) b: {
-            // We ignore bools and null as we handle them with special op codes for optimization
-            const value = switch (self.at(data.instr)) {
-                .bool, .null => break :b,
-                .enum_create => |val| Value.makeObj(Obj.EnumInstance.create(
-                    self.manager.allocator,
-                    self.manager.module.symbols[val.sym.symbol_index].obj.as(Obj.Enum),
-                    @intCast(val.tag_index),
-                    Value.null_,
-                ).asObj()),
-                .int => |val| Value.makeInt(val),
-                .float => |val| Value.makeFloat(val),
-                .string => |val| Value.makeObj(Obj.String.comptimeCopy(
-                    self.manager.vm,
-                    self.manager.interner.getKey(val).?,
-                ).asObj()),
-                else => unreachable,
-            };
-
-            self.manager.module.constants[data.index] = value;
-        }
-
-        if (load) {
-            switch (self.at(data.instr)) {
-                .bool => |b| self.writeOp(if (b) .push_true else .push_false),
-                .null => self.writeOp(.push_null),
-                // TODO: protect the cast
-                else => self.writeOpAndByte(.load_constant, @intCast(data.index)),
-            }
-        }
-    }
-
-    fn enumCreate(self: *Self, data: *const Instruction.EnumCreate) Error!void {
-        try self.loadSymbol(&data.sym);
-
-        // TODO: Error
-        if (data.tag_index >= std.math.maxInt(u8)) {
-            @panic("Enum is to big, not implemented yet");
-        }
-
-        self.writeOpAndByte(.enum_create, @intCast(data.tag_index));
-    }
-
-    fn enumDecl(self: *Self, data: *const Instruction.EnumDecl) Error!void {
-        const enum_val = Obj.Enum.create(self.manager.allocator, self.manager.interner.getKey(data.name).?);
-        self.addSymbol(data.sym_index, Value.makeObj(enum_val.asObj()));
-        try self.containerFnDecls(data.functions);
-    }
-
-    fn field(self: *Self, data: *const Instruction.Field) Error!void {
-        try self.compileInstr(data.structure);
-        self.writeOpAndByte(
-            if (self.state.cow) .get_field_cow else .get_field,
-            @intCast(data.index),
-        );
-    }
-
-    fn fnCall(self: *Self, data: *const Instruction.Call) Error!void {
+    fn call(self: *Self, data: *const Instruction.Call) Error!void {
         switch (self.at(data.callee)) {
             .field => |f| {
                 // If we call a method / static function, calling a field holding a function is another call conv
@@ -638,6 +565,9 @@ const Compiler = struct {
             },
             .load_builtin => |b| {
                 return self.callSymbol(data, 0, b, null);
+            },
+            .obj_func => |obj_data| {
+                return self.callObjFn(obj_data, data.args);
             },
             else => {},
         }
@@ -665,6 +595,13 @@ const Compiler = struct {
             self.writeOpAndByte(.call_sym, @intCast(sym_index));
         }
         self.writeByte(@intCast(data.args.len + arity_offset));
+    }
+
+    fn callObjFn(self: *Self, data: Instruction.ObjFn, args: []const Instruction.Arg) Error!void {
+        try self.compileInstr(data.obj);
+        try self.compileArgs(args);
+        self.writeOpAndByte(.call_array_fn, @intCast(data.fn_index));
+        self.writeByte(@intCast(args.len));
     }
 
     fn compileArgs(self: *Self, args: []const Instruction.Arg) Error!void {
@@ -739,6 +676,82 @@ const Compiler = struct {
             const func = try self.compileFnBody(fn_name, &fn_data);
             self.addSymbol(fn_data.sym_index, Value.makeObj(func.asObj()));
         }
+    }
+
+    // TODO: protect cast
+    fn capture(self: *Self, data: *const Instruction.FnDecl.Capture) Error!void {
+        self.writeOpAndByte(if (data.local) .get_capt_local else .get_capt_frame, @intCast(data.index));
+    }
+
+    fn cast(self: *Self, typ: ir.Type) Error!void {
+        switch (typ) {
+            .float => self.writeOp(.cast_to_float, self.getLineNumber()),
+            .int => unreachable,
+        }
+    }
+
+    fn constant(self: *Self, data: Instruction.Constant, load: bool) Error!void {
+        if (data.index == std.math.maxInt(CompilationUnit.ConstIndex) + 1) {
+            return error.TooManyConst;
+        }
+
+        const gop = self.manager.compiled_constants.getOrPut(self.manager.allocator, data.index) catch oom();
+
+        if (!gop.found_existing) b: {
+            // We ignore bools and null as we handle them with special op codes for optimization
+            const value = switch (self.at(data.instr)) {
+                .bool, .null => break :b,
+                .enum_create => |val| Value.makeObj(Obj.EnumInstance.create(
+                    self.manager.allocator,
+                    self.manager.module.symbols[val.sym.symbol_index].obj.as(Obj.Enum),
+                    @intCast(val.tag_index),
+                    Value.null_,
+                ).asObj()),
+                .int => |val| Value.makeInt(val),
+                .float => |val| Value.makeFloat(val),
+                .string => |val| Value.makeObj(Obj.String.comptimeCopy(
+                    self.manager.vm,
+                    self.manager.interner.getKey(val).?,
+                ).asObj()),
+                else => unreachable,
+            };
+
+            self.manager.module.constants[data.index] = value;
+        }
+
+        if (load) {
+            switch (self.at(data.instr)) {
+                .bool => |b| self.writeOp(if (b) .push_true else .push_false),
+                .null => self.writeOp(.push_null),
+                // TODO: protect the cast
+                else => self.writeOpAndByte(.load_constant, @intCast(data.index)),
+            }
+        }
+    }
+
+    fn enumCreate(self: *Self, data: *const Instruction.EnumCreate) Error!void {
+        try self.loadSymbol(&data.sym);
+
+        // TODO: Error
+        if (data.tag_index >= std.math.maxInt(u8)) {
+            @panic("Enum is to big, not implemented yet");
+        }
+
+        self.writeOpAndByte(.enum_create, @intCast(data.tag_index));
+    }
+
+    fn enumDecl(self: *Self, data: *const Instruction.EnumDecl) Error!void {
+        const enum_val = Obj.Enum.create(self.manager.allocator, self.manager.interner.getKey(data.name).?);
+        self.addSymbol(data.sym_index, Value.makeObj(enum_val.asObj()));
+        try self.containerFnDecls(data.functions);
+    }
+
+    fn field(self: *Self, data: *const Instruction.Field) Error!void {
+        try self.compileInstr(data.structure);
+        self.writeOpAndByte(
+            if (self.state.cow) .get_field_cow else .get_field,
+            @intCast(data.index),
+        );
     }
 
     fn identifier(self: *Self, data: *const Instruction.Variable) Error!void {

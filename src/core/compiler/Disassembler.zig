@@ -71,6 +71,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, offset: usize) usize {
         .bound_method => self.indexInstruction(writer, "bound_method", offset),
         .box => self.simpleInstruction(writer, "box", offset),
         .call => self.indexInstruction(writer, "call", offset),
+        .call_array_fn => self.callObjFn(writer, .array, offset),
         .call_sym => self.callSym(writer, offset),
         .call_sym_ext => self.callExtSym(writer, offset),
         .call_native => self.callNativeSym(writer, offset),
@@ -326,6 +327,20 @@ fn callNativeSym(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize
     const symbol = self.natives[index];
     symbol.print(writer);
     try writer.print("\n", .{});
+
+    return offset + 3;
+}
+
+fn callObjFn(self: *Self, writer: *Writer, kind: enum { array }, offset: usize) Writer.Error!usize {
+    const text = "call_" ++ @tagName(kind) ++ "_fn";
+    const index = self.chunk.code.items[offset + 1];
+    const arity = self.chunk.code.items[offset + 2];
+
+    if (self.render_mode == .@"test") {
+        try writer.print("{s} index {}, arity {}\n", .{ text, index, arity });
+    } else {
+        try writer.print("{s:<20} index {:>4}, arity {:>4}\n", .{ text, index, arity });
+    }
 
     return offset + 3;
 }

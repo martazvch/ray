@@ -1,0 +1,4 @@
+fn main() {
+    let file = open("natives.ray")
+    print file.readAll()
+}

@@ -44,11 +44,13 @@ pub const ZigFnMeta = struct {
 };
 
 pub const ZigFn = *const fn (*Vm, []const Value) ?Value;
+pub const DeinitFn = *const fn (*anyopaque, *Vm) void;
 
 pub const ZigStructMeta = struct {
     name: []const u8,
     fields: []const Field = &.{},
     functions: []const ZigFnMeta = &.{},
+    deinit_fn: DeinitFn,
 
     pub const Field = struct {
         name: []const u8,
@@ -66,11 +68,6 @@ pub const ZigStructMeta = struct {
         const copy = funcs;
         return &copy;
     }
-};
-
-pub const ZigStruct = struct {
-    child: *anyopaque,
-    funcs: []const ZigFn,
 };
 
 pub fn makeNative(func: anytype) ZigFn {

@@ -142,6 +142,15 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
                 self.stack.top -= len;
                 self.stack.push(Value.makeObj(array.asObj()));
             },
+            .call_array_fn => {
+                const index = frame.readByte();
+                const arity = frame.readByte();
+                const array = self.stack.peekRef(arity).obj.as(Obj.Array);
+                const result = array.funcs[index](array, self, (self.stack.top - arity)[0..arity]);
+
+                self.stack.top -= arity + 1;
+                if (result) |res| self.stack.push(res);
+            },
             .array_get => {
                 const index = self.stack.pop().int;
                 const array = self.stack.pop().obj.as(Obj.Array);

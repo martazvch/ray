@@ -6,7 +6,11 @@ const Writer = std.Io.Writer;
 
 const options = @import("options");
 
-const TypeId = @import("../analyzer/types.zig").TypeId;
+const type_mod = @import("../analyzer/types.zig");
+const TypeId = type_mod.TypeId;
+const ObjFnInfos = type_mod.ObjFnInfos;
+const ObjFns = type_mod.ObjFns;
+
 const Chunk = @import("../compiler/Chunk.zig");
 const CompiledModule = @import("../compiler/compiler.zig").CompiledModule;
 const ffi = @import("../builtins/ffi.zig");
@@ -119,7 +123,7 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
         },
         .native_obj => {
             const object = self.as(NativeObj);
-            object.deinit(vm.gc_alloc);
+            object.deinit(vm);
         },
         .string => self.as(String).deinit(vm.gc_alloc),
         .structure => {
@@ -200,6 +204,7 @@ pub fn structLiteral(self: *Obj, vm: *Vm) *Instance {
 pub const Array = struct {
     obj: Obj,
     values: ArrayList(Value),
+    funcs: []const *const fn (*Self, *Vm, []Value) ?Value,
 
     const Self = @This();
 
@@ -211,6 +216,12 @@ pub const Array = struct {
         defer vm.gc.popTmpRoot();
 
         obj.values.ensureTotalCapacity(vm.gc_alloc, values.len) catch oom();
+
+        obj.funcs = &.{
+            push,
+            pop,
+            len,
+        };
 
         for (values) |val| {
             obj.values.appendAssumeCapacity(val);
@@ -247,6 +258,34 @@ pub const Array = struct {
         // We don't own the values, just the array
         self.values.deinit(vm.gc_alloc);
         vm.gc_alloc.destroy(self);
+    }
+
+    pub fn call(self: *Self, vm: *Vm, stack: []Value, fn_index: usize) ?Value {
+        return self.funcs[fn_index](self, vm, stack);
+    }
+
+    pub fn getFns(allocator: Allocator) ObjFns {
+        errdefer oom();
+
+        var map = ObjFns.empty;
+        try map.put(allocator, "push", .{ .params = &.{.generic}, .return_type = .void });
+        try map.put(allocator, "pop", .{ .params = &.{}, .return_type = .generic });
+        try map.put(allocator, "len", .{ .params = &.{}, .return_type = .int });
+
+        return map;
+    }
+
+    fn push(self: *Self, vm: *Vm, stack: []Value) ?Value {
+        self.values.append(vm.gc_alloc, stack[0]) catch oom();
+        return null;
+    }
+
+    fn pop(self: *Self, _: *Vm, _: []Value) ?Value {
+        return self.values.pop();
+    }
+
+    fn len(self: *Self, _: *Vm, _: []Value) ?Value {
+        return .makeInt(@intCast(self.values.items.len));
     }
 };
 
@@ -324,6 +363,14 @@ pub const String = struct {
     pub fn deinit(self: *Self, allocator: Allocator) void {
         allocator.free(self.chars);
         allocator.destroy(self);
+    }
+
+    pub fn getFns(_: Allocator) ObjFns {
+        errdefer oom();
+
+        const map = ObjFns.empty;
+
+        return map;
     }
 };
 
@@ -575,18 +622,17 @@ pub const NativeObj = struct {
     obj: Obj,
     name: []const u8,
     child: *anyopaque,
-    funcs: []const ffi.ZigFn,
+    deinit_fn: ffi.DeinitFn,
 
     const Self = @This();
 
-    // pub fn create(vm: *Vm, name: []const u8, child: *anyopaque, info: ffi.ZigStruct) *Self {
-    pub fn create(vm: *Vm, name: []const u8, child: *anyopaque, funcs: []const ffi.ZigFn) *Self {
+    pub fn create(vm: *Vm, name: []const u8, child: *anyopaque, deinit_fn: ffi.DeinitFn) *Self {
         // Fields first for GC because other wise allocating fields after creation
         // of the instance may trigger GC in between
         const obj = Obj.allocate(vm, Self, undefined);
         obj.name = name;
         obj.child = child;
-        obj.funcs = funcs;
+        obj.deinit_fn = deinit_fn;
 
         if (options.log_gc) obj.asObj().log();
 
@@ -597,14 +643,8 @@ pub const NativeObj = struct {
         return &self.obj;
     }
 
-    pub fn getFunc(self: *Self, index: usize) Value {
-        _ = self; // autofix
-        _ = index; // autofix
-        unreachable;
-    }
-
-    // TODO: destroy child too?
-    pub fn deinit(self: *Self, allocator: Allocator) void {
-        allocator.destroy(self);
+    pub fn deinit(self: *Self, vm: *Vm) void {
+        self.deinit_fn(self.child, vm);
+        vm.gc_alloc.destroy(self);
     }
 };

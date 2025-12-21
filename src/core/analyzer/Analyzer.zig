@@ -1264,6 +1264,7 @@ fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
         },
         .structure => |*ty| try self.structureAccess(expr.field, ty, struct_res.ti.is_sym, ctx.in_call),
         .module => |ty| return self.moduleAccess(expr.field, ty),
+        .array => |ty| return self.arrayFnAccess(struct_res.instr, expr.field, ty),
         else => return self.err(
             .{ .non_struct_field_access = .{ .found = self.typeName(struct_res.type) } },
             span,
@@ -1297,6 +1298,64 @@ fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
                 .{ .field = .{ .structure = struct_res.instr, .index = field_res.index, .kind = field_res.kind } },
                 span.start,
             ),
+    };
+}
+
+fn arrayFnAccess(self: *Self, array_instr: InstrIndex, fn_tk: Ast.TokenIndex, array_type: Type.Array) Result {
+    const func_name = self.ast.toSource(fn_tk);
+    const func = self.pipeline.state.array_fns.get(func_name) orelse return self.err(
+        .{ .undeclared_field_access = .{ .name = func_name } },
+        self.ast.getSpan(fn_tk),
+    );
+
+    const ty = self.runtimeFnToType(func, array_type.child);
+
+    return .{
+        .type = ty,
+        .instr = self.irb.addInstr(
+            .{ .obj_func = .{
+                .obj = array_instr,
+                .fn_index = self.pipeline.state.array_fns.getIndex(func_name).?,
+                .kind = .array,
+            } },
+            self.ast.getSpan(fn_tk).start,
+        ),
+    };
+}
+
+fn runtimeFnToType(self: *Self, func: type_mod.ObjFnInfos, current_generic: *const Type) *const Type {
+    var params: Type.Function.ParamsMap = .empty;
+    params.ensureTotalCapacity(self.allocator, func.params.len + 1) catch oom();
+    params.putAssumeCapacity(
+        self.interner.intern("self"),
+        .{ .type = current_generic, .default = null, .captured = false },
+    );
+
+    for (func.params) |p| {
+        params.putAssumeCapacity(
+            0,
+            .{ .type = self.runtimeObjToType(p, current_generic), .default = null, .captured = false },
+        );
+    }
+
+    const ty: Type = .{ .function = .{
+        .kind = .method,
+        .loc = null,
+        .params = params,
+        .return_type = self.runtimeObjToType(func.return_type, current_generic),
+    } };
+
+    return self.ti.intern(ty);
+}
+
+fn runtimeObjToType(self: *Self, ty: type_mod.ObjFnType, current_generic: *const Type) *const Type {
+    return switch (ty) {
+        .bool => self.ti.getCached(.bool),
+        .int => self.ti.getCached(.int),
+        .float => self.ti.getCached(.float),
+        .str => self.ti.getCached(.str),
+        .void => self.ti.getCached(.void),
+        .generic => current_generic,
     };
 }
 

@@ -37,6 +37,7 @@ pub const Instruction = struct {
         match: Match,
         multiple_var_decl: MultiVarDecl,
         null,
+        obj_func: ObjFn,
         pat_nullable: Index,
         pop: Index,
         print: Index,
@@ -169,6 +170,7 @@ pub const Instruction = struct {
         pub const Arm = struct { expr: Kind, body: Index };
     };
     pub const MultiVarDecl = struct { decls: []const Index };
+    pub const ObjFn = struct { obj: Index, fn_index: usize, kind: enum { array } };
     pub const Return = struct { value: ?Index };
     pub const StructDecl = struct {
         // Interner index

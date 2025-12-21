@@ -483,6 +483,22 @@ pub const TypeInterner = struct {
     }
 };
 
+// Type for runtime object
+pub const ObjFns = std.StringArrayHashMapUnmanaged(ObjFnInfos);
+pub const ObjFnInfos = struct {
+    params: []const ObjFnType,
+    return_type: ObjFnType,
+};
+
+pub const ObjFnType = enum {
+    bool,
+    int,
+    float,
+    str,
+    generic,
+    void,
+};
+
 test "inline union" {
     const expect = std.testing.expect;
 

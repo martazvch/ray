@@ -40,6 +40,7 @@ pub const OpCode = enum(u8) {
     bound_method,
     box,
     call,
+    call_array_fn,
     call_sym,
     call_sym_ext,
     call_native,
