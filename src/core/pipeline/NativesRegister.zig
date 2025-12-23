@@ -86,7 +86,7 @@ fn registerStruct(self: *Self, allocator: Allocator, S: type, interner: *Interne
         }
 
         const index, const fn_type = self.registerFn(allocator, func, interner, ti);
-        ty.structure.functions.putAssumeCapacity(interned_name, .{ .index = index, .type = fn_type });
+        ty.structure.functions.putAssumeCapacity(interned_name, .{ .name = interned_name, .index = index, .type = fn_type });
     }
 
     // TODO: use assume capacity (check all the 'put')
@@ -118,7 +118,7 @@ fn fnZigToRay(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMeta, int
         const param_index = if (i == 0) i else i - 1;
         params.putAssumeCapacity(
             interner.intern(func.params[param_index].name),
-            .{ .type = param_ty, .default = null, .captured = false },
+            .{ .name = null, .type = param_ty, .default = null, .captured = false },
         );
     }
 

@@ -127,8 +127,9 @@ mod_name: InternerIdx,
 mod_index: usize,
 cached_names: struct { empty: usize, main: usize, std: usize, self: usize, Self: usize, init: usize },
 
-pub fn init(allocator: Allocator, pipeline: *Pipeline) Self {
+pub fn init(allocator: Allocator, pipeline: *Pipeline, save_dbg_infos: bool) Self {
     var scope: LexScope = .empty;
+    scope.save = save_dbg_infos;
     scope.initGlobalScope(allocator, pipeline.state);
 
     return .{
@@ -190,6 +191,8 @@ pub fn analyze(self: *Self, ast: *const Ast, module_name: []const u8, expect_mai
     if (expect_main and self.main == null) {
         self.err(.no_main, .{ .start = 0, .end = 0 }) catch {};
     }
+
+    self.scope.closeGlobalScope();
 
     return .{
         .name = module_name,
@@ -330,7 +333,7 @@ fn enumTag(self: *Self, tag: Ast.EnumDecl.Tag, ctx: *const Context) Error!struct
 fn containerFnDecls(
     self: *Self,
     decls: []const Ast.FnDecl,
-    funcs: *AutoHashMapUnmanaged(InternerIdx, LexScope.Symbol),
+    funcs: *AutoArrayHashMapUnmanaged(InternerIdx, LexScope.Symbol),
     ctx: *Context,
 ) Error![]const InstrIndex {
     funcs.ensureTotalCapacity(self.allocator, @intCast(decls.len)) catch oom();
@@ -459,7 +462,12 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
 
             is_method = true;
             _ = try self.declareVariable(param_name, self_type, p.meta.captured, true, true, false, null, .zero);
-            decls.putAssumeCapacity(param_name, .{ .type = self_type, .default = null, .captured = false });
+            decls.putAssumeCapacity(param_name, .{
+                .name = param_name,
+                .type = self_type,
+                .default = null,
+                .captured = false,
+            });
             continue;
         }
 
@@ -482,6 +490,7 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
 
         _ = try self.declareVariable(param_name, param_type, p.meta.captured, true, true, false, null, span);
         decls.putAssumeCapacity(param_name, .{
+            .name = param_name,
             .type = param_type,
             .default = const_index,
             .captured = p.meta.captured,
@@ -1336,13 +1345,13 @@ fn runtimeFnToType(self: *Self, func: type_mod.ObjFnInfos, current_generic: *con
     params.ensureTotalCapacity(self.allocator, func.params.len + 1) catch oom();
     params.putAssumeCapacity(
         self.interner.intern("self"),
-        .{ .type = current_generic, .default = null, .captured = false },
+        .{ .name = self.interner.intern("self"), .type = current_generic, .default = null, .captured = false },
     );
 
     for (func.params) |p| {
         params.putAssumeCapacity(
             0,
-            .{ .type = self.runtimeObjToType(p, current_generic), .default = null, .captured = false },
+            .{ .name = null, .type = self.runtimeObjToType(p, current_generic), .default = null, .captured = false },
         );
     }
 
@@ -1591,6 +1600,7 @@ fn identifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool, ctx: *
         if (initialized and !res.variable.initialized) {
             return self.err(.{ .use_uninit_var = .{ .name = text } }, self.ast.getSpan(token_name));
         }
+        res.variable.used = true;
 
         return .{
             .type = res.variable.type,
@@ -2321,7 +2331,7 @@ fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) Error
             var params: AutoArrayHashMapUnmanaged(InternerIdx, Type.Function.Parameter) = .{};
             for (func.params, 0..) |p, i| {
                 const p_type = try self.checkAndGetType(p, ctx);
-                params.put(self.allocator, i, .{ .type = p_type, .default = null, .captured = false }) catch oom();
+                params.put(self.allocator, i, .{ .name = null, .type = p_type, .default = null, .captured = false }) catch oom();
             }
 
             return self.ti.intern(.{ .function = .{

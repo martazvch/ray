@@ -73,7 +73,7 @@ pub const Type = union(enum) {
     pub const Enum = struct {
         loc: ?Loc,
         tags: Tags,
-        functions: Map(InternerIdx, LexScope.Symbol),
+        functions: ArrayMap(InternerIdx, LexScope.Symbol),
 
         pub const empty: Enum = .{ .loc = null, .tags = .empty };
         pub const Tags = MapNameType;
@@ -99,7 +99,7 @@ pub const Type = union(enum) {
         kind: Kind,
 
         pub const Kind = enum { normal, method, bound, native, native_method };
-        pub const Parameter = struct { type: *const Type, default: ?InstrIndex, captured: bool };
+        pub const Parameter = struct { name: ?InternerIdx, type: *const Type, default: ?InstrIndex, captured: bool };
         pub const ParamsMap = ArrayMap(InternerIdx, Parameter);
         pub const Proto = ArrayMap(InternerIdx, struct { done: bool = false, default: ?InstrIndex = null });
 
@@ -148,7 +148,7 @@ pub const Type = union(enum) {
     pub const Structure = struct {
         loc: ?Loc,
         fields: FieldsMap,
-        functions: Map(InternerIdx, LexScope.Symbol),
+        functions: ArrayMap(InternerIdx, LexScope.Symbol),
 
         pub const FieldsMap = ArrayMap(InternerIdx, Field);
         pub const Field = struct {

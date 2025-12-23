@@ -18,6 +18,7 @@ const LexicalScope = @import("../analyzer/LexicalScope.zig");
 const Parser = @import("../parser/Parser.zig");
 const ParserMsg = @import("../parser/parser_msg.zig").ParserMsg;
 const IrRenderer = @import("../analyzer/IrRenderer.zig");
+const Irb = @import("../analyzer/IrBuilder.zig");
 const Obj = @import("../runtime/Obj.zig");
 
 const misc = @import("misc");
@@ -51,7 +52,7 @@ pub fn run(self: *Self, file_name: []const u8, path: []const u8, source: [:0]con
 
     const ast = try self.parse(file_name, source);
 
-    var analyzer: Analyzer = .init(self.allocator, self);
+    var analyzer: Analyzer = .init(self.allocator, self, false);
     const analyzed_module = analyzer.analyze(&ast, file_name, !self.is_sub);
 
     // Analyzed Ast printer
@@ -97,6 +98,57 @@ pub fn run(self: *Self, file_name: []const u8, path: []const u8, source: [:0]con
         error.ExitOnPrint
     else
         entry_point;
+}
+
+pub fn runFrontend(self: *Self, file_name: []const u8, source: [:0]const u8) !struct {
+    []const LexicalScope.Scope,
+    []const LexicalScope.Symbol,
+    Irb,
+} {
+    // Initiliaze the path builder
+    self.state.path_builder.append(self.allocator, std.fs.cwd().realpathAlloc(self.allocator, ".") catch oom());
+
+    const ast = try self.parse(file_name, source);
+
+    var analyzer: Analyzer = .init(self.allocator, self, true);
+    _ = analyzer.analyze(&ast, file_name, !self.is_sub);
+
+    // Analyzed Ast printer
+    if (analyzer.warns.items.len > 0) {
+        try reportAll(AnalyzerMsg, analyzer.warns.items, !options.test_mode, file_name, source);
+    }
+    if (analyzer.errs.items.len > 0) {
+        try reportAll(AnalyzerMsg, analyzer.errs.items, !options.test_mode, file_name, source);
+        self.instr_count = analyzer.irb.count();
+        return error.ExitOnPrint;
+    }
+    if (self.state.config.print_ir) {
+        try self.printIr(self.allocator, file_name, &analyzer, self.instr_count);
+        if (options.test_mode and !self.is_sub) return error.ExitOnPrint;
+    }
+
+    var scopes = std.ArrayList(LexicalScope.Scope).initCapacity(self.allocator, analyzer.scope.saved.items.len) catch oom();
+
+    for (analyzer.scope.saved.items, 0..) |scope, i| {
+        // TODO: error
+        if (scope == .tombstone) {
+            std.log.debug("Found a tombstone at: {}", .{i});
+            @panic("Invalid state");
+        }
+        scopes.appendAssumeCapacity(scope.scope);
+    }
+
+    var symbols = std.ArrayList(LexicalScope.Symbol).initCapacity(self.allocator, analyzer.scope.saved_syms.items.len) catch oom();
+
+    for (analyzer.scope.saved_syms.items) |symbol| {
+        symbols.appendAssumeCapacity(symbol.*);
+    }
+
+    return .{
+        scopes.toOwnedSlice(self.allocator) catch oom(),
+        symbols.toOwnedSlice(self.allocator) catch oom(),
+        analyzer.irb,
+    };
 }
 
 pub fn parse(self: *Self, file_name: []const u8, source: [:0]const u8) !Ast {

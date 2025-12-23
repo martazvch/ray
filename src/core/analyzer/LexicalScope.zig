@@ -17,9 +17,11 @@ const oom = misc.oom;
 const Self = @This();
 
 pub const Variable = struct {
+    name: InternerIdx,
     type: *const Type,
     kind: enum { local, global },
     initialized: bool,
+    used: bool = false,
     index: Index,
     captured: bool,
     constant: bool,
@@ -30,10 +32,10 @@ pub const Variable = struct {
 };
 
 pub const Break = *const Type;
-pub const Symbol = struct { type: *const Type, index: usize };
+pub const Symbol = struct { name: InternerIdx, type: *const Type, index: usize };
 pub const ExternSymbol = struct { module_index: usize, symbol: Symbol };
 
-pub const VariableMap = AutoHashMapUnmanaged(InternerIdx, Variable);
+pub const VariableMap = AutoArrayHashMapUnmanaged(InternerIdx, Variable);
 pub const SymbolArrMap = AutoArrayHashMapUnmanaged(InternerIdx, Symbol);
 pub const ExternMap = AutoHashMapUnmanaged(InternerIdx, ExternSymbol);
 
@@ -43,12 +45,23 @@ builtins: AutoHashMapUnmanaged(InternerIdx, *const Type),
 natives: AutoHashMapUnmanaged(InternerIdx, Symbol),
 symbol_count: usize,
 
+// Dbg
+save: bool,
+saved: ArrayList(SaveSlot),
+saved_syms: ArrayList(*Symbol),
+
+pub const SaveSlot = union(enum) { tombstone, scope: Scope };
+
 pub const empty: Self = .{
     .scopes = .empty,
     .current = undefined,
     .builtins = .empty,
     .natives = .empty,
     .symbol_count = 0,
+
+    .save = false,
+    .saved = .empty,
+    .saved_syms = .empty,
 };
 
 pub const Scope = struct {
@@ -93,11 +106,32 @@ pub fn open(self: *Self, allocator: Allocator, name: ?InternerIdx, barrier: bool
 
     self.scopes.append(allocator, scope) catch oom();
     self.updateCurrent();
+
+    if (self.save) {
+        self.saved.append(allocator, .tombstone) catch oom();
+    }
 }
 
 pub fn close(self: *Self) struct { usize, []const Break } {
     const popped = self.scopes.pop().?;
     self.updateCurrent();
+
+    // Saves the scope at the latest tombstone to reproduce runtime scope order
+    if (self.save) {
+        var it: RevIterator(SaveSlot) = .init(self.saved.items);
+
+        save: {
+            while (it.next()) |slot| {
+                if (slot.* == .tombstone) {
+                    slot.* = .{ .scope = popped };
+                    break :save;
+                }
+            }
+
+            unreachable;
+        }
+    }
+
     return .{ popped.variables.count(), popped.breaks.items };
 }
 
@@ -114,9 +148,17 @@ pub fn initGlobalScope(self: *Self, allocator: Allocator, state: *State) void {
     var it = state.native_reg.funcs_meta.iterator();
     while (it.next()) |entry| {
         self.natives.putAssumeCapacity(entry.key_ptr.*, .{
+            .name = entry.key_ptr.*,
             .index = self.natives.count(),
             .type = entry.value_ptr.*,
         });
+    }
+}
+
+pub fn closeGlobalScope(self: *Self) void {
+    const popped = self.scopes.pop().?;
+    if (self.save) {
+        self.saved.items[0] = .{ .scope = popped };
     }
 }
 
@@ -144,6 +186,7 @@ pub fn declareVar(
     if (index == 255 and !self.isGlobal()) return error.TooManyLocals;
 
     self.current.variables.put(allocator, name, .{
+        .name = name,
         .type = ty,
         .kind = if (self.isGlobal()) .global else .local,
         .initialized = initialized,
@@ -162,6 +205,7 @@ pub fn declareVarInFutureScope(self: *Self, allocator: Allocator, name: Interner
     if (index == 255) return error.TooManyLocals;
 
     self.current.forwarded.put(allocator, name, .{
+        .name = name,
         .type = ty,
         .kind = .local,
         .initialized = true,
@@ -187,10 +231,16 @@ pub fn getVariable(self: *const Self, name: InternerIdx) ?struct { *Variable, us
 
 /// Forward declares a symbol without incrementing global symbol count
 pub fn forwardDeclareSymbol(self: *Self, allocator: Allocator, name: InternerIdx) *Symbol {
-    self.current.symbols.put(allocator, name, .{ .type = undefined, .index = self.symbol_count }) catch oom();
+    self.current.symbols.put(allocator, name, .{ .name = name, .type = undefined, .index = self.symbol_count }) catch oom();
     self.symbol_count += 1;
 
-    return self.current.symbols.getPtr(name).?;
+    const sym = self.current.symbols.getPtr(name).?;
+
+    if (self.save) {
+        self.saved_syms.append(allocator, sym) catch oom();
+    }
+
+    return sym;
 }
 
 pub fn getSymbol(self: *const Self, name: InternerIdx) ?*Symbol {
