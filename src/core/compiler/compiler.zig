@@ -43,7 +43,6 @@ pub const CompiledModule = struct {
 
 pub const CompilationUnit = struct {
     allocator: Allocator,
-    vm: *Vm,
     interner: *const Interner,
     compiler: Compiler,
     errs: ArrayList(CompilerReport),
@@ -53,6 +52,7 @@ pub const CompilationUnit = struct {
     module: CompiledModule,
     line: usize,
     compiled_constants: misc.Set(usize),
+    interned_strings: *std.AutoHashMapUnmanaged(usize, *Obj.String),
 
     // For disassembler
     native_funcs: []const Value,
@@ -65,7 +65,7 @@ pub const CompilationUnit = struct {
     pub fn init(
         allocator: Allocator,
         name: []const u8,
-        vm: *Vm,
+        interned_strings: *std.AutoHashMapUnmanaged(usize, *Obj.String),
         interner: *const Interner,
         render_mode: Disassembler.RenderMode,
         global_count: usize,
@@ -75,7 +75,6 @@ pub const CompilationUnit = struct {
     ) Self {
         return .{
             .allocator = allocator,
-            .vm = vm,
             .interner = interner,
             .compiler = undefined,
             .errs = .empty,
@@ -86,6 +85,7 @@ pub const CompilationUnit = struct {
             .line = 0,
             .compiled_constants = .empty,
             .native_funcs = native_funcs,
+            .interned_strings = interned_strings,
         };
     }
 
@@ -710,7 +710,8 @@ const Compiler = struct {
                 .int => |val| Value.makeInt(val),
                 .float => |val| Value.makeFloat(val),
                 .string => |val| Value.makeObj(Obj.String.comptimeCopy(
-                    self.manager.vm,
+                    self.manager.allocator,
+                    self.manager.interned_strings,
                     self.manager.interner.getKey(val).?,
                 ).asObj()),
                 else => unreachable,

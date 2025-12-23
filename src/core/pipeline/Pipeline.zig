@@ -19,28 +19,27 @@ const Parser = @import("../parser/Parser.zig");
 const ParserMsg = @import("../parser/parser_msg.zig").ParserMsg;
 const IrRenderer = @import("../analyzer/IrRenderer.zig");
 const Obj = @import("../runtime/Obj.zig");
-const Vm = @import("../runtime/Vm.zig");
 
 const misc = @import("misc");
 const reportAll = misc.reporter.reportAll;
 const oom = misc.oom;
 
-vm: *Vm,
 allocator: Allocator,
 state: *State,
 instr_count: usize,
 is_sub: bool,
+strings: std.AutoHashMapUnmanaged(usize, *Obj.String),
 
 const Self = @This();
 const Error = error{ExitOnPrint};
 
-pub fn init(allocator: Allocator, vm: *Vm, state: *State) Self {
+pub fn init(allocator: Allocator, state: *State) Self {
     return .{
-        .vm = vm,
         .allocator = allocator,
         .state = state,
         .instr_count = 0,
         .is_sub = false,
+        .strings = .empty,
     };
 }
 
@@ -71,9 +70,9 @@ pub fn run(self: *Self, file_name: []const u8, path: []const u8, source: [:0]con
 
     // Compiler
     var compiler = CompilationUnit.init(
-        self.vm.allocator,
+        self.allocator,
         file_name,
-        self.vm,
+        &self.strings,
         &self.state.interner,
         if (!self.state.config.print_bytecode) .none else if (options.test_mode) .@"test" else .normal,
         analyzer.scope.current.variables.count(),
@@ -130,7 +129,7 @@ pub fn parse(self: *Self, file_name: []const u8, source: [:0]const u8) !Ast {
 }
 
 pub fn createSubPipeline(self: *Self) Self {
-    var pipeline: Self = .init(self.allocator, self.vm, self.state);
+    var pipeline: Self = .init(self.allocator, self.state);
     pipeline.is_sub = true;
     return pipeline;
 }

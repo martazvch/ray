@@ -34,7 +34,10 @@ pub fn new(allocator: Allocator, config: Config) Self {
         .array_fns = Obj.Array.getFns(allocator),
         .string_fns = Obj.String.getFns(allocator),
     };
+
     ctx.type_interner.cacheFrequentTypes();
+    ctx.registerNatives(allocator, @import("../builtins/builtins.zig"));
+    ctx.registerNatives(allocator, @import("..//builtins/file.zig"));
 
     return ctx;
 }

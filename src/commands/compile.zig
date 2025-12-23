@@ -53,13 +53,8 @@ pub fn runPipeline(self: *Self, allocator: Allocator, args: anytype) !void {
     defer arena.deinit();
 
     var state: State = .new(arena_alloc, .{});
-    state.registerNatives(arena_alloc, @import("../core/builtins/builtins.zig"));
 
-    var vm: Vm = undefined;
-    vm.init(allocator, &state);
-    defer vm.deinit();
-
-    var pipeline: Pipeline = .init(arena_alloc, &vm, &state);
+    var pipeline: Pipeline = .init(arena_alloc, &state);
 
     _ = pipeline.run(file_path, ".", file_content) catch |e| switch (e) {
         error.ExitOnPrint => return,

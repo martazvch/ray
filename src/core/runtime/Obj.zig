@@ -315,17 +315,17 @@ pub const String = struct {
     }
 
     /// **Warning**: Meant to be used at compile time only
-    pub fn comptimeCopy(vm: *Vm, str: []const u8) *String {
+    pub fn comptimeCopy(allocator: Allocator, interned: *std.AutoHashMapUnmanaged(usize, *Obj.String), str: []const u8) *String {
         const hash = String.hashString(str);
-        const gop = vm.strings.getOrPut(hash) catch oom();
+        const gop = interned.getOrPut(allocator, hash) catch oom();
         if (gop.found_existing) {
             return gop.value_ptr.*;
         }
 
-        const chars = vm.allocator.alloc(u8, str.len) catch oom();
+        const chars = allocator.alloc(u8, str.len) catch oom();
         @memcpy(chars, str);
 
-        var obj = Obj.allocateComptime(vm.allocator, Self, undefined);
+        var obj = Obj.allocateComptime(allocator, Self, undefined);
         obj.chars = chars;
         obj.hash = hash;
 
