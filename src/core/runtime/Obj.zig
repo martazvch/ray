@@ -37,6 +37,7 @@ const Kind = enum {
     iterator,
     native_fn,
     native_obj,
+    range,
     string,
     structure,
 
@@ -52,6 +53,7 @@ const Kind = enum {
             Iterator => .iterator,
             NativeFunction => .native_fn,
             NativeObj => .native_obj,
+            Range => .range,
             String => .string,
             Structure => .structure,
             else => @compileError(@typeName(T) ++ " isn't a runtime object type"),
@@ -97,7 +99,7 @@ pub fn deepCopy(self: *Obj, vm: *Vm) *Obj {
         .enum_instance => @panic("TODO"),
         .instance => self.as(Instance).deepCopy(vm).asObj(),
         // Immutable, shallow copy ok
-        .box, .closure, .@"enum", .function, .iterator, .native_fn, .native_obj, .string, .structure => self,
+        .box, .closure, .@"enum", .function, .iterator, .native_fn, .native_obj, .range, .string, .structure => self,
     };
 }
 
@@ -128,6 +130,7 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
             const object = self.as(NativeObj);
             object.deinit(vm);
         },
+        .range => self.as(Range).deinit(vm.gc_alloc),
         .string => self.as(String).deinit(vm.gc_alloc),
         .structure => {
             const structure = self.as(Structure);
@@ -180,6 +183,7 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
         .iterator => try writer.writeAll("<iterator>"),
         .native_fn => try writer.print("<native fn {s}>", .{self.as(NativeFunction).name}),
         .native_obj => try writer.print("<native object {s}>", .{self.as(NativeObj).name}),
+        .range => try writer.print("<range {}..{}>", .{ self.as(Range).start, self.as(Range).end }),
         .string => try writer.print("{s}", .{self.as(String).chars}),
         .structure => try writer.print("<structure {s}>", .{self.as(Structure).name}),
     }
@@ -197,6 +201,7 @@ pub fn log(self: *Obj) void {
         .iterator => std.debug.print("<iterator>", .{}),
         .native_fn => std.debug.print("<native function {s}>", .{self.as(NativeFunction).name}),
         .native_obj => unreachable,
+        .range => std.debug.print("<range>", .{}),
         .string => std.debug.print("{s}", .{self.as(String).chars}),
         .structure => std.debug.print("<structure {s}>", .{self.as(Structure).name}),
     }
@@ -675,6 +680,37 @@ pub const Iterator = struct {
 
         defer self.index += 1;
         return self.values[self.index];
+    }
+};
+
+pub const Range = struct {
+    obj: Obj,
+    // For printing
+    start: i64,
+    end: i64,
+    current: i64,
+    incr: i64,
+
+    const Self = @This();
+
+    pub fn create(vm: *Vm, start: i64, end: i64) *Self {
+        const obj = Obj.allocate(vm, Self, undefined);
+        obj.start = start;
+        obj.end = end;
+        obj.current = start;
+        obj.incr = if (start < end) 1 else -1;
+
+        if (options.log_gc) std.debug.print("<range>\n", .{});
+
+        return obj;
+    }
+
+    pub fn asObj(self: *Self) *Obj {
+        return &self.obj;
+    }
+
+    pub fn deinit(self: *Self, allocator: Allocator) void {
+        allocator.destroy(self);
     }
 };
 

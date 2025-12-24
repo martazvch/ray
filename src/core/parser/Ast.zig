@@ -146,6 +146,7 @@ pub const Expr = union(enum) {
     literal: Literal,
     match: Match,
     pattern: Pattern,
+    range: Range,
     @"return": Return,
     struct_literal: StructLiteral,
     ternary: Ternary,
@@ -215,6 +216,11 @@ pub const Literal = struct {
     idx: TokenIndex,
 
     pub const Tag = enum { bool, float, identifier, int, null, self, string };
+};
+
+pub const Range = struct {
+    start: *Expr,
+    end: *Expr,
 };
 
 pub const Return = struct {
@@ -397,6 +403,10 @@ pub fn getSpan(self: *const Self, anynode: anytype) Span {
                 .start = self.token_spans[e.token].start,
                 .end = self.getSpan(e.expr).end,
             },
+        },
+        Range => .{
+            .start = self.getSpan(node.start).start,
+            .end = self.getSpan(node.end).end,
         },
         Return => self.token_spans[node.kw],
         StructLiteral => self.getSpan(node.structure),

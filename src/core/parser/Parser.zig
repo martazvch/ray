@@ -1303,6 +1303,8 @@ fn postfix(self: *Self, prefixExpr: *Expr) Error!*Expr {
 
             // Can't chain them, break the loop
             return self.structLiteral(expr);
+        } else if (self.match(.dot_dot)) {
+            return self.range(expr);
         } else break;
     }
 
@@ -1378,6 +1380,16 @@ fn finishCall(self: *Self, expr: *Expr) Error!*Expr {
     try self.expect(.right_paren, .expect_paren_after_fn_args);
 
     return call_expr;
+}
+
+fn range(self: *Self, start: *Expr) Error!*Expr {
+    const expr = self.allocator.create(Expr) catch oom();
+    expr.* = .{ .range = .{
+        .start = start,
+        .end = try self.parsePrecedenceExpr(0),
+    } };
+
+    return expr;
 }
 
 fn structLiteral(self: *Self, expr: *Expr) Error!*Expr {

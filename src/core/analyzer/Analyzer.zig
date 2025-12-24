@@ -831,6 +831,7 @@ fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Contex
         .literal => |*e| self.literal(e, ctx),
         .match => |*e| self.match(e, expect, ctx),
         .pattern => |e| self.pattern(e, ctx),
+        .range => |e| self.range(e, ctx),
         .@"return" => |*e| self.returnExpr(e, ctx),
         .struct_literal => |*e| self.structLiteral(e, ctx),
         .ternary => |*e| self.ternary(e, ctx),
@@ -2025,6 +2026,26 @@ fn nullablePattern(self: *Self, pat: Ast.Pattern.Nullable, ctx: *Context) Result
     return .{
         .type = self.ti.cache.bool,
         .instr = self.irb.addInstr(.{ .pat_nullable = expr_ty.instr }, span.start),
+    };
+}
+
+fn range(self: *Self, expr: Ast.Range, ctx: *Context) Result {
+    const start = try self.analyzeExpr(expr.start, .value, ctx);
+    const end = try self.analyzeExpr(expr.end, .value, ctx);
+
+    if (!start.type.is(.int)) {
+        return self.err(.{ .range_non_int = .{ .found = self.typeName(start.type) } }, self.ast.getSpan(expr.start));
+    }
+    if (!end.type.is(.int)) {
+        return self.err(.{ .range_non_int = .{ .found = self.typeName(end.type) } }, self.ast.getSpan(expr.end));
+    }
+
+    return .{
+        .type = self.ti.getCached(.range),
+        .instr = self.irb.addInstr(
+            .{ .range = .{ .start = start.instr, .end = end.instr } },
+            self.ast.getSpan(expr).start,
+        ),
     };
 }
 

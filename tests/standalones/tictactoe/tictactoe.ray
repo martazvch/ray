@@ -28,16 +28,14 @@ struct Cell {
 
 struct Grid {
     cells: [][]Cell,
-    dim: int,
 
-    fn init(dim=3) -> Self {
+    fn init() -> Self {
         return Self{
             cells: [
                 [Cell{}, Cell{}, Cell{}],
                 [Cell{}, Cell{}, Cell{}],
                 [Cell{}, Cell{}, Cell{}],
             ],
-            dim,
         }
     }
 
@@ -58,17 +56,17 @@ struct Grid {
         var grid = "\n"
         var i = 0
 
-        while i < self.dim {
+        for row in self.cells {
             var line = ""
             var j = 0
-            
-            while j < self.dim {
-                line += self.cells[i][j].toStr() + if j < 2 do " " else ""
+
+            for cell in row {
+                line += cell.toStr() + if j < self.cells.len() - 1 do " " else ""
                 j += 1
             }
 
+            grid += line + if i < self.cells.len() - 1 do "\n" else ""
             i += 1
-            grid += line + if i < self.dim do "\n" else ""
         }
         
         print grid
@@ -92,5 +90,7 @@ fn main() {
     grid.playAt(1, 1, .cross, method: true)
     grid.display()
 }
+
+
 
 

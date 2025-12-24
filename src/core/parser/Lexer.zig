@@ -458,7 +458,13 @@ pub fn next(self: *Self) Token {
                     self.index += 1;
                     continue :state .int;
                 },
-                '.' => continue :state .float,
+                '.' => {
+                    if (self.index < self.source.len - 1 and self.source[self.index + 1] == '.') {
+                        // Range syntaxe: 1..3
+                    } else {
+                        continue :state .float;
+                    }
+                },
                 else => {},
             }
         },
@@ -683,6 +689,19 @@ test "dot" {
         .dot,      .dot_dot,     .dot_dot_dot, .dot_question_mark,
         .dot_star, .dot_dot_dot,
     };
+
+    for (0..res.len) |i| {
+        const tag = lexer.tokens.items(.tag)[i];
+        try expect(tag == res[i]);
+    }
+}
+
+test "range" {
+    var lexer = Self.init(std.testing.allocator);
+    defer lexer.deinit();
+    lexer.lex("1..2");
+
+    const res = [_]Token.Tag{ .int, .dot_dot, .int };
 
     for (0..res.len) |i| {
         const tag = lexer.tokens.items(.tag)[i];

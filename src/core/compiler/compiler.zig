@@ -346,6 +346,7 @@ const Compiler = struct {
 
             .pop => |index| self.wrappedInstr(.pop, index),
             .print => |index| self.wrappedInstr(.print, index),
+            .range => |data| self.range(data),
             .@"return" => |*data| self.returnInstr(data),
             .struct_decl => |*data| self.structDecl(data),
             .struct_literal => |*data| self.structLiteral(data),
@@ -866,6 +867,11 @@ const Compiler = struct {
         for (data.decls) |decl| {
             try self.compileInstr(decl);
         }
+    }
+
+    fn range(self: *Self, data: Instruction.Range) Error!void {
+        try self.compileInstr(data.start);
+        try self.compileInstr(data.end);
     }
 
     fn returnInstr(self: *Self, data: *const Instruction.Return) Error!void {

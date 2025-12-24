@@ -21,6 +21,7 @@ pub const Type = union(enum) {
     bool,
     str,
     null,
+    range,
     array: Array,
     @"enum": Enum,
     function: Function,
@@ -245,7 +246,7 @@ pub const Type = union(enum) {
         hasher.update(asBytes(&@intFromEnum(self)));
 
         switch (self) {
-            .never, .void, .int, .float, .bool, .str, .null => {},
+            .never, .void, .int, .float, .bool, .str, .null, .range => {},
             .array => |ty| ty.child.hash(allocator, hasher),
             .@"enum" => |ty| {
                 if (ty.loc) |loc| {
@@ -301,7 +302,7 @@ pub const Type = union(enum) {
         var writer = res.writer(allocator);
 
         switch (self.*) {
-            .never, .int, .float, .bool, .str, .null, .void => return @tagName(self.*),
+            .never, .int, .float, .bool, .str, .null, .void, .range => return @tagName(self.*),
             .array => |ty| {
                 writer.writeAll("[]") catch oom();
                 writer.writeAll(ty.child.toString(allocator, interner, mod_name)) catch oom();
@@ -385,7 +386,7 @@ pub const TypeInterner = struct {
     ids: Set(*const Type),
     cache: Cache,
 
-    const CacheList: []const Type = &.{ .float, .int, .bool, .str, .null, .void, .never };
+    const CacheList: []const Type = &.{ .float, .int, .bool, .str, .null, .void, .never, .range };
     pub const Cache = CreateCache(CacheList);
 
     pub fn init(allocator: Allocator) TypeInterner {

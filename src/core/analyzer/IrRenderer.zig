@@ -96,6 +96,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .pat_nullable => |index| self.indexInstr("Nullable pattern", index),
         .pop => |index| self.indexInstr("Pop", index),
         .print => |index| self.indexInstr("Print", index),
+        .range => |data| self.range(data),
         .@"return" => |*data| self.returnInstr(data),
         .string => |data| self.stringInstr(data),
         .struct_decl => |*data| self.structDecl(data),
@@ -421,6 +422,14 @@ fn multipleVarDecl(self: *Self, data: *const Instruction.MultiVarDecl) void {
     for (data.decls) |decl| {
         self.parseInstr(decl);
     }
+}
+
+fn range(self: *Self, data: Instruction.Range) void {
+    self.indentAndAppendSlice("[Range]");
+    self.indentAndAppendSlice("- start:");
+    self.parseInstr(data.start);
+    self.indentAndAppendSlice("- end:");
+    self.parseInstr(data.end);
 }
 
 fn returnInstr(self: *Self, data: *const Instruction.Return) void {
