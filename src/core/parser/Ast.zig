@@ -70,7 +70,7 @@ pub const For = struct {
     for_tk: TokenIndex,
     binding: TokenIndex,
     expr: *Expr,
-    body: *Expr,
+    body: Block,
 };
 
 pub const MultiVarDecl = struct {

@@ -81,6 +81,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .field => |data| self.getField(data, false),
         .float => |data| self.floatInstr(data),
         .fn_decl => |*data| self.fnDeclaration(data),
+        .for_loop => |data| self.forLoop(data),
         .identifier => |*data| self.identifier(data),
         .@"if" => |*data| self.ifInstr(data),
         .int => |data| self.intInstr(data),
@@ -337,6 +338,18 @@ fn fnDeclaration(self: *Self, data: *const Instruction.FnDecl) void {
             self.indentAndPrintSlice("[Capture index: {}, is_local: {}]", .{ capt.index, capt.local });
         }
     }
+}
+
+fn forLoop(self: *Self, data: Instruction.For) void {
+    self.indentAndAppendSlice("[For]");
+    self.indentAndAppendSlice("- expr:");
+    self.indent_level += 1;
+    self.parseInstr(data.expr);
+    self.indent_level -= 1;
+    self.indentAndAppendSlice("- body:");
+    self.indent_level += 1;
+    self.parseInstr(data.body);
+    self.indent_level -= 1;
 }
 
 fn identifier(self: *Self, data: *const Instruction.Variable) void {

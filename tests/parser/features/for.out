@@ -3,7 +3,7 @@
         "name": "main",
         "params": [],
         "return_type": "void",
-        "block": [
+        "body": [
             "var_decl": {
                 "name": "arr",
                 "type": {},
@@ -21,13 +21,11 @@
                 "value": {
                     "literal": "arr"
                 },
-                "body": {
-                    "block": [
-                        "print": {
-                            "literal": "v"
-                        }
-                    ]
-                }
+                "body": [
+                    "print": {
+                        "literal": "v"
+                    }
+                ]
             }
         ]
     }

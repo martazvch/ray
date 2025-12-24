@@ -326,6 +326,7 @@ const Compiler = struct {
             .enum_decl => |*data| self.enumDecl(data),
             .field => |*data| self.field(data),
             .fn_decl => |*data| self.compileFn(data),
+            .for_loop => |data| self.forLoop(data),
             .identifier => |*data| self.identifier(data),
             .@"if" => |*data| self.ifInstr(data),
             .incr_rc => |index| self.wrappedInstr(.incr_ref, index),
@@ -755,6 +756,23 @@ const Compiler = struct {
         );
     }
 
+    fn forLoop(self: *Self, data: Instruction.For) Error!void {
+        try self.compileInstr(data.expr);
+        self.writeOp(switch (data.kind) {
+            .array => .iter_new_arr,
+            .str => .iter_new_str,
+            else => @panic("Not implemented yet"),
+        });
+        const loop_start = self.function.chunk.code.items.len;
+        self.writeOp(.iter_next);
+        const iter_end = self.emitJump(.jump_null);
+        try self.compileInstr(data.body);
+        try self.emitLoop(loop_start);
+        try self.patchJump(iter_end);
+        // Null value and iterator
+        self.writeOp(.pop2);
+    }
+
     fn identifier(self: *Self, data: *const Instruction.Variable) Error!void {
         self.emitGetVar(data);
     }
@@ -775,10 +793,9 @@ const Compiler = struct {
         try self.patchJump(then_jump);
 
         // If we go in the else branch, we pop the condition too
-        self.writeOp(.pop);
         // If the condition was a nullable pattern, the variable tested against `null` is still on
         // top of stack so we have to remove it
-        if (is_null_pat) self.writeOp(.pop);
+        self.writeOp(if (is_null_pat) .pop2 else .pop);
 
         // We insert a jump in the then body to be able to jump over the else branch
         // Otherwise, we just patch the then_jump
@@ -1004,6 +1021,7 @@ const Compiler = struct {
             try self.compileInstr(instr);
         }
 
+        // PERF:
         for (0..body.pop_count) |_| {
             self.writeOp(.pop);
         }
@@ -1012,10 +1030,9 @@ const Compiler = struct {
 
         try self.patchJump(exit_jump);
         // If false
-        self.writeOp(.pop);
         // If the condition was null pattern, the variable tested against `null` is still on
         // top of stack so we have to remove it
-        if (is_null_pat) self.writeOp(.pop);
+        self.writeOp(if (is_null_pat) .pop2 else .pop);
 
         for (self.block_stack.close().items) |b| {
             try self.patchJump(b);

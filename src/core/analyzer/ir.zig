@@ -28,6 +28,7 @@ pub const Instruction = struct {
         field: Field,
         float: f64,
         fn_decl: FnDecl,
+        for_loop: For,
         identifier: Variable,
         @"if": If,
         incr_rc: Index,
@@ -151,6 +152,13 @@ pub const Instruction = struct {
         returns: bool,
 
         pub const Capture = struct { index: usize, local: bool };
+    };
+    pub const For = struct {
+        expr: Index,
+        body: Index,
+        kind: Kind,
+
+        pub const Kind = enum { array, str, range, other };
     };
     pub const If = struct {
         cond: Index,

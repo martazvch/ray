@@ -351,11 +351,29 @@ fn containerFnDecls(
     return func_instrs.toOwnedSlice(self.allocator) catch oom();
 }
 
-fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) Error!InstrIndex {
-    _ = self; // autofix
-    _ = node; // autofix
-    _ = ctx; // autofix
-    @panic("Not implemented yet");
+fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
+    const binding = try self.internIfNotInCurrentScope(node.binding);
+    const res = try self.analyzeExpr(node.expr, .value, ctx);
+
+    // Virtual scope to declare the iterator
+    self.scope.open(self.allocator, null, false, false);
+    defer _ = self.scope.close();
+
+    _ = try self.declareVariable(0, undefined, false, true, false, false, null, undefined);
+
+    const kind: Instruction.For.Kind, const elem_type = switch (res.type.*) {
+        .array => |t| .{ .array, t.child },
+        .str => .{ .str, res.type },
+        else => |*t| return self.err(.{ .iter_non_iterable = .{ .found = self.typeName(t) } }, self.ast.getSpan(node.expr)),
+    };
+
+    try self.forwardDeclareVariable(binding, elem_type, false, self.ast.getSpan(node.binding));
+    const body_res = try self.block(&node.body, .none, ctx);
+
+    return self.irb.addInstr(
+        .{ .for_loop = .{ .expr = res.instr, .body = body_res.instr, .kind = kind } },
+        self.ast.getSpan(node).start,
+    );
 }
 
 const FnDeclRes = struct { instr: usize, sym: LexScope.Symbol };

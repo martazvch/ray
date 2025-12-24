@@ -759,7 +759,7 @@ fn forLoop(self: *Self) Error!Node {
         .for_tk = for_tk,
         .binding = binding,
         .expr = expr,
-        .body = body,
+        .body = body.block,
     } };
 }
 

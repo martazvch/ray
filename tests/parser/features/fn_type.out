@@ -3,7 +3,7 @@
         "name": "factory",
         "params": [],
         "return_type": "fn() -> void",
-        "block": []
+        "body": []
     },
     "fn_decl": {
         "name": "factory",
@@ -15,7 +15,7 @@
             }
         ],
         "return_type": "fn(float, bool) -> float",
-        "block": []
+        "body": []
     },
     "fn_decl": {
         "name": "factory",
@@ -27,6 +27,6 @@
             }
         ],
         "return_type": "int",
-        "block": []
+        "body": []
     }
 }

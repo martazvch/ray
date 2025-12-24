@@ -1,0 +1,6 @@
+struct Foo {}
+fn main() {
+    for v in 5 {}
+    let foo = Foo{}
+    for v in foo {}
+}

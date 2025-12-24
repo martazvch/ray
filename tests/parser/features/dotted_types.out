@@ -9,7 +9,7 @@
             }
         ],
         "return_type": "void",
-        "block": []
+        "body": []
     },
     "var_decl": {
         "name": "clr",

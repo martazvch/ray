@@ -34,6 +34,7 @@ const Kind = enum {
     enum_instance,
     function,
     instance,
+    iterator,
     native_fn,
     native_obj,
     string,
@@ -48,6 +49,7 @@ const Kind = enum {
             EnumInstance => .enum_instance,
             Function => .function,
             Instance => .instance,
+            Iterator => .iterator,
             NativeFunction => .native_fn,
             NativeObj => .native_obj,
             String => .string,
@@ -85,20 +87,17 @@ fn allocateComptime(allocator: Allocator, comptime T: type, type_id: TypeId) *T 
     const ptr = allocator.create(T) catch oom();
     ptr.obj = .{ .kind = .fromType(T), .next = null, .type_id = type_id };
 
-    if (comptime options.log_gc) {
-        std.debug.print("{*} allocate {} bytes for: ", .{ ptr, @sizeOf(T) });
-    }
-
     return ptr;
 }
 
 pub fn deepCopy(self: *Obj, vm: *Vm) *Obj {
     return switch (self.kind) {
         .array => self.as(Array).deepCopy(vm).asObj(),
+        // TODO:
         .enum_instance => @panic("TODO"),
         .instance => self.as(Instance).deepCopy(vm).asObj(),
         // Immutable, shallow copy ok
-        .box, .closure, .@"enum", .function, .native_fn, .native_obj, .string, .structure => self,
+        .box, .closure, .@"enum", .function, .iterator, .native_fn, .native_obj, .string, .structure => self,
     };
 }
 
@@ -117,6 +116,10 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
             const instance = self.as(Instance);
             instance.deinit(vm.gc_alloc);
         },
+        .iterator => {
+            const iterator = self.as(Iterator);
+            iterator.deinit(vm.gc_alloc);
+        },
         .native_fn => {
             const function = self.as(NativeFunction);
             function.deinit(vm.gc_alloc);
@@ -128,7 +131,7 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
         .string => self.as(String).deinit(vm.gc_alloc),
         .structure => {
             const structure = self.as(Structure);
-            structure.deinit(vm);
+            structure.deinit(vm.gc_alloc);
         },
     }
 }
@@ -174,6 +177,7 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
             try writer.print("<function {s}>", .{function.name});
         },
         .instance => try writer.print("<instance of {s}>", .{self.as(Instance).parent.name}),
+        .iterator => try writer.writeAll("<iterator>"),
         .native_fn => try writer.print("<native fn {s}>", .{self.as(NativeFunction).name}),
         .native_obj => try writer.print("<native object {s}>", .{self.as(NativeObj).name}),
         .string => try writer.print("{s}", .{self.as(String).chars}),
@@ -186,9 +190,13 @@ pub fn log(self: *Obj) void {
         .array => std.debug.print("<array>", .{}),
         .box => std.debug.print("box", .{}),
         .closure => std.debug.print("<closure {s}>", .{self.as(Closure).function.name}),
+        .@"enum" => std.debug.print("<enum {s}>", .{self.as(Enum).name}),
+        .enum_instance => std.debug.print("<enum instance {s}>", .{self.as(EnumInstance).parent.name}),
         .function => std.debug.print("<fn {s}>", .{self.as(Function).name}),
         .instance => std.debug.print("<instance of {s}>", .{self.as(Instance).parent.name}),
+        .iterator => std.debug.print("<iterator>", .{}),
         .native_fn => std.debug.print("<native function {s}>", .{self.as(NativeFunction).name}),
+        .native_obj => unreachable,
         .string => std.debug.print("{s}", .{self.as(String).chars}),
         .structure => std.debug.print("<structure {s}>", .{self.as(Structure).name}),
     }
@@ -212,6 +220,8 @@ pub const Array = struct {
         const obj = Obj.allocate(vm, Self, undefined);
         obj.values = .empty;
 
+        if (options.log_gc) std.debug.print("<array>\n", .{});
+
         vm.gc.pushTmpRoot(obj.asObj());
         defer vm.gc.popTmpRoot();
 
@@ -226,8 +236,6 @@ pub const Array = struct {
         for (values) |val| {
             obj.values.appendAssumeCapacity(val);
         }
-
-        if (options.log_gc) obj.asObj().log();
 
         return obj;
     }
@@ -260,6 +268,7 @@ pub const Array = struct {
         vm.gc_alloc.destroy(self);
     }
 
+    // Api
     pub fn call(self: *Self, vm: *Vm, stack: []Value, fn_index: usize) ?Value {
         return self.funcs[fn_index](self, vm, stack);
     }
@@ -296,7 +305,6 @@ pub const String = struct {
 
     const Self = @This();
 
-    // PERF: flexible array member: https://craftinginterpreters.com/strings.html#challenges
     fn create(vm: *Vm, str: []const u8, hash: u32) *String {
         var obj = Obj.allocate(vm, Self, undefined);
         obj.chars = str;
@@ -334,8 +342,8 @@ pub const String = struct {
         return obj;
     }
 
-    // Take a string allocated by calling Vm. If interned already, free
-    // the memory and return the interned one
+    /// Take a string allocated by calling Vm. If interned already, free
+    /// the memory and return the interned one
     pub fn take(vm: *Vm, str: []const u8) *String {
         const hash = String.hashString(str);
         if (vm.strings.get(hash)) |interned| {
@@ -344,6 +352,18 @@ pub const String = struct {
         }
 
         return String.create(vm, str, hash);
+    }
+
+    /// Take a string. If interned already, returns the interned one
+    pub fn takeCopy(vm: *Vm, str: []const u8) *String {
+        const copied = vm.gc_alloc.dupe(u8, str) catch oom();
+
+        const hash = String.hashString(copied);
+        if (vm.strings.get(hash)) |interned| {
+            return interned;
+        }
+
+        return String.create(vm, copied, hash);
     }
 
     pub fn asObj(self: *String) *Obj {
@@ -387,8 +407,6 @@ pub const Function = struct {
         obj.chunk = .empty;
         obj.name = allocator.dupe(u8, name) catch oom();
         obj.module_index = module_index;
-
-        if (options.log_gc) obj.asObj().log();
 
         return obj;
     }
@@ -473,10 +491,6 @@ pub const NativeFunction = struct {
         obj.name = name;
         obj.function = function;
 
-        if (options.log_gc) {
-            std.debug.print("native fn\n", .{});
-        }
-
         return obj;
     }
 
@@ -510,8 +524,8 @@ pub const Structure = struct {
 
     // Functions aren't freed because they are on the main linked list of objects in the VM
     // The memory of the array is owned though
-    pub fn deinit(self: *Self, vm: *Vm) void {
-        vm.gc_alloc.destroy(self);
+    pub fn deinit(self: *Self, allocator: Allocator) void {
+        allocator.destroy(self);
     }
 };
 
@@ -618,6 +632,52 @@ pub const EnumInstance = struct {
     }
 };
 
+pub const Iterator = struct {
+    obj: Obj,
+    // We keep a reference to the parent so when using literals like: for v in [1, 2] {}
+    // GC can trace the literal, otherwise it's destroyed
+    parent: Value,
+    values: []Value,
+    index: usize,
+    owns: bool,
+
+    const Self = @This();
+
+    pub fn create(vm: *Vm, parent: Value, values: []Value, owns: bool) *Self {
+        // The value has been popped from stack, need to keep reference of it
+        vm.gc.pushTmpRoot(parent.obj);
+        defer vm.gc.popTmpRoot();
+
+        const obj = Obj.allocate(vm, Self, undefined);
+        obj.parent = parent;
+        obj.values = values;
+        obj.index = 0;
+        obj.owns = owns;
+
+        if (options.log_gc) std.debug.print("<iterator>\n", .{});
+
+        return obj;
+    }
+
+    pub fn asObj(self: *Self) *Obj {
+        return &self.obj;
+    }
+
+    pub fn deinit(self: *Self, allocator: Allocator) void {
+        if (self.owns) allocator.free(self.values);
+        allocator.destroy(self);
+    }
+
+    pub fn next(self: *Self) Value {
+        if (self.index == self.values.len) {
+            return .null;
+        }
+
+        defer self.index += 1;
+        return self.values[self.index];
+    }
+};
+
 pub const NativeObj = struct {
     obj: Obj,
     name: []const u8,
@@ -626,15 +686,13 @@ pub const NativeObj = struct {
 
     const Self = @This();
 
-    pub fn create(vm: *Vm, name: []const u8, child: *anyopaque, deinit_fn: ffi.DeinitFn) *Self {
+    pub fn create(allocator: Allocator, name: []const u8, child: *anyopaque, deinit_fn: ffi.DeinitFn) *Self {
         // Fields first for GC because other wise allocating fields after creation
         // of the instance may trigger GC in between
-        const obj = Obj.allocate(vm, Self, undefined);
+        const obj = Obj.allocateComptime(allocator, Self, undefined);
         obj.name = name;
         obj.child = child;
         obj.deinit_fn = deinit_fn;
-
-        if (options.log_gc) obj.asObj().log();
 
         return obj;
     }

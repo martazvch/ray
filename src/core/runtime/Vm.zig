@@ -372,6 +372,31 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
                 const type_id = frame.readByte();
                 self.stack.push(.makeBool(self.stack.peek(0).obj.type_id == type_id));
             },
+            .iter_new_arr => {
+                const value = self.stack.pop();
+                self.stack.push(.makeObj(
+                    Obj.Iterator.create(self, value, value.obj.as(Obj.Array).values.items, false).asObj(),
+                ));
+            },
+            .iter_new_str => {
+                const value = self.stack.pop();
+                const string = value.obj.as(Obj.String);
+                var chars = self.gc_alloc.alloc(Value, string.chars.len) catch oom();
+
+                for (string.chars, 0..) |c, i| {
+                    const string_obj = Obj.String.takeCopy(self, &.{c}).asObj();
+                    chars[i] = .makeObj(string_obj);
+                    self.gc.pushTmpRoot(string_obj);
+                }
+
+                self.stack.push(.makeObj(
+                    Obj.Iterator.create(self, value, chars, true).asObj(),
+                ));
+                self.gc.popTmpRootMany(string.chars.len);
+            },
+            .iter_next => {
+                self.stack.push(self.stack.peekRef(0).obj.as(Obj.Iterator).next());
+            },
             .jump => {
                 const jump = frame.readShort();
                 frame.ip += jump;
@@ -383,6 +408,10 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             .jump_true => {
                 const jump = frame.readShort();
                 if (self.stack.peek(0).bool) frame.ip += jump;
+            },
+            .jump_null => {
+                const jump = frame.readShort();
+                if (self.stack.peek(0) == .null) frame.ip += jump;
             },
             .lt_float => self.stack.push(Value.makeBool(self.stack.pop().float > self.stack.pop().float)),
             .lt_int => self.stack.push(Value.makeBool(self.stack.pop().int > self.stack.pop().int)),
@@ -432,7 +461,8 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             .neg_float => self.stack.peekRef(0).float *= -1,
             .neg_int => self.stack.peekRef(0).int *= -1,
             .not => self.stack.peekRef(0).not(),
-            .pop => _ = self.stack.pop(),
+            .pop => self.stack.top -= 1,
+            .pop2 => self.stack.top -= 2,
             .print => {
                 self.stack.pop().print(stdout);
                 stdout.writeAll("\n") catch oom();

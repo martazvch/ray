@@ -36,6 +36,7 @@ pub const AnalyzerMsg = union(enum) {
     invalid_comparison: struct { found1: []const u8, found2: []const u8 },
     invalid_logical: struct { found: []const u8 },
     invalid_unary: struct { found: []const u8 },
+    iter_non_iterable: struct { found: []const u8 },
     match_arm_type_mismatch: struct { expect: []const u8, found: []const u8 },
     match_duplicate_arm: struct { name: []const u8 },
     match_enum_invalid_pat,
@@ -125,6 +126,7 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_comparison => |e| writer.print("invalid comparison between types '{s}' and '{s}'", .{ e.found1, e.found2 }),
             .invalid_logical => writer.writeAll("logical operators must be used with booleans"),
             .invalid_unary => writer.writeAll("invalid unary operation"),
+            .iter_non_iterable => |e| writer.print("can't iterate over type '{s}'", .{e.found}),
             .match_arm_type_mismatch => |e| writer.print("match arm type mismatch, expect '{s}' but found '{s}'", .{ e.expect, e.found }),
             .match_duplicate_arm => |e| writer.print("arm '{s}' is used multiple times", .{e.name}),
             .match_enum_invalid_pat => writer.writeAll("invalid pattern for matching enums"),
@@ -204,6 +206,7 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_comparison => writer.writeAll("expressions have different types"),
             .invalid_logical => |e| writer.print("this expression resolves to a '{s}'", .{e.found}),
             .invalid_unary, .non_bool_cond => writer.writeAll("expression is not a boolean type"),
+            .iter_non_iterable => writer.writeAll("this doesn't have Iterator trait"),
             .match_arm_type_mismatch => |e| writer.print("this is of type '{s}'", .{e.found}),
             .match_duplicate_arm => writer.writeAll("this case"),
             .match_enum_invalid_pat => writer.writeAll("here"),
@@ -301,6 +304,10 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_comparison => writer.writeAll("expressions must have the same type when compared"),
             .invalid_logical => writer.writeAll("modify the logic to operate on booleans"),
             .invalid_unary => |e| writer.print("can only negate boolean type, found '{s}'", .{e.found}),
+            .iter_non_iterable => writer.writeAll(
+                \\it is only possible to iterate over builtin types array, string, range and maps and over types
+                \\that implement the Iterator trait
+            ),
             .match_arm_type_mismatch => writer.writeAll("refer to type's definition"),
             .match_duplicate_arm => writer.writeAll("delete the duplicated arm"),
             .match_enum_invalid_pat => writer.writeAll(

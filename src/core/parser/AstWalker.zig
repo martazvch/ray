@@ -164,7 +164,9 @@ fn captureFromNode(self: *Self, node: *Ast.Node, ctx: *CaptureCtx) void {
         .enum_decl => {},
         .for_loop => |n| {
             self.captureFromExpr(n.expr, ctx);
-            self.captureFromExpr(n.body, ctx);
+            for (n.body.nodes) |*body_node| {
+                self.captureFromNode(body_node, ctx);
+            }
         },
         .fn_decl => |*n| self.functionCaptures(n, ctx),
         .multi_var_decl => |*n| {

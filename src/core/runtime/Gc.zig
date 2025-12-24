@@ -54,6 +54,10 @@ pub fn popTmpRoot(self: *Self) void {
     _ = self.tmp_roots.pop();
 }
 
+pub fn popTmpRootMany(self: *Self, count: usize) void {
+    self.tmp_roots.shrinkRetainingCapacity(self.tmp_roots.items.len - count);
+}
+
 pub fn collect(self: *Self) Allocator.Error!void {
     if (options.log_gc) {
         print("\n-- GC begin\n", .{});
@@ -132,6 +136,10 @@ fn blackenObject(self: *Self, obj: *Obj) Allocator.Error!void {
         .instance => {
             const instance = obj.as(Instance);
             try self.markArray(instance.fields);
+        },
+        .iterator => {
+            try self.markValue(&obj.as(Obj.Iterator).parent);
+            try self.markArray(obj.as(Obj.Iterator).values);
         },
         .native_fn => unreachable,
         // TODO: see why we can't mark functions and structure unreachable

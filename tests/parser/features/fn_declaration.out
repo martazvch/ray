@@ -3,7 +3,7 @@
         "name": "add",
         "params": [],
         "return_type": "void",
-        "block": []
+        "body": []
     },
     "fn_decl": {
         "name": "add",
@@ -15,7 +15,7 @@
             }
         ],
         "return_type": "void",
-        "block": []
+        "body": []
     },
     "fn_decl": {
         "name": "add",
@@ -27,7 +27,7 @@
             }
         ],
         "return_type": "void",
-        "block": []
+        "body": []
     },
     "fn_decl": {
         "name": "add",
@@ -39,7 +39,7 @@
             }
         ],
         "return_type": "void",
-        "block": []
+        "body": []
     },
     "fn_decl": {
         "name": "add",
@@ -51,7 +51,7 @@
             }
         ],
         "return_type": "void",
-        "block": []
+        "body": []
     },
     "fn_decl": {
         "name": "add",
@@ -63,7 +63,7 @@
             }
         ],
         "return_type": "void",
-        "block": []
+        "body": []
     },
     "fn_decl": {
         "name": "add",
@@ -80,13 +80,13 @@
             }
         ],
         "return_type": "void",
-        "block": []
+        "body": []
     },
     "fn_decl": {
         "name": "_ad",
         "params": [],
         "return_type": "int",
-        "block": [
+        "body": [
             "var_decl": {
                 "name": "tmp",
                 "type": {},
@@ -112,7 +112,7 @@
             }
         ],
         "return_type": "Promise",
-        "block": []
+        "body": []
     },
     "fn_decl": {
         "name": "shareType",
@@ -149,7 +149,7 @@
             }
         ],
         "return_type": "void",
-        "block": []
+        "body": []
     },
     "fn_decl": {
         "name": "defaultValue",
@@ -189,7 +189,7 @@
             }
         ],
         "return_type": "void",
-        "block": []
+        "body": []
     },
     "fn_decl": {
         "name": "mixAll",
@@ -241,6 +241,6 @@
             }
         ],
         "return_type": "void",
-        "block": []
+        "body": []
     }
 }

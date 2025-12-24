@@ -5,7 +5,7 @@
                 "literal": "true"
             }
         },
-        "block": []
+        "body": []
     },
     "while": {
         "pattern: value": {
@@ -15,7 +15,7 @@
                 ]
             }
         },
-        "block": [
+        "body": [
             "var_decl": {
                 "name": "tmp",
                 "type": {},
@@ -42,6 +42,6 @@
             },
             "constant": "true"
         },
-        "block": []
+        "body": []
     }
 }

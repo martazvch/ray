@@ -1,0 +1,2 @@
+iter_non_iterable, int
+iter_non_iterable, Foo

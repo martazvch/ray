@@ -10,25 +10,23 @@ pop
 get_local index 0
 print
 pop
-jump 12 -> 17
+jump 12 -> 16
 
 // Pops if condition and lhs of null pattern
-pop
-pop
+pop2
 
 // While
 call_sym index 0, arity 0, <function getValue>
 ne_null_push
-jump_false 21 -> 32
+jump_false 20 -> 31
 pop
 get_local index 0
 print
 pop
-loop 29 -> 17
+loop 28 -> 16
 
 // Pops if condition and lhs of null pattern
-pop
-pop
+pop2
 
 ret_naked
 

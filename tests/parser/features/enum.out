@@ -11,7 +11,7 @@
                 "name": "init",
                 "params": [],
                 "return_type": "Self",
-                "block": [
+                "body": [
                     "return": {
                         "field": {
                             "structure": {
@@ -32,7 +32,7 @@
                     }
                 ],
                 "return_type": "str",
-                "block": []
+                "body": []
             }
         ]
     }

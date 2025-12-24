@@ -51,7 +51,7 @@ fn open(vm: *Vm, path: []const u8) *File {
         .fd = std.fs.cwd().openFile(path, .{}) catch unreachable,
     };
 
-    const obj = Obj.NativeObj.create(vm, "File", self, File.zig_struct.deinit_fn);
+    const obj = Obj.NativeObj.create(vm.gc_alloc, "File", self, File.zig_struct.deinit_fn);
 
     return @ptrCast(@alignCast(&obj.child));
 }
