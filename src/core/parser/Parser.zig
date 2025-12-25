@@ -351,9 +351,7 @@ fn fnParams(self: *Self, is_closure: bool) Error![]Ast.VarDecl {
 
         while (self.match(.identifier)) {
             param_names.append(self.allocator, self.token_idx - 1) catch oom();
-            if (self.match(.comma)) {
-                continue;
-            }
+            if (!self.match(.comma)) break;
         }
 
         if (param_names.items.len == 0) {
@@ -361,10 +359,14 @@ fn fnParams(self: *Self, is_closure: bool) Error![]Ast.VarDecl {
         }
 
         const typ = if (self.match(.colon)) try self.parseType() else null;
+
         const value = if (self.match(.equal)) b: {
             named_started = true;
             break :b try self.parsePrecedenceExpr(0);
-        } else if (named_started) return self.errAtCurrent(.positional_after_default_param) else null;
+        } else if (named_started)
+            return self.errAtCurrent(.positional_after_default_param)
+        else
+            null;
 
         if (typ == null and value == null) {
             //  TODO: change error for ':' or '='
