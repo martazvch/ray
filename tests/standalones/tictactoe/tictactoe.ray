@@ -54,19 +54,15 @@ struct Grid {
 
     fn display(self) {
         var grid = "\n"
-        var i = 0
 
-        for row in self.cells {
+        for i, row in self.cells {
             var line = ""
-            var j = 0
 
-            for cell in row {
-                line += cell.toStr() + if j < self.cells.len() - 1 do " " else ""
-                j += 1
+            for j, cell in row {
+                line += cell.toStr() + (j < self.cells.len() - 1 ? " " : "")
             }
 
-            grid += line + if i < self.cells.len() - 1 do "\n" else ""
-            i += 1
+            grid += line + (i < self.cells.len() - 1 ? "\n" : "")
         }
         
         print grid
@@ -90,6 +86,8 @@ fn main() {
     grid.playAt(1, 1, .cross, method: true)
     grid.display()
 }
+
+
 
 
 

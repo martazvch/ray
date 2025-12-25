@@ -1,10 +1,9 @@
 struct Iterator {
     items: []int,
-    len: int,
     count = 0,
 
     fn next(self) -> ?int {
-        if self.count == self.len do return null
+        if self.count == self.items.len() do return null
         self.count += 1
         return self.items[self.count - 1]
     }
@@ -23,7 +22,7 @@ struct Data {
     }
 
     fn iterator(self, cat: str) -> Iterator {
-        return Iterator{ items: if cat == "first" do self.first else self.second, len: 3 }
+        return Iterator{ items: cat == "first" ? self.first : self.second }
     }
 }
 
@@ -74,3 +73,5 @@ fn main() {
         print v // expect 120, 340, 560 
     }
 }
+
+

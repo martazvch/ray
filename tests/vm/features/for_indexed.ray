@@ -1,0 +1,18 @@
+fn main() {
+    for i, v in [10, 20, 30] {
+        print i
+        print v
+    }
+
+    for i, v in [-9, -8, -7] {
+        print "----"
+        print i
+        print v
+
+        for j, vv in [100, 200, 300] {
+            print j
+            print vv
+        }
+    }
+}
+

@@ -368,11 +368,21 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
         else => |*t| return self.err(.{ .iter_non_iterable = .{ .found = self.typeName(t) } }, self.ast.getSpan(node.expr)),
     };
 
+    if (node.index_binding) |index| {
+        const interned = try self.internIfNotInCurrentScope(index);
+        try self.forwardDeclareVariable(interned, self.ti.getCached(.int), false, self.ast.getSpan(index));
+    }
+
     try self.forwardDeclareVariable(binding, elem_type, false, self.ast.getSpan(node.binding));
     const body_res = try self.block(&node.body, .none, ctx);
 
     return self.irb.addInstr(
-        .{ .for_loop = .{ .expr = res.instr, .body = body_res.instr, .kind = kind } },
+        .{ .for_loop = .{
+            .expr = res.instr,
+            .body = body_res.instr,
+            .kind = kind,
+            .use_index = node.index_binding != null,
+        } },
         self.ast.getSpan(node).start,
     );
 }

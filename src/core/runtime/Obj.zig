@@ -637,6 +637,7 @@ pub const Iterator = struct {
     parent: ?Value,
     ptr: *anyopaque,
     vtable: *const VTable,
+    count: i64,
 
     const Self = @This();
     pub const VTable = struct {
@@ -644,9 +645,12 @@ pub const Iterator = struct {
         deinitFn: *const fn (*anyopaque, Allocator) void,
     };
 
-    pub fn create(vm: *Vm, vtable: *const VTable) *Self {
+    pub fn create(vm: *Vm, ptr: *anyopaque, vtable: *const VTable, parent: ?Value) *Self {
         const obj = Obj.allocate(vm, Self, undefined);
+        obj.ptr = ptr;
+        obj.parent = parent;
         obj.vtable = vtable;
+        obj.count = 0;
 
         if (options.log_gc) std.debug.print("<iterator>\n", .{});
 
@@ -664,6 +668,11 @@ pub const Iterator = struct {
 
     pub fn next(self: *Self, vm: *Vm) Value {
         return self.vtable.nextFn(self.ptr, vm);
+    }
+
+    pub fn nextWithIndex(self: *Self, vm: *Vm) struct { i64, Value } {
+        defer self.count += 1;
+        return .{ self.count, self.vtable.nextFn(self.ptr, vm) };
     }
 };
 
@@ -701,15 +710,10 @@ pub const ArrIterator = struct {
     }
 
     pub fn iterator(self: *Self, vm: *Vm, parent: Value) *Iterator {
-        const obj = Obj.allocate(vm, Iterator, undefined);
-        obj.ptr = self;
-        obj.parent = parent;
-        obj.vtable = &.{
+        return Iterator.create(vm, self, &.{
             .nextFn = next,
             .deinitFn = deinit,
-        };
-
-        return obj;
+        }, parent);
     }
 };
 
@@ -748,15 +752,10 @@ pub const StrIterator = struct {
     }
 
     pub fn iterator(self: *Self, vm: *Vm) *Iterator {
-        const obj = Obj.allocate(vm, Iterator, undefined);
-        obj.ptr = self;
-        obj.parent = null;
-        obj.vtable = &.{
+        return Iterator.create(vm, self, &.{
             .nextFn = next,
             .deinitFn = deinit,
-        };
-
-        return obj;
+        }, null);
     }
 };
 
@@ -797,15 +796,10 @@ pub const RangeIterator = struct {
     }
 
     pub fn iterator(self: *Self, vm: *Vm) *Iterator {
-        const obj = Obj.allocate(vm, Iterator, undefined);
-        obj.ptr = self;
-        obj.parent = null;
-        obj.vtable = &.{
+        return Iterator.create(vm, self, &.{
             .nextFn = next,
             .deinitFn = deinit,
-        };
-
-        return obj;
+        }, null);
     }
 };
 

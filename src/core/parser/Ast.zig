@@ -68,6 +68,7 @@ pub const FnDecl = struct {
 
 pub const For = struct {
     for_tk: TokenIndex,
+    index_binding: ?TokenIndex,
     binding: TokenIndex,
     expr: *Expr,
     body: Block,

@@ -1,4 +1,5 @@
 expect_identifier_for_binding
 expect_in
 expect_brace_before_for_body
+expect_identifier_for_binding
 

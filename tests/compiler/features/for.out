@@ -50,6 +50,20 @@ pop
 loop 74 -> 66
 pop2
 
+push_true
+push_false
+array_new index 2
+iter_new_arr
+iter_next_index
+jump_null 84 -> 98
+get_local index 3
+print
+get_local index 4
+print
+pop
+pop
+loop 95 -> 83
+pop3
 ret_naked
 
 -- global scope --

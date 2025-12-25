@@ -16,5 +16,9 @@ fn main() {
     for c in "Martin" {
         print c
     }
+
+    for i, v in [] {
+        print i
+    }
 }
 

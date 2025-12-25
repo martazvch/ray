@@ -376,6 +376,11 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             .iter_new_range => self.stack.peekRef(0).* = .makeObj(Obj.RangeIterator.create(self, self.stack.peek(0).range)),
             .iter_new_str => self.stack.peekRef(0).* = .makeObj(Obj.StrIterator.create(self, self.stack.peek(0).obj.as(Obj.String))),
             .iter_next => self.stack.push(self.stack.peekRef(0).obj.as(Obj.Iterator).next(self)),
+            .iter_next_index => {
+                const index, const value = self.stack.peekRef(0).obj.as(Obj.Iterator).nextWithIndex(self);
+                self.stack.push(.makeInt(index));
+                self.stack.push(value);
+            },
             .jump => {
                 const jump = frame.readShort();
                 frame.ip += jump;
@@ -442,6 +447,7 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             .not => self.stack.peekRef(0).not(),
             .pop => self.stack.top -= 1,
             .pop2 => self.stack.top -= 2,
+            .pop3 => self.stack.top -= 3,
             .print => {
                 self.stack.pop().print(stdout);
                 stdout.writeAll("\n") catch oom();

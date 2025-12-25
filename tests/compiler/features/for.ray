@@ -16,4 +16,9 @@ fn main() {
     for c in "Martin" {
         print c
     }
+
+    for i, v in [true, false] {
+        print i
+        print v
+    }
 }

@@ -47,3 +47,10 @@
         [Block pop count: 1, is_expr: false]
             [Print]
                 [Variable index: 3, scope: local]
+    [For]
+    - expr:
+        [Array]
+    - body:
+        [Block pop count: 2, is_expr: false]
+            [Print]
+                [Variable index: 3, scope: local]

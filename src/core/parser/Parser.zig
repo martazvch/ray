@@ -743,9 +743,19 @@ fn discard(self: *Self) Error!Node {
 
 fn forLoop(self: *Self) Error!Node {
     const for_tk = self.token_idx - 1;
+    var index_token: ?TokenIndex = null;
+    var binding_token: TokenIndex = undefined;
 
     try self.expect(.identifier, .expect_identifier_for_binding);
-    const binding = self.token_idx - 1;
+    const first = self.token_idx - 1;
+
+    if (self.match(.comma)) {
+        try self.expect(.identifier, .expect_identifier_for_binding);
+        index_token = first;
+        binding_token = self.token_idx - 1;
+    } else {
+        binding_token = first;
+    }
 
     try self.expect(.in, .expect_in);
     const save_cond = self.ctx.setAndGetPrevious(.in_cond, true);
@@ -757,7 +767,8 @@ fn forLoop(self: *Self) Error!Node {
 
     return .{ .for_loop = .{
         .for_tk = for_tk,
-        .binding = binding,
+        .index_binding = index_token,
+        .binding = binding_token,
         .expr = expr,
         .body = body.block,
     } };

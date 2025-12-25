@@ -765,13 +765,13 @@ const Compiler = struct {
             .str => .iter_new_str,
         });
         const loop_start = self.function.chunk.code.items.len;
-        self.writeOp(.iter_next);
+        self.writeOp(if (data.use_index) .iter_next_index else .iter_next);
         const iter_end = self.emitJump(.jump_null);
         try self.compileInstr(data.body);
         try self.emitLoop(loop_start);
         try self.patchJump(iter_end);
         // Null value and iterator
-        self.writeOp(.pop2);
+        self.writeOp(if (data.use_index) .pop3 else .pop2);
     }
 
     fn identifier(self: *Self, data: *const Instruction.Variable) Error!void {

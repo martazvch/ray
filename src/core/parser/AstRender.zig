@@ -70,6 +70,7 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
         .for_loop => |n| {
             try self.openKey(@tagName(node.*), .block);
             try self.pushKeyValue("name", self.ast.toSource(n.binding), true);
+            try self.pushKeyValue("index", if (n.index_binding) |index| self.ast.toSource(index) else "null", true);
             try self.renderSingleExpr("value", n.expr, .block, true);
             try self.renderBlock(&n.body, "body", false);
             try self.closeKey(.block, comma);

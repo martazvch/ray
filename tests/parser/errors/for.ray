@@ -1,3 +1,5 @@
 for 56 in arr {}
 for value arr {}
 for value in arr print 5
+
+for 5, value in arr {}

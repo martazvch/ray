@@ -1,7 +1,5 @@
-fn main() {
-    let arr = [1, 2, 3]
-    for v in arr {
-        print v
-    }
+for v in arr {
+    print v
 }
 
+for i, v in arr {}

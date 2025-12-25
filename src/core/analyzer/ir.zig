@@ -158,6 +158,7 @@ pub const Instruction = struct {
         expr: Index,
         body: Index,
         kind: Kind,
+        use_index: bool,
 
         pub const Kind = enum { array, str, range };
     };
