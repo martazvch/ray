@@ -83,6 +83,8 @@ pub const Instruction = struct {
             le_int,
             lt_float,
             lt_int,
+            mod_float,
+            mod_int,
             mul_float,
             mul_int,
             mul_str,

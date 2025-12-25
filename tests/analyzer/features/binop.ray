@@ -4,4 +4,6 @@ fn main() {
     _ = "steak" * 3
     _ = 5 * "house"
     _ = "juicy " + "orange"
+    4 % 6
+    4.5 % 1.2
 }

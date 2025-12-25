@@ -126,6 +126,8 @@ pub fn disInstruction(self: *Self, writer: *Writer, offset: usize) usize {
         .load_builtin => self.indexInstruction(writer, "load_builtin", offset),
         .load_sym => self.loadSymbol(writer, offset),
         .loop => self.jumpInstruction(writer, "loop", -1, offset),
+        .mod_float => self.simpleInstruction(writer, "mod_float", offset),
+        .mod_int => self.simpleInstruction(writer, "mod_int", offset),
         .mul_float => self.simpleInstruction(writer, "mul_float", offset),
         .mul_int => self.simpleInstruction(writer, "mul_int", offset),
         .ne_bool => self.simpleInstruction(writer, "ne_bool", offset),

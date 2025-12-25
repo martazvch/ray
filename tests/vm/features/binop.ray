@@ -40,4 +40,9 @@ fn main() {
     // local call
     fn sub(a: int, b: int) -> int { return a - b }
     print 66 + sub(1, 7) // expect: 60
+
+    print 18 % 6
+    print 20 % 3
+
+    print 1.2 % 4.3
 }

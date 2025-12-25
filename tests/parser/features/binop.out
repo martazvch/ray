@@ -118,5 +118,14 @@
             "literal": "2"
         },
         "op": "!="
+    },
+    "binop": {
+        "lhs": {
+            "literal": "4"
+        },
+        "rhs": {
+            "literal": "6"
+        },
+        "op": "%"
     }
 }

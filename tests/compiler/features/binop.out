@@ -124,6 +124,16 @@ load_constant index 24, value 3
 ne_float
 pop
 
+load_constant index 3, value 1
+load_constant index 20, value 3
+mod_int
+pop
+
+load_constant index 29, value 1.2
+load_constant index 30, value 4.3
+mod_float
+pop
+
 ret_naked
 
 -- global scope --

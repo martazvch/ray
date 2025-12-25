@@ -279,6 +279,10 @@ pub fn next(self: *Self) Token {
                         res.tag = .star_equal;
                     } else res.tag = .star;
                 },
+                '%' => {
+                    res.tag = .modulo;
+                    self.index += 1;
+                },
                 '/' => continue :state .slash,
                 '\n' => {
                     res.tag = .new_line;
@@ -601,14 +605,14 @@ test "numbers" {
 test "tokens" {
     var lexer = Self.init(std.testing.allocator);
     defer lexer.deinit();
-    lexer.lex("(){}.:,=!< ><= >= !=+-*/ += -= *= /=[]|@");
+    lexer.lex("(){}.:,=!< ><= >= !=+-*/ += -= *= /=[]|@%");
 
     const res = [_]Token.Tag{
         .left_paren,    .right_paren, .left_brace, .right_brace, .dot,          .colon,
         .comma,         .equal,       .bang,       .less,        .greater,      .less_equal,
         .greater_equal, .bang_equal,  .plus,       .minus,       .star,         .slash,
         .plus_equal,    .minus_equal, .star_equal, .slash_equal, .left_bracket, .right_bracket,
-        .pipe,          .at,
+        .pipe,          .at,          .modulo,
     };
 
     for (0..res.len) |i| {

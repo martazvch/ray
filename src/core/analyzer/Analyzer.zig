@@ -551,7 +551,7 @@ fn fnBody(self: *Self, body: []Node, fn_type: *const Type.Function, name_span: S
         returns = res.cf == .@"return";
 
         // If last expression produced a value and that it wasn't the last one we pop it
-        if (!last and !final_type.is(.void) and !res.type.is(.never)) {
+        if (fn_type.return_type == self.ti.getCached(.void) and !res.type.is(.void) and !res.type.is(.never)) {
             instrs.appendAssumeCapacity(self.irb.wrapPreviousInstr(.pop));
         } else {
             instrs.appendAssumeCapacity(res.instr);
@@ -1067,7 +1067,7 @@ fn binop(self: *Self, expr: *const Ast.Binop, ctx: *Context) Result {
 
     const op: Instruction.Binop.Op, const lhs_instr, const rhs_instr, const ty = instr: {
         switch (expr.op) {
-            .plus, .slash, .star, .minus => {
+            .plus, .slash, .star, .minus, .modulo => {
                 const lhs_instr, const rhs_instr, const ty = binopArithmeticCoercion(lhs, rhs) catch |e| return switch (e) {
                     error.NonNumLsh => self.err(.{ .invalid_arithmetic = .{ .found = self.typeName(lhs.type) } }, lhs_span),
                     error.NonNumRhs => self.err(.{ .invalid_arithmetic = .{ .found = self.typeName(rhs.type) } }, rhs_span),
@@ -1142,6 +1142,7 @@ fn getArithmeticOp(op: TokenTag, ty: *const Type) Instruction.Binop.Op {
         .slash => if (ty.is(.int)) .div_int else .div_float,
         .star => if (ty.is(.int)) .mul_int else .mul_float,
         .minus => if (ty.is(.int)) .sub_int else .sub_float,
+        .modulo => if (ty.is(.int)) .mod_int else .mod_float,
 
         .less => if (ty.is(.int)) .lt_int else .lt_float,
         .less_equal => if (ty.is(.int)) .le_int else .le_float,

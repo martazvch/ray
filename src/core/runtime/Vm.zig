@@ -427,6 +427,19 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
                 const jump = frame.readShort();
                 frame.ip -= jump;
             },
+            // TODO: modulo errors
+            .mod_float => {
+                const rhs = self.stack.pop().float;
+                const lhs = self.stack.pop().float;
+                if (rhs == 0) @panic("Modulo wit 0");
+                self.stack.push(.makeFloat(@mod(lhs, rhs)));
+            },
+            .mod_int => {
+                const rhs = self.stack.pop().int;
+                const lhs = self.stack.pop().int;
+                if (rhs == 0) @panic("Modulo wit 0");
+                self.stack.push(.makeInt(@mod(lhs, rhs)));
+            },
             .mul_float => {
                 const rhs = self.stack.pop().float;
                 self.stack.peekRef(0).float *= rhs;

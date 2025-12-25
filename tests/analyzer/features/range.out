@@ -14,8 +14,9 @@
     [Variable declaration index: 0, scope: local]
         [Constant 6]
             [Int 150]
-    [Range]
-    - start:
-    [Call symbol 0]
-    - end:
-    [Variable index: 0, scope: local]
+    [Pop]
+        [Range]
+        - start:
+        [Call symbol 0]
+        - end:
+        [Variable index: 0, scope: local]

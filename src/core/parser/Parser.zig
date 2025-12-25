@@ -859,6 +859,7 @@ const rules = std.enums.directEnumArrayDefault(Token.Tag, Rule, .{ .prec = -1 },
     .minus = .{ .prec = 60 },
     .plus = .{ .prec = 60 },
 
+    .modulo = .{ .prec = 70 },
     .slash = .{ .prec = 70 },
     .star = .{ .prec = 70 },
 });

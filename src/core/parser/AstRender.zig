@@ -297,6 +297,7 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
                 .equal_equal => "==",
                 .@"and", .@"or" => |tag| @tagName(tag),
                 .plus => "+",
+                .modulo => "%",
                 .minus => "-",
                 .star => "*",
                 .slash => "/",

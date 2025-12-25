@@ -146,6 +146,7 @@ jump 199 -> 205
 pop
 load_constant index 18, value invalid
 pop
+pop
 
 ret_naked
 
