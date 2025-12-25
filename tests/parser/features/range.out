@@ -1,0 +1,23 @@
+{
+    "range": {
+        "start": {
+            "literal": "0"
+        },
+        "end": {
+            "literal": "5"
+        }
+    },
+    "range": {
+        "start": {
+            "fn_call": {
+                "callee": {
+                    "literal": "getValue"
+                },
+                "args": []
+            }
+        },
+        "end": {
+            "literal": "end"
+        }
+    }
+}

@@ -1,0 +1,7 @@
+fn getFloat() -> float { return 5.6 }
+
+fn main() {
+    0..getFloat()
+    1.2..5
+    true.."oui"
+}

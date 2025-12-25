@@ -372,31 +372,10 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
                 const type_id = frame.readByte();
                 self.stack.push(.makeBool(self.stack.peek(0).obj.type_id == type_id));
             },
-            .iter_new_arr => {
-                const value = self.stack.pop();
-                self.stack.push(.makeObj(
-                    Obj.Iterator.create(self, value, value.obj.as(Obj.Array).values.items, false).asObj(),
-                ));
-            },
-            .iter_new_str => {
-                const value = self.stack.pop();
-                const string = value.obj.as(Obj.String);
-                var chars = self.gc_alloc.alloc(Value, string.chars.len) catch oom();
-
-                for (string.chars, 0..) |c, i| {
-                    const string_obj = Obj.String.takeCopy(self, &.{c}).asObj();
-                    chars[i] = .makeObj(string_obj);
-                    self.gc.pushTmpRoot(string_obj);
-                }
-
-                self.stack.push(.makeObj(
-                    Obj.Iterator.create(self, value, chars, true).asObj(),
-                ));
-                self.gc.popTmpRootMany(string.chars.len);
-            },
-            .iter_next => {
-                self.stack.push(self.stack.peekRef(0).obj.as(Obj.Iterator).next());
-            },
+            .iter_new_arr => self.stack.peekRef(0).* = .makeObj(Obj.ArrIterator.create(self, self.stack.peek(0))),
+            .iter_new_range => self.stack.peekRef(0).* = .makeObj(Obj.RangeIterator.create(self, self.stack.peek(0).range)),
+            .iter_new_str => self.stack.peekRef(0).* = .makeObj(Obj.StrIterator.create(self, self.stack.peek(0).obj.as(Obj.String))),
+            .iter_next => self.stack.push(self.stack.peekRef(0).obj.as(Obj.Iterator).next(self)),
             .jump => {
                 const jump = frame.readShort();
                 frame.ip += jump;
@@ -471,6 +450,7 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             .push_false => self.stack.push(Value.false_),
             .push_null => self.stack.push(Value.null_),
             .push_true => self.stack.push(Value.true_),
+            .range_new => self.stack.push(.makeRange(self.stack.pop().int, self.stack.pop().int)),
             .ret => {
                 const result = self.stack.pop();
                 self.frame_stack.count -= 1;

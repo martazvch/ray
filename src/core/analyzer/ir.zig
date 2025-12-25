@@ -159,7 +159,7 @@ pub const Instruction = struct {
         body: Index,
         kind: Kind,
 
-        pub const Kind = enum { array, str, range, other };
+        pub const Kind = enum { array, str, range };
     };
     pub const If = struct {
         cond: Index,

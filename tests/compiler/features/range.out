@@ -1,0 +1,38 @@
+-- main --
+load_constant index 4, value 5
+load_constant index 3, value 0
+range_new
+iter_new_range
+iter_next
+jump_null 7 -> 35
+get_local index 1
+print
+load_constant index 6, value 8
+load_constant index 5, value 6
+range_new
+iter_new_range
+iter_next
+jump_null 20 -> 30
+get_local index 3
+print
+pop
+loop 27 -> 19
+pop2
+pop
+loop 32 -> 6
+pop2
+load_constant index 3, value 0
+load_constant index 4, value 5
+range_new
+iter_new_range
+iter_next
+jump_null 43 -> 53
+get_local index 1
+print
+pop
+loop 50 -> 42
+pop2
+ret_naked
+
+-- global scope --
+call_sym index 0, arity 0, <function main>

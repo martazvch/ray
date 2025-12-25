@@ -1,0 +1,13 @@
+fn main() {
+    for i in 0..5 {
+        print i
+        for j in 6..8 {
+            print j
+        }
+    }
+
+    for i in 5..0 {
+        print i
+    }
+}
+

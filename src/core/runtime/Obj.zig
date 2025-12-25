@@ -37,7 +37,6 @@ const Kind = enum {
     iterator,
     native_fn,
     native_obj,
-    range,
     string,
     structure,
 
@@ -53,7 +52,6 @@ const Kind = enum {
             Iterator => .iterator,
             NativeFunction => .native_fn,
             NativeObj => .native_obj,
-            Range => .range,
             String => .string,
             Structure => .structure,
             else => @compileError(@typeName(T) ++ " isn't a runtime object type"),
@@ -99,7 +97,7 @@ pub fn deepCopy(self: *Obj, vm: *Vm) *Obj {
         .enum_instance => @panic("TODO"),
         .instance => self.as(Instance).deepCopy(vm).asObj(),
         // Immutable, shallow copy ok
-        .box, .closure, .@"enum", .function, .iterator, .native_fn, .native_obj, .range, .string, .structure => self,
+        .box, .closure, .@"enum", .function, .iterator, .native_fn, .native_obj, .string, .structure => self,
     };
 }
 
@@ -130,7 +128,6 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
             const object = self.as(NativeObj);
             object.deinit(vm);
         },
-        .range => self.as(Range).deinit(vm.gc_alloc),
         .string => self.as(String).deinit(vm.gc_alloc),
         .structure => {
             const structure = self.as(Structure);
@@ -183,7 +180,6 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
         .iterator => try writer.writeAll("<iterator>"),
         .native_fn => try writer.print("<native fn {s}>", .{self.as(NativeFunction).name}),
         .native_obj => try writer.print("<native object {s}>", .{self.as(NativeObj).name}),
-        .range => try writer.print("<range {}..{}>", .{ self.as(Range).start, self.as(Range).end }),
         .string => try writer.print("{s}", .{self.as(String).chars}),
         .structure => try writer.print("<structure {s}>", .{self.as(Structure).name}),
     }
@@ -201,7 +197,6 @@ pub fn log(self: *Obj) void {
         .iterator => std.debug.print("<iterator>", .{}),
         .native_fn => std.debug.print("<native function {s}>", .{self.as(NativeFunction).name}),
         .native_obj => unreachable,
-        .range => std.debug.print("<range>", .{}),
         .string => std.debug.print("{s}", .{self.as(String).chars}),
         .structure => std.debug.print("<structure {s}>", .{self.as(Structure).name}),
     }
@@ -639,25 +634,19 @@ pub const EnumInstance = struct {
 
 pub const Iterator = struct {
     obj: Obj,
-    // We keep a reference to the parent so when using literals like: for v in [1, 2] {}
-    // GC can trace the literal, otherwise it's destroyed
-    parent: Value,
-    values: []Value,
-    index: usize,
-    owns: bool,
+    parent: ?Value,
+    ptr: *anyopaque,
+    vtable: *const VTable,
 
     const Self = @This();
+    pub const VTable = struct {
+        nextFn: *const fn (*anyopaque, *Vm) Value,
+        deinitFn: *const fn (*anyopaque, Allocator) void,
+    };
 
-    pub fn create(vm: *Vm, parent: Value, values: []Value, owns: bool) *Self {
-        // The value has been popped from stack, need to keep reference of it
-        vm.gc.pushTmpRoot(parent.obj);
-        defer vm.gc.popTmpRoot();
-
+    pub fn create(vm: *Vm, vtable: *const VTable) *Self {
         const obj = Obj.allocate(vm, Self, undefined);
-        obj.parent = parent;
-        obj.values = values;
-        obj.index = 0;
-        obj.owns = owns;
+        obj.vtable = vtable;
 
         if (options.log_gc) std.debug.print("<iterator>\n", .{});
 
@@ -669,48 +658,154 @@ pub const Iterator = struct {
     }
 
     pub fn deinit(self: *Self, allocator: Allocator) void {
-        if (self.owns) allocator.free(self.values);
+        self.vtable.deinitFn(self.ptr, allocator);
         allocator.destroy(self);
     }
 
-    pub fn next(self: *Self) Value {
-        if (self.index == self.values.len) {
-            return .null;
-        }
-
-        defer self.index += 1;
-        return self.values[self.index];
+    pub fn next(self: *Self, vm: *Vm) Value {
+        return self.vtable.nextFn(self.ptr, vm);
     }
 };
 
-pub const Range = struct {
-    obj: Obj,
-    // For printing
-    start: i64,
-    end: i64,
-    current: i64,
-    incr: i64,
+pub const ArrIterator = struct {
+    values: []Value,
+    index: usize,
 
     const Self = @This();
 
-    pub fn create(vm: *Vm, start: i64, end: i64) *Self {
-        const obj = Obj.allocate(vm, Self, undefined);
-        obj.start = start;
-        obj.end = end;
-        obj.current = start;
-        obj.incr = if (start < end) 1 else -1;
+    pub fn create(vm: *Vm, parent: Value) *Obj {
+        var self: *Self = vm.gc_alloc.create(Self) catch oom();
+        self.values = parent.obj.as(Array).values.items;
+        self.index = 0;
 
-        if (options.log_gc) std.debug.print("<range>\n", .{});
-
-        return obj;
+        return self.iterator(vm, parent).asObj();
     }
 
     pub fn asObj(self: *Self) *Obj {
         return &self.obj;
     }
 
-    pub fn deinit(self: *Self, allocator: Allocator) void {
-        allocator.destroy(self);
+    pub fn next(self: *anyopaque, _: *Vm) Value {
+        const s: *Self = @ptrCast(@alignCast(self));
+        if (s.index == s.values.len) {
+            return .null;
+        }
+
+        defer s.index += 1;
+        return s.values[s.index];
+    }
+
+    pub fn deinit(self: *anyopaque, allocator: Allocator) void {
+        const s: *Self = @ptrCast(@alignCast(self));
+        allocator.destroy(s);
+    }
+
+    pub fn iterator(self: *Self, vm: *Vm, parent: Value) *Iterator {
+        const obj = Obj.allocate(vm, Iterator, undefined);
+        obj.ptr = self;
+        obj.parent = parent;
+        obj.vtable = &.{
+            .nextFn = next,
+            .deinitFn = deinit,
+        };
+
+        return obj;
+    }
+};
+
+pub const StrIterator = struct {
+    string: *String,
+    index: usize,
+
+    const Self = @This();
+    pub const empty: Self = .{ .string = undefined, .index = 0 };
+
+    pub fn create(vm: *Vm, string: *String) *Obj {
+        var self: *Self = vm.gc_alloc.create(Self) catch oom();
+        self.string = string;
+        self.index = 0;
+
+        return self.iterator(vm).asObj();
+    }
+
+    pub fn asObj(self: *Self) *Obj {
+        return &self.obj;
+    }
+
+    pub fn next(self: *anyopaque, vm: *Vm) Value {
+        const s: *Self = @ptrCast(@alignCast(self));
+        if (s.index == s.string.chars.len) {
+            return .null;
+        }
+
+        defer s.index += 1;
+        return .makeObj(Obj.String.takeCopy(vm, &.{s.string.chars[s.index]}).asObj());
+    }
+
+    pub fn deinit(self: *anyopaque, allocator: Allocator) void {
+        const s: *Self = @ptrCast(@alignCast(self));
+        allocator.destroy(s);
+    }
+
+    pub fn iterator(self: *Self, vm: *Vm) *Iterator {
+        const obj = Obj.allocate(vm, Iterator, undefined);
+        obj.ptr = self;
+        obj.parent = null;
+        obj.vtable = &.{
+            .nextFn = next,
+            .deinitFn = deinit,
+        };
+
+        return obj;
+    }
+};
+
+pub const RangeIterator = struct {
+    obj: Obj,
+    end: i64,
+    current: i64,
+    incr: i64,
+
+    const Self = @This();
+
+    pub fn create(vm: *Vm, range: Value.Range) *Obj {
+        var self: *Self = vm.gc_alloc.create(Self) catch oom();
+        self.end = range.end;
+        self.current = range.start;
+        self.incr = if (range.start < range.end) 1 else -1;
+
+        return self.iterator(vm).asObj();
+    }
+
+    pub fn asObj(self: *Self) *Obj {
+        return &self.obj;
+    }
+
+    pub fn next(self: *anyopaque, _: *Vm) Value {
+        const s: *Self = @ptrCast(@alignCast(self));
+        if (s.current == s.end) {
+            return .null;
+        }
+
+        defer s.current += s.incr;
+        return .makeInt(s.current);
+    }
+
+    pub fn deinit(self: *anyopaque, allocator: Allocator) void {
+        const s: *Self = @ptrCast(@alignCast(self));
+        allocator.destroy(s);
+    }
+
+    pub fn iterator(self: *Self, vm: *Vm) *Iterator {
+        const obj = Obj.allocate(vm, Iterator, undefined);
+        obj.ptr = self;
+        obj.parent = null;
+        obj.vtable = &.{
+            .nextFn = next,
+            .deinitFn = deinit,
+        };
+
+        return obj;
     }
 };
 

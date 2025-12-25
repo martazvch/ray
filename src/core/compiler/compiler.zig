@@ -761,8 +761,8 @@ const Compiler = struct {
         try self.compileInstr(data.expr);
         self.writeOp(switch (data.kind) {
             .array => .iter_new_arr,
+            .range => .iter_new_range,
             .str => .iter_new_str,
-            else => @panic("Not implemented yet"),
         });
         const loop_start = self.function.chunk.code.items.len;
         self.writeOp(.iter_next);
@@ -870,8 +870,9 @@ const Compiler = struct {
     }
 
     fn range(self: *Self, data: Instruction.Range) Error!void {
-        try self.compileInstr(data.start);
         try self.compileInstr(data.end);
+        try self.compileInstr(data.start);
+        self.writeOp(.range_new);
     }
 
     fn returnInstr(self: *Self, data: *const Instruction.Return) Error!void {

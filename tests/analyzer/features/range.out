@@ -1,0 +1,21 @@
+[Function declaration getInt, returns]
+    [Return]
+        [Constant 3]
+            [Int 8]
+[Function declaration main]
+    [Pop]
+        [Range]
+        - start:
+        [Constant 4]
+            [Int 0]
+        - end:
+        [Constant 5]
+            [Int 5]
+    [Variable declaration index: 0, scope: local]
+        [Constant 6]
+            [Int 150]
+    [Range]
+    - start:
+    [Call symbol 0]
+    - end:
+    [Variable index: 0, scope: local]

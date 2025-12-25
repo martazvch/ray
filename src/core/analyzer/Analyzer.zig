@@ -363,6 +363,7 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
 
     const kind: Instruction.For.Kind, const elem_type = switch (res.type.*) {
         .array => |t| .{ .array, t.child },
+        .range => .{ .range, self.ti.getCached(.int) },
         .str => .{ .str, res.type },
         else => |*t| return self.err(.{ .iter_non_iterable = .{ .found = self.typeName(t) } }, self.ast.getSpan(node.expr)),
     };
@@ -2033,12 +2034,8 @@ fn range(self: *Self, expr: Ast.Range, ctx: *Context) Result {
     const start = try self.analyzeExpr(expr.start, .value, ctx);
     const end = try self.analyzeExpr(expr.end, .value, ctx);
 
-    if (!start.type.is(.int)) {
-        return self.err(.{ .range_non_int = .{ .found = self.typeName(start.type) } }, self.ast.getSpan(expr.start));
-    }
-    if (!end.type.is(.int)) {
-        return self.err(.{ .range_non_int = .{ .found = self.typeName(end.type) } }, self.ast.getSpan(expr.end));
-    }
+    try self.validateRange(start.type, self.ast.getSpan(expr.start));
+    try self.validateRange(end.type, self.ast.getSpan(expr.end));
 
     return .{
         .type = self.ti.getCached(.range),
@@ -2047,6 +2044,12 @@ fn range(self: *Self, expr: Ast.Range, ctx: *Context) Result {
             self.ast.getSpan(expr).start,
         ),
     };
+}
+
+fn validateRange(self: *Self, ty: *const Type, span: Span) Error!void {
+    if (!ty.is(.int)) {
+        return self.err(.{ .range_non_int = .{ .found = self.typeName(ty) } }, span);
+    }
 }
 
 fn returnExpr(self: *Self, expr: *const Ast.Return, ctx: *Context) Result {

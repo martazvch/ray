@@ -17,13 +17,29 @@ fn main() {
     }
 
     print "----"
+    for c in "Martin" {
+        print c
+    }
+
     let string = "Tom"
     for c in string {
         print c
     }
 
+    print "----"
     for c in "Martin" {
         print c
+        for cc in "Tom" {
+            print cc
+        }
+    }
+
+    print "----"
+    for c in "Martin" {
+        print c
+        for j in [4, 5] {
+            print j
+        }
     }
 }
 

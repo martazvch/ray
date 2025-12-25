@@ -137,10 +137,7 @@ fn blackenObject(self: *Self, obj: *Obj) Allocator.Error!void {
             const instance = obj.as(Instance);
             try self.markArray(instance.fields);
         },
-        .iterator => {
-            try self.markValue(&obj.as(Obj.Iterator).parent);
-            try self.markArray(obj.as(Obj.Iterator).values);
-        },
+        .iterator => if (obj.as(Obj.Iterator).parent) |*p| try self.markValue(p),
         .native_fn => unreachable,
         // TODO: see why we can't mark functions and structure unreachable
         // I think they should not be reachable because only allocated at comptime

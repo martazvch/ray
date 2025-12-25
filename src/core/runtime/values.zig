@@ -11,12 +11,14 @@ pub const Value = union(enum) {
     float: f64,
     int: i64,
     null,
+    range: Range,
     obj: *Obj,
 
     const Self = @This();
     pub const true_: Self = .{ .bool = true };
     pub const false_: Self = .{ .bool = false };
     pub const null_: Self = .{ .null = undefined };
+    pub const Range = struct { start: i64, end: i64 };
 
     pub fn makeBool(value: bool) Self {
         return .{ .bool = value };
@@ -28,6 +30,10 @@ pub const Value = union(enum) {
 
     pub fn makeInt(value: i64) Self {
         return .{ .int = value };
+    }
+
+    pub fn makeRange(start: i64, end: i64) Self {
+        return .{ .range = .{ .start = start, .end = end } };
     }
 
     pub fn makeObj(object: *Obj) Self {
@@ -48,7 +54,7 @@ pub const Value = union(enum) {
 
     pub fn deepCopy(self: Self, vm: *Vm) Self {
         return switch (self) {
-            .bool, .float, .int, .null => self,
+            .bool, .float, .int, .null, .range => self,
             .obj => |obj| Self.makeObj(obj.deepCopy(vm)),
         };
     }
@@ -59,6 +65,7 @@ pub const Value = union(enum) {
             .float => |v| writer.print("{d}", .{v}) catch oom(),
             .int => |v| writer.print("{}", .{v}) catch oom(),
             .null => writer.print("null", .{}) catch oom(),
+            .range => |v| writer.print("{}..{}", .{ v.start, v.end }) catch oom(),
             .obj => |v| v.print(writer) catch oom(),
         }
     }

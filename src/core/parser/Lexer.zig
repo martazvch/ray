@@ -302,10 +302,15 @@ pub fn next(self: *Self) Token {
                     continue :state .string;
                 },
                 '0' => {
-                    // TODO: protect
-                    if (self.source[self.index + 1] == '.') {
-                        self.index += 1;
-                        continue :state .float;
+                    if (self.checkAt(1, '.')) {
+                        if (self.checkAt(2, '.')) {
+                            // Range syntax like: 0..5
+                            res.tag = .int;
+                            self.index += 1;
+                        } else {
+                            self.index += 1;
+                            continue :state .float;
+                        }
                     } else {
                         self.index += 1;
                         switch (self.source[self.index]) {
@@ -459,7 +464,7 @@ pub fn next(self: *Self) Token {
                     continue :state .int;
                 },
                 '.' => {
-                    if (self.index < self.source.len - 1 and self.source[self.index + 1] == '.') {
+                    if (self.checkAt(1, '.')) {
                         // Range syntaxe: 1..3
                     } else {
                         continue :state .float;
@@ -540,6 +545,10 @@ pub fn next(self: *Self) Token {
 
     res.span.end = self.index;
     return res;
+}
+
+fn checkAt(self: *const Self, at: usize, char: u8) bool {
+    return self.index < self.source.len + at and self.source[self.index + at] == char;
 }
 
 // ------------
