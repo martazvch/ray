@@ -353,6 +353,8 @@ fn containerFnDecls(
 
 fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
     const binding = try self.internIfNotInCurrentScope(node.binding);
+    const index_interned = if (node.index_binding) |index| try self.internIfNotInCurrentScope(index) else null;
+
     const res = try self.analyzeExpr(node.expr, .value, ctx);
 
     // Virtual scope to declare the iterator
@@ -368,9 +370,8 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
         else => |*t| return self.err(.{ .iter_non_iterable = .{ .found = self.typeName(t) } }, self.ast.getSpan(node.expr)),
     };
 
-    if (node.index_binding) |index| {
-        const interned = try self.internIfNotInCurrentScope(index);
-        try self.forwardDeclareVariable(interned, self.ti.getCached(.int), false, self.ast.getSpan(index));
+    if (index_interned) |interned| {
+        try self.forwardDeclareVariable(interned, self.ti.getCached(.int), false, self.ast.getSpan(node.index_binding.?));
     }
 
     try self.forwardDeclareVariable(binding, elem_type, false, self.ast.getSpan(node.binding));

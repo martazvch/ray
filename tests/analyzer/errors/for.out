@@ -1,2 +1,4 @@
 iter_non_iterable, int
 iter_non_iterable, Foo
+already_declared, i
+already_declared, v
