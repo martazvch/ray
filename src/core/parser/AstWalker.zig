@@ -211,6 +211,7 @@ fn captureFromExpr(self: *Self, expr: *Ast.Expr, ctx: *CaptureCtx) void {
         },
         .@"break" => |e| if (e.expr) |val| self.captureFromExpr(val, ctx),
         .enum_lit => {},
+        .fail => |e| self.captureFromExpr(e.expr, ctx),
         .fn_call => |*e| {
             self.captureFromExpr(e.callee, ctx);
             for (e.args) |arg| {

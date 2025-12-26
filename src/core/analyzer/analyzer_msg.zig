@@ -25,8 +25,12 @@ pub const AnalyzerMsg = union(enum) {
     enum_lit_non_enum: struct { found: []const u8 },
     enum_tag_access,
     enum_unknown_decl: struct { @"enum": []const u8, field: []const u8 },
+    error_not_in_union: struct { found: []const u8, expect: []const u8 },
+    error_with_return: struct { found: []const u8 },
     expect_statement,
     expect_value_found_type: struct { found: []const u8 },
+    fail_no_err: struct { found: []const u8 },
+    fail_outside_fn,
     float_equal,
     fn_expect_value: struct { expect: []const u8 },
     index_assign_str,
@@ -116,8 +120,12 @@ pub const AnalyzerMsg = union(enum) {
             .enum_lit_non_enum => |e| writer.print("expect an enum but found '{s}'", .{e.found}),
             .enum_tag_access => writer.writeAll("can't access enum's tag at runtime"),
             .enum_unknown_decl => |e| writer.print("enum '{s}' have no declaration '{s}'", .{ e.@"enum", e.field }),
+            .error_not_in_union => |e| writer.print("error '{s}' is not part of union '{s}'", .{ e.found, e.expect }),
+            .error_with_return => |e| writer.print("can't return error '{s}' with 'return', use 'fail'", .{e.found}),
             .expect_statement => writer.writeAll("did not expect an expression in this context"),
             .expect_value_found_type => |e| writer.print("expect a value found type '{s}'", .{e.found}),
+            .fail_no_err => |e| writer.print("'fail' is used to return errors from functions, found '{s}'", .{e.found}),
+            .fail_outside_fn => writer.writeAll("fail outside of a function"),
             .float_equal => writer.writeAll("floating-point values equality is unsafe"),
             .fn_expect_value => |e| writer.print("no value returned from function expecting '{s}'", .{e.expect}),
             .index_assign_str => writer.writeAll("string type does not support indexing assignment"),
@@ -197,6 +205,8 @@ pub const AnalyzerMsg = union(enum) {
             .enum_lit_non_enum => writer.writeAll("this enum literal don't match any enum"),
             .enum_tag_access => writer.writeAll("this is one of the enum's tag"),
             .enum_unknown_decl => writer.writeAll("this name is unknown"),
+            .error_not_in_union => writer.writeAll("this is not part of declaration"),
+            .error_with_return => writer.writeAll("this is an error"),
             .expect_statement => writer.writeAll("this is an expression"),
             .expect_value_found_type => writer.writeAll("this is not a runtime value"),
             .float_equal => writer.writeAll("both sides are 'floats'"),
@@ -229,7 +239,8 @@ pub const AnalyzerMsg = union(enum) {
             .non_struct_struct_literal => writer.writeAll("this is not a structure"),
             .null_assign_to_non_optional => writer.writeAll("this is not an optinal type"),
             .range_non_int => writer.writeAll("this is not an int"),
-            .return_outside_fn, .self_outside_decl => writer.writeAll("here"),
+            .fail_no_err => writer.writeAll("this is not an error"),
+            .fail_outside_fn, .return_outside_fn, .self_outside_decl => writer.writeAll("here"),
             .ternary_cond_non_bool => writer.writeAll("this is not a bool"),
             .too_many_locals, .too_many_types => writer.writeAll("this is the exceding one"),
             .type_mismatch => |e| writer.print("this expression is of type '{s}'", .{e.found}),
@@ -269,8 +280,8 @@ pub const AnalyzerMsg = union(enum) {
             ),
             .cant_infer_array_type => writer.writeAll(
                 \\can't extract any type information from an empty array '[]'. you must either declare a type in variable's
-                \\signature like: 'var arr: []int = []' or initialize the array with at least one value (not possible every time).
-                \\Also, doing 'var arr: []int = []' is equivalent to 'var arr: []int'.
+                \\signature like: 'var arr: [int] = []' or initialize the array with at least one value (not possible every time).
+                \\Also, doing 'var arr: [int] = []' is equivalent to 'var arr: [int]'.
             ),
             .pat_null_non_optional => writer.writeAll("refer to value's defnintion to see its type or use a regular control flow"),
             .dead_code => writer.writeAll("remove unreachable code"),
@@ -288,11 +299,15 @@ pub const AnalyzerMsg = union(enum) {
                 \\with an 'if' statement like: 'if foo == .a {}' or with pattern matching via 'match'.
             ),
             .enum_unknown_decl => writer.writeAll("refer to enum's declaration to see available tags and declarations"),
+            .error_not_in_union => writer.writeAll("refer to function's declaration to see acceptable errors"),
+            .error_with_return => writer.writeAll("'return' keyword is used to write into ok channel and 'fail' writes to the error one"),
             .expect_statement => writer.writeAll(
                 \\expressions are allowed inside declarations: functions' bodies, ...
                 \\you might be trying to put an expression in global scope for example
             ),
             .expect_value_found_type => writer.writeAll("types can't be used as a runtime value"),
+            .fail_no_err => writer.writeAll("if you want to return a value, use 'return' instead"),
+            .fail_outside_fn => writer.writeAll("fail statements are only allow to exit a function's body with an error"),
             .float_equal => writer.writeAll(
                 \\floating-point values are approximations to infinitly precise real numbers. 
                 \\   If you want to compare floats, you should compare against an Epsilon, like

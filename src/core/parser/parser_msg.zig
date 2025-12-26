@@ -4,6 +4,7 @@ pub const ParserMsg = union(enum) {
     chaining_cmp_op,
     default_value_self,
     enum_lit_non_ident,
+    err_type_not_ident,
     expect_brace_end_container: struct { kind: []const u8 },
     expect_brace_after_struct_lit,
     expect_brace_after_while_cond,
@@ -67,6 +68,7 @@ pub const ParserMsg = union(enum) {
             .chaining_cmp_op => writer.writeAll("chaining comparison operators"),
             .default_value_self => writer.writeAll("can't assign a default value to 'self'"),
             .enum_lit_non_ident => writer.writeAll("expect an identifier for enum literal"),
+            .err_type_not_ident => writer.writeAll("expect identifier when parsing error types"),
             .expect_arrow_before_fn_type => writer.writeAll("expect arrow '->' before function type"),
             .expect_arrow_before_pm_arm_body => writer.writeAll("expect arrow '=>' before pattern matching arm's body"),
             .expect_block_or_do => |e| writer.print("expect a block or 'do' after '{s}' condition", .{e.what}),
@@ -131,6 +133,7 @@ pub const ParserMsg = union(enum) {
     pub fn getHint(self: Self, writer: *Writer) !void {
         try switch (self) {
             .chaining_cmp_op => writer.writeAll("this one is not allowed"),
+            .err_type_not_ident => writer.writeAll("this is not an identifier"),
             .expect_brace_end_container,
             .expect_brace_after_struct_lit,
             .expect_brace_after_while_cond,
@@ -194,6 +197,7 @@ pub const ParserMsg = union(enum) {
                 "'self' is the only parameter than can't have a default value, as it's value is infered by the compiler",
             ),
             .enum_lit_non_ident => writer.writeAll("enum literal syntax is: '.enum_tag'"),
+            .err_type_not_ident => writer.writeAll("when declaring an error union type, error type names should be an identifier"),
             .expect_arrow_before_fn_type => writer.writeAll("add an arrow '->' between function's arguments list and type"),
             // TODO: check if true
             .expect_arrow_before_pm_arm_body => writer.writeAll(

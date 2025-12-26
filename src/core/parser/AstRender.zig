@@ -52,7 +52,7 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
             try self.renderSingleExpr(@tagName(node.*), n, .block, comma);
         },
         .enum_decl => |n| {
-            try self.openKey(@tagName(node.*), .block);
+            try self.openKey(if (n.is_err) "error" else "enum", .block);
             if (n.name) |name| try self.pushKeyValue("name", self.ast.toSource(name), true);
 
             if (n.tags.len > 0) {
@@ -225,6 +225,14 @@ fn renderType(self: *Self, typ: ?*Ast.Type) Error![]const u8 {
             try buf.appendSlice(self.allocator, "[]");
             try buf.appendSlice(self.allocator, try self.renderType(t.child));
         },
+        .error_union => |t| {
+            try buf.appendSlice(self.allocator, try self.renderType(t.ok));
+            try buf.appendSlice(self.allocator, "|");
+            for (t.errs, 0..) |err, i| {
+                try buf.appendSlice(self.allocator, self.ast.toSource(err));
+                if (i < t.errs.len - 1) try buf.appendSlice(self.allocator, "|");
+            }
+        },
         .fields => |fields| {
             for (fields, 0..) |f, i| {
                 try buf.appendSlice(self.allocator, self.ast.toSource(f));
@@ -312,6 +320,7 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
         },
         .closure => |*e| try self.renderFnDecl("", e, comma),
         .enum_lit => |e| try self.pushKeyValue("enum_literal", self.ast.toSource(e), comma),
+        .fail => |e| try self.renderSingleExpr(@tagName(expr.*), e.expr, .block, comma),
         .field => |e| {
             try self.openKey(@tagName(expr.*), .block);
             try self.renderSingleExpr("structure", e.structure, .block, true);

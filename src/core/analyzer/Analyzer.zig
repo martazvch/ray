@@ -291,7 +291,7 @@ fn enumDeclaration(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtRe
     const name_tk = node.name orelse @panic("anonymus enums aren't supported yet");
     const name = try self.internIfNotInCurrentScope(name_tk);
 
-    const interned = self.ti.newEnum(.{ .name = name, .container = container_name });
+    const interned = self.ti.newEnum(.{ .name = name, .container = container_name }, node.is_err);
     const ty = &interned.@"enum";
 
     const sym = self.scope.forwardDeclareSymbol(self.allocator, name);
@@ -304,7 +304,7 @@ fn enumDeclaration(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtRe
     defer self.closeContainer();
 
     try self.enumTags(node.tags, ty, ctx);
-    const funcs = try self.containerFnDecls(node.functions, &interned.@"enum".functions, ctx);
+    const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
 
     return self.irb.addInstr(
         .{ .enum_decl = .{ .name = name, .sym_index = sym.index, .functions = funcs } },
@@ -842,6 +842,7 @@ fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Contex
         .@"break" => |*e| self.breakExpr(e, ctx),
         .closure => |*e| self.closure(e, ctx),
         .enum_lit => |e| self.enumLit(e, ctx),
+        .fail => |e| self.fail(e, ctx),
         .field => |*e| self.field(e, ctx),
         .fn_call => |*e| self.call(e, ctx),
         .grouping => |*e| self.analyzeExpr(e.expr, expect, ctx),
@@ -1246,6 +1247,28 @@ fn enumLit(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result {
             .{ .enum_create = .{ .sym = .{ .module_index = 0, .symbol_index = @intCast(sym.sym.index) }, .tag_index = @intCast(tag_index) } },
             span.start,
         ),
+    };
+}
+
+fn fail(self: *Self, expr: Ast.Fail, ctx: *Context) Result {
+    const span = self.ast.getSpan(expr);
+    const fn_type = ctx.fn_type orelse return self.err(.fail_outside_fn, span);
+    const ty = fn_type.function.return_type;
+
+    var value_res = try self.analyzeExpr(expr.expr, .value, ctx);
+
+    // We can't return an error with 'return' unless we're defining a method on the error's enum
+    if (!value_res.type.isErr()) return self.err(
+        .{ .fail_no_err = .{ .found = self.typeName(value_res.type) } },
+        span,
+    );
+
+    value_res.type = try self.performTypeCoercion(ty, value_res.type, true, self.ast.getSpan(expr.expr));
+
+    return .{
+        .type = value_res.type,
+        .cf = .@"return",
+        .instr = self.irb.addInstr(.{ .fail = .{ .value = value_res.instr } }, span.start),
     };
 }
 
@@ -2071,6 +2094,17 @@ fn returnExpr(self: *Self, expr: *const Ast.Return, ctx: *Context) Result {
 
     var value_res = try self.analyzeExpr(exp, .value, ctx);
 
+    // We can't return an error with 'return' unless we're defining a method on the error's enum
+    check: {
+        if (!value_res.type.isErr()) break :check;
+        if (ctx.self_type) |self_type| if (self_type == value_res.type) break :check;
+
+        return self.err(
+            .{ .error_with_return = .{ .found = self.typeName(value_res.type) } },
+            span,
+        );
+    }
+
     if (ty != value_res.type) {
         const err_span = if (expr.expr) |e| self.ast.getSpan(e) else span;
         value_res.type = try self.performTypeCoercion(ty, value_res.type, true, err_span);
@@ -2347,6 +2381,19 @@ fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) Error
 
             return self.ti.intern(.{ .array = .{ .child = child } });
         },
+        .error_union => |err_union| {
+            const ok = try self.checkAndGetType(err_union.ok, ctx);
+
+            var errs = ArrayList(*const Type).initCapacity(self.allocator, err_union.errs.len) catch oom();
+            for (err_union.errs) |e| {
+                errs.appendAssumeCapacity(try self.checkAndGetType(&.{ .scalar = e }, ctx));
+            }
+
+            return self.ti.intern(.{ .error_union = .{
+                .ok = ok,
+                .errs = errs.toOwnedSlice(self.allocator) catch oom(),
+            } });
+        },
         .fields => |fields| {
             // TODO: Error
             if (fields.len > 2) @panic("Nested types are not supported yet");
@@ -2444,6 +2491,10 @@ fn mergeTypes(self: *Self, types: []const *const Type) *const Type {
 fn performTypeCoercion(self: *Self, decl: *const Type, value: *const Type, decl_explicit_void: bool, span: Span) Error!*const Type {
     if (decl == value) return decl;
 
+    if (decl.is(.error_union)) {
+        return self.performErrorCoercion(decl, value, span);
+    }
+
     if (value.is(.null)) {
         return if (decl.is(.optional))
             decl
@@ -2491,6 +2542,23 @@ fn performTypeCoercion(self: *Self, decl: *const Type, value: *const Type, decl_
         .{ .type_mismatch = .{ .expect = self.typeName(decl), .found = self.typeName(value) } },
         span,
     );
+}
+
+fn performErrorCoercion(self: *Self, decl: *const Type, value: *const Type, span: Span) Error!*const Type {
+    const error_union = decl.error_union;
+
+    if (value.isErr()) {
+        for (error_union.errs) |union_err| {
+            if (union_err == value) return decl;
+        }
+
+        return self.err(.{ .error_not_in_union = .{
+            .found = self.typeName(value),
+            .expect = self.typeUnion(error_union.errs),
+        } }, span);
+    } else {
+        return self.performTypeCoercion(error_union.ok, value, false, span);
+    }
 }
 
 /// Checks if two different pointers to function type are equal, due to anonymus ones
@@ -2593,6 +2661,20 @@ fn checkArrayOfUnion(self: *Self, decl: *const Type.Union, value: *const Type) b
 
 fn typeName(self: *const Self, ty: *const Type) []const u8 {
     return ty.toString(self.allocator, self.interner, self.mod_name);
+}
+
+fn typeUnion(self: *const Self, types: []*const Type) []const u8 {
+    errdefer oom();
+
+    var res: std.ArrayList(u8) = .empty;
+    var writer = res.writer(self.allocator);
+
+    for (types, 0..) |ty, i| {
+        try writer.writeAll(ty.toString(self.allocator, self.interner, self.mod_name));
+        if (i < types.len - 1) try writer.writeAll("|");
+    }
+
+    return try res.toOwnedSlice(self.allocator);
 }
 
 fn declareVariable(

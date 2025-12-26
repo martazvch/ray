@@ -24,6 +24,7 @@ pub const Type = union(enum) {
     range,
     array: Array,
     @"enum": Enum,
+    error_union: ErrorUnion,
     function: Function,
     module: InternerIdx,
     optional: *const Type,
@@ -74,6 +75,7 @@ pub const Type = union(enum) {
     pub const Enum = struct {
         loc: ?Loc,
         tags: Tags,
+        is_err: bool,
         functions: ArrayMap(InternerIdx, LexScope.Symbol),
 
         pub const empty: Enum = .{ .loc = null, .tags = .empty };
@@ -91,6 +93,11 @@ pub const Type = union(enum) {
 
             return res;
         }
+    };
+
+    pub const ErrorUnion = struct {
+        ok: *const Type,
+        errs: []*const Type,
     };
 
     pub const Function = struct {
@@ -230,6 +237,11 @@ pub const Type = union(enum) {
         };
     }
 
+    pub fn isErr(self: *const Type) bool {
+        const e = self.as(.@"enum") orelse return false;
+        return e.is_err;
+    }
+
     pub fn hash(self: Type, allocator: Allocator, hasher: anytype) void {
         const asBytes = std.mem.asBytes;
 
@@ -248,7 +260,8 @@ pub const Type = union(enum) {
         switch (self) {
             .never, .void, .int, .float, .bool, .str, .null, .range => {},
             .array => |ty| ty.child.hash(allocator, hasher),
-            .@"enum" => |ty| {
+            .@"enum" => |*ty| {
+                hasher.update(asBytes(&ty.is_err));
                 if (ty.loc) |loc| {
                     hasher.update(asBytes(&loc.name));
                     hasher.update(asBytes(&loc.container));
@@ -256,6 +269,12 @@ pub const Type = union(enum) {
                     for (ty.tags.values()) |tag| {
                         tag.hash(allocator, hasher);
                     }
+                }
+            },
+            .error_union => |ty| {
+                ty.ok.hash(allocator, hasher);
+                for (ty.errs) |err| {
+                    err.hash(allocator, hasher);
                 }
             },
             .function => |ty| {
@@ -308,7 +327,7 @@ pub const Type = union(enum) {
                 writer.writeAll(ty.child.toString(allocator, interner, mod_name)) catch oom();
                 writer.writeAll("]") catch oom();
             },
-            .@"enum" => |ty| {
+            .@"enum" => |*ty| {
                 if (ty.loc) |loc| {
                     // If symbol is defnined in current mod/file, don't repeat the module
                     if (loc.container == mod_name) {
@@ -317,7 +336,8 @@ pub const Type = union(enum) {
                         writer.print("{s}.{s}", .{ interner.getKey(loc.container).?, interner.getKey(loc.name).? }) catch oom();
                     }
                 } else {
-                    writer.writeAll("enum {") catch oom();
+                    writer.writeAll(@tagName(self.*)) catch oom();
+                    writer.writeAll(" {") catch oom();
 
                     for (ty.tags.keys(), ty.tags.values(), 0..) |k, v, i| {
                         writer.print("{s}: {s}{s}", .{
@@ -327,6 +347,15 @@ pub const Type = union(enum) {
                         }) catch oom();
                     }
                     writer.writeAll("}") catch oom();
+                }
+            },
+            .error_union => |ty| {
+                errdefer oom();
+                try writer.writeAll(ty.ok.toString(allocator, interner, mod_name));
+                try writer.writeAll("!");
+                for (ty.errs, 0..) |err, i| {
+                    try writer.writeAll(err.toString(allocator, interner, mod_name));
+                    if (i < ty.errs.len - 1) writer.writeAll("|") catch oom();
                 }
             },
             .function => |ty| {
@@ -476,10 +505,11 @@ pub const TypeInterner = struct {
         } });
     }
 
-    pub fn newEnum(self: *TypeInterner, loc: ?Type.Loc) *Type {
+    pub fn newEnum(self: *TypeInterner, loc: ?Type.Loc, is_err: bool) *Type {
         return self.intern(.{ .@"enum" = .{
             .loc = loc,
             .tags = .empty,
+            .is_err = is_err,
             .functions = .empty,
         } });
     }

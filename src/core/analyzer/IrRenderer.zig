@@ -77,6 +77,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .discard => |index| self.indexInstr("Discard", index),
         .enum_create => |data| self.enumCreate(data),
         .enum_decl => |*data| self.enumDecl(data),
+        .fail => |data| self.returnInstr("Fail", data),
         .field => |data| self.getField(data, false),
         .float => |data| self.floatInstr(data),
         .fn_decl => |*data| self.fnDeclaration(data),
@@ -97,7 +98,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .pop => |index| self.indexInstr("Pop", index),
         .print => |index| self.indexInstr("Print", index),
         .range => |data| self.range(data),
-        .@"return" => |*data| self.returnInstr(data),
+        .@"return" => |data| self.returnInstr("Return", data),
         .string => |data| self.stringInstr(data),
         .struct_decl => |*data| self.structDecl(data),
         .struct_literal => |*data| self.structLiteral(data),
@@ -432,8 +433,8 @@ fn range(self: *Self, data: Instruction.Range) void {
     self.parseInstr(data.end);
 }
 
-fn returnInstr(self: *Self, data: *const Instruction.Return) void {
-    self.indentAndAppendSlice("[Return]");
+fn returnInstr(self: *Self, text: []const u8, data: Instruction.Return) void {
+    self.indentAndPrintSlice("[{s}]", .{text});
 
     if (data.value) |val| {
         self.indent_level += 1;

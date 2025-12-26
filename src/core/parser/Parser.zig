@@ -223,7 +223,7 @@ fn synchronize(self: *Self) void {
 
     while (!self.check(.eof)) {
         switch (self.token_tags[self.token_idx]) {
-            .@"enum", .@"fn", .@"for", .@"if", .left_brace, .print, .@"return", .@"struct", .use, .@"var", .when, .@"while" => return,
+            .@"enum", .@"fn", .@"for", .@"if", .left_brace, .let, .print, .@"return", .@"struct", .use, .@"var", .when, .@"while" => return,
             else => self.advance(),
         }
     }
@@ -233,7 +233,9 @@ fn declaration(self: *Self) Error!Node {
     return if (self.match(.@"var") or self.match(.let))
         self.varDecl()
     else if (self.match(.@"enum"))
-        self.enumDecl()
+        self.enumDecl(false)
+    else if (self.match(.@"error"))
+        self.enumDecl(true)
     else if (self.match(.@"fn"))
         self.fnDecl()
     else if (self.match(.@"struct"))
@@ -244,7 +246,7 @@ fn declaration(self: *Self) Error!Node {
         self.statement();
 }
 
-fn enumDecl(self: *Self) Error!Node {
+fn enumDecl(self: *Self, is_err: bool) Error!Node {
     const tk = self.token_idx - 1;
     const name = if (self.matchAndSkip(.identifier)) self.token_idx - 1 else null;
     try self.expect(.left_brace, .expect_brace_before_enum_body);
@@ -262,6 +264,7 @@ fn enumDecl(self: *Self) Error!Node {
     return .{ .enum_decl = .{
         .tk = tk,
         .name = name,
+        .is_err = is_err,
         .tags = tags.toOwnedSlice(self.allocator) catch oom(),
         .functions = functions,
     } };
@@ -632,7 +635,31 @@ fn parseType(self: *Self) Error!*Ast.Type {
         return u;
     }
 
+    if (self.match(.bang)) {
+        return self.parseErrorType(ty);
+    }
+
     return ty;
+}
+
+fn parseErrorType(self: *Self, ty: *Ast.Type) Error!*Ast.Type {
+    var errs: ArrayList(TokenIndex) = .empty;
+
+    try self.expect(.identifier, .err_type_not_ident);
+    errs.append(self.allocator, self.token_idx - 1) catch oom();
+
+    while (self.match(.pipe)) {
+        try self.expect(.identifier, .err_type_not_ident);
+        errs.append(self.allocator, self.token_idx - 1) catch oom();
+    }
+
+    const err_union = self.allocator.create(Ast.Type) catch oom();
+    err_union.* = .{ .error_union = .{
+        .ok = ty,
+        .errs = errs.toOwnedSlice(self.allocator) catch oom(),
+    } };
+
+    return err_union;
 }
 
 fn use(self: *Self) Error!Node {
@@ -913,6 +940,7 @@ fn parseExpr(self: *Self) Error!*Expr {
         .@"break" => self.breakExpr(),
         .colon => self.labelledBlock(),
         .dot => self.enumLit(),
+        .fail => self.fail(),
         .false => self.literal(.bool),
         .float => self.literal(.float),
         .@"if" => self.ifExpr(),
@@ -1082,6 +1110,17 @@ fn enumLit(self: *Self) Error!*Expr {
     const expr = self.allocator.create(Expr) catch oom();
     try self.expect(.identifier, .enum_lit_non_ident);
     expr.* = .{ .enum_lit = self.token_idx - 1 };
+    return expr;
+}
+
+fn fail(self: *Self) Error!*Expr {
+    const kw = self.token_idx - 1;
+    const expr = self.allocator.create(Expr) catch oom();
+    expr.* = .{ .fail = .{
+        .expr = try self.parsePrecedenceExpr(0),
+        .kw = kw,
+    } };
+
     return expr;
 }
 

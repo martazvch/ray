@@ -37,6 +37,7 @@ pub const EnumDecl = struct {
     tk: TokenIndex,
     name: ?TokenIndex,
     tags: []const Tag,
+    is_err: bool,
     functions: []FnDecl,
 
     pub const Tag = struct {
@@ -85,6 +86,7 @@ pub const Type = union(enum) {
     },
     function: Fn,
     fields: []TokenIndex,
+    error_union: struct { ok: *Type, errs: []const TokenIndex },
     optional: struct { token: TokenIndex, child: *Type },
     scalar: TokenIndex,
     @"union": []const *Type,
@@ -139,6 +141,7 @@ pub const Expr = union(enum) {
     @"break": Break,
     closure: FnDecl,
     enum_lit: TokenIndex,
+    fail: Fail,
     field: Field,
     fn_call: FnCall,
     grouping: Grouping,
@@ -176,6 +179,11 @@ pub const Break = struct {
     kw: TokenIndex,
     label: ?TokenIndex,
     expr: ?*Expr,
+};
+
+pub const Fail = struct {
+    expr: *Expr,
+    kw: TokenIndex,
 };
 
 pub const Field = struct {
@@ -339,6 +347,10 @@ pub fn getSpan(self: *const Self, anynode: anytype) Span {
                 .start = self.token_spans[t.openning].start,
                 .end = self.getSpan(t.child).end,
             },
+            .error_union => |t| .{
+                .start = self.getSpan(t.ok).start,
+                .end = self.token_spans[t.errs[t.errs.len - 1]].end,
+            },
             .fields => |t| .{
                 .start = self.token_spans[t[0]].start,
                 .end = self.token_spans[t[t.len - 1]].end,
@@ -375,6 +387,10 @@ pub fn getSpan(self: *const Self, anynode: anytype) Span {
             .start = self.token_spans[node.kw].start,
             .end = self.getSpan(e).end,
         } else self.token_spans[node.kw],
+        Fail => .{
+            .start = self.token_spans[node.kw].start,
+            .end = self.getSpan(node.expr).end,
+        },
         Field => .{
             .start = self.getSpan(node.structure.*).start,
             .end = self.token_spans[node.field].end,

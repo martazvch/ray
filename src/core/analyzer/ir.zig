@@ -24,6 +24,7 @@ pub const Instruction = struct {
         discard: Index,
         enum_create: EnumCreate,
         enum_decl: EnumDecl,
+        fail: Return,
         field: Field,
         float: f64,
         fn_decl: FnDecl,

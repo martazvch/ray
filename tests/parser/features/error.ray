@@ -1,0 +1,9 @@
+error File {
+    fileNotFound,
+    wrongPermission,
+
+    fn fromPath(path: str) -> Self {
+        return .fileNotFound
+    }
+}
+

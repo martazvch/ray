@@ -1,0 +1,30 @@
+error Foo { foo }
+
+error File {
+    notFound,
+    wrongPermission,
+
+    fn fromPath(path: str) -> Self {
+        return .notFound
+    }
+}
+
+
+fn failable() -> int!File {
+    return File.notFound
+}
+
+fn failable2() -> int!File {
+    fail Foo.foo
+}
+
+fn failable3() -> int!File {
+    fail 1
+}
+
+fail File.notFound
+
+fn main() {
+    print failable()
+}
+

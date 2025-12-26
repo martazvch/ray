@@ -323,6 +323,7 @@ const Compiler = struct {
 
             .enum_create => |*data| self.enumCreate(data),
             .enum_decl => |*data| self.enumDecl(data),
+            .fail => |data| self.returnInstr(data),
             .field => |*data| self.field(data),
             .fn_decl => |*data| self.compileFn(data),
             .for_loop => |data| self.forLoop(data),
@@ -347,7 +348,7 @@ const Compiler = struct {
             .pop => |index| self.wrappedInstr(.pop, index),
             .print => |index| self.wrappedInstr(.print, index),
             .range => |data| self.range(data),
-            .@"return" => |*data| self.returnInstr(data),
+            .@"return" => |data| self.returnInstr(data),
             .struct_decl => |*data| self.structDecl(data),
             .struct_literal => |*data| self.structLiteral(data),
             .unary => |*data| self.unary(data),
@@ -872,7 +873,7 @@ const Compiler = struct {
         self.writeOp(.range_new);
     }
 
-    fn returnInstr(self: *Self, data: *const Instruction.Return) Error!void {
+    fn returnInstr(self: *Self, data: Instruction.Return) Error!void {
         if (data.value) |val| {
             try self.compileInstr(val);
             self.writeOp(.ret);

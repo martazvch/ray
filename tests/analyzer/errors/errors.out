@@ -1,0 +1,4 @@
+error_with_return, File
+error_not_in_union, Foo, File
+fail_no_err, int
+fail_outside_fn

@@ -1,0 +1,10 @@
+{
+    "fail": {
+        "field": {
+            "structure": {
+                "literal": "File"
+            },
+            "field_name": "notFound"
+        }
+    }
+}

@@ -1,0 +1,27 @@
+{
+    "error": {
+        "name": "File",
+        "tags": [
+            "fileNotFound": "",
+            "wrongPermission": ""
+        ]
+        "functions": [
+            "fn_decl": {
+                "name": "fromPath",
+                "params": [
+                    {
+                        "name": "path",
+                        "type": "str",
+                        "value": {}
+                    }
+                ],
+                "return_type": "Self",
+                "body": [
+                    "return": {
+                        "enum_literal": "fileNotFound"
+                    }
+                ]
+            }
+        ]
+    }
+}
