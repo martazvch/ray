@@ -3,7 +3,7 @@ fn main() {
 
     // Late assign
     print "Test 1"
-    var arrRef: []int
+    var arrRef: [int]
     arrRef = arr[1]
 
     print arrRef // [4, 5, 6]
@@ -24,7 +24,7 @@ fn main() {
 
     // Mutates the original object late assign
     print "Test 3"
-    var arrRef3: []int
+    var arrRef3: [int]
     arrRef3 = arr[1]
     print arrRef3 // [4, 5, 6]
     arr[1] = [-1, -2, -3]

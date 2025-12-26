@@ -27,7 +27,7 @@ struct Cell {
 }
 
 struct Grid {
-    cells: [][]Cell,
+    cells: [[Cell]],
 
     fn init() -> Self {
         return Self{

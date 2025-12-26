@@ -94,25 +94,25 @@ All the supported operators are listed below from highest to lowest [precedence]
 | bitwise OR | `\|` | left |
 | relational | `<` `<=` `>` `>=` | none |
 | equality | `==` `!=` | none |
-| logical AND | `&&` | left |
-| logical OR | `\|\|` | left |
+| logical AND | `and` | left |
+| logical OR | `or` | left |
 | null fallback | `??` | left |
 | error fallback | `!!` | left |
 | ternary | `expr1 ? expr2 : expr3` | right |
 | assignment | `=` `*=` `/=` `+=` `-=` `&=` `^=` | right |
-| expand | `..` | none |
+| expand | `...` | none |
 
 ### Precedence
 
 Precedence expresses the *weight* of each operator used to determine the order of resolution.
 For example `==` has a higher precedence than `&&` meaning that the two expressions below are equivalent:
 
-```rust
-if (a == 1 && b == 2) { ... }
-if ((a == 1) && (b == 2)) { ... }
+```zig
+if (a == 1 and b == 2) { ... }
+if ((a == 1) and (b == 2)) { ... }
 ```
 
-Both equality checks are gonna be resolved before the logical `&&`.
+Both equality checks are gonna be resolved before the logical `and`.
 
 ### Associativity
 
@@ -199,6 +199,14 @@ You can concatenate strings using `+` operator and repeat them with by multiplyi
 assert("Space " + "shuttle" == "Space shuttle")
 assert("o" * 5 == "ooooo")
 assert("o" * 5 + "k" == "oooook")
+```
+
+Strings can be indexed with `[]` syntax with either a scalar or a range (like arrays).
+
+```rust
+let name = "Tom"
+assert(name[1] == "o")
+assert(name[1..3] == "om")
 ```
 
 TODO: string interpolation
@@ -651,14 +659,14 @@ It's signature defines:
 - Return type `int!impl Error`: union of an error and an integers
 
 ```zig
-fn main(args: []str) {}
+fn main(args: [str]) {}
 ```
 
 If you're not using the argument or the return type, you can omit them. All the following are valid syntaxes:
 
 ```zig
 fn main() {}
-fn main(args: []str) {}
+fn main(args: [str]) {}
 fn main() -> int!Err {}
 ```
 

@@ -577,8 +577,8 @@ fn parseType(self: *Self) Error!*Ast.Type {
     // Array
     else if (self.match(.left_bracket)) {
         const openning = self.token_idx - 1;
-        try self.expect(.right_bracket, .missing_bracket_array_type);
         ty.* = .{ .array = .{ .openning = openning, .child = try self.parseType() } };
+        try self.expect(.right_bracket, .missing_bracket_array_type);
     }
     // Function
     else if (self.match(.@"fn")) {

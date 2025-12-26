@@ -1,11 +1,11 @@
 fn main() {
     struct Point {
         x, y: int,
-        past: [][]int,
+        past: [[int]],
     }
 
     struct Poly {
-        vertex: [][]Point
+        vertex: [[Point]],
     }
 
     struct Object {

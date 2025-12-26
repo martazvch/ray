@@ -1,5 +1,5 @@
 struct Iterator {
-    items: []int,
+    items: [int],
     count = 0,
 
     fn next(self) -> ?int {
@@ -10,14 +10,14 @@ struct Iterator {
 }
 
 struct Data {
-    first: []int,
-    second: []int,
+    first: [int],
+    second: [int],
 
     fn init() -> Self {
         return Self{ first: [], second: [] }
     }
 
-    fn initWithData(first: []int, second: []int) -> Self {
+    fn initWithData(first: [int], second: [int]) -> Self {
         return Self{ first, second }
     }
 

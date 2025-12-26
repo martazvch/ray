@@ -1,8 +1,8 @@
-var arr: []int
-var arr2: [][]float
+var arr: [int]
+var arr2: [[float]]
 
 var arr3 = [1+4, 2, 3, get(),]
-var arr4: []bool = [
+var arr4: [bool] = [
     true,
     false
     ,

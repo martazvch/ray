@@ -1,11 +1,11 @@
 fn main() {
-    var arr: []int = [1, true]
-    var arr: []int|bool = [1, true, "nop"]
-    var arr: [][]int = [1, 2,]
-    var arr: []int = [true, false]
+    var arr: [int] = [1, true]
+    var arr: [int|bool] = [1, true, "nop"]
+    var arr: [[int]] = [1, 2,]
+    var arr: [int] = [true, false]
 
 
-    var voidArr: []void
+    var voidArr: [void]
     var voidArrVoidVal = []
 
     var voidValueInArray = [1, {}]

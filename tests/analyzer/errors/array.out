@@ -1,7 +1,7 @@
-type_mismatch, []int, []int|bool
-type_mismatch, []int|bool, []int|bool|str
-type_mismatch, [][]int, []int
-type_mismatch, []int, []bool
+type_mismatch, [int], [int|bool]
+type_mismatch, [int|bool], [int|bool|str]
+type_mismatch, [[int]], [int]
+type_mismatch, [int], [bool]
 void_array
 cant_infer_array_type
 block_all_path_dont_return

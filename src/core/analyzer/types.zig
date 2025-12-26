@@ -304,8 +304,9 @@ pub const Type = union(enum) {
         switch (self.*) {
             .never, .int, .float, .bool, .str, .null, .void, .range => return @tagName(self.*),
             .array => |ty| {
-                writer.writeAll("[]") catch oom();
+                writer.writeAll("[") catch oom();
                 writer.writeAll(ty.child.toString(allocator, interner, mod_name)) catch oom();
+                writer.writeAll("]") catch oom();
             },
             .@"enum" => |ty| {
                 if (ty.loc) |loc| {

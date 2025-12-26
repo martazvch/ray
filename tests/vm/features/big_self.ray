@@ -7,7 +7,7 @@ struct Foo {
 }
 
 struct Bar {
-    a: []bool
+    a: [bool]
 
     fn init() -> Self {
         return Self {a: [true]}

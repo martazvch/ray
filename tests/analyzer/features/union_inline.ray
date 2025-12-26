@@ -9,7 +9,7 @@ fn main() {
     arr[0] = false
     arr[0] = 1
 
-    var arr2: []str|float = [4.5, 6.7, "yep"]
+    var arr2: [str|float] = [4.5, 6.7, "yep"]
     arr2[0] = "maybe"
     arr2[0] = 6.9
 
@@ -24,7 +24,7 @@ fn main() {
     optUnion = optInt
 
     // Arrays
-    // var arr: []int|float = [1, 2, 3]
-    // arr = [1.2, 2.3, 3.4]
+    var arr3: [int|float] = [1, 2, 3]
+    arr3 = [1.2, 2.3, 3.4]
 }
 
