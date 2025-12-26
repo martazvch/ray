@@ -102,6 +102,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .string => |data| self.stringInstr(data),
         .struct_decl => |*data| self.structDecl(data),
         .struct_literal => |*data| self.structLiteral(data),
+        .trap => |data| self.trap(data),
         .unary => |*data| self.unary(data),
         .unbox => |index| self.indexInstr("Unbox", index),
         .var_decl => |*data| self.varDecl(data),
@@ -293,7 +294,7 @@ fn constant(self: *Self, data: Instruction.Constant) void {
 }
 
 fn enumCreate(self: *Self, data: Instruction.EnumCreate) void {
-    self.indentAndAppendSlice("[Enum create]");
+    self.indentAndPrintSlice("[{s} create]", .{if (data.is_err) "Error" else "Enum"});
     self.indent_level += 1;
     defer self.indent_level -= 1;
     self.indentAndAppendSlice("- enum");
@@ -472,6 +473,18 @@ fn structLiteral(self: *Self, data: *const Instruction.StructLiteral) void {
     self.indentAndAppendSlice("- structure");
     self.parseInstr(data.structure);
     self.argsList("field", data.values);
+}
+
+fn trap(self: *Self, data: Instruction.Trap) void {
+    self.indentAndAppendSlice("[Trap]");
+    self.indentAndAppendSlice("- lhs");
+    self.indent_level += 1;
+    self.parseInstr(data.lhs);
+    self.indent_level -= 1;
+    self.indentAndAppendSlice("- rhs");
+    self.indent_level += 1;
+    self.parseInstr(data.rhs);
+    self.indent_level -= 1;
 }
 
 fn unary(self: *Self, data: *const Instruction.Unary) void {

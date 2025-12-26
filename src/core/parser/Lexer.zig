@@ -57,6 +57,7 @@ pub const Token = struct {
         .{ "return", .@"return" },
         .{ "self", .self },
         .{ "struct", .@"struct" },
+        .{ "trap", .trap },
         .{ "true", .true },
         .{ "use", .use },
         .{ "var", .@"var" },
@@ -128,6 +129,7 @@ pub const Token = struct {
         star_equal,
         string,
         @"struct",
+        trap,
         true,
         underscore,
         use,
@@ -629,14 +631,14 @@ test "keywords" {
     lexer.lex(
         \\\and else false for fn if null or print return 
         \\\self struct true var while not do use break when
-        \\\as enum match let in fail
+        \\\as enum match let in fail trap
     );
 
     const res = [_]Token.Tag{
         .@"and",    .@"else",  .false, .@"for",    .@"fn", .@"if",   .null,     .@"or", .print,
         .@"return", .new_line, .self,  .@"struct", .true,  .@"var",  .@"while", .not,   .do,
         .use,       .@"break", .when,  .new_line,  .as,    .@"enum", .match,    .let,   .in,
-        .fail,      .eof,
+        .fail,      .trap,     .eof,
     };
 
     for (0..res.len) |i| {

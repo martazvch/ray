@@ -255,6 +255,14 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             .eq_int => self.stack.push(Value.makeBool(self.stack.pop().int == self.stack.pop().int)),
             .eq_null => self.stack.push(Value.makeBool(self.stack.pop() == .null)),
             .eq_str => self.stack.push(Value.makeBool(self.stack.pop().obj.as(Obj.String) == self.stack.pop().obj.as(Obj.String))),
+            .err_create => {
+                self.stack.peekRef(0).* = .makeObj(Obj.Error.create(
+                    self.allocator,
+                    self.stack.peek(0).obj.as(Obj.Enum),
+                    frame.readByte(),
+                    .null,
+                ).asObj());
+            },
             .exit_repl => {
                 // Here, there is no value to pop for now, no implicit null is
                 // put on top of the stack
@@ -369,6 +377,17 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             .jump_true => {
                 const jump = frame.readShort();
                 if (self.stack.peek(0).bool) frame.ip += jump;
+            },
+            .jump_no_err => {
+                const jump = frame.readShort();
+                err: {
+                    if (self.stack.peek(0).asObj()) |obj| {
+                        if (obj.kind == .@"error") {
+                            break :err;
+                        }
+                    }
+                    frame.ip += jump;
+                }
             },
             .jump_null => {
                 const jump = frame.readShort();

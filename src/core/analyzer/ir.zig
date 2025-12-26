@@ -48,6 +48,7 @@ pub const Instruction = struct {
         string: usize,
         struct_decl: StructDecl,
         struct_literal: StructLiteral,
+        trap: Trap,
         unary: Unary,
         unbox: Index,
         var_decl: VarDecl,
@@ -141,6 +142,7 @@ pub const Instruction = struct {
     pub const EnumCreate = struct {
         sym: LoadSymbol,
         tag_index: usize,
+        is_err: bool,
     };
     pub const EnumDecl = struct {
         name: usize,
@@ -206,6 +208,10 @@ pub const Instruction = struct {
     pub const StructLiteral = struct {
         structure: Index,
         values: []const Arg,
+    };
+    pub const Trap = struct {
+        lhs: Index,
+        rhs: Index,
     };
     pub const Unary = struct {
         op: Op,

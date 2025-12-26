@@ -435,6 +435,12 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
             try self.renderSingleExpr("else", e.@"else", .block, false);
             try self.closeKey(.block, comma);
         },
+        .trap => |e| {
+            try self.openKey(@tagName(expr.*), .block);
+            try self.renderSingleExpr("lhs", e.lhs, .block, true);
+            try self.renderSingleExpr("rhs", e.rhs, .block, false);
+            try self.closeKey(.block, comma);
+        },
         .unary => |e| {
             try self.openKey(@tagName(expr.*), .block);
             try self.pushKeyValue("op", self.ast.toSource(e.op), true);

@@ -351,6 +351,7 @@ const Compiler = struct {
             .@"return" => |data| self.returnInstr(data),
             .struct_decl => |*data| self.structDecl(data),
             .struct_literal => |*data| self.structLiteral(data),
+            .trap => |data| self.trap(data),
             .unary => |*data| self.unary(data),
             .unbox => |index| self.wrappedInstr(.unbox, index),
             .var_decl => |*data| self.varDecl(data),
@@ -679,12 +680,20 @@ const Compiler = struct {
             // We ignore bools and null as we handle them with special op codes for optimization
             const value = switch (self.at(data.instr)) {
                 .bool, .null => break :b,
-                .enum_create => |val| Value.makeObj(Obj.EnumInstance.create(
-                    self.manager.allocator,
-                    self.manager.module.symbols[val.sym.symbol_index].obj.as(Obj.Enum),
-                    @intCast(val.tag_index),
-                    Value.null_,
-                ).asObj()),
+                .enum_create => |val| if (val.is_err)
+                    Value.makeObj(Obj.Error.create(
+                        self.manager.allocator,
+                        self.manager.module.symbols[val.sym.symbol_index].obj.as(Obj.Enum),
+                        @intCast(val.tag_index),
+                        Value.null_,
+                    ).asObj())
+                else
+                    Value.makeObj(Obj.EnumInstance.create(
+                        self.manager.allocator,
+                        self.manager.module.symbols[val.sym.symbol_index].obj.as(Obj.Enum),
+                        @intCast(val.tag_index),
+                        Value.null_,
+                    ).asObj()),
                 .int => |val| Value.makeInt(val),
                 .float => |val| Value.makeFloat(val),
                 .string => |val| Value.makeObj(Obj.String.comptimeCopy(
@@ -716,7 +725,7 @@ const Compiler = struct {
             @panic("Enum is to big, not implemented yet");
         }
 
-        self.writeOpAndByte(.enum_create, @intCast(data.tag_index));
+        self.writeOpAndByte(if (data.is_err) .err_create else .enum_create, @intCast(data.tag_index));
     }
 
     fn enumDecl(self: *Self, data: *const Instruction.EnumDecl) Error!void {
@@ -926,6 +935,13 @@ const Compiler = struct {
         }
 
         self.writeByte(@intCast(data.values.len));
+    }
+
+    fn trap(self: *Self, data: Instruction.Trap) Error!void {
+        try self.compileInstr(data.lhs);
+        const ok_jump = self.emitJump(.jump_no_err);
+        try self.compileInstr(data.rhs);
+        try self.patchJump(ok_jump);
     }
 
     fn unary(self: *Self, data: *const Instruction.Unary) Error!void {

@@ -1356,7 +1356,13 @@ fn postfix(self: *Self, prefixExpr: *Expr) Error!*Expr {
 
             // Can't chain them, break the loop
             return self.structLiteral(expr);
-        } else if (self.match(.dot_dot)) {
+        }
+        // Trap
+        else if (self.match(.trap)) {
+            return self.trap(expr);
+        }
+        // Range
+        else if (self.match(.dot_dot)) {
             return self.range(expr);
         } else break;
     }
@@ -1502,4 +1508,22 @@ fn ternary(self: *Self, expr: *Expr) Error!*Expr {
     } };
 
     return ternary_expr;
+}
+
+fn trap(self: *Self, expr: *Expr) Error!*Expr {
+    const trap_expr = self.allocator.create(Expr) catch oom();
+    try self.expect(.identifier, .trap_no_binding);
+    const binding = self.token_idx - 1;
+
+    if (!self.check(.left_brace) and !self.check(.match)) {
+        return self.errAtCurrent(.trap_no_brace_or_match);
+    }
+
+    trap_expr.* = .{ .trap = .{
+        .lhs = expr,
+        .binding = binding,
+        .rhs = try self.parsePrecedenceExpr(0),
+    } };
+
+    return trap_expr;
 }

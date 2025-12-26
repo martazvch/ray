@@ -56,6 +56,8 @@ pub const ParserMsg = union(enum) {
     self_as_non_first_param,
     struct_lit_non_ident_field,
     too_many_fn_args: struct { what: []const u8 },
+    trap_no_binding,
+    trap_no_brace_or_match,
     typed_self,
     unclosed_brace,
     unclosed_paren,
@@ -120,6 +122,8 @@ pub const ParserMsg = union(enum) {
             .self_as_non_first_param => writer.writeAll("'self' parameter not in first position"),
             .struct_lit_non_ident_field => writer.writeAll("trying to assign to a non-field in structure literal"),
             .too_many_fn_args => |e| writer.print("functions can't have more than 255 {s}", .{e.what}),
+            .trap_no_brace_or_match => writer.writeAll("expect left brace '{' or 'match' after error binding"),
+            .trap_no_binding => writer.writeAll("expect an identifier to bind the error"),
             .typed_self => writer.writeAll("can't specify a type for 'self', it's a keyword whose type is known by the compiler"),
             .unclosed_brace => writer.writeAll("unclosed brace"),
             .unclosed_paren => writer.writeAll("unclosed parenthesis"),
@@ -160,6 +164,8 @@ pub const ParserMsg = union(enum) {
             .missing_bracket_array_type,
             .missing_comma_after_field,
             .missing_fn_param_type,
+            .trap_no_brace_or_match,
+            .trap_no_binding,
             => writer.writeAll("expect to be here"),
             .expect_colon_before_type => writer.writeAll("before this identifier"),
             .expect_colon_struct_lit => writer.writeAll("expect to be after this"),
@@ -253,6 +259,10 @@ pub const ParserMsg = union(enum) {
             .too_many_fn_args => |e| writer.print(
                 "split your function into multiple small ones or pass your {s} in structures / arrays",
                 .{e.what},
+            ),
+            .trap_no_brace_or_match, .trap_no_binding => writer.writeAll(
+                \\'trap' syntax is: trap <err> <expr>, where the expression is either a block '{...}' or a 'match'.
+                \\If you just want to provdie a fallback value use '!!'
             ),
             .typed_self => writer.writeAll("remove the type, the compiler infers the type for 'self' on its own"),
             .unclosed_brace => writer.writeAll("close the opening brace"),

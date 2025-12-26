@@ -32,6 +32,7 @@ const Kind = enum {
     closure,
     @"enum",
     enum_instance,
+    @"error",
     function,
     instance,
     iterator,
@@ -47,6 +48,7 @@ const Kind = enum {
             Closure => .closure,
             Enum => .@"enum",
             EnumInstance => .enum_instance,
+            Error => .@"error",
             Function => .function,
             Instance => .instance,
             Iterator => .iterator,
@@ -94,7 +96,7 @@ pub fn deepCopy(self: *Obj, vm: *Vm) *Obj {
     return switch (self.kind) {
         .array => self.as(Array).deepCopy(vm).asObj(),
         // TODO:
-        .enum_instance => @panic("TODO"),
+        .enum_instance, .@"error" => @panic("TODO"),
         .instance => self.as(Instance).deepCopy(vm).asObj(),
         // Immutable, shallow copy ok
         .box, .closure, .@"enum", .function, .iterator, .native_fn, .native_obj, .string, .structure => self,
@@ -108,6 +110,7 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
         .closure => self.as(Closure).deinit(vm),
         .@"enum" => self.as(Enum).deinit(vm),
         .enum_instance => self.as(EnumInstance).deinit(vm),
+        .@"error" => self.as(Error).deinit(vm),
         .function => {
             const function = self.as(Function);
             function.deinit(vm);
@@ -172,6 +175,10 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
             const instance = self.as(EnumInstance);
             try writer.print("<enum {s}, tag {}>", .{ instance.parent.name, instance.tag_id });
         },
+        .@"error" => {
+            const instance = self.as(Error);
+            try writer.print("<error {s}, tag {}>", .{ instance.parent.name, instance.tag_id });
+        },
         .function => {
             const function = self.as(Function);
             try writer.print("<function {s}>", .{function.name});
@@ -192,6 +199,7 @@ pub fn log(self: *Obj) void {
         .closure => std.debug.print("<closure {s}>", .{self.as(Closure).function.name}),
         .@"enum" => std.debug.print("<enum {s}>", .{self.as(Enum).name}),
         .enum_instance => std.debug.print("<enum instance {s}>", .{self.as(EnumInstance).parent.name}),
+        .@"error" => std.debug.print("<error instance {s}>", .{self.as(Error).parent.name}),
         .function => std.debug.print("<fn {s}>", .{self.as(Function).name}),
         .instance => std.debug.print("<instance of {s}>", .{self.as(Instance).parent.name}),
         .iterator => std.debug.print("<iterator>", .{}),
@@ -605,6 +613,32 @@ pub const Enum = struct {
 };
 
 pub const EnumInstance = struct {
+    obj: Obj,
+    parent: *const Enum,
+    tag_id: u8,
+    payload: Value,
+
+    const Self = @This();
+
+    pub fn create(allocator: Allocator, parent: *const Enum, tag_id: u8, payload: Value) *Self {
+        const obj = Obj.allocateComptime(allocator, Self, undefined);
+        obj.parent = parent;
+        obj.tag_id = tag_id;
+        obj.payload = payload;
+
+        return obj;
+    }
+
+    pub fn asObj(self: *Self) *Obj {
+        return &self.obj;
+    }
+
+    pub fn deinit(self: *Self, vm: *Vm) void {
+        vm.gc_alloc.destroy(self);
+    }
+};
+
+pub const Error = struct {
     obj: Obj,
     parent: *const Enum,
     tag_id: u8,

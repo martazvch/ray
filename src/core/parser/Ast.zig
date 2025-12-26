@@ -154,6 +154,7 @@ pub const Expr = union(enum) {
     @"return": Return,
     struct_literal: StructLiteral,
     ternary: Ternary,
+    trap: Trap,
     unary: Unary,
     when: When,
 };
@@ -242,12 +243,6 @@ pub const StructLiteral = struct {
     fields: []FieldAndValue,
 };
 
-pub const Ternary = struct {
-    condition: *Expr,
-    then: *Expr,
-    @"else": *Expr,
-};
-
 pub const FieldAndValue = struct {
     name: TokenIndex,
     value: ?*Expr,
@@ -284,6 +279,18 @@ pub const Pattern = union(enum) {
         binding: TokenIndex,
         expr: *Expr,
     };
+};
+
+pub const Ternary = struct {
+    condition: *Expr,
+    then: *Expr,
+    @"else": *Expr,
+};
+
+pub const Trap = struct {
+    lhs: *Expr,
+    rhs: *Expr,
+    binding: TokenIndex,
 };
 
 pub const Unary = struct {
@@ -430,6 +437,10 @@ pub fn getSpan(self: *const Self, anynode: anytype) Span {
         Ternary => .{
             .start = self.getSpan(node.condition).start,
             .end = self.getSpan(node.@"else").end,
+        },
+        Trap => .{
+            .start = self.getSpan(node.lhs).start,
+            .end = self.getSpan(node.rhs).end,
         },
         Unary => .{
             .start = self.token_spans[node.op].start,

@@ -855,6 +855,7 @@ fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Contex
         .@"return" => |*e| self.returnExpr(e, ctx),
         .struct_literal => |*e| self.structLiteral(e, ctx),
         .ternary => |*e| self.ternary(e, ctx),
+        .trap => |e| self.trap(e, ctx),
         .unary => |*e| self.unary(e, ctx),
         .when => |*e| self.when(e, expect, ctx),
     };
@@ -1244,7 +1245,11 @@ fn enumLit(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result {
         .ti = .{ .comp_time = enum_ty.tags.get(tag_name).?.is(.void) },
         .instr = self.irb.addConstant(
             // TODO: protect the cast
-            .{ .enum_create = .{ .sym = .{ .module_index = 0, .symbol_index = @intCast(sym.sym.index) }, .tag_index = @intCast(tag_index) } },
+            .{ .enum_create = .{
+                .sym = .{ .module_index = 0, .symbol_index = @intCast(sym.sym.index) },
+                .tag_index = @intCast(tag_index),
+                .is_err = enum_ty.is_err,
+            } },
             span.start,
         ),
     };
@@ -1409,7 +1414,11 @@ fn enumAccess(self: *Self, enum_info: InstrInfos, ty: Type.Enum, tag_tk: Ast.Tok
                 .type = self.ti.intern(.{ .@"enum" = ty }),
                 .ti = .{ .comp_time = ty.tags.get(tag_name).?.is(.void) },
                 .instr = self.irb.addConstant(
-                    .{ .enum_create = .{ .sym = self.irb.data(enum_info.instr).load_symbol, .tag_index = index } },
+                    .{ .enum_create = .{
+                        .sym = self.irb.data(enum_info.instr).load_symbol,
+                        .tag_index = index,
+                        .is_err = ty.is_err,
+                    } },
                     self.ast.getSpan(tag_tk).start,
                 ),
             },
@@ -2214,6 +2223,27 @@ fn ternary(self: *Self, expr: *const Ast.Ternary, ctx: *Context) Result {
     };
 }
 
+fn trap(self: *Self, expr: Ast.Trap, ctx: *Context) Result {
+    const lhs = try self.analyzeExpr(expr.lhs, .value, ctx);
+
+    const err_type = lhs.type.as(.error_union) orelse @panic("Not an error union");
+    const err_name = try self.internIfNotInCurrentScope(expr.binding);
+
+    _ = try self.forwardDeclareVariable(
+        err_name,
+        self.ti.intern(.{ .@"union" = .{ .types = err_type.errs } }),
+        false,
+        self.ast.getSpan(expr.binding),
+    );
+
+    const rhs = try self.analyzeExpr(expr.rhs, .value, ctx);
+
+    return .{
+        .type = rhs.type,
+        .instr = self.irb.addInstr(.{ .trap = .{ .lhs = lhs.instr, .rhs = rhs.instr } }, self.ast.getSpan(expr).start),
+    };
+}
+
 fn unary(self: *Self, expr: *const Ast.Unary, ctx: *Context) Result {
     const span = self.ast.getSpan(expr);
     const op = self.ast.token_tags[expr.op];
@@ -2697,7 +2727,7 @@ fn declareVariable(
         constant,
         comp_time,
         ext_mod,
-    ) catch return self.err(.too_many_locals, span);
+    ) catch self.err(.too_many_locals, span);
 }
 
 fn forwardDeclareVariable(self: *Self, name: InternerIdx, ty: *const Type, captured: bool, span: Span) Error!void {
