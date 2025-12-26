@@ -6,7 +6,6 @@ pub const AnalyzerMsg = union(enum) {
     already_declared: struct { name: []const u8 },
     already_declared_param: struct { name: []const u8 },
     already_declared_field: struct { name: []const u8 },
-    array_mismatch_dim: struct { declared: usize, accessed: usize },
     assign_to_constant: struct { name: []const u8 },
     assign_to_struct_fn,
     assign_type,
@@ -52,7 +51,7 @@ pub const AnalyzerMsg = union(enum) {
     no_main,
     non_bool_cond: struct { what: []const u8, found: []const u8 },
     non_indexable_type: struct { found: []const u8 },
-    non_integer_index: struct { found: []const u8 },
+    invalid_index: struct { found: []const u8 },
     non_null_comp_optional: struct { found: []const u8 },
     non_struct_field_access: struct { found: []const u8 },
     non_struct_struct_literal,
@@ -98,7 +97,6 @@ pub const AnalyzerMsg = union(enum) {
             .already_declared => |e| writer.print("identifier '{s}' is already declared in this scope", .{e.name}),
             .already_declared_field => |e| writer.print("a field named '{s}' already exist in structure declaration", .{e.name}),
             .already_declared_param => |e| writer.print("identifier '{s}' is already used in parameters list", .{e.name}),
-            .array_mismatch_dim => |e| writer.print("trying to access dimension {} of a {}-dimensions array", .{ e.accessed, e.declared }),
             .assign_to_constant => |e| writer.print("can't assign to constant variable '{s}'", .{e.name}),
             .assign_to_struct_fn => writer.writeAll("can't assign to structure's functions"),
             .assign_type => writer.writeAll("trying to assign a type"),
@@ -144,7 +142,7 @@ pub const AnalyzerMsg = union(enum) {
             .no_main => writer.writeAll("no main function found"),
             .non_indexable_type => |e| writer.print("can't index type '{s}'", .{e.found}),
             .non_bool_cond => |e| writer.print("non boolean condition, found type '{s}'", .{e.found}),
-            .non_integer_index => |e| writer.print("non integer index, found '{s}'", .{e.found}),
+            .invalid_index => |e| writer.print("invalid index type, found '{s}'", .{e.found}),
             .non_null_comp_optional => |e| writer.print("can't compare anything else than 'null' to optional type, found '{s}'", .{e.found}),
             .non_struct_field_access => writer.writeAll("attempting to access a field on a non structure type"),
             .non_struct_struct_literal => writer.writeAll("expect a structure type in structure literal expressions"),
@@ -182,7 +180,6 @@ pub const AnalyzerMsg = union(enum) {
     pub fn getHint(self: Self, writer: *Writer) !void {
         try switch (self) {
             .already_declared, .already_declared_field, .already_declared_param => writer.writeAll("this name"),
-            .array_mismatch_dim => writer.writeAll("this array access is wrong"),
             .assign_to_constant => writer.writeAll("this variable is declared as a constant"),
             .assign_to_struct_fn => writer.writeAll("this field is a function"),
             .assign_type => writer.writeAll("This is a type, not a value"),
@@ -226,7 +223,7 @@ pub const AnalyzerMsg = union(enum) {
             .no_main => writer.writeAll("in this file"),
             .non_indexable_type => writer.writeAll("not indexable"),
             .non_comptime_in_global, .non_comptime_default => writer.writeAll("this expression"),
-            .non_integer_index => writer.writeAll("this is not an integer"),
+            .invalid_index => writer.writeAll("can't be used as an index"),
             .non_null_comp_optional => writer.writeAll("this is not 'null' literal"),
             .non_struct_field_access => |e| writer.print("expect a structure but found '{s}'", .{e.found}),
             .non_struct_struct_literal => writer.writeAll("this is not a structure"),
@@ -255,7 +252,6 @@ pub const AnalyzerMsg = union(enum) {
             .already_declared,
             .already_declared_field,
             .already_declared_param,
-            .array_mismatch_dim,
             => writer.writeAll("refer to variable's definition to get array's dimension"),
             .assign_to_struct_fn => writer.writeAll("it is not allowed to modify structures' functions at runtime"),
             .assign_to_constant => writer.writeAll(
@@ -342,7 +338,7 @@ pub const AnalyzerMsg = union(enum) {
                 \\can only use index syntax '[]' for builtin types array, string and map or types defining the Indexable trait
             ),
             // TODO: when there will be Range, modify
-            .non_integer_index => writer.writeAll("can only use integer values to index arrays"),
+            .invalid_index => writer.writeAll("can only use integer or ranges as index"),
             .non_bool_cond => |e| writer.print("'{s}' conditions can only be boolean type", .{e.what}),
             .non_null_comp_optional => writer.writeAll("replace the compared value with 'null' literal or change the condition"),
             .non_struct_field_access => writer.writeAll("refer to variable's definition to know its type"),

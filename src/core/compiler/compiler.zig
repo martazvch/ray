@@ -380,16 +380,8 @@ const Compiler = struct {
         try self.compileInstr(data.expr);
         self.state.cow = prev;
 
-        for (data.indicies) |index| {
-            try self.compileInstr(index);
-        }
-
-        // TODO: protect the cast
-        if (data.indicies.len == 1) {
-            self.writeOp(.array_set);
-        } else {
-            self.writeOpAndByte(.array_set_chain, @intCast(data.indicies.len));
-        }
+        try self.compileInstr(data.index);
+        self.writeOp(.array_set);
     }
 
     fn assignment(self: *Self, data: *const Instruction.Assignment) Error!void {
@@ -796,17 +788,11 @@ const Compiler = struct {
         // Index, we deactivate cow for indicies because never wanted but could be triggered by a multiple array
         // access inside an array assignment
         const prev = self.state.setAndGetPrev(.cow, false);
-        for (data.indicies) |index| {
-            try self.compileInstr(index);
-        }
+        try self.compileInstr(data.index);
         self.state.cow = prev;
 
         // TODO: protect the cast
-        if (data.indicies.len == 1) {
-            self.writeOp(if (data.kind == .array) .index_arr else .index_str);
-        } else {
-            self.writeOpAndByte(if (self.state.cow) .array_get_chain_cow else .array_get_chain, @intCast(data.indicies.len));
-        }
+        self.writeOp(if (data.kind == .array) if (self.state.cow) .index_arr_cow else .index_arr else .index_str);
     }
 
     // TODO: protect the casts

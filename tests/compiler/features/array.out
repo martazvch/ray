@@ -60,9 +60,10 @@ array_new index 2
 
 load_constant index 11, value 98
 get_local_cow index 5
-get_local index 4
 get_local index 3
-array_set_chain index 2
+index_arr_cow
+get_local index 4
+array_set
 
 ret_naked
 

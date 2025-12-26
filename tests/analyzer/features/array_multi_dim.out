@@ -55,27 +55,36 @@
         [Indexing array]
             - index
             [Constant 3]
-            [Constant 4]
             - expr
-            [Variable index: 0, scope: local]
+            [Indexing array]
+                - index
+                [Constant 4]
+                - expr
+                [Variable index: 0, scope: local]
     [Print]
         [Indexing array]
             - index
             [Unary minus]
                 [Constant 4]
-            [Unary minus]
-                [Constant 3]
             - expr
-            [Variable index: 0, scope: local]
+            [Indexing array]
+                - index
+                [Unary minus]
+                    [Constant 3]
+                - expr
+                [Variable index: 0, scope: local]
     [Constant 15]
         [Int 99]
     [Indexing assignment, array]
         - index
         [Call symbol 1]
-        [Unary minus]
-            [Constant 4]
         - expr
-        [Variable index: 0, scope: local]
+        [Indexing array]
+            - index
+            [Unary minus]
+                [Constant 4]
+            - expr
+            [Variable index: 0, scope: local]
     [Array]
         [Constant 4]
     [Indexing assignment, array]
@@ -90,10 +99,13 @@
     [Indexing assignment, array]
         - index
         [Constant 4]
-        [Call symbol 1]
         - expr
-        [Field access 0]
-            [Variable index: 2, scope: local]
+        [Indexing array]
+            - index
+            [Call symbol 1]
+            - expr
+            [Field access 0]
+                [Variable index: 2, scope: local]
     [Print]
         [Indexing array]
             - index
@@ -105,7 +117,10 @@
         [Indexing array]
             - index
             [Constant 4]
-            [Call symbol 1]
             - expr
-            [Field access 0]
-                [Variable index: 2, scope: local]
+            [Indexing array]
+                - index
+                [Call symbol 1]
+                - expr
+                [Field access 0]
+                    [Variable index: 2, scope: local]

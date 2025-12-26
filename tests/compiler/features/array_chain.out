@@ -66,26 +66,29 @@ struct_lit index 2, arity 2, <structure Object>
 get_local index 6
 get_field index 0
 get_field index 0
-load_constant index 26, value 0
 load_constant index 4, value 1
-array_get_chain index 2
+index_arr
+load_constant index 26, value 0
+index_arr
 print
 
 get_local index 6
 get_field index 0
 get_field index 0
-load_constant index 26, value 0
 get_local index 0
-array_get_chain index 2
+index_arr
+load_constant index 26, value 0
+index_arr
 get_field index 0
 print
 
 get_local index 6
 get_field index 0
 get_field index 0
-load_constant index 26, value 0
 load_constant index 4, value 1
-array_get_chain index 2
+index_arr
+load_constant index 26, value 0
+index_arr
 get_field index 2
 load_constant index 26, value 0
 index_arr
@@ -94,13 +97,15 @@ print
 get_local index 6
 get_field index 0
 get_field index 0
+load_constant index 4, value 1
+index_arr
 load_constant index 26, value 0
-load_constant index 4, value 1
-array_get_chain index 2
+index_arr
 get_field index 2
-load_constant index 4, value 1
 get_local index 0
-array_get_chain index 2
+index_arr
+load_constant index 4, value 1
+index_arr
 print
 
 load_constant index 27, value 55
@@ -109,12 +114,14 @@ array_new index 2
 get_local_cow index 6
 get_field_cow index 0
 get_field_cow index 0
-load_constant index 26, value 0
 load_constant index 4, value 1
-array_get_chain_cow index 2
+index_arr_cow
+load_constant index 26, value 0
+index_arr_cow
 get_field_cow index 2
 load_constant index 26, value 0
 array_set
+
 ret_naked
 
 -- global scope --

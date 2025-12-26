@@ -1774,22 +1774,12 @@ fn checkBranch(self: *Self, ty: *const Type, cf: InstrInfos.ControlFlow, expect:
 }
 
 fn indexing(self: *Self, expr: *const Ast.Indexing, ctx: *Context) Result {
-    var indicies: ArrayList(InstrIndex) = .empty;
+    const index = try self.expectIndex(expr.index, ctx);
 
-    const expr_res = arr: {
-        if (expr.expr.* == .indexing) {
-            break :arr try self.indexingChain(expr, &indicies, ctx);
-        } else {
-            indicies.append(self.allocator, try self.expectIndex(expr.index, ctx)) catch oom();
-            break :arr try self.analyzeExpr(expr.expr, .value, ctx);
-        }
-    };
+    const expr_res = try self.analyzeExpr(expr.expr, .value, ctx);
 
     const elem_type = switch (expr_res.type.*) {
-        .array => |t| t.getChildAt(indicies.items.len - 1) orelse return self.err(
-            .{ .array_mismatch_dim = .{ .declared = expr_res.type.array.depth(), .accessed = indicies.items.len } },
-            self.ast.getSpan(expr),
-        ),
+        .array => |t| t.child,
         .str => expr_res.type,
         else => return self.err(
             .{ .non_indexable_type = .{ .found = self.typeName(expr_res.type) } },
@@ -1803,7 +1793,7 @@ fn indexing(self: *Self, expr: *const Ast.Indexing, ctx: *Context) Result {
         .instr = self.irb.addInstr(
             .{ .indexing = .{
                 .expr = expr_res.instr,
-                .indicies = indicies.toOwnedSlice(self.allocator) catch oom(),
+                .index = index,
                 .kind = if (expr_res.type.* == .array) .array else .str,
             } },
             self.ast.getSpan(expr).start,
@@ -1827,8 +1817,8 @@ fn indexingChain(self: *Self, expr: *const Ast.Indexing, indicies: *ArrayList(In
 fn expectIndex(self: *Self, expr: *const Expr, ctx: *Context) Error!InstrIndex {
     const res = try self.analyzeExpr(expr, .value, ctx);
 
-    if (res.type != self.ti.cache.int) return self.err(
-        .{ .non_integer_index = .{ .found = self.typeName(res.type) } },
+    if (!res.type.is(.int) and !res.type.is(.range)) return self.err(
+        .{ .invalid_index = .{ .found = self.typeName(res.type) } },
         self.ast.getSpan(expr),
     );
 

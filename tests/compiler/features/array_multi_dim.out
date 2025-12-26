@@ -37,25 +37,28 @@ array_new index 2
 struct_lit index 0, arity 1, <structure Foo>
 
 get_local index 0
-load_constant index 4, value 2
 load_constant index 3, value 1
-array_get_chain index 2
+index_arr
+load_constant index 4, value 2
+index_arr
 print
 
 get_local index 0
-load_constant index 3, value 1
-neg_int
 load_constant index 4, value 2
 neg_int
-array_get_chain index 2
+index_arr
+load_constant index 3, value 1
+neg_int
+index_arr
 print
 
 load_constant index 15, value 99
 get_local_cow index 0
-call_sym index 1, arity 0, <function getIdx>
 load_constant index 3, value 1
 neg_int
-array_set_chain index 2
+index_arr_cow
+call_sym index 1, arity 0, <function getIdx>
+array_set
 
 load_constant index 3, value 1
 array_new index 1
@@ -68,9 +71,10 @@ load_constant index 13, value 9
 neg_int
 get_local_cow index 2
 get_field_cow index 0
-load_constant index 3, value 1
 call_sym index 1, arity 0, <function getIdx>
-array_set_chain index 2
+index_arr_cow
+load_constant index 3, value 1
+array_set
 
 get_local index 2
 get_field index 0
@@ -80,9 +84,10 @@ print
 
 get_local index 2
 get_field index 0
-load_constant index 3, value 1
 call_sym index 1, arity 0, <function getIdx>
-array_get_chain index 2
+index_arr
+load_constant index 3, value 1
+index_arr
 print
 
 ret_naked

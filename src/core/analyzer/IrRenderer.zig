@@ -136,7 +136,7 @@ fn indexing(self: *Self, data: Instruction.Indexing, cow: bool, comptime is_assi
     if (cow) self.indentAndAppendSlice("[Cow]");
 
     self.indentAndAppendSlice("- index");
-    for (data.indicies) |index| self.parseInstr(index);
+    self.parseInstr(data.index);
     self.indentAndAppendSlice("- expr");
     self.parseInstr(data.expr);
 }

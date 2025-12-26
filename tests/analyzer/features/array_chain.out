@@ -112,21 +112,27 @@
             - index
             [Constant 26]
                 [Int 0]
-            [Constant 4]
             - expr
-            [Field access 0]
-                [Field access 0]
-                    [Variable index: 5, scope: local]
-    [Print]
-        [Field access 0]
             [Indexing array]
                 - index
-                [Constant 26]
                 [Constant 4]
                 - expr
                 [Field access 0]
                     [Field access 0]
                         [Variable index: 5, scope: local]
+    [Print]
+        [Field access 0]
+            [Indexing array]
+                - index
+                [Constant 26]
+                - expr
+                [Indexing array]
+                    - index
+                    [Constant 4]
+                    - expr
+                    [Field access 0]
+                        [Field access 0]
+                            [Variable index: 5, scope: local]
     [Print]
         [Indexing array]
             - index
@@ -136,26 +142,35 @@
                 [Indexing array]
                     - index
                     [Constant 26]
-                    [Constant 4]
                     - expr
-                    [Field access 0]
+                    [Indexing array]
+                        - index
+                        [Constant 4]
+                        - expr
                         [Field access 0]
-                            [Variable index: 5, scope: local]
+                            [Field access 0]
+                                [Variable index: 5, scope: local]
     [Print]
         [Indexing array]
             - index
             [Constant 4]
-            [Constant 4]
             - expr
-            [Field access 2]
-                [Indexing array]
-                    - index
-                    [Constant 26]
-                    [Constant 4]
-                    - expr
-                    [Field access 0]
-                        [Field access 0]
-                            [Variable index: 5, scope: local]
+            [Indexing array]
+                - index
+                [Constant 4]
+                - expr
+                [Field access 2]
+                    [Indexing array]
+                        - index
+                        [Constant 26]
+                        - expr
+                        [Indexing array]
+                            - index
+                            [Constant 4]
+                            - expr
+                            [Field access 0]
+                                [Field access 0]
+                                    [Variable index: 5, scope: local]
     [Array]
         [Constant 27]
             [Int 55]
@@ -170,8 +185,11 @@
             [Indexing array]
                 - index
                 [Constant 26]
-                [Constant 4]
                 - expr
-                [Field access 0]
+                [Indexing array]
+                    - index
+                    [Constant 4]
+                    - expr
                     [Field access 0]
-                        [Variable index: 5, scope: local]
+                        [Field access 0]
+                            [Variable index: 5, scope: local]

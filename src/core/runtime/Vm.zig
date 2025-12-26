@@ -151,39 +151,6 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
                 self.stack.top -= arity + 1;
                 if (result) |res| self.stack.push(res);
             },
-            .array_get_chain => {
-                const depth = frame.readByte();
-                var array = self.stack.peekRef(depth).obj.as(Obj.Array);
-
-                for (0..depth - 1) |i| {
-                    const index = checkArrayIndex(array.values.items.len, self.stack.peek(i).int);
-                    array = array.values.items[index].obj.as(Obj.Array);
-                }
-
-                const index = checkArrayIndex(array.values.items.len, self.stack.peek(depth - 1).int);
-                const value = array.values.items[index];
-
-                self.stack.peekRef(depth).* = value;
-                self.stack.top -= depth;
-            },
-            .array_get_chain_cow => {
-                const depth = frame.readByte();
-                var value = self.stack.peek(depth);
-                var array = value.obj.as(Obj.Array);
-
-                for (0..depth - 1) |i| {
-                    const index = checkArrayIndex(array.values.items.len, self.stack.peek(i).int);
-                    value = array.values.items[index];
-                    value.obj = self.cow(value.obj);
-                    array = value.obj.as(Obj.Array);
-                }
-
-                const index = checkArrayIndex(array.values.items.len, self.stack.peek(depth - 1).int);
-                array.values.items[index].obj = self.cow(array.values.items[index].obj);
-
-                self.stack.peekRef(depth).* = array.values.items[index];
-                self.stack.top -= depth;
-            },
             // PERF: don't pop, just decrement rsp (check all pops, maybe they aren't usefull at all)
             .array_set => {
                 const index = self.stack.pop().int;
@@ -192,22 +159,6 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
 
                 const final = checkArrayIndex(array.values.items.len, index);
                 array.values.items[final] = value;
-            },
-            .array_set_chain => {
-                // Array on top of stack already cowed
-                const depth = frame.readByte();
-                var array = self.stack.peekRef(depth).obj.as(Obj.Array);
-
-                for (0..depth - 1) |i| {
-                    const index = checkArrayIndex(array.values.items.len, self.stack.peek(i).int);
-                    var value = array.values.items[index];
-                    value.obj = self.cow(value.obj);
-                    array = value.obj.as(Obj.Array);
-                }
-
-                const index = checkArrayIndex(array.values.items.len, self.stack.peek(depth - 1).int);
-                array.values.items[index] = self.stack.peek(depth + 1);
-                self.stack.top -= depth + 2;
             },
             .bound_method => {
                 const sym_index = frame.readByte();
@@ -360,6 +311,15 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
                 const array = self.stack.pop().obj.as(Obj.Array);
                 const final = checkArrayIndex(array.values.items.len, index);
                 self.stack.push(array.values.items[final]);
+            },
+            .index_arr_cow => {
+                const index = self.stack.pop().int;
+                const array = self.stack.pop().obj.as(Obj.Array);
+                const final = checkArrayIndex(array.values.items.len, index);
+
+                var value = array.values.items[final];
+                value.obj = self.cow(value.obj);
+                self.stack.push(value);
             },
             .index_str => {
                 const index = self.stack.pop().int;

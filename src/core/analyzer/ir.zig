@@ -58,7 +58,7 @@ pub const Instruction = struct {
 
     pub const Indexing = struct {
         expr: Index,
-        indicies: []const Index,
+        index: Index,
         kind: Kind,
 
         pub const Kind = enum { array, str };
