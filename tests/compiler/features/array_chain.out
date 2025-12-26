@@ -88,7 +88,7 @@ load_constant index 4, value 1
 array_get_chain index 2
 get_field index 2
 load_constant index 26, value 0
-array_get
+index_arr
 print
 
 get_local index 6

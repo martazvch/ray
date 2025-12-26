@@ -24,7 +24,7 @@ if {
 }
 
 
-// Do syntaxe
+// Do syntax
 
 if true do print "ok"
 

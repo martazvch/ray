@@ -65,7 +65,6 @@ pub fn renderIr(self: *Self, file_name: []const u8, roots: []const usize) Error!
 fn parseInstr(self: *Self, instr: ir.Index) void {
     switch (self.instrs[instr]) {
         .array => |*data| self.array(data),
-        .array_access => |*data| self.arrayAccess(data, false, false),
         .assignment => |*data| self.assignment(data),
         .binop => |*data| self.binop(data),
         .block => |*data| self.block(data),
@@ -86,6 +85,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .@"if" => |*data| self.ifInstr(data),
         .int => |data| self.intInstr(data),
         .incr_rc => |index| self.indexInstr("Incr rc", index),
+        .indexing => |data| self.indexing(data, false, false),
         .load_symbol => |*data| self.loadSymbol(data),
         .load_builtin => |index| self.indentAndPrintSlice("[Builtin symbol: {}]", .{index}),
         .match => |*data| self.match(data),
@@ -128,8 +128,8 @@ fn array(self: *Self, data: *const Instruction.Array) void {
     }
 }
 
-fn arrayAccess(self: *Self, data: *const Instruction.ArrayAccess, cow: bool, is_assign: bool) void {
-    self.indentAndAppendSlice(if (is_assign) "[Array assignment]" else "[Array access]");
+fn indexing(self: *Self, data: Instruction.Indexing, cow: bool, comptime is_assign: bool) void {
+    self.indentAndPrintSlice(if (is_assign) "[Indexing assignment, {t}]" else "[Indexing {t}]", .{data.kind});
     self.indent_level += 1;
     defer self.indent_level -= 1;
 
@@ -137,15 +137,15 @@ fn arrayAccess(self: *Self, data: *const Instruction.ArrayAccess, cow: bool, is_
 
     self.indentAndAppendSlice("- index");
     for (data.indicies) |index| self.parseInstr(index);
-    self.indentAndAppendSlice("- array");
-    self.parseInstr(data.array);
+    self.indentAndAppendSlice("- expr");
+    self.parseInstr(data.expr);
 }
 
 fn assignment(self: *Self, data: *const Instruction.Assignment) void {
     self.parseInstr(data.value);
 
     const variable_data, const unbox = switch (self.instrs[data.assigne]) {
-        .array_access => |*arr_data| return self.arrayAccess(arr_data, data.cow, true),
+        .indexing => |indexing_data| return self.indexing(indexing_data, data.cow, true),
         .identifier => |*variable| .{ variable, false },
         .field => |member| return self.fieldAssignment(member, data.cow),
         .unbox => |index| .{ &self.instrs[index].identifier, true },

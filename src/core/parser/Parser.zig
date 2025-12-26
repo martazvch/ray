@@ -1306,7 +1306,7 @@ fn postfix(self: *Self, prefixExpr: *Expr) Error!*Expr {
         }
         // Array access
         else if (self.match(.left_bracket)) {
-            expr = try self.arrayAccess(expr);
+            expr = try self.indexing(expr);
         }
         // Structure literal
         else if (self.check(.left_brace)) {
@@ -1323,20 +1323,6 @@ fn postfix(self: *Self, prefixExpr: *Expr) Error!*Expr {
     }
 
     return expr;
-}
-
-fn arrayAccess(self: *Self, expr: *Expr) Error!*Expr {
-    const array_access = self.allocator.create(Expr) catch oom();
-    const index = try self.parsePrecedenceExpr(0);
-    try self.expect(.right_bracket, .missing_array_access_close_bracket);
-
-    array_access.* = .{ .array_access = .{
-        .array = expr,
-        .index = index,
-        .end = self.token_idx - 1,
-    } };
-
-    return array_access;
 }
 
 fn field(self: *Self, expr: *Expr) Error!*Expr {
@@ -1394,6 +1380,20 @@ fn finishCall(self: *Self, expr: *Expr) Error!*Expr {
     try self.expect(.right_paren, .expect_paren_after_fn_args);
 
     return call_expr;
+}
+
+fn indexing(self: *Self, expr: *Expr) Error!*Expr {
+    const indexing_expr = self.allocator.create(Expr) catch oom();
+    const index = try self.parsePrecedenceExpr(0);
+    try self.expect(.right_bracket, .missing_array_access_close_bracket);
+
+    indexing_expr.* = .{ .indexing = .{
+        .expr = expr,
+        .index = index,
+        .end = self.token_idx - 1,
+    } };
+
+    return indexing_expr;
 }
 
 fn range(self: *Self, start: *Expr) Error!*Expr {

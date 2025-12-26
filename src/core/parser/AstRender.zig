@@ -277,12 +277,6 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
                 try self.closeKey(.list, comma);
             }
         },
-        .array_access => |*e| {
-            try self.openKey("array access", .block);
-            try self.renderSingleExpr("array", e.array, .block, true);
-            try self.renderSingleExpr("index", e.index, .block, false);
-            try self.closeKey(.block, comma);
-        },
         .block => |*e| try self.renderBlock(e, null, comma),
         .binop => |*e| {
             try self.openKey(@tagName(expr.*), .block);
@@ -357,6 +351,12 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
             if (e.@"else") |*data| {
                 try self.renderSingleNode("else", data, .block, comma);
             }
+            try self.closeKey(.block, comma);
+        },
+        .indexing => |*e| {
+            try self.openKey("indexing", .block);
+            try self.renderSingleExpr("expr", e.expr, .block, true);
+            try self.renderSingleExpr("index", e.index, .block, false);
             try self.closeKey(.block, comma);
         },
         .literal => |e| {

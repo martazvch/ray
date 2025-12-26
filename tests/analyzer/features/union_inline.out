@@ -15,17 +15,17 @@
             [Constant 0]
     [Constant 1]
         [Bool false]
-    [Array assignment]
+    [Indexing assignment, array]
         - index
         [Constant 4]
             [Int 0]
-        - array
+        - expr
         [Variable index: 2, scope: local]
     [Constant 3]
-    [Array assignment]
+    [Indexing assignment, array]
         - index
         [Constant 4]
-        - array
+        - expr
         [Variable index: 2, scope: local]
     [Variable declaration index: 3, scope: local]
         [Array]
@@ -37,17 +37,17 @@
                 [String yep]
     [Constant 8]
         [String maybe]
-    [Array assignment]
+    [Indexing assignment, array]
         - index
         [Constant 4]
-        - array
+        - expr
         [Variable index: 3, scope: local]
     [Constant 9]
         [Float 6.9]
-    [Array assignment]
+    [Indexing assignment, array]
         - index
         [Constant 4]
-        - array
+        - expr
         [Variable index: 3, scope: local]
     [Variable declaration index: 4, scope: local]
         [Constant 10]

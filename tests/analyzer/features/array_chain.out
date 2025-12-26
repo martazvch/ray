@@ -108,51 +108,51 @@
                 [Variable index: 4, scope: local]
             [Default field constant index 3]
     [Print]
-        [Array access]
+        [Indexing array]
             - index
             [Constant 26]
                 [Int 0]
             [Constant 4]
-            - array
+            - expr
             [Field access 0]
                 [Field access 0]
                     [Variable index: 5, scope: local]
     [Print]
         [Field access 0]
-            [Array access]
+            [Indexing array]
                 - index
                 [Constant 26]
                 [Constant 4]
-                - array
+                - expr
                 [Field access 0]
                     [Field access 0]
                         [Variable index: 5, scope: local]
     [Print]
-        [Array access]
+        [Indexing array]
             - index
             [Constant 26]
-            - array
+            - expr
             [Field access 2]
-                [Array access]
+                [Indexing array]
                     - index
                     [Constant 26]
                     [Constant 4]
-                    - array
+                    - expr
                     [Field access 0]
                         [Field access 0]
                             [Variable index: 5, scope: local]
     [Print]
-        [Array access]
+        [Indexing array]
             - index
             [Constant 4]
             [Constant 4]
-            - array
+            - expr
             [Field access 2]
-                [Array access]
+                [Indexing array]
                     - index
                     [Constant 26]
                     [Constant 4]
-                    - array
+                    - expr
                     [Field access 0]
                         [Field access 0]
                             [Variable index: 5, scope: local]
@@ -161,17 +161,17 @@
             [Int 55]
         [Constant 28]
             [Int 66]
-    [Array assignment]
+    [Indexing assignment, array]
         [Cow]
         - index
         [Constant 26]
-        - array
+        - expr
         [Field access 2]
-            [Array access]
+            [Indexing array]
                 - index
                 [Constant 26]
                 [Constant 4]
-                - array
+                - expr
                 [Field access 0]
                     [Field access 0]
                         [Variable index: 5, scope: local]

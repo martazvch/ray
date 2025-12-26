@@ -469,7 +469,7 @@ pub fn next(self: *Self) Token {
                 },
                 '.' => {
                     if (self.checkAt(1, '.')) {
-                        // Range syntaxe: 1..3
+                        // Range syntax: 1..3
                     } else {
                         continue :state .float;
                     }

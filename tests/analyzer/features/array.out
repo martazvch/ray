@@ -27,39 +27,39 @@
                     [Int 7]
                 [Call symbol 1]
     [Print]
-        [Array access]
+        [Indexing array]
             - index
             [Constant 4]
-            - array
+            - expr
             [Variable index: 0, scope: local]
     [Print]
-        [Array access]
+        [Indexing array]
             - index
             [Unary minus]
                 [Constant 3]
-            - array
+            - expr
             [Variable index: 0, scope: local]
     [Constant 8]
         [Int 99]
-    [Array assignment]
+    [Indexing assignment, array]
         - index
         [Call symbol 1]
-        - array
+        - expr
         [Variable index: 0, scope: local]
     [Unary minus]
         [Constant 9]
             [Int 9]
-    [Array assignment]
+    [Indexing assignment, array]
         - index
         [Call symbol 1]
-        - array
+        - expr
         [Field access 0]
             [Variable index: 2, scope: local]
     [Print]
-        [Array access]
+        [Indexing array]
             - index
             [Call symbol 1]
-            - array
+            - expr
             [Field access 0]
                 [Variable index: 2, scope: local]
     [Variable declaration index: 3, scope: local]
@@ -79,17 +79,17 @@
             [Constant 4]
             [Constant 3]
     [Constant 3]
-    [Array assignment]
+    [Indexing assignment, array]
         - index
         [Constant 4]
-        - array
+        - expr
         [Variable index: 6, scope: local]
     [Constant 2]
         [Null]
-    [Array assignment]
+    [Indexing assignment, array]
         - index
         [Constant 4]
-        - array
+        - expr
         [Variable index: 6, scope: local]
     [Array]
         [Constant 4]

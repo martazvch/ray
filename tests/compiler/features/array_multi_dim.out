@@ -75,7 +75,7 @@ array_set_chain index 2
 get_local index 2
 get_field index 0
 call_sym index 1, arity 0, <function getIdx>
-array_get
+index_arr
 print
 
 get_local index 2

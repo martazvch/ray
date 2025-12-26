@@ -151,12 +151,6 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
                 self.stack.top -= arity + 1;
                 if (result) |res| self.stack.push(res);
             },
-            .array_get => {
-                const index = self.stack.pop().int;
-                const array = self.stack.pop().obj.as(Obj.Array);
-                const final = checkArrayIndex(array.values.items.len, index);
-                self.stack.push(array.values.items[final]);
-            },
             .array_get_chain => {
                 const depth = frame.readByte();
                 var array = self.stack.peekRef(depth).obj.as(Obj.Array);
@@ -361,6 +355,18 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             .gt_float => self.stack.push(Value.makeBool(self.stack.pop().float < self.stack.pop().float)),
             .gt_int => self.stack.push(Value.makeBool(self.stack.pop().int < self.stack.pop().int)),
             .incr_ref => self.stack.peekRef(0).obj.ref_count += 1,
+            .index_arr => {
+                const index = self.stack.pop().int;
+                const array = self.stack.pop().obj.as(Obj.Array);
+                const final = checkArrayIndex(array.values.items.len, index);
+                self.stack.push(array.values.items[final]);
+            },
+            .index_str => {
+                const index = self.stack.pop().int;
+                const string = self.stack.pop().obj.as(Obj.String);
+                const final = checkArrayIndex(string.chars.len, index);
+                self.stack.push(.makeObj(Obj.String.takeCopy(self, &.{string.chars[final]}).asObj()));
+            },
             .is_bool => self.stack.push(.makeBool(self.stack.peek(0) == .bool)),
             .is_float => self.stack.push(.makeBool(self.stack.peek(0) == .float)),
             .is_int => self.stack.push(.makeBool(self.stack.peek(0) == .int)),

@@ -12,7 +12,6 @@ pub const Instruction = struct {
 
     pub const Data = union(enum) {
         array: Array,
-        array_access: ArrayAccess,
         assignment: Assignment,
         binop: Binop,
         block: Block,
@@ -32,6 +31,7 @@ pub const Instruction = struct {
         identifier: Variable,
         @"if": If,
         incr_rc: Index,
+        indexing: Indexing,
         int: i64,
         load_symbol: LoadSymbol,
         load_builtin: usize,
@@ -56,7 +56,13 @@ pub const Instruction = struct {
         noop, // Used only by 'use' statements as they don't produce any instructions
     };
 
-    pub const ArrayAccess = struct { array: Index, indicies: []const Index };
+    pub const Indexing = struct {
+        expr: Index,
+        indicies: []const Index,
+        kind: Kind,
+
+        pub const Kind = enum { array, str };
+    };
     pub const Binop = struct {
         lhs: Index,
         rhs: Index,

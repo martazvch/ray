@@ -20,13 +20,13 @@ struct_lit index 0, arity 1, <structure Foo>
 
 get_local index 0
 load_constant index 4, value 1
-array_get
+index_arr
 print
 
 get_local index 0
 load_constant index 3, value 2
 neg_int
-array_get
+index_arr
 print
 
 load_constant index 8, value 99
@@ -44,7 +44,7 @@ array_set
 get_local index 2
 get_field index 0
 call_sym index 1, arity 0, <function getIdx>
-array_get
+index_arr
 print
 
 load_constant index 4, value 1

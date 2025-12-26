@@ -73,29 +73,29 @@
                 [Variable index: 2, scope: local]
     [Variable declaration index: 7, scope: local]
         [Incr rc]
-            [Array access]
+            [Indexing array]
                 - index
                 [Constant 8]
                     [Int 0]
-                - array
+                - expr
                 [Field access 1]
                     [Variable index: 2, scope: local]
     [Variable declaration index: 8, scope: local]
         [Incr rc]
             [Field access 0]
-                [Array access]
+                [Indexing array]
                     - index
                     [Constant 8]
-                    - array
+                    - expr
                     [Field access 1]
                         [Variable index: 2, scope: local]
     [Variable declaration index: 9, scope: local]
         [Field access 0]
             [Field access 0]
-                [Array access]
+                [Indexing array]
                     - index
                     [Constant 8]
-                    - array
+                    - expr
                     [Field access 1]
                         [Variable index: 2, scope: local]
     [Variable declaration index: 10, scope: local]

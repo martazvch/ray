@@ -134,7 +134,6 @@ pub const While = struct {
 
 pub const Expr = union(enum) {
     array: Array,
-    array_access: ArrayAccess,
     block: Block,
     binop: Binop,
     @"break": Break,
@@ -144,6 +143,7 @@ pub const Expr = union(enum) {
     fn_call: FnCall,
     grouping: Grouping,
     @"if": If,
+    indexing: Indexing,
     literal: Literal,
     match: Match,
     pattern: Pattern,
@@ -158,12 +158,6 @@ pub const Expr = union(enum) {
 pub const Array = struct {
     values: []*Expr,
     span: Span,
-};
-
-pub const ArrayAccess = struct {
-    array: *Expr,
-    index: *Expr,
-    end: TokenIndex,
 };
 
 pub const Block = struct {
@@ -210,6 +204,12 @@ pub const If = struct {
     then: Node,
     @"else": ?Node,
     if_token: TokenIndex,
+};
+
+pub const Indexing = struct {
+    expr: *Expr,
+    index: *Expr,
+    end: TokenIndex,
 };
 
 pub const Literal = struct {
@@ -366,10 +366,6 @@ pub fn getSpan(self: *const Self, anynode: anytype) Span {
             .start = self.token_spans[node.span.start].start,
             .end = self.token_spans[node.span.end].end,
         },
-        ArrayAccess => .{
-            .start = self.getSpan(node.array).start,
-            .end = self.token_spans[node.end].end,
-        },
         Block => node.span,
         Binop => .{
             .start = self.getSpan(node.lhs.*).start,
@@ -386,6 +382,10 @@ pub fn getSpan(self: *const Self, anynode: anytype) Span {
         FnCall => self.getSpan(node.callee),
         Grouping => node.span,
         If => self.getSpan(node.if_token),
+        Indexing => .{
+            .start = self.getSpan(node.expr).start,
+            .end = self.token_spans[node.end].end,
+        },
         Literal => self.token_spans[node.idx],
         Match => .{
             .start = self.token_spans[node.kw].start,

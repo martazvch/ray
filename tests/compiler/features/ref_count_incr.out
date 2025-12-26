@@ -40,13 +40,13 @@ incr_ref
 get_local index 2
 get_field index 1
 load_constant index 6, value 0
-array_get
+index_arr
 incr_ref
 
 get_local index 2
 get_field index 1
 load_constant index 6, value 0
-array_get
+index_arr
 get_field index 0
 incr_ref
 

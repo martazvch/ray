@@ -1,0 +1,10 @@
+-- main --
+load_constant index 3, value Tom
+get_local index 0
+load_constant index 4, value 1
+index_str
+print
+ret_naked
+
+-- global scope --
+call_sym index 0, arity 0, <function main>

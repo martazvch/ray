@@ -200,10 +200,6 @@ fn captureFromExpr(self: *Self, expr: *Ast.Expr, ctx: *CaptureCtx) void {
         .array => |*e| for (e.values) |val| {
             self.captureFromExpr(val, ctx);
         },
-        .array_access => |*e| {
-            self.captureFromExpr(e.array, ctx);
-            self.captureFromExpr(e.index, ctx);
-        },
         .binop => |*e| {
             self.captureFromExpr(e.lhs, ctx);
             self.captureFromExpr(e.rhs, ctx);
@@ -228,6 +224,10 @@ fn captureFromExpr(self: *Self, expr: *Ast.Expr, ctx: *CaptureCtx) void {
             self.captureFromPattern(e.pattern, ctx);
             self.captureFromNode(&e.then, ctx);
             if (e.@"else") |*n| self.captureFromNode(n, ctx);
+        },
+        .indexing => |*e| {
+            self.captureFromExpr(e.expr, ctx);
+            self.captureFromExpr(e.index, ctx);
         },
         .literal => |e| {
             if (e.tag != .identifier) return;

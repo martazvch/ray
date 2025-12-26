@@ -1,0 +1,5 @@
+non_indexable_type, bool
+non_integer_index, bool
+non_integer_index, float
+array_mismatch_dim, 2, 3
+index_assign_str

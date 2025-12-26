@@ -248,7 +248,14 @@ fn assignment(self: *Self, node: *const Ast.Assignment, ctx: *Context) StmtResul
             break :b .{ .type = field_result.type, .instr = field_result.instr };
         },
         .fn_call => return self.err(.invalid_assign_target, span),
-        .array_access => try self.analyzeExpr(node.assigne, .value, ctx),
+        .indexing => |*expr| b: {
+            const res = try self.indexing(expr, ctx);
+
+            if (res.type.* == .str) {
+                return self.err(.index_assign_str, self.ast.getSpan(expr.expr));
+            }
+            break :b res;
+        },
         else => return self.err(.invalid_assign_target, span),
     };
 
@@ -830,7 +837,6 @@ const ExprResKind = enum {
 fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Context) Result {
     const res = try switch (expr.*) {
         .array => |*e| self.array(e, ctx),
-        .array_access => |*e| self.arrayAccess(e, ctx),
         .block => |*e| self.block(e, expect, ctx),
         .binop => |*e| self.binop(e, ctx),
         .@"break" => |*e| self.breakExpr(e, ctx),
@@ -840,6 +846,7 @@ fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Contex
         .fn_call => |*e| self.call(e, ctx),
         .grouping => |*e| self.analyzeExpr(e.expr, expect, ctx),
         .@"if" => |*e| self.ifExpr(e, expect, ctx),
+        .indexing => |*e| self.indexing(e, ctx),
         .literal => |*e| self.literal(e, ctx),
         .match => |*e| self.match(e, expect, ctx),
         .pattern => |e| self.pattern(e, ctx),
@@ -905,62 +912,6 @@ fn array(self: *Self, expr: *const Ast.Array, ctx: *Context) Result {
             self.ast.getSpan(expr).start,
         ),
     };
-}
-
-fn arrayAccess(self: *Self, expr: *const Ast.ArrayAccess, ctx: *Context) Result {
-    var indicies: ArrayList(InstrIndex) = .empty;
-
-    const arr_res = arr: {
-        if (expr.array.* == .array_access) {
-            break :arr try self.arrayAccessChain(expr, &indicies, ctx);
-        } else {
-            indicies.append(self.allocator, try self.expectArrayIndex(expr.index, ctx)) catch oom();
-            break :arr try self.analyzeExpr(expr.array, .value, ctx);
-        }
-    };
-
-    if (!arr_res.type.is(.array)) return self.err(
-        .{ .non_array_indexing = .{ .found = self.typeName(arr_res.type) } },
-        self.ast.getSpan(expr.array),
-    );
-
-    const child_type = arr_res.type.array.getChildAt(indicies.items.len - 1) orelse return self.err(
-        .{ .array_mismatch_dim = .{ .declared = arr_res.type.array.depth(), .accessed = indicies.items.len } },
-        self.ast.getSpan(expr),
-    );
-
-    return .{
-        .type = child_type,
-        .ti = .{ .heap = child_type.isHeap() },
-        .instr = self.irb.addInstr(
-            .{ .array_access = .{ .array = arr_res.instr, .indicies = indicies.toOwnedSlice(self.allocator) catch oom() } },
-            self.ast.getSpan(expr).start,
-        ),
-    };
-}
-
-fn arrayAccessChain(self: *Self, expr: *const Ast.ArrayAccess, indicies: *ArrayList(InstrIndex), ctx: *Context) Result {
-    var current = expr;
-
-    while (current.array.* == .array_access) {
-        indicies.append(self.allocator, try self.expectArrayIndex(current.index, ctx)) catch oom();
-        current = &current.array.array_access;
-    }
-    indicies.append(self.allocator, try self.expectArrayIndex(current.index, ctx)) catch oom();
-
-    return self.analyzeExpr(current.array, .value, ctx);
-}
-
-/// Analyze the expression and return an error if the type isn't an integer
-fn expectArrayIndex(self: *Self, expr: *const Expr, ctx: *Context) Error!InstrIndex {
-    const res = try self.analyzeExpr(expr, .value, ctx);
-
-    if (res.type != self.ti.cache.int) return self.err(
-        .{ .non_integer_index = .{ .found = self.typeName(res.type) } },
-        self.ast.getSpan(expr),
-    );
-
-    return res.instr;
 }
 
 fn block(self: *Self, expr: *const Ast.Block, expect: ExprResKind, ctx: *Context) Result {
@@ -1820,6 +1771,68 @@ fn checkBranch(self: *Self, ty: *const Type, cf: InstrInfos.ControlFlow, expect:
     if (expect == .value and ty.is(.void)) return self.err(.void_value, span);
 
     return ty;
+}
+
+fn indexing(self: *Self, expr: *const Ast.Indexing, ctx: *Context) Result {
+    var indicies: ArrayList(InstrIndex) = .empty;
+
+    const expr_res = arr: {
+        if (expr.expr.* == .indexing) {
+            break :arr try self.indexingChain(expr, &indicies, ctx);
+        } else {
+            indicies.append(self.allocator, try self.expectIndex(expr.index, ctx)) catch oom();
+            break :arr try self.analyzeExpr(expr.expr, .value, ctx);
+        }
+    };
+
+    const elem_type = switch (expr_res.type.*) {
+        .array => |t| t.getChildAt(indicies.items.len - 1) orelse return self.err(
+            .{ .array_mismatch_dim = .{ .declared = expr_res.type.array.depth(), .accessed = indicies.items.len } },
+            self.ast.getSpan(expr),
+        ),
+        .str => expr_res.type,
+        else => return self.err(
+            .{ .non_indexable_type = .{ .found = self.typeName(expr_res.type) } },
+            self.ast.getSpan(expr.expr),
+        ),
+    };
+
+    return .{
+        .type = elem_type,
+        .ti = .{ .heap = elem_type.isHeap() },
+        .instr = self.irb.addInstr(
+            .{ .indexing = .{
+                .expr = expr_res.instr,
+                .indicies = indicies.toOwnedSlice(self.allocator) catch oom(),
+                .kind = if (expr_res.type.* == .array) .array else .str,
+            } },
+            self.ast.getSpan(expr).start,
+        ),
+    };
+}
+
+fn indexingChain(self: *Self, expr: *const Ast.Indexing, indicies: *ArrayList(InstrIndex), ctx: *Context) Result {
+    var current = expr;
+
+    while (current.expr.* == .indexing) {
+        indicies.append(self.allocator, try self.expectIndex(current.index, ctx)) catch oom();
+        current = &current.expr.indexing;
+    }
+    indicies.append(self.allocator, try self.expectIndex(current.index, ctx)) catch oom();
+
+    return self.analyzeExpr(current.expr, .value, ctx);
+}
+
+/// Analyze the expression and return an error if the type isn't an integer
+fn expectIndex(self: *Self, expr: *const Expr, ctx: *Context) Error!InstrIndex {
+    const res = try self.analyzeExpr(expr, .value, ctx);
+
+    if (res.type != self.ti.cache.int) return self.err(
+        .{ .non_integer_index = .{ .found = self.typeName(res.type) } },
+        self.ast.getSpan(expr),
+    );
+
+    return res.instr;
 }
 
 fn literal(self: *Self, expr: *const Ast.Literal, ctx: *Context) Result {

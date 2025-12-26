@@ -4,18 +4,10 @@ fn main() {
     var arr: [][]int = [1, 2,]
     var arr: []int = [true, false]
 
-    var foo = "not an array"
-    foo[0]
-
-    var array = [1.5, 6.8]
-    array[true]
-    array[1.0]
 
     var voidArr: []void
     var voidArrVoidVal = []
 
     var voidValueInArray = [1, {}]
 
-    var twoDim = [[1, 2], [3, 4]]
-    print twoDim[0][1][2]
 }

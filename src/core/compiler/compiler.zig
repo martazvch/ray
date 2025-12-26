@@ -310,7 +310,6 @@ const Compiler = struct {
 
         try switch (self.manager.instr_data[instr]) {
             .array => |*data| self.array(data),
-            .array_access => |*data| self.arrayAccess(data),
             .assignment => |*data| self.assignment(data),
             .binop => |*data| self.binop(data),
             .block => |*data| self.block(data),
@@ -330,6 +329,7 @@ const Compiler = struct {
             .identifier => |*data| self.identifier(data),
             .@"if" => |*data| self.ifInstr(data),
             .incr_rc => |index| self.wrappedInstr(.incr_ref, index),
+            .indexing => |data| self.indexing(data),
             // TODO: protect the cast
             .load_builtin => |index| self.writeOpAndByte(.load_builtin, @intCast(index)),
             .load_symbol => |*data| self.loadSymbol(data),
@@ -375,28 +375,9 @@ const Compiler = struct {
         self.writeOpAndByte(.array_new, @intCast(data.values.len));
     }
 
-    fn arrayAccess(self: *Self, data: *const Instruction.ArrayAccess) Error!void {
-        try self.compileInstr(data.array);
-
-        // Index, we deactivate cow for indicies because never wanted but could be triggered by a multiple array
-        // access inside an array assignment
-        const prev = self.state.setAndGetPrev(.cow, false);
-        for (data.indicies) |index| {
-            try self.compileInstr(index);
-        }
-        self.state.cow = prev;
-
-        // TODO: protect the cast
-        if (data.indicies.len == 1) {
-            self.writeOp(.array_get);
-        } else {
-            self.writeOpAndByte(if (self.state.cow) .array_get_chain_cow else .array_get_chain, @intCast(data.indicies.len));
-        }
-    }
-
-    fn arrayAssign(self: *Self, data: *const Instruction.ArrayAccess) Error!void {
+    fn arrayAssign(self: *Self, data: Instruction.Indexing) Error!void {
         const prev = self.state.setAndGetPrev(.cow, true);
-        try self.compileInstr(data.array);
+        try self.compileInstr(data.expr);
         self.state.cow = prev;
 
         for (data.indicies) |index| {
@@ -417,7 +398,7 @@ const Compiler = struct {
         // TODO: no use of data.cow?
         const variable_data, const unbox = switch (self.manager.instr_data[data.assigne]) {
             .identifier => |*variable| .{ variable, false },
-            .array_access => |*arr_data| return self.arrayAssign(arr_data),
+            .indexing => |indexing_data| return self.arrayAssign(indexing_data),
             .field => |*field_data| return self.fieldAssignment(field_data),
             .unbox => |index| .{ &self.manager.instr_data[index].identifier, true },
             else => unreachable,
@@ -807,6 +788,25 @@ const Compiler = struct {
         }
 
         try self.patchJump(else_jump);
+    }
+
+    fn indexing(self: *Self, data: Instruction.Indexing) Error!void {
+        try self.compileInstr(data.expr);
+
+        // Index, we deactivate cow for indicies because never wanted but could be triggered by a multiple array
+        // access inside an array assignment
+        const prev = self.state.setAndGetPrev(.cow, false);
+        for (data.indicies) |index| {
+            try self.compileInstr(index);
+        }
+        self.state.cow = prev;
+
+        // TODO: protect the cast
+        if (data.indicies.len == 1) {
+            self.writeOp(if (data.kind == .array) .index_arr else .index_str);
+        } else {
+            self.writeOpAndByte(if (self.state.cow) .array_get_chain_cow else .array_get_chain, @intCast(data.indicies.len));
+        }
     }
 
     // TODO: protect the casts
