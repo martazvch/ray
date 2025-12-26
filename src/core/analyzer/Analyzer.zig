@@ -1774,10 +1774,10 @@ fn checkBranch(self: *Self, ty: *const Type, cf: InstrInfos.ControlFlow, expect:
 }
 
 fn indexing(self: *Self, expr: *const Ast.Indexing, ctx: *Context) Result {
-    const index = try self.expectIndex(expr.index, ctx);
-
+    const index, const index_kind = try self.expectIndex(expr.index, ctx);
     const expr_res = try self.analyzeExpr(expr.expr, .value, ctx);
 
+    // NOTE: when implementing maps, disallow range for it
     const elem_type = switch (expr_res.type.*) {
         .array => |t| t.child,
         .str => expr_res.type,
@@ -1794,6 +1794,7 @@ fn indexing(self: *Self, expr: *const Ast.Indexing, ctx: *Context) Result {
             .{ .indexing = .{
                 .expr = expr_res.instr,
                 .index = index,
+                .index_kind = index_kind,
                 .kind = if (expr_res.type.* == .array) .array else .str,
             } },
             self.ast.getSpan(expr).start,
@@ -1801,28 +1802,18 @@ fn indexing(self: *Self, expr: *const Ast.Indexing, ctx: *Context) Result {
     };
 }
 
-fn indexingChain(self: *Self, expr: *const Ast.Indexing, indicies: *ArrayList(InstrIndex), ctx: *Context) Result {
-    var current = expr;
-
-    while (current.expr.* == .indexing) {
-        indicies.append(self.allocator, try self.expectIndex(current.index, ctx)) catch oom();
-        current = &current.expr.indexing;
-    }
-    indicies.append(self.allocator, try self.expectIndex(current.index, ctx)) catch oom();
-
-    return self.analyzeExpr(current.expr, .value, ctx);
-}
-
 /// Analyze the expression and return an error if the type isn't an integer
-fn expectIndex(self: *Self, expr: *const Expr, ctx: *Context) Error!InstrIndex {
+fn expectIndex(self: *Self, expr: *const Expr, ctx: *Context) Error!struct { InstrIndex, Instruction.Indexing.IndexKind } {
     const res = try self.analyzeExpr(expr, .value, ctx);
 
-    if (!res.type.is(.int) and !res.type.is(.range)) return self.err(
-        .{ .invalid_index = .{ .found = self.typeName(res.type) } },
-        self.ast.getSpan(expr),
-    );
-
-    return res.instr;
+    return switch (res.type.*) {
+        .int => .{ res.instr, .scalar },
+        .range => .{ res.instr, .range },
+        else => self.err(
+            .{ .invalid_index = .{ .found = self.typeName(res.type) } },
+            self.ast.getSpan(expr),
+        ),
+    };
 }
 
 fn literal(self: *Self, expr: *const Ast.Literal, ctx: *Context) Result {

@@ -785,14 +785,23 @@ const Compiler = struct {
     fn indexing(self: *Self, data: Instruction.Indexing) Error!void {
         try self.compileInstr(data.expr);
 
-        // Index, we deactivate cow for indicies because never wanted but could be triggered by a multiple array
+        // Index, we deactivate cow for index because never wanted but could be triggered by a multiple array
         // access inside an array assignment
         const prev = self.state.setAndGetPrev(.cow, false);
         try self.compileInstr(data.index);
         self.state.cow = prev;
 
-        // TODO: protect the cast
-        self.writeOp(if (data.kind == .array) if (self.state.cow) .index_arr_cow else .index_arr else .index_str);
+        const op: OpCode = switch (data.index_kind) {
+            .scalar => switch (data.kind) {
+                .array => if (self.state.cow) .index_arr_cow else .index_arr,
+                .str => .index_str,
+            },
+            .range => switch (data.kind) {
+                .array => if (self.state.cow) .index_arr_cow else .index_range_arr,
+                .str => .index_range_str,
+            },
+        };
+        self.writeOp(op);
     }
 
     // TODO: protect the casts

@@ -64,7 +64,7 @@ pub fn renderIr(self: *Self, file_name: []const u8, roots: []const usize) Error!
 
 fn parseInstr(self: *Self, instr: ir.Index) void {
     switch (self.instrs[instr]) {
-        .array => |*data| self.array(data),
+        .array => |data| self.array(data),
         .assignment => |*data| self.assignment(data),
         .binop => |*data| self.binop(data),
         .block => |*data| self.block(data),
@@ -118,7 +118,7 @@ fn indexInstr(self: *Self, name: []const u8, index: ir.Index) void {
     self.parseInstr(index);
 }
 
-fn array(self: *Self, data: *const Instruction.Array) void {
+fn array(self: *Self, data: Instruction.Array) void {
     self.indentAndAppendSlice("[Array]");
     self.indent_level += 1;
     defer self.indent_level -= 1;

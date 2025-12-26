@@ -151,13 +151,12 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
                 self.stack.top -= arity + 1;
                 if (result) |res| self.stack.push(res);
             },
-            // PERF: don't pop, just decrement rsp (check all pops, maybe they aren't usefull at all)
             .array_set => {
                 const index = self.stack.pop().int;
                 const array = self.stack.pop().obj.as(Obj.Array);
                 const value = self.stack.pop();
 
-                const final = checkArrayIndex(array.values.items.len, index);
+                const final = normalizeIndex(array.values.items.len, index);
                 array.values.items[final] = value;
             },
             .bound_method => {
@@ -309,23 +308,35 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             .index_arr => {
                 const index = self.stack.pop().int;
                 const array = self.stack.pop().obj.as(Obj.Array);
-                const final = checkArrayIndex(array.values.items.len, index);
+                const final = normalizeIndex(array.values.items.len, index);
                 self.stack.push(array.values.items[final]);
             },
             .index_arr_cow => {
                 const index = self.stack.pop().int;
                 const array = self.stack.pop().obj.as(Obj.Array);
-                const final = checkArrayIndex(array.values.items.len, index);
+                const final = normalizeIndex(array.values.items.len, index);
 
                 var value = array.values.items[final];
                 value.obj = self.cow(value.obj);
                 self.stack.push(value);
             },
+            .index_range_arr => {
+                const index = self.stack.pop().range;
+                const array = self.stack.pop().obj.as(Obj.Array);
+                const start, const end = checkRangeIndex(array.values.items.len, index);
+                self.stack.push(.makeObj(Obj.Array.create(self, array.values.items[start..end]).asObj()));
+            },
             .index_str => {
                 const index = self.stack.pop().int;
                 const string = self.stack.pop().obj.as(Obj.String);
-                const final = checkArrayIndex(string.chars.len, index);
+                const final = normalizeIndex(string.chars.len, index);
                 self.stack.push(.makeObj(Obj.String.takeCopy(self, &.{string.chars[final]}).asObj()));
+            },
+            .index_range_str => {
+                const index = self.stack.pop().range;
+                const string = self.stack.pop().obj.as(Obj.String);
+                const start, const end = checkRangeIndex(string.chars.len, index);
+                self.stack.push(.makeObj(Obj.String.takeCopy(self, string.chars[start..end]).asObj()));
             },
             .is_bool => self.stack.push(.makeBool(self.stack.peek(0) == .bool)),
             .is_float => self.stack.push(.makeBool(self.stack.peek(0) == .float)),
@@ -561,18 +572,29 @@ fn strMul(self: *Self, str: *const Obj.String, factor: i64) void {
     self.stack.top -= 1;
 }
 
-fn checkArrayIndex(array_len: usize, index: i64) usize {
-    // TODO: runtime error desactivable with release fast mode
-    if (index > array_len - 1) @panic("Out of bound access");
+// // TODO: runtime error desactivable with release fast mode
+fn normalizeIndex(len: usize, index: i64) usize {
+    if (index >= 0) {
+        const i: usize = @intCast(index);
+        if (i > len) @panic("index out of bounds");
+        return i;
+    } else {
+        const abs = @abs(index);
+        if (abs > len) @panic("index out of bounds");
+        return len - @as(usize, @intCast(abs));
+    }
+}
 
-    return if (index >= 0)
-        @intCast(index)
-    else b: {
-        const tmp: usize = @abs(index);
-        if (tmp > array_len) @panic("Out of bound");
+// // TODO: runtime error desactivable with release fast mode
+fn checkRangeIndex(len: usize, range: Value.Range) struct { usize, usize } {
+    const s = normalizeIndex(len, range.start);
+    const e = normalizeIndex(len, range.end);
 
-        break :b array_len - tmp;
-    };
+    if (s > e) {
+        @panic("invalid range: start > end");
+    }
+
+    return .{ s, e };
 }
 
 // PERF: inline methods?

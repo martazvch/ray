@@ -356,14 +356,12 @@ pub const String = struct {
 
     /// Take a string. If interned already, returns the interned one
     pub fn takeCopy(vm: *Vm, str: []const u8) *String {
-        const copied = vm.gc_alloc.dupe(u8, str) catch oom();
-
-        const hash = String.hashString(copied);
+        const hash = String.hashString(str);
         if (vm.strings.get(hash)) |interned| {
             return interned;
         }
 
-        return String.create(vm, copied, hash);
+        return String.create(vm, vm.gc_alloc.dupe(u8, str) catch oom(), hash);
     }
 
     pub fn asObj(self: *String) *Obj {

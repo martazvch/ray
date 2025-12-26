@@ -60,8 +60,10 @@ pub const Instruction = struct {
         expr: Index,
         index: Index,
         kind: Kind,
+        index_kind: IndexKind,
 
         pub const Kind = enum { array, str };
+        pub const IndexKind = enum { scalar, range };
     };
     pub const Binop = struct {
         lhs: Index,
