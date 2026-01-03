@@ -142,12 +142,12 @@ pub const Instruction = struct {
     pub const EnumCreate = struct {
         sym: LoadSymbol,
         tag_index: usize,
-        is_err: bool,
     };
     pub const EnumDecl = struct {
         name: usize,
         sym_index: SymbolIndex,
         functions: []const Index,
+        is_err: bool,
     };
     pub const Field = struct {
         structure: Index,

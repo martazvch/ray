@@ -619,37 +619,56 @@ fn getData(path: str) -> ?Data {
 
 #### Trap for error handling
 
-The keyword `trap` can be used after function calls to interact with the error if the call resulted in an error. It can be used for:
-- Providing a fallback value in case of error
-- Interacting with the error before returning from the function
+The keyword `trap` can be used after failable function calls to interact with the error if the call resulted in an error.
+There are tw syntaxes:
 
-Fallback value example:
+##### Trap with an identifier
+
+Just after the `trap` keyword, you can provide an identifier that binds to the captured error
 
 ```rust
-let i = parseInt("abc") trap 5
-assert(i == 5)
 
-let i = parseInt("abc") trap |e| {
-    print("Error while parsing int")
+let i = parseInt("abc") trap e {
+    print(e)
     break 5
 }
 assert(i == 5)
 ```
 
-Error interaction example:
+If you don't need the captured error, you can ignore it with `_`:
+
+```rust
+
+let i = parseInt("abc")!.toBase(2) trap _ {
+    fail ParseErr.invalidBase
+}
+```
+
+##### Trap with match
+
+You often want to treat each individual errors in a custom way and you can use the `trap match` syntax for that.
+It binds the error to the provided identifier.
 
 ```rust
 fn createUser(input: str) User!UserErr {
-    let id = parseInt(input)!.toBase(2) trap |e| {
-        print("Either 'parseInt' or 'toBase' failed: " + e)
-        // Return from function
-        fail .invalidInput
+    let id = parseInt(input)!.toBase(2) trap match e {
+        .invalidInt => {
+            print("not an integer")
+            fail .invalidParsing
+        }
+        .outsideIntRange => {
+            print("integer is too large")
+            fail .invalidParsing
+        }
+        _ => fail .invalidInput
     }
 }
 ```
 
 > [!NOTE]
-> Using `trap` with an error propagation `!` at the end of expression results in a compilation error
+> - Using `trap` with an error propagation `!` at the end of expression results in a compilation error
+> - Using `trap` with any other syntax is a compilation error
+> - If you just want to provide a fallback value without treating the error, use `!!` operator
 
 #### Main function
 

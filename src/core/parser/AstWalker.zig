@@ -261,7 +261,10 @@ fn captureFromExpr(self: *Self, expr: *Ast.Expr, ctx: *CaptureCtx) void {
         },
         .trap => |e| {
             self.captureFromExpr(e.lhs, ctx);
-            self.captureFromExpr(e.rhs, ctx);
+            switch (e.rhs) {
+                .match => |m| self.captureFromExpr(m, ctx),
+                .binding => |b| self.captureFromExpr(b.body, ctx),
+            }
         },
         .unary => |e| self.captureFromExpr(e.expr, ctx),
         .when => |*e| {

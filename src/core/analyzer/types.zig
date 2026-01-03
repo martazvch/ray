@@ -97,7 +97,7 @@ pub const Type = union(enum) {
 
     pub const ErrorUnion = struct {
         ok: *const Type,
-        errs: []*const Type,
+        err: *const Type,
     };
 
     pub const Function = struct {
@@ -273,9 +273,7 @@ pub const Type = union(enum) {
             },
             .error_union => |ty| {
                 ty.ok.hash(allocator, hasher);
-                for (ty.errs) |err| {
-                    err.hash(allocator, hasher);
-                }
+                ty.err.hash(allocator, hasher);
             },
             .function => |ty| {
                 if (ty.loc) |loc| {
@@ -353,10 +351,7 @@ pub const Type = union(enum) {
                 errdefer oom();
                 try writer.writeAll(ty.ok.toString(allocator, interner, mod_name));
                 try writer.writeAll("!");
-                for (ty.errs, 0..) |err, i| {
-                    try writer.writeAll(err.toString(allocator, interner, mod_name));
-                    if (i < ty.errs.len - 1) writer.writeAll("|") catch oom();
-                }
+                try writer.writeAll(ty.err.toString(allocator, interner, mod_name));
             },
             .function => |ty| {
                 writer.writeAll("fn(") catch oom();

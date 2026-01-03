@@ -14,7 +14,7 @@ pub const ParserMsg = union(enum) {
     expect_brace_before_fn_body,
     expect_brace_before_for_body,
     expect_brace_before_struct_body,
-    expect_brace_before_when_body,
+    expect_brace_before_patmatch_body,
     expect_block_or_do: struct { what: []const u8 },
     expect_closing_pipe,
     expect_colon_before_type,
@@ -56,8 +56,8 @@ pub const ParserMsg = union(enum) {
     self_as_non_first_param,
     struct_lit_non_ident_field,
     too_many_fn_args: struct { what: []const u8 },
-    trap_no_binding,
-    trap_no_brace_or_match,
+    trap_no_block_after_binding,
+    trap_no_ident_or_match,
     typed_self,
     unclosed_brace,
     unclosed_paren,
@@ -81,7 +81,7 @@ pub const ParserMsg = union(enum) {
             .expect_brace_before_fn_body => writer.writeAll("expect opening brace before function's body"),
             .expect_brace_before_for_body => writer.writeAll("expect opening brace before for's body"),
             .expect_brace_before_struct_body => writer.writeAll("expect opening brace before structure's body"),
-            .expect_brace_before_when_body => writer.writeAll("expect opening brace before when's body"),
+            .expect_brace_before_patmatch_body => writer.writeAll("expect opening brace before pattern matching body"),
             .expect_closing_pipe => writer.writeAll("expect closing '|' after closure's parameters list"),
             .expect_colon_before_type => writer.writeAll("invalid variable type declaration"),
             .expect_comma_array_values => writer.writeAll("expect a ',' between array values"),
@@ -122,8 +122,8 @@ pub const ParserMsg = union(enum) {
             .self_as_non_first_param => writer.writeAll("'self' parameter not in first position"),
             .struct_lit_non_ident_field => writer.writeAll("trying to assign to a non-field in structure literal"),
             .too_many_fn_args => |e| writer.print("functions can't have more than 255 {s}", .{e.what}),
-            .trap_no_brace_or_match => writer.writeAll("expect left brace '{' or 'match' after error binding"),
-            .trap_no_binding => writer.writeAll("expect an identifier to bind the error"),
+            .trap_no_block_after_binding => writer.writeAll("expect a block after error binding"),
+            .trap_no_ident_or_match => writer.writeAll("expect an identifier or a match to "),
             .typed_self => writer.writeAll("can't specify a type for 'self', it's a keyword whose type is known by the compiler"),
             .unclosed_brace => writer.writeAll("unclosed brace"),
             .unclosed_paren => writer.writeAll("unclosed parenthesis"),
@@ -146,7 +146,7 @@ pub const ParserMsg = union(enum) {
             .expect_brace_before_enum_body,
             .expect_brace_before_fn_body,
             .expect_brace_before_for_body,
-            .expect_brace_before_when_body,
+            .expect_brace_before_patmatch_body,
             .expect_brace_before_struct_body,
             .expect_block_or_do,
             .expect_closing_pipe,
@@ -164,8 +164,8 @@ pub const ParserMsg = union(enum) {
             .missing_bracket_array_type,
             .missing_comma_after_field,
             .missing_fn_param_type,
-            .trap_no_brace_or_match,
-            .trap_no_binding,
+            .trap_no_block_after_binding,
+            .trap_no_ident_or_match,
             => writer.writeAll("expect to be here"),
             .expect_colon_before_type => writer.writeAll("before this identifier"),
             .expect_colon_struct_lit => writer.writeAll("expect to be after this"),
@@ -212,7 +212,7 @@ pub const ParserMsg = union(enum) {
             .expect_brace_before_enum_body,
             .expect_brace_before_fn_body,
             .expect_brace_before_struct_body,
-            .expect_brace_before_when_body,
+            .expect_brace_before_patmatch_body,
             => writer.writeAll("add an opening brace '{'"),
             .expect_brace_end_container => writer.writeAll("add an closing brace '}'"),
             .expect_brace_after_struct_lit => writer.writeAll("add an openning brace '{'"),
@@ -260,9 +260,14 @@ pub const ParserMsg = union(enum) {
                 "split your function into multiple small ones or pass your {s} in structures / arrays",
                 .{e.what},
             ),
-            .trap_no_brace_or_match, .trap_no_binding => writer.writeAll(
-                \\'trap' syntax is: trap <err> <expr>, where the expression is either a block '{...}' or a 'match'.
-                \\If you just want to provdie a fallback value use '!!'
+            .trap_no_ident_or_match, .trap_no_block_after_binding => writer.writeAll(
+                \\'trap' syntaxes are:
+                \\  binding and block:    trap <error_binding> { ... }
+                \\  no binding and block: trap _ { ... }
+                \\  trap match:           trap match <error_binding> { ... }
+                \\
+                \\All error bindings must be identifiers
+                \\If you just want to provdie a fallback value when using an error union, use '!!'
             ),
             .typed_self => writer.writeAll("remove the type, the compiler infers the type for 'self' on its own"),
             .unclosed_brace => writer.writeAll("close the opening brace"),

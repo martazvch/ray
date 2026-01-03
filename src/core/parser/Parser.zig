@@ -1323,7 +1323,7 @@ fn patternMatchStart(self: *Self) Error!PatternMatchStart {
     const alias = try self.getAlias(.at);
 
     self.skipNewLines();
-    try self.expectOrErrAtPrev(.left_brace, .expect_brace_before_when_body);
+    try self.expectOrErrAtPrev(.left_brace, .expect_brace_before_patmatch_body);
     const opening_brace = self.token_idx - 1;
     self.skipNewLines();
 
@@ -1512,17 +1512,30 @@ fn ternary(self: *Self, expr: *Expr) Error!*Expr {
 
 fn trap(self: *Self, expr: *Expr) Error!*Expr {
     const trap_expr = self.allocator.create(Expr) catch oom();
-    try self.expect(.identifier, .trap_no_binding);
-    const binding = self.token_idx - 1;
 
-    if (!self.check(.left_brace) and !self.check(.match)) {
-        return self.errAtCurrent(.trap_no_brace_or_match);
-    }
+    const rhs: Ast.Trap.Kind = switch (self.current(.tag)) {
+        .match => rhs: {
+            self.advance();
+            break :rhs .{ .match = try self.matchExpr() };
+        },
+        .identifier, .underscore => rhs: {
+            self.advance();
+            const token = if (self.match(.underscore)) null else self.token_idx - 1;
+            try self.expect(.left_brace, .trap_no_block_after_binding);
+
+            break :rhs .{ .binding = .{
+                .token = token,
+                .body = try self.blockExpr(),
+            } };
+        },
+        else => {
+            return self.errAtCurrent(.trap_no_ident_or_match);
+        },
+    };
 
     trap_expr.* = .{ .trap = .{
         .lhs = expr,
-        .binding = binding,
-        .rhs = try self.parsePrecedenceExpr(0),
+        .rhs = rhs,
     } };
 
     return trap_expr;

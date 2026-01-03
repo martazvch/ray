@@ -1,0 +1,69 @@
+{
+    "trap": {
+        "lhs": {
+            "fn_call": {
+                "callee": {
+                    "literal": "func"
+                },
+                "args": []
+            }
+        },
+        "rhs": {
+            "binding": {
+                "name": "err",
+                "body": {
+                    "block": [
+                        "print": {
+                            "literal": "err"
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    "trap": {
+        "lhs": {
+            "fn_call": {
+                "callee": {
+                    "literal": "func"
+                },
+                "args": []
+            }
+        },
+        "rhs": {
+            "binding": {
+                "name": "_",
+                "body": {
+                    "block": []
+                }
+            }
+        }
+    },
+    "trap": {
+        "lhs": {
+            "fn_call": {
+                "callee": {
+                    "literal": "func"
+                },
+                "args": []
+            }
+        },
+        "rhs": {
+            "match": {
+                "expression": {
+                    "literal": "binding"
+                },
+                "arms": [
+                    {
+                        "expr": {
+                            "enum_literal": "fileNotFound"
+                        },
+                        "body": {
+                            "block": []
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}

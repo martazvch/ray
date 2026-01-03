@@ -294,7 +294,7 @@ fn constant(self: *Self, data: Instruction.Constant) void {
 }
 
 fn enumCreate(self: *Self, data: Instruction.EnumCreate) void {
-    self.indentAndPrintSlice("[{s} create]", .{if (data.is_err) "Error" else "Enum"});
+    self.indentAndAppendSlice("[Enum create]");
     self.indent_level += 1;
     defer self.indent_level -= 1;
     self.indentAndAppendSlice("- enum");

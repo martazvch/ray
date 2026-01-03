@@ -680,20 +680,12 @@ const Compiler = struct {
             // We ignore bools and null as we handle them with special op codes for optimization
             const value = switch (self.at(data.instr)) {
                 .bool, .null => break :b,
-                .enum_create => |val| if (val.is_err)
-                    Value.makeObj(Obj.Error.create(
-                        self.manager.allocator,
-                        self.manager.module.symbols[val.sym.symbol_index].obj.as(Obj.Enum),
-                        @intCast(val.tag_index),
-                        Value.null_,
-                    ).asObj())
-                else
-                    Value.makeObj(Obj.EnumInstance.create(
-                        self.manager.allocator,
-                        self.manager.module.symbols[val.sym.symbol_index].obj.as(Obj.Enum),
-                        @intCast(val.tag_index),
-                        Value.null_,
-                    ).asObj()),
+                .enum_create => |val| Value.makeObj(Obj.EnumInstance.createComptime(
+                    self.manager.allocator,
+                    self.manager.module.symbols[val.sym.symbol_index].obj.as(Obj.Enum),
+                    @intCast(val.tag_index),
+                    Value.null_,
+                ).asObj()),
                 .int => |val| Value.makeInt(val),
                 .float => |val| Value.makeFloat(val),
                 .string => |val| Value.makeObj(Obj.String.comptimeCopy(
@@ -718,6 +710,8 @@ const Compiler = struct {
     }
 
     fn enumCreate(self: *Self, data: *const Instruction.EnumCreate) Error!void {
+        // TODO:
+        // PERF: could do like structure literal, no need to push the symbol to stack
         try self.loadSymbol(&data.sym);
 
         // TODO: Error
@@ -725,11 +719,11 @@ const Compiler = struct {
             @panic("Enum is to big, not implemented yet");
         }
 
-        self.writeOpAndByte(if (data.is_err) .err_create else .enum_create, @intCast(data.tag_index));
+        self.writeOpAndByte(.enum_create, @intCast(data.tag_index));
     }
 
     fn enumDecl(self: *Self, data: *const Instruction.EnumDecl) Error!void {
-        const enum_val = Obj.Enum.create(self.manager.allocator, self.manager.interner.getKey(data.name).?);
+        const enum_val = Obj.Enum.create(self.manager.allocator, self.manager.interner.getKey(data.name).?, data.is_err);
         self.addSymbol(data.sym_index, Value.makeObj(enum_val.asObj()));
         try self.containerFnDecls(data.functions);
     }

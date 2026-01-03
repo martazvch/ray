@@ -243,7 +243,8 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             },
             .dup => self.stack.push(self.stack.peek(0)),
             .enum_create => {
-                self.stack.peekRef(0).* = .makeObj(Obj.EnumInstance.create(
+                // TODO: Should not be comptime!
+                self.stack.peekRef(0).* = .makeObj(Obj.EnumInstance.createComptime(
                     self.allocator,
                     self.stack.peek(0).obj.as(Obj.Enum),
                     frame.readByte(),
@@ -255,14 +256,6 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             .eq_int => self.stack.push(Value.makeBool(self.stack.pop().int == self.stack.pop().int)),
             .eq_null => self.stack.push(Value.makeBool(self.stack.pop() == .null)),
             .eq_str => self.stack.push(Value.makeBool(self.stack.pop().obj.as(Obj.String) == self.stack.pop().obj.as(Obj.String))),
-            .err_create => {
-                self.stack.peekRef(0).* = .makeObj(Obj.Error.create(
-                    self.allocator,
-                    self.stack.peek(0).obj.as(Obj.Enum),
-                    frame.readByte(),
-                    .null,
-                ).asObj());
-            },
             .exit_repl => {
                 // Here, there is no value to pop for now, no implicit null is
                 // put on top of the stack
@@ -518,6 +511,7 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             .struct_lit => {
                 const index = frame.readByte();
                 const arity = frame.readByte();
+                // const instance = Obj.Instance.create(self, frame.module.symbols[index].obj.as(Obj.Structure));
                 const instance = Obj.Instance.create(self, frame.module.symbols[index].obj.as(Obj.Structure));
                 structLit(instance, arity, &self.stack);
             },

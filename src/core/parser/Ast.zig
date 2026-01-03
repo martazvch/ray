@@ -289,8 +289,17 @@ pub const Ternary = struct {
 
 pub const Trap = struct {
     lhs: *Expr,
-    rhs: *Expr,
-    binding: TokenIndex,
+    rhs: Kind,
+
+    pub const Kind = union(enum) {
+        match: *Expr,
+        binding: Binding,
+    };
+
+    pub const Binding = struct {
+        token: ?TokenIndex,
+        body: *Expr,
+    };
 };
 
 pub const Unary = struct {
@@ -440,7 +449,10 @@ pub fn getSpan(self: *const Self, anynode: anytype) Span {
         },
         Trap => .{
             .start = self.getSpan(node.lhs).start,
-            .end = self.getSpan(node.rhs).end,
+            .end = switch (node.rhs) {
+                .match => |m| self.getSpan(m).end,
+                .binding => |b| self.getSpan(b.body).end,
+            },
         },
         Unary => .{
             .start = self.token_spans[node.op].start,

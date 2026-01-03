@@ -1,0 +1,8 @@
+func() trap err {
+    print err
+}
+func() trap _ { }
+func() trap match binding {
+    .fileNotFound => { }
+}
+

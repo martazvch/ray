@@ -210,13 +210,6 @@ pub fn log(self: *Obj) void {
     }
 }
 
-pub fn structLiteral(self: *Obj, vm: *Vm) *Instance {
-    return switch (self.kind) {
-        .structure => Instance.create(vm, self.as(Structure)),
-        else => unreachable,
-    };
-}
-
 pub const Array = struct {
     obj: Obj,
     values: ArrayList(Value),
@@ -585,13 +578,15 @@ pub const Instance = struct {
 pub const Enum = struct {
     obj: Obj,
     name: []const u8,
+    is_err: bool,
     // tags: []const []const u8,
 
     const Self = @This();
 
-    pub fn create(allocator: Allocator, name: []const u8) *Self {
+    pub fn create(allocator: Allocator, name: []const u8, is_err: bool) *Self {
         const obj = Obj.allocateComptime(allocator, Self, undefined);
         obj.name = allocator.dupe(u8, name) catch oom();
+        obj.is_err = is_err;
         // obj.tags = tags;
 
         return obj;
@@ -620,11 +615,14 @@ pub const EnumInstance = struct {
 
     const Self = @This();
 
-    pub fn create(allocator: Allocator, parent: *const Enum, tag_id: u8, payload: Value) *Self {
+    /// Creates a compile time constant that is a naked enum field
+    pub fn createComptime(allocator: Allocator, parent: *const Enum, tag_id: u8, payload: Value) *Self {
         const obj = Obj.allocateComptime(allocator, Self, undefined);
         obj.parent = parent;
         obj.tag_id = tag_id;
         obj.payload = payload;
+
+        obj.obj.kind = if (parent.is_err) .@"error" else .enum_instance;
 
         return obj;
     }
@@ -651,6 +649,10 @@ pub const Error = struct {
         obj.parent = parent;
         obj.tag_id = tag_id;
         obj.payload = payload;
+
+        if (parent.is_err) {
+            obj.kind = .@"error";
+        }
 
         return obj;
     }

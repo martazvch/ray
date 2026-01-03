@@ -51,7 +51,6 @@ pub const OpCode = enum(u8) {
     eq_int,
     eq_null,
     eq_str,
-    err_create,
     exit_repl,
     ge_float,
     ge_int,

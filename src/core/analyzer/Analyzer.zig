@@ -307,7 +307,12 @@ fn enumDeclaration(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtRe
     const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
 
     return self.irb.addInstr(
-        .{ .enum_decl = .{ .name = name, .sym_index = sym.index, .functions = funcs } },
+        .{ .enum_decl = .{
+            .name = name,
+            .sym_index = sym.index,
+            .functions = funcs,
+            .is_err = node.is_err,
+        } },
         self.ast.getSpan(node).start,
     );
 }
@@ -1248,7 +1253,6 @@ fn enumLit(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result {
             .{ .enum_create = .{
                 .sym = .{ .module_index = 0, .symbol_index = @intCast(sym.sym.index) },
                 .tag_index = @intCast(tag_index),
-                .is_err = enum_ty.is_err,
             } },
             span.start,
         ),
@@ -1417,7 +1421,6 @@ fn enumAccess(self: *Self, enum_info: InstrInfos, ty: Type.Enum, tag_tk: Ast.Tok
                     .{ .enum_create = .{
                         .sym = self.irb.data(enum_info.instr).load_symbol,
                         .tag_index = index,
-                        .is_err = ty.is_err,
                     } },
                     self.ast.getSpan(tag_tk).start,
                 ),
@@ -2225,23 +2228,46 @@ fn ternary(self: *Self, expr: *const Ast.Ternary, ctx: *Context) Result {
 
 fn trap(self: *Self, expr: Ast.Trap, ctx: *Context) Result {
     const lhs = try self.analyzeExpr(expr.lhs, .value, ctx);
-
+    // TODO: error
     const err_type = lhs.type.as(.error_union) orelse @panic("Not an error union");
-    const err_name = try self.internIfNotInCurrentScope(expr.binding);
 
-    _ = try self.forwardDeclareVariable(
-        err_name,
-        self.ti.intern(.{ .@"union" = .{ .types = err_type.errs } }),
-        false,
-        self.ast.getSpan(expr.binding),
-    );
-
-    const rhs = try self.analyzeExpr(expr.rhs, .value, ctx);
+    const rhs = switch (expr.rhs) {
+        .match => |m| try self.trapMatch(m, err_type, ctx),
+        .binding => |b| try self.trapIdent(b, err_type, ctx),
+    };
 
     return .{
         .type = rhs.type,
         .instr = self.irb.addInstr(.{ .trap = .{ .lhs = lhs.instr, .rhs = rhs.instr } }, self.ast.getSpan(expr).start),
     };
+}
+
+fn trapMatch(self: *Self, expr: *Expr, err_type: Type.ErrorUnion, ctx: *Context) Result {
+    const match_expr = expr.match.expr;
+
+    // TODO: error
+    if (match_expr.* != .literal or match_expr.literal.tag != .identifier) {
+        @panic("must be an identifier");
+    }
+
+    const err_name = try self.internIfNotInCurrentScope(match_expr.literal.idx);
+    const binding_span = self.ast.getSpan(match_expr.literal.idx);
+
+    // If it's a `trap match`, we open another scope to discard the error at the end
+    self.scope.open(self.allocator, null, false, true);
+    defer _ = self.scope.close();
+
+    _ = try self.declareVariable(err_name, err_type.err, false, true, true, false, null, binding_span);
+    return self.analyzeExpr(expr, .value, ctx);
+}
+
+fn trapIdent(self: *Self, binding: Ast.Trap.Binding, err_type: Type.ErrorUnion, ctx: *Context) Result {
+    if (binding.token) |token| {
+        const err_name = try self.internIfNotInCurrentScope(token);
+        const binding_span = self.ast.getSpan(token);
+        _ = try self.forwardDeclareVariable(err_name, err_type.err, false, binding_span);
+    }
+    return self.analyzeExpr(binding.body, .value, ctx);
 }
 
 fn unary(self: *Self, expr: *const Ast.Unary, ctx: *Context) Result {
@@ -2421,7 +2447,7 @@ fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) Error
 
             return self.ti.intern(.{ .error_union = .{
                 .ok = ok,
-                .errs = errs.toOwnedSlice(self.allocator) catch oom(),
+                .err = self.ti.intern(.{ .@"union" = .{ .types = errs.toOwnedSlice(self.allocator) catch oom() } }),
             } });
         },
         .fields => |fields| {
@@ -2578,13 +2604,18 @@ fn performErrorCoercion(self: *Self, decl: *const Type, value: *const Type, span
     const error_union = decl.error_union;
 
     if (value.isErr()) {
-        for (error_union.errs) |union_err| {
-            if (union_err == value) return decl;
+        switch (error_union.err.*) {
+            .@"union" => |u| {
+                for (u.types) |union_err| {
+                    if (union_err == value) return decl;
+                }
+            },
+            else => |*t| if (t == value) return decl,
         }
 
         return self.err(.{ .error_not_in_union = .{
             .found = self.typeName(value),
-            .expect = self.typeUnion(error_union.errs),
+            .expect = self.typeName(error_union.err),
         } }, span);
     } else {
         return self.performTypeCoercion(error_union.ok, value, false, span);
@@ -2691,20 +2722,6 @@ fn checkArrayOfUnion(self: *Self, decl: *const Type.Union, value: *const Type) b
 
 fn typeName(self: *const Self, ty: *const Type) []const u8 {
     return ty.toString(self.allocator, self.interner, self.mod_name);
-}
-
-fn typeUnion(self: *const Self, types: []*const Type) []const u8 {
-    errdefer oom();
-
-    var res: std.ArrayList(u8) = .empty;
-    var writer = res.writer(self.allocator);
-
-    for (types, 0..) |ty, i| {
-        try writer.writeAll(ty.toString(self.allocator, self.interner, self.mod_name));
-        if (i < types.len - 1) try writer.writeAll("|");
-    }
-
-    return try res.toOwnedSlice(self.allocator);
 }
 
 fn declareVariable(
