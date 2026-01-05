@@ -156,7 +156,6 @@ pub const Expr = union(enum) {
     ternary: Ternary,
     trap: Trap,
     unary: Unary,
-    when: When,
 };
 
 pub const Array = struct {
@@ -251,16 +250,36 @@ pub const FieldAndValue = struct {
 pub const Match = struct {
     kw: TokenIndex,
     expr: *Expr,
-    arms: []Arm,
+    body: Kind,
 
-    pub const Arm = struct {
-        expr: Kind,
+    pub const Kind = union(enum) {
+        value: []ValueArm,
+        type: []TypeArm,
+    };
+
+    pub const ValueArm = struct {
+        expr: ArmKind,
         alias: ?TokenIndex,
         body: Node,
 
-        pub const Kind = union(enum) {
+        pub const ArmKind = union(enum) {
             expr: *Expr,
             wildcard: TokenIndex,
+        };
+    };
+
+    pub const TypeArm = struct {
+        type: ArmKind,
+        body: BodyKind,
+
+        pub const ArmKind = union(enum) {
+            expr: *Type,
+            wildcard: TokenIndex,
+        };
+
+        pub const BodyKind = union(enum) {
+            value: Node,
+            patmat: []ValueArm,
         };
     };
 };
@@ -305,18 +324,6 @@ pub const Trap = struct {
 pub const Unary = struct {
     op: TokenIndex,
     expr: *Expr,
-};
-
-pub const When = struct {
-    kw: TokenIndex,
-    expr: *Expr,
-    alias: ?TokenIndex,
-    arms: []Arm,
-
-    pub const Arm = struct {
-        type: *Type,
-        body: Node,
-    };
 };
 
 /// Can be used with any `*Node`, `*Expr` or a `token index`
@@ -423,7 +430,7 @@ pub fn getSpan(self: *const Self, anynode: anytype) Span {
             .start = self.token_spans[node.kw].start,
             .end = self.getSpan(node.expr).end,
         },
-        Match.Arm.Kind => switch (node) {
+        Match.ValueArm.ArmKind => switch (node) {
             .expr => |e| self.getSpan(e),
             .wildcard => |e| self.token_spans[e],
         },
@@ -456,10 +463,6 @@ pub fn getSpan(self: *const Self, anynode: anytype) Span {
         },
         Unary => .{
             .start = self.token_spans[node.op].start,
-            .end = self.getSpan(node.expr).end,
-        },
-        When => .{
-            .start = self.token_spans[node.kw].start,
             .end = self.getSpan(node.expr).end,
         },
         else => @compileError("Trying to get span on a non Node object and not usize"),

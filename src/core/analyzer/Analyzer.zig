@@ -854,7 +854,7 @@ fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Contex
         .@"if" => |*e| self.ifExpr(e, expect, ctx),
         .indexing => |*e| self.indexing(e, ctx),
         .literal => |*e| self.literal(e, ctx),
-        .match => |*e| self.match(e, expect, ctx),
+        .match => |e| self.match(e, expect, ctx),
         .pattern => |e| self.pattern(e, ctx),
         .range => |e| self.range(e, ctx),
         .@"return" => |*e| self.returnExpr(e, ctx),
@@ -862,7 +862,6 @@ fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Contex
         .ternary => |*e| self.ternary(e, ctx),
         .trap => |e| self.trap(e, ctx),
         .unary => |*e| self.unary(e, ctx),
-        .when => |*e| self.when(e, expect, ctx),
     };
 
     const span = self.ast.getSpan(expr);
@@ -1921,17 +1920,12 @@ fn literal(self: *Self, expr: *const Ast.Literal, ctx: *Context) Result {
     return .{ .type = ty, .ti = .{ .comp_time = true }, .instr = instr };
 }
 
-fn match(self: *Self, expr: *const Ast.Match, expect: ExprResKind, ctx: *Context) Result {
+fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Result {
     const value = try self.analyzeExpr(expr.expr, .value, ctx);
 
-    // Sets current type (for enum literals for example)
-    const prev_decl_type = ctx.setAndGetPrevious(.decl_type, value.type);
-    defer ctx.decl_type = prev_decl_type;
-
-    // TODO: error
-    const types, const arms = switch (value.type.*) {
-        .@"enum" => try self.matchEnum(expr, value.type, expect, ctx),
-        else => @panic("Match on anything else than enum not implemented yet"),
+    const types, const arms = switch (expr.body) {
+        .value => |arms| try self.matchValueArms(value.type, arms, expr.kw, expect, ctx),
+        .type => @panic("TODO"),
     };
 
     return .{
@@ -1949,14 +1943,42 @@ fn match(self: *Self, expr: *const Ast.Match, expect: ExprResKind, ctx: *Context
 
 const MatchArms = struct { []const *const Type, []const Instruction.Match.Arm };
 
-fn matchEnum(self: *Self, expr: *const Ast.Match, ty: *const Type, expect: ExprResKind, ctx: *Context) Error!MatchArms {
+fn matchValueArms(
+    self: *Self,
+    ty: *const Type,
+    arms: []const Ast.Match.ValueArm,
+    kw: Ast.TokenIndex,
+    expect: ExprResKind,
+    ctx: *Context,
+) Error!MatchArms {
+    return switch (ty.*) {
+        .@"enum" => try self.matchEnum(ty, arms, kw, expect, ctx),
+        else => |t| {
+            std.log.debug("Found: {any}", .{t});
+            @panic("Match on anything else than enum not implemented yet");
+        },
+    };
+}
+
+fn matchEnum(
+    self: *Self,
+    ty: *const Type,
+    arms: []const Ast.Match.ValueArm,
+    kw: Ast.TokenIndex,
+    expect: ExprResKind,
+    ctx: *Context,
+) Error!MatchArms {
     var had_err = false;
     var has_wildcard = false;
     var types: Set(*const Type) = .empty;
-    var arms = ArrayList(Instruction.Match.Arm).initCapacity(self.allocator, expr.arms.len) catch oom();
+    var arms_instr = ArrayList(Instruction.Match.Arm).initCapacity(self.allocator, arms.len) catch oom();
     var proto = ty.@"enum".proto(self.allocator);
 
-    for (expr.arms, 0..) |*arm, i| {
+    // Sets current type for enum literals
+    const prev_decl_type = ctx.setAndGetPrevious(.decl_type, ty);
+    defer ctx.decl_type = prev_decl_type;
+
+    for (arms, 0..) |*arm, i| {
         const arm_span = self.ast.getSpan(arm.expr);
 
         const pat: ir.Instruction.Match.Kind = pat: switch (arm.expr) {
@@ -1982,7 +2004,7 @@ fn matchEnum(self: *Self, expr: *const Ast.Match, ty: *const Type, expect: ExprR
                 break :pat .{ .instr = pat.instr };
             },
             .wildcard => {
-                if (i != expr.arms.len - 1) {
+                if (i != arms.len - 1) {
                     return self.err(.match_wildcard_not_last, arm_span);
                 }
 
@@ -2004,12 +2026,12 @@ fn matchEnum(self: *Self, expr: *const Ast.Match, ty: *const Type, expect: ExprR
         };
 
         types.add(self.allocator, body.type) catch oom();
-        arms.appendAssumeCapacity(.{ .expr = pat, .body = body.instr });
+        arms_instr.appendAssumeCapacity(.{ .expr = pat, .body = body.instr });
     }
 
-    if (!has_wildcard) try self.matchValidation(&proto, self.ast.getSpan(expr.kw));
+    if (!has_wildcard) try self.matchValidation(&proto, self.ast.getSpan(kw));
 
-    return if (had_err) error.Err else .{ types.toOwned(), arms.toOwnedSlice(self.allocator) catch oom() };
+    return if (had_err) error.Err else .{ types.toOwned(), arms_instr.toOwnedSlice(self.allocator) catch oom() };
 }
 
 fn matchValidation(self: *Self, proto: *const Type.Enum.Proto, span: Span) Error!void {
@@ -2228,8 +2250,10 @@ fn ternary(self: *Self, expr: *const Ast.Ternary, ctx: *Context) Result {
 
 fn trap(self: *Self, expr: Ast.Trap, ctx: *Context) Result {
     const lhs = try self.analyzeExpr(expr.lhs, .value, ctx);
-    // TODO: error
-    const err_type = lhs.type.as(.error_union) orelse @panic("Not an error union");
+    const err_type = lhs.type.as(.error_union) orelse return self.err(
+        .{ .trap_on_non_error = .{ .found = self.typeName(lhs.type) } },
+        self.ast.getSpan(expr.lhs),
+    );
 
     const rhs = switch (expr.rhs) {
         .match => |m| try self.trapMatch(m, err_type, ctx),
@@ -2242,12 +2266,20 @@ fn trap(self: *Self, expr: Ast.Trap, ctx: *Context) Result {
     };
 }
 
+fn trapIdent(self: *Self, binding: Ast.Trap.Binding, err_type: Type.ErrorUnion, ctx: *Context) Result {
+    if (binding.token) |token| {
+        const err_name = try self.internIfNotInCurrentScope(token);
+        const binding_span = self.ast.getSpan(token);
+        _ = try self.forwardDeclareVariable(err_name, err_type.err, false, binding_span);
+    }
+    return self.analyzeExpr(binding.body, .value, ctx);
+}
+
 fn trapMatch(self: *Self, expr: *Expr, err_type: Type.ErrorUnion, ctx: *Context) Result {
     const match_expr = expr.match.expr;
 
-    // TODO: error
     if (match_expr.* != .literal or match_expr.literal.tag != .identifier) {
-        @panic("must be an identifier");
+        return self.err(.trap_match_not_ident, self.ast.getSpan(match_expr));
     }
 
     const err_name = try self.internIfNotInCurrentScope(match_expr.literal.idx);
@@ -2259,15 +2291,6 @@ fn trapMatch(self: *Self, expr: *Expr, err_type: Type.ErrorUnion, ctx: *Context)
 
     _ = try self.declareVariable(err_name, err_type.err, false, true, true, false, null, binding_span);
     return self.analyzeExpr(expr, .value, ctx);
-}
-
-fn trapIdent(self: *Self, binding: Ast.Trap.Binding, err_type: Type.ErrorUnion, ctx: *Context) Result {
-    if (binding.token) |token| {
-        const err_name = try self.internIfNotInCurrentScope(token);
-        const binding_span = self.ast.getSpan(token);
-        _ = try self.forwardDeclareVariable(err_name, err_type.err, false, binding_span);
-    }
-    return self.analyzeExpr(binding.body, .value, ctx);
 }
 
 fn unary(self: *Self, expr: *const Ast.Unary, ctx: *Context) Result {

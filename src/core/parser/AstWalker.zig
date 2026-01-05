@@ -238,8 +238,28 @@ fn captureFromExpr(self: *Self, expr: *Ast.Expr, ctx: *CaptureCtx) void {
         },
         .match => |*e| {
             self.captureFromExpr(e.expr, ctx);
-            for (e.arms) |*arm| {
-                self.captureFromNode(&arm.body, ctx);
+            switch (e.body) {
+                .value => |arms| {
+                    for (arms) |*arm| {
+                        switch (arm.expr) {
+                            .expr => |pat_expr| self.captureFromExpr(pat_expr, ctx),
+                            .wildcard => {},
+                        }
+                        self.captureFromNode(&arm.body, ctx);
+                    }
+                },
+                .type => |arms| {
+                    for (arms) |*arm| {
+                        switch (arm.body) {
+                            .value => |*n| self.captureFromNode(n, ctx),
+                            .patmat => |sub_arms| {
+                                for (sub_arms) |*sub_arm| {
+                                    self.captureFromNode(&sub_arm.body, ctx);
+                                }
+                            },
+                        }
+                    }
+                },
             }
         },
         .pattern => |e| self.captureFromPattern(e, ctx),
@@ -267,12 +287,6 @@ fn captureFromExpr(self: *Self, expr: *Ast.Expr, ctx: *CaptureCtx) void {
             }
         },
         .unary => |e| self.captureFromExpr(e.expr, ctx),
-        .when => |*e| {
-            self.captureFromExpr(e.expr, ctx);
-            for (e.arms) |*arm| {
-                self.captureFromNode(&arm.body, ctx);
-            }
-        },
     }
 }
 

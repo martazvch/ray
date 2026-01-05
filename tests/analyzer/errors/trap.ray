@@ -1,0 +1,24 @@
+error File {
+    fileNotFound,
+    wrongPermission,
+
+    fn fromPath(path: str) -> Self {
+        return .fileNotFound
+    }
+}
+
+
+fn failable(value: int) -> int!File {
+    if (value < 5) {
+        fail File.fileNotFound
+    }
+
+    return 10
+}
+
+fn oui() -> int { return 5 }
+
+fn main() {
+    failable(5) trap match oui() {}
+    oui() trap match e {}
+}

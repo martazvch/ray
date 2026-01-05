@@ -1,0 +1,15 @@
+expect_arrow_before_arm_body
+expect_expr, }
+
+expect_brace_before_match_body
+expect_expr, }
+
+expect_new_line_pm_arm
+
+expect_brace_before_match_type_arm
+expect_expr, }
+
+expect_arrow_colon_before_arm_body
+expect_expr, }
+
+expect_brace_after_match_type

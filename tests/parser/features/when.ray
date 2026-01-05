@@ -1,7 +1,0 @@
-when getValue() @v {
-    int => print v
-    float => {
-        print "im a float"
-    }
-}
-

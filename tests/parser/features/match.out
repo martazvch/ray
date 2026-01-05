@@ -1,0 +1,142 @@
+{
+    "match": {
+        "expression": {
+            "literal": "value"
+        },
+        "arms": [
+            {
+                "expr": {
+                    "enum_literal": "fileNotFound"
+                },
+                "body": {
+                    "literal": "oui"
+                }
+            },
+            {
+                "expr": {
+                    "enum_literal": "otherError"
+                },
+                "body": {
+                    "literal": "non"
+                }
+            },
+            {
+                "expr": "wildcard",
+                "body": {
+                    "literal": "dont know bro"
+                }
+            }
+        ]
+    },
+    "match": {
+        "expression": {
+            "literal": "value"
+        },
+        "arms": [
+            {
+                "type": "int",
+                "body": {
+                    "literal": "5"
+                }
+            },
+            {
+                "type": "float",
+                "body": {
+                    "block": [
+                        "var_decl": {
+                            "name": "a",
+                            "type": {},
+                            "value": {
+                                "literal": "1"
+                            },
+                            "const": "true"
+                        },
+                        "var_decl": {
+                            "name": "b",
+                            "type": {},
+                            "value": {
+                                "literal": "2"
+                            },
+                            "const": "true"
+                        },
+                        "assignment": {
+                            "assigne": {
+                                "break": {
+                                    "literal": "a"
+                                }
+                            },
+                            "value": {
+                                "literal": "b"
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "expr": "wildcard",
+                "body": {
+                    "literal": "10"
+                }
+            }
+        ]
+    },
+    "match": {
+        "expression": {
+            "literal": "value"
+        },
+        "arms": [
+            {
+                "type": "int",
+                "arms": [
+                    {
+                        "expr": {
+                            "literal": "0"
+                        },
+                        "body": {
+                            "literal": "1"
+                        }
+                    },
+                    {
+                        "expr": {
+                            "literal": "6"
+                        },
+                        "body": {
+                            "literal": "varName"
+                        }
+                    },
+                    {
+                        "expr": "wildcard",
+                        "body": {
+                            "literal": "oui"
+                        }
+                    }
+                ]
+            },
+            {
+                "type": "float",
+                "arms": [
+                    {
+                        "expr": {
+                            "literal": "1.2"
+                        },
+                        "body": {
+                            "literal": "4"
+                        }
+                    },
+                    {
+                        "expr": "wildcard",
+                        "body": {
+                            "literal": "5.6"
+                        }
+                    }
+                ]
+            },
+            {
+                "expr": "wildcard",
+                "body": {
+                    "literal": "youpi"
+                }
+            }
+        ]
+    }
+}

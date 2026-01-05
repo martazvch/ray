@@ -1,0 +1,28 @@
+match value {
+    .fileNotFound => "oui"
+    .otherError => "non"
+    _ => "dont know bro"
+}    
+
+match value is {
+    int => 5
+    float => {
+        let a = 1
+        let b = 2
+        break a = b
+    }
+    _ => 10
+}
+
+match value is {
+    int: {
+        0 => 1
+        6 => varName
+        _ => "oui"
+    }
+    float: {
+        1.2 => 4
+        _ => 5.6
+    }
+    _ => "youpi"
+}

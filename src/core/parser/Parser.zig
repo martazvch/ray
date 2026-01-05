@@ -223,7 +223,7 @@ fn synchronize(self: *Self) void {
 
     while (!self.check(.eof)) {
         switch (self.token_tags[self.token_idx]) {
-            .@"enum", .@"fn", .@"for", .@"if", .left_brace, .let, .print, .@"return", .@"struct", .use, .@"var", .when, .@"while" => return,
+            .@"enum", .@"fn", .@"for", .@"if", .left_brace, .let, .match, .print, .@"return", .@"struct", .use, .@"var", .@"while" => return,
             else => self.advance(),
         }
     }
@@ -957,7 +957,6 @@ fn parseExpr(self: *Self) Error!*Expr {
         .self => self.literal(.self),
         .string => self.literal(.string),
         .true => self.literal(.bool),
-        .when => self.when(),
         else => {
             const span = self.token_spans[self.token_idx - 1];
             return self.errAtPrev(.{ .expect_expr = .{ .found = span.text(self.source) } });
@@ -1211,41 +1210,103 @@ fn literal(self: *Self, tag: Ast.Literal.Tag) Error!*Expr {
 }
 
 fn matchExpr(self: *Self) Error!*Expr {
-    const start = try self.patternMatchStart();
+    const kw = self.token_idx - 1;
 
-    var arms: ArrayList(Ast.Match.Arm) = .empty;
+    const value = value: {
+        const save_cond = self.ctx.setAndGetPrevious(.in_cond, true);
+        defer self.ctx.in_cond = save_cond;
+        break :value try self.parsePrecedenceExpr(0);
+    };
 
-    while (!self.check(.eof) and !self.check(.right_brace)) {
-        arms.append(self.allocator, try self.matchArm()) catch oom();
-        try self.expect(.new_line, .expect_new_line_pm_arm);
-        self.skipNewLines();
-    }
+    const match_type = self.match(.is);
 
-    try self.expectOrErrAtToken(.right_brace, .unclosed_brace, start.open_brace);
+    self.skipNewLines();
+    try self.expectOrErrAtPrev(.left_brace, .expect_brace_before_match_body);
+    const opening_brace = self.token_idx - 1;
+    self.skipNewLines();
+
+    const body = if (match_type) try self.matchType() else try self.matchValue();
+
+    try self.expectOrErrAtToken(.right_brace, .unclosed_brace, opening_brace);
 
     const expr = self.allocator.create(Expr) catch oom();
     expr.* = .{ .match = .{
-        .kw = start.token,
-        .expr = start.value,
-        .arms = arms.toOwnedSlice(self.allocator) catch oom(),
+        .kw = kw,
+        .expr = value,
+        .body = body,
     } };
 
     return expr;
 }
 
-fn matchArm(self: *Self) Error!Ast.Match.Arm {
-    const expr: Ast.Match.Arm.Kind = if (self.match(.underscore))
+fn matchValue(self: *Self) Error!Ast.Match.Kind {
+    return .{ .value = try self.matchValueArms() };
+}
+
+fn matchValueArms(self: *Self) Error![]Ast.Match.ValueArm {
+    var arms: ArrayList(Ast.Match.ValueArm) = .empty;
+
+    while (!self.check(.eof) and !self.check(.right_brace)) {
+        arms.append(self.allocator, try self.matchValueArm()) catch oom();
+        try self.expect(.new_line, .expect_new_line_pm_arm);
+        self.skipNewLines();
+    }
+
+    return arms.toOwnedSlice(self.allocator) catch oom();
+}
+
+fn matchValueArm(self: *Self) Error!Ast.Match.ValueArm {
+    const expr: Ast.Match.ValueArm.ArmKind = if (self.match(.underscore))
         .{ .wildcard = self.token_idx - 1 }
     else
         .{ .expr = try self.parsePrecedenceExpr(0) };
     const alias = try self.getAlias(.at);
-    try self.expect(.arrow_big, .expect_arrow_before_pm_arm_body);
+    try self.expect(.arrow_big, .expect_arrow_before_arm_body);
 
     return .{
         .expr = expr,
         .alias = alias,
         .body = try self.statement(),
     };
+}
+
+fn matchType(self: *Self) Error!Ast.Match.Kind {
+    var arms: ArrayList(Ast.Match.TypeArm) = .empty;
+
+    while (!self.check(.eof) and !self.check(.right_brace)) {
+        arms.append(self.allocator, try self.matchTypeArm()) catch oom();
+        try self.expect(.new_line, .expect_new_line_pm_arm);
+        self.skipNewLines();
+    }
+
+    return .{ .type = arms.toOwnedSlice(self.allocator) catch oom() };
+}
+
+fn matchTypeArm(self: *Self) Error!Ast.Match.TypeArm {
+    const ty: Ast.Match.TypeArm.ArmKind = if (self.match(.underscore))
+        .{ .wildcard = self.token_idx - 1 }
+    else
+        .{ .expr = try self.parseType() };
+
+    const body: Ast.Match.TypeArm.BodyKind = if (self.match(.arrow_big))
+        .{ .value = try self.statement() }
+    else if (self.match(.colon))
+        try self.matchTypeSubMatch()
+    else
+        return self.errAtCurrent(.expect_arrow_colon_before_arm_body);
+
+    return .{ .type = ty, .body = body };
+}
+
+fn matchTypeSubMatch(self: *Self) Error!Ast.Match.TypeArm.BodyKind {
+    self.skipNewLines();
+    try self.expectOrErrAtPrev(.left_brace, .expect_brace_before_match_type_arm);
+    self.skipNewLines();
+
+    const arms = try self.matchValueArms();
+    try self.expect(.right_brace, .expect_brace_after_match_type);
+
+    return .{ .patmat = arms };
 }
 
 fn returnExpr(self: *Self) Error!*Expr {
@@ -1269,65 +1330,6 @@ fn unary(self: *Self) Error!*Expr {
     expr.* = .{ .unary = .{ .op = self.token_idx - 2, .expr = try self.parseExpr() } };
 
     return expr;
-}
-
-fn when(self: *Self) Error!*Expr {
-    const start = try self.patternMatchStart();
-    var arms: ArrayList(Ast.When.Arm) = .empty;
-
-    while (!self.check(.eof) and !self.check(.right_brace)) {
-        arms.append(self.allocator, try self.whenArm()) catch oom();
-        try self.expect(.new_line, .expect_new_line_pm_arm);
-        self.skipNewLines();
-    }
-
-    try self.expectOrErrAtToken(.right_brace, .unclosed_brace, start.open_brace);
-
-    const expr = self.allocator.create(Expr) catch oom();
-    expr.* = .{ .when = .{
-        .kw = start.token,
-        .expr = start.value,
-        .alias = start.alias,
-        .arms = arms.toOwnedSlice(self.allocator) catch oom(),
-    } };
-
-    return expr;
-}
-
-fn whenArm(self: *Self) Error!Ast.When.Arm {
-    const ty = try self.parseType();
-    try self.expect(.arrow_big, .expect_arrow_before_pm_arm_body);
-
-    return .{
-        .type = ty,
-        .body = try self.statement(),
-    };
-}
-
-const PatternMatchStart = struct {
-    token: TokenIndex,
-    alias: ?TokenIndex,
-    value: *Expr,
-    open_brace: TokenIndex,
-};
-
-fn patternMatchStart(self: *Self) Error!PatternMatchStart {
-    const kw = self.token_idx - 1;
-
-    const value = value: {
-        const save_cond = self.ctx.setAndGetPrevious(.in_cond, true);
-        defer self.ctx.in_cond = save_cond;
-        break :value try self.parsePrecedenceExpr(0);
-    };
-
-    const alias = try self.getAlias(.at);
-
-    self.skipNewLines();
-    try self.expectOrErrAtPrev(.left_brace, .expect_brace_before_patmatch_body);
-    const opening_brace = self.token_idx - 1;
-    self.skipNewLines();
-
-    return .{ .token = kw, .value = value, .alias = alias, .open_brace = opening_brace };
 }
 
 // Parses postfix expressions: calls, member access

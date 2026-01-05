@@ -1,0 +1,2 @@
+trap_match_not_ident
+trap_on_non_error, int

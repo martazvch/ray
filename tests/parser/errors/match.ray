@@ -1,0 +1,23 @@
+match value {
+    "value" print "oui"
+}
+
+match value
+    "value" => print "oui"
+}
+
+match value {
+    "value" => { print "oui" } "otherValue" => "error"
+}
+
+match value is {
+    int: print "oui"
+}
+
+match value is {
+    int print "oui"
+}
+
+match value is {
+    int: {
+        0 => 0

@@ -48,6 +48,7 @@ pub const Token = struct {
         .{ "for", .@"for" },
         .{ "if", .@"if" },
         .{ "in", .in },
+        .{ "is", .is },
         .{ "let", .let },
         .{ "match", .match },
         .{ "not", .not },
@@ -62,7 +63,6 @@ pub const Token = struct {
         .{ "use", .use },
         .{ "var", .@"var" },
         .{ "while", .@"while" },
-        .{ "when", .when },
     });
 
     pub const Tag = enum {
@@ -99,6 +99,7 @@ pub const Token = struct {
         @"if",
         in,
         int,
+        is,
         left_brace,
         left_bracket,
         left_paren,
@@ -134,7 +135,6 @@ pub const Token = struct {
         underscore,
         use,
         @"var",
-        when,
         @"while",
 
         leading_zeroes,
@@ -630,15 +630,15 @@ test "keywords" {
     defer lexer.deinit();
     lexer.lex(
         \\\and else false for fn if null or print return 
-        \\\self struct true var while not do use break when
-        \\\as enum match let in fail trap
+        \\\self struct true var while not do use break 
+        \\\as enum match let in fail trap is
     );
 
     const res = [_]Token.Tag{
-        .@"and",    .@"else",  .false, .@"for",    .@"fn", .@"if",   .null,     .@"or", .print,
-        .@"return", .new_line, .self,  .@"struct", .true,  .@"var",  .@"while", .not,   .do,
-        .use,       .@"break", .when,  .new_line,  .as,    .@"enum", .match,    .let,   .in,
-        .fail,      .trap,     .eof,
+        .@"and",    .@"else",  .false,    .@"for",    .@"fn",   .@"if",  .null,     .@"or", .print,
+        .@"return", .new_line, .self,     .@"struct", .true,    .@"var", .@"while", .not,   .do,
+        .use,       .@"break", .new_line, .as,        .@"enum", .match,  .let,      .in,    .fail,
+        .trap,      .is,       .eof,
     };
 
     for (0..res.len) |i| {
