@@ -1,16 +1,16 @@
 {
     "fn_call": {
         "callee": {
-            "literal": "foo"
+            "identifier": "foo"
         },
         "args": [
             {
                 "name": "arg1",
-                "literal": "8"
+                "int": "8"
             },
             {
                 "name": "secondArg",
-                "literal": "azerty"
+                "string": "azerty"
             }
         ]
     }

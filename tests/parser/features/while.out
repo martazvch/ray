@@ -2,7 +2,7 @@
     "while": {
         "pattern: value": {
             "expr": {
-                "literal": "true"
+                "bool": "true"
             }
         },
         "body": []
@@ -11,7 +11,7 @@
         "pattern: value": {
             "expr": {
                 "block": [
-                    "literal": "true"
+                    "bool": "true"
                 ]
             }
         },
@@ -22,10 +22,10 @@
                 "value": {
                     "binop": {
                         "lhs": {
-                            "literal": "1"
+                            "int": "1"
                         },
                         "rhs": {
-                            "literal": "5"
+                            "int": "5"
                         },
                         "op": "+"
                     }
@@ -38,7 +38,7 @@
         "pattern: nullable": {
             "binding": "a",
             "expr": {
-                "literal": "nullable"
+                "identifier": "nullable"
             },
             "constant": "true"
         },

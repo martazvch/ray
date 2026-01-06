@@ -7,20 +7,20 @@
     },
     "assignment": {
         "assigne": {
-            "literal": "a"
+            "identifier": "a"
         },
         "value": {
-            "literal": "1"
+            "int": "1"
         }
     },
     "assignment": {
         "assigne": {
-            "literal": "a"
+            "identifier": "a"
         },
         "value": {
             "fn_call": {
                 "callee": {
-                    "literal": "add"
+                    "identifier": "add"
                 },
                 "args": []
             }
@@ -28,7 +28,7 @@
     },
     "assignment": {
         "assigne": {
-            "literal": "a"
+            "identifier": "a"
         },
         "value": {
             "block": []

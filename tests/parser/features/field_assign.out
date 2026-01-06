@@ -5,7 +5,7 @@
                 "structure": {
                     "field": {
                         "structure": {
-                            "literal": "tom"
+                            "identifier": "tom"
                         },
                         "field_name": "pet"
                     }
@@ -14,7 +14,7 @@
             }
         },
         "value": {
-            "literal": "true"
+            "bool": "true"
         }
     }
 }

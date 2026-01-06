@@ -44,8 +44,8 @@ pub const AnalyzerMsg = union(enum) {
     match_arm_type_mismatch: struct { expect: []const u8, found: []const u8 },
     match_duplicate_arm: struct { name: []const u8 },
     match_enum_invalid_pat,
+    match_non_exhaustive: struct { missing: []const u8 },
     match_wildcard_exhaustive,
-    match_wildcard_not_last,
     missing_symbol_in_module: struct { symbol: []const u8, module: []const u8 },
     missing_else_clause: struct { if_type: []const u8 },
     missing_field_struct_literal: struct { name: []const u8 },
@@ -91,10 +91,6 @@ pub const AnalyzerMsg = union(enum) {
     void_array,
     void_param,
     void_value,
-    when_arm_duplicate,
-    when_arm_not_in_union: struct { found: []const u8, expect: []const u8 },
-    match_non_exhaustive: struct { kind: []const u8, missing: []const u8 },
-    when_with_non_union: struct { found: []const u8 },
 
     const Self = @This();
 
@@ -141,8 +137,8 @@ pub const AnalyzerMsg = union(enum) {
             .match_arm_type_mismatch => |e| writer.print("match arm type mismatch, expect '{s}' but found '{s}'", .{ e.expect, e.found }),
             .match_duplicate_arm => |e| writer.print("arm '{s}' is used multiple times", .{e.name}),
             .match_enum_invalid_pat => writer.writeAll("invalid pattern for matching enums"),
+            .match_non_exhaustive => |e| writer.print("non-exhaustive pattern matching, missing: '{s}'", .{e.missing}),
             .match_wildcard_exhaustive => writer.writeAll("can't use wildcard with an exhaustive pattern match"),
-            .match_wildcard_not_last => writer.writeAll("wildcard must be the last arm"),
             .missing_symbol_in_module => |e| writer.print("no symbol named '{s}' in module '{s}'", .{ e.symbol, e.module }),
             .missing_else_clause => writer.writeAll("'if' is missing an 'else' clause"),
             .missing_field_struct_literal => |e| writer.print("missing field '{s}' in structure literal", .{e.name}),
@@ -182,10 +178,6 @@ pub const AnalyzerMsg = union(enum) {
             .void_array => writer.writeAll("can't declare an array of 'void' values"),
             .void_param => writer.writeAll("function parameters can't be of 'void' type"),
             .void_value => writer.writeAll("value is of type 'void'"),
-            .when_arm_duplicate => writer.writeAll("this pattern is already covered by another arm"),
-            .when_arm_not_in_union => |e| writer.print("type '{s}' is not part of union '{s}'", .{ e.found, e.expect }),
-            .match_non_exhaustive => |e| writer.print("non-exhaustive '{s}' pattern matching, missing: '{s}'", .{ e.kind, e.missing }),
-            .when_with_non_union => |e| writer.print("using 'when' expression on a non-union type is useless, found type: '{s}'", .{e.found}),
         };
     }
 
@@ -226,8 +218,8 @@ pub const AnalyzerMsg = union(enum) {
             .match_arm_type_mismatch => |e| writer.print("this is of type '{s}'", .{e.found}),
             .match_duplicate_arm => writer.writeAll("this case"),
             .match_enum_invalid_pat => writer.writeAll("here"),
+            .match_non_exhaustive => writer.writeAll("this expression"),
             .match_wildcard_exhaustive => writer.writeAll("wildcard useless"),
-            .match_wildcard_not_last => writer.writeAll("this is not the last case"),
             .missing_symbol_in_module => writer.writeAll("this symbol is unknown"),
             .missing_else_clause => |e| writer.print("'if' expression is of type '{s}'", .{e.if_type}),
             .missing_field_struct_literal => writer.writeAll("non-exhaustive structure literal"),
@@ -258,9 +250,6 @@ pub const AnalyzerMsg = union(enum) {
             .unknown_param, .void_param => writer.writeAll("this parameter"),
             .void_array => writer.writeAll("declared here"),
             .void_value => writer.writeAll("this expression produces no value"),
-            .when_arm_not_in_union, .when_arm_duplicate => writer.writeAll("this arm"),
-            .match_non_exhaustive => writer.writeAll("this expression"),
-            .when_with_non_union => writer.writeAll("this is not an union"),
         };
     }
 
@@ -341,8 +330,10 @@ pub const AnalyzerMsg = union(enum) {
                 \\      Shape.rectangle => ...
                 \\  }
             ),
+            .match_non_exhaustive => writer.writeAll(
+                "all pattern matching must be exhaustive. You can use '_' as the last arm to catch all the remaining possibilities",
+            ),
             .match_wildcard_exhaustive => writer.writeAll("can't use wildcard prong with an exhaustive pattern match"),
-            .match_wildcard_not_last => writer.writeAll("wildcard prong must be the last one"),
             .missing_symbol_in_module => writer.writeAll("refer to module's source code or documentation to ge the list of available symbols"),
             .missing_else_clause => writer.writeAll("add an 'else' block that evaluate to the expected type"),
             .missing_field_struct_literal => writer.writeAll(
@@ -391,14 +382,6 @@ pub const AnalyzerMsg = union(enum) {
             .void_array => writer.writeAll("use any other type to declare an array"),
             .void_param => writer.writeAll("use a any other type than 'void' or remove parameter"),
             .void_value => writer.writeAll("consider returning a value from expression"),
-            .when_arm_duplicate => writer.writeAll(
-                "pattern matching must be exhaustive and each possibility must be matched exactly once",
-            ),
-            .when_arm_not_in_union => writer.writeAll("remove the arm"),
-            .match_non_exhaustive => writer.writeAll(
-                "all pattern matching must be exhaustive. You can use '_' as the last arm to catch all the remaining possibilities",
-            ),
-            .when_with_non_union => writer.writeAll("remove 'when' expression and use the value as it is"),
         };
     }
 };

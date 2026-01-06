@@ -16,7 +16,7 @@ const IrBuilder = @import("IrBuilder.zig");
 const LexScope = @import("LexicalScope.zig");
 const ir = @import("ir.zig");
 const InstrIndex = ir.Index;
-const Instruction = ir.Instruction;
+const Instr = ir.Instruction;
 const Span = @import("../parser/Lexer.zig").Span;
 const TokenTag = @import("../parser/Lexer.zig").Token.Tag;
 
@@ -24,6 +24,8 @@ const type_mod = @import("types.zig");
 const Type = type_mod.Type;
 const TypeInterner = type_mod.TypeInterner;
 const TypeIds = type_mod.TypeIds;
+
+const matchers = @import("matchers.zig");
 
 const misc = @import("misc");
 const Interner = misc.Interner;
@@ -39,7 +41,7 @@ pub const AnalyzedModule = struct {
     symbols: LexScope.SymbolArrMap,
 };
 
-const Context = struct {
+pub const Context = struct {
     decl_type: ?*const Type,
     fn_type: ?*const Type,
     self_type: ?*const Type,
@@ -78,7 +80,7 @@ const Context = struct {
 };
 
 const Self = @This();
-const Error = error{ Err, NotSymbol };
+pub const Error = error{ Err, NotSymbol };
 const TypeResult = Error!struct { type: *const Type, instr: InstrIndex };
 const StmtResult = Error!InstrIndex;
 
@@ -89,7 +91,7 @@ const TypeInfos = struct {
     /// External module index where the symbol comes from
     ext_mod: ?usize = null,
 };
-const InstrInfos = struct {
+pub const InstrInfos = struct {
     type: *const Type,
     ti: TypeInfos = .{},
     cf: ControlFlow = .none,
@@ -159,7 +161,7 @@ pub fn init(allocator: Allocator, pipeline: *Pipeline, save_dbg_infos: bool) Sel
     };
 }
 
-fn err(self: *Self, kind: AnalyzerMsg, span: Span) Error {
+pub fn err(self: *Self, kind: AnalyzerMsg, span: Span) Error {
     self.errs.append(self.allocator, AnalyzerReport.err(kind, span.start, span.end)) catch oom();
     return error.Err;
 }
@@ -201,7 +203,7 @@ pub fn analyze(self: *Self, ast: *const Ast, module_name: []const u8, expect_mai
     };
 }
 
-fn analyzeNode(self: *Self, node: *const Node, expect: ExprResKind, ctx: *Context) Result {
+pub fn analyzeNode(self: *Self, node: *const Node, expect: ExprResKind, ctx: *Context) Result {
     const instr = switch (node.*) {
         .assignment => |*n| try self.assignment(n, ctx),
         .discard => |n| try self.discard(n, ctx),
@@ -228,11 +230,9 @@ fn assignment(self: *Self, node: *const Ast.Assignment, ctx: *Context) StmtResul
     const span = self.ast.getSpan(node.assigne);
 
     const maybe_assigne: ?InstrInfos = switch (node.assigne.*) {
-        .literal => |*e| b: {
-            if (e.tag != .identifier) break :b null;
-
-            var assigne = try self.expectVariableIdentifier(e.idx);
-            if (assigne.variable.constant) return self.err(.{ .assign_to_constant = .{ .name = self.ast.toSource(e.idx) } }, span);
+        .identifier => |e| b: {
+            var assigne = try self.expectVariableIdentifier(e);
+            if (assigne.variable.constant) return self.err(.{ .assign_to_constant = .{ .name = self.ast.toSource(e) } }, span);
 
             assigne.variable.initialized = true;
             break :b .{ .type = assigne.variable.type, .instr = assigne.instr };
@@ -375,7 +375,7 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
 
     _ = try self.declareVariable(0, undefined, false, true, false, false, null, undefined);
 
-    const kind: Instruction.For.Kind, const elem_type = switch (res.type.*) {
+    const kind: Instr.For.Kind, const elem_type = switch (res.type.*) {
         .array => |t| .{ .array, t.child },
         .range => .{ .range, self.ti.getCached(.int) },
         .str => .{ .str, res.type },
@@ -466,8 +466,8 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
     };
 }
 
-fn loadFunctionCaptures(self: *Self, captures_meta: *const Ast.FnDecl.Meta.Captures) Error![]const Instruction.FnDecl.Capture {
-    var captures: ArrayList(Instruction.FnDecl.Capture) = .empty;
+fn loadFunctionCaptures(self: *Self, captures_meta: *const Ast.FnDecl.Meta.Captures) Error![]const Instr.FnDecl.Capture {
+    var captures: ArrayList(Instr.FnDecl.Capture) = .empty;
     captures.ensureTotalCapacity(self.allocator, captures_meta.count()) catch oom();
 
     var it = captures_meta.iterator();
@@ -594,7 +594,7 @@ fn defaultValue(self: *Self, decl_type: *const Type, val: *const Expr, kind: any
     }
 
     // TODO: see if this is safe enough with comp_time check above
-    const const_index = self.irb.instructions.items(.data)[value_res.instr].constant.index;
+    const const_index = self.irb.getInstr(value_res.instr).constant.index;
     return .{ value_res, const_index };
 }
 
@@ -669,10 +669,8 @@ fn expectAssignableValue(self: *Self, expr: *const Ast.Expr, ctx: *Context) Resu
     const span = self.ast.getSpan(expr);
 
     const value_res: ?InstrInfos = switch (expr.*) {
-        .literal => |*e| b: {
-            if (e.tag != .identifier) break :b try self.literal(e, ctx);
-
-            const value = self.identifier(e.idx, true, ctx) catch break :b null;
+        .identifier => |e| b: {
+            const value = self.resolveIdentifier(e, true, ctx) catch break :b null;
             if (value.kind == .symbol and value.type.* != .function) break :b null;
             break :b .{ .type = value.type, .ti = .{ .heap = value.type.isHeap() }, .instr = value.instr };
         },
@@ -827,7 +825,7 @@ fn whileStmt(self: *Self, node: *const Ast.While, ctx: *Context) StmtResult {
     return self.irb.addInstr(.{ .@"while" = .{ .cond = cond_res.instr, .body = body_res.instr } }, span.start);
 }
 
-const ExprResKind = enum {
+pub const ExprResKind = enum {
     any,
     value,
     maybe,
@@ -839,25 +837,31 @@ const ExprResKind = enum {
     }
 };
 
-fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Context) Result {
+pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Context) Result {
     const res = try switch (expr.*) {
         .array => |*e| self.array(e, ctx),
         .block => |*e| self.block(e, expect, ctx),
         .binop => |*e| self.binop(e, ctx),
+        .bool => |e| self.boolLit(e),
         .@"break" => |*e| self.breakExpr(e, ctx),
         .closure => |*e| self.closure(e, ctx),
         .enum_lit => |e| self.enumLit(e, ctx),
         .fail => |e| self.fail(e, ctx),
         .field => |*e| self.field(e, ctx),
+        .float => |e| self.floatLit(e),
         .fn_call => |*e| self.call(e, ctx),
         .grouping => |*e| self.analyzeExpr(e.expr, expect, ctx),
+        .identifier => |e| self.identifier(e, ctx),
         .@"if" => |*e| self.ifExpr(e, expect, ctx),
         .indexing => |*e| self.indexing(e, ctx),
-        .literal => |*e| self.literal(e, ctx),
+        .int => |e| self.intLit(e),
         .match => |e| self.match(e, expect, ctx),
+        .null => |e| self.nullLit(e),
         .pattern => |e| self.pattern(e, ctx),
         .range => |e| self.range(e, ctx),
         .@"return" => |*e| self.returnExpr(e, ctx),
+        .self => |e| self.identifier(e, ctx),
+        .string => |e| self.string(e),
         .struct_literal => |*e| self.structLiteral(e, ctx),
         .ternary => |*e| self.ternary(e, ctx),
         .trap => |e| self.trap(e, ctx),
@@ -1022,7 +1026,7 @@ fn binop(self: *Self, expr: *const Ast.Binop, ctx: *Context) Result {
         };
     }
 
-    const op: Instruction.Binop.Op, const lhs_instr, const rhs_instr, const ty = instr: {
+    const op: Instr.Binop.Op, const lhs_instr, const rhs_instr, const ty = instr: {
         switch (expr.op) {
             .plus, .slash, .star, .minus, .modulo => {
                 const lhs_instr, const rhs_instr, const ty = binopArithmeticCoercion(lhs, rhs) catch |e| return switch (e) {
@@ -1093,7 +1097,7 @@ fn binopArithmeticCoercion(
     return .{ lhs.instr, rhs.instr, lhs_type };
 }
 
-fn getArithmeticOp(op: TokenTag, ty: *const Type) Instruction.Binop.Op {
+fn getArithmeticOp(op: TokenTag, ty: *const Type) Instr.Binop.Op {
     return switch (op) {
         .plus => if (ty.is(.int)) .add_int else .add_float,
         .slash => if (ty.is(.int)) .div_int else .div_float,
@@ -1138,7 +1142,7 @@ fn binopComparisonCoercion(
     return error.Invalid;
 }
 
-fn getComparisonOp(op: TokenTag, ty: *const Type) Instruction.Binop.Op {
+fn getComparisonOp(op: TokenTag, ty: *const Type) Instr.Binop.Op {
     return switch (ty.*) {
         .bool => if (op == .equal_equal) .eq_bool else .ne_bool,
         .int => if (op == .equal_equal) .eq_int else .ne_int,
@@ -1225,7 +1229,7 @@ fn closure(self: *Self, expr: *const Ast.FnDecl, ctx: *Context) Result {
     };
 }
 
-fn enumLit(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result {
+pub fn enumLit(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result {
     const span = self.ast.getSpan(tag);
     const decl = ctx.decl_type orelse return self.err(.enum_lit_no_type, span);
 
@@ -1280,7 +1284,7 @@ fn fail(self: *Self, expr: Ast.Fail, ctx: *Context) Result {
     };
 }
 
-fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
+pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
     const span = self.ast.getSpan(expr.structure);
     const struct_res = try self.analyzeExpr(expr.structure, .any, ctx);
 
@@ -1392,7 +1396,7 @@ fn runtimeObjToType(self: *Self, ty: type_mod.ObjFnType, current_generic: *const
 
 const AccessResult = struct {
     type: *const Type,
-    kind: Instruction.Field.Kind,
+    kind: Instr.Field.Kind,
     index: usize,
 };
 
@@ -1529,14 +1533,14 @@ fn fnArgsList(
     ext_mod: ?usize,
     err_span: Span,
     ctx: *Context,
-) Error![]const Instruction.Arg {
+) Error![]const Instr.Arg {
     var proto = ty.proto(self.allocator);
     const param_count = proto.count();
     const params = ty.params.values()[@intFromBool(ty.kind == .method)..];
 
     if (args.len > param_count) return self.err(.{ .too_many_fn_args = .{ .expect = param_count, .found = args.len } }, err_span);
 
-    var instrs = self.allocator.alloc(Instruction.Arg, params.len) catch oom();
+    var instrs = self.allocator.alloc(Instr.Arg, params.len) catch oom();
     var proto_values = proto.values();
 
     for (proto_values, 0..) |val, i| {
@@ -1608,7 +1612,7 @@ const IdentRes = struct {
 };
 
 /// Tries to find a match from variables and symbols and returns its type while emitting an instruction
-fn identifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool, ctx: *const Context) Error!IdentRes {
+fn resolveIdentifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool, ctx: *const Context) Error!IdentRes {
     const span = self.ast.getSpan(token_name);
     const text = self.ast.toSource(token_name);
     const name = self.interner.intern(text);
@@ -1837,7 +1841,7 @@ fn indexing(self: *Self, expr: *const Ast.Indexing, ctx: *Context) Result {
 }
 
 /// Analyze the expression and return an error if the type isn't an integer
-fn expectIndex(self: *Self, expr: *const Expr, ctx: *Context) Error!struct { InstrIndex, Instruction.Indexing.IndexKind } {
+fn expectIndex(self: *Self, expr: *const Expr, ctx: *Context) Error!struct { InstrIndex, Instr.Indexing.IndexKind } {
     const res = try self.analyzeExpr(expr, .value, ctx);
 
     return switch (res.type.*) {
@@ -1850,90 +1854,115 @@ fn expectIndex(self: *Self, expr: *const Expr, ctx: *Context) Error!struct { Ins
     };
 }
 
-fn literal(self: *Self, expr: *const Ast.Literal, ctx: *Context) Result {
-    const span = self.ast.getSpan(expr);
-    const text = self.ast.toSource(expr);
+pub fn boolLit(self: *Self, expr: Ast.Bool) Result {
+    return .{
+        .type = self.ti.cache.bool,
+        .ti = .{ .comp_time = true },
+        .instr = self.irb.addConstant(
+            .{ .bool = self.ast.token_tags[expr] == .true },
+            self.ast.getSpan(expr).start,
+        ),
+    };
+}
 
-    const ty, const instr = b: {
-        switch (expr.tag) {
-            .bool => break :b .{ self.ti.cache.bool, self.irb.addConstant(.{ .bool = self.ast.token_tags[expr.idx] == .true }, span.start) },
-            .identifier, .self => {
-                const res = try self.identifier(expr.idx, true, ctx);
-                return .{
-                    .type = res.type,
-                    .ti = .{ .heap = res.type.isHeap(), .is_sym = res.kind == .symbol, .comp_time = res.comp_time, .ext_mod = res.module },
-                    .instr = res.instr,
-                };
-            },
-            .int => {
-                const value = std.fmt.parseInt(isize, text, 10) catch blk: {
-                    // TODO: error handling, only one possible it's invalid char
-                    std.debug.print("Error parsing integer\n", .{});
-                    break :blk 0;
-                };
-
-                break :b .{ self.ti.cache.int, self.irb.addConstant(.{ .int = value }, span.start) };
-            },
-            .float => {
-                const value = std.fmt.parseFloat(f64, text) catch blk: {
-                    // TODO: error handling, only one possible it's invalid char or too big
-                    std.debug.print("Error parsing float\n", .{});
-                    break :blk 0.0;
-                };
-
-                break :b .{ self.ti.cache.float, self.irb.addConstant(.{ .float = value }, span.start) };
-            },
-            .null => break :b .{ self.ti.cache.null, self.irb.addConstant(.null, span.start) },
-            .string => {
-                const no_quotes = text[1 .. text.len - 1];
-                var final: ArrayList(u8) = .empty;
-                var i: usize = 0;
-
-                while (i < no_quotes.len) : (i += 1) {
-                    const c = no_quotes[i];
-
-                    if (c == '\\') {
-                        i += 1;
-
-                        // Safe access here because lexer checked if the string and termianted
-                        switch (no_quotes[i]) {
-                            'n' => final.append(self.allocator, '\n') catch oom(),
-                            't' => final.append(self.allocator, '\t') catch oom(),
-                            '"' => final.append(self.allocator, '"') catch oom(),
-                            'r' => final.append(self.allocator, '\r') catch oom(),
-                            '\\' => final.append(self.allocator, '\\') catch oom(),
-                            else => return self.err(
-                                .{ .unknow_char_escape = .{ .found = no_quotes[i .. i + 1] } },
-                                span,
-                            ),
-                        }
-                    } else final.append(self.allocator, c) catch oom();
-                }
-
-                const value = self.interner.intern(final.toOwnedSlice(self.allocator) catch oom());
-
-                break :b .{ self.ti.cache.str, self.irb.addConstant(.{ .string = value }, span.start) };
-            },
-        }
+pub fn floatLit(self: *Self, expr: Ast.Float) Result {
+    const value = std.fmt.parseFloat(f64, self.ast.toSource(expr)) catch blk: {
+        // TODO: error handling, only one possible it's invalid char
+        std.debug.print("Error parsing float\n", .{});
+        break :blk 0;
     };
 
-    return .{ .type = ty, .ti = .{ .comp_time = true }, .instr = instr };
+    return .{
+        .type = self.ti.cache.float,
+        .ti = .{ .comp_time = true },
+        .instr = self.irb.addConstant(.{ .float = value }, self.ast.getSpan(expr).start),
+    };
+}
+
+pub fn intLit(self: *Self, expr: Ast.Int) Result {
+    const value = std.fmt.parseInt(i64, self.ast.toSource(expr), 10) catch blk: {
+        // TODO: error handling, only one possible it's invalid char
+        std.debug.print("Error parsing integer\n", .{});
+        break :blk 0;
+    };
+
+    return .{
+        .type = self.ti.cache.int,
+        .ti = .{ .comp_time = true },
+        .instr = self.irb.addConstant(.{ .int = value }, self.ast.getSpan(expr).start),
+    };
+}
+
+pub fn identifier(self: *Self, expr: Ast.Identifier, ctx: *Context) Result {
+    const res = try self.resolveIdentifier(expr, true, ctx);
+    return .{
+        .type = res.type,
+        .ti = .{ .heap = res.type.isHeap(), .is_sym = res.kind == .symbol, .comp_time = res.comp_time, .ext_mod = res.module },
+        .instr = res.instr,
+    };
+}
+
+pub fn nullLit(self: *Self, expr: Ast.Null) Result {
+    return .{
+        .type = self.ti.cache.null,
+        .ti = .{ .comp_time = true },
+        .instr = self.irb.addConstant(.null, self.ast.getSpan(expr).start),
+    };
+}
+
+pub fn string(self: *Self, expr: Ast.String) Result {
+    const text = self.ast.toSource(expr);
+    const span = self.ast.getSpan(expr);
+
+    const no_quotes = text[1 .. text.len - 1];
+    var final: ArrayList(u8) = .empty;
+    var i: usize = 0;
+
+    while (i < no_quotes.len) : (i += 1) {
+        const c = no_quotes[i];
+
+        if (c == '\\') {
+            i += 1;
+
+            // Safe access here because lexer checked if the string and termianted
+            switch (no_quotes[i]) {
+                'n' => final.append(self.allocator, '\n') catch oom(),
+                't' => final.append(self.allocator, '\t') catch oom(),
+                '"' => final.append(self.allocator, '"') catch oom(),
+                'r' => final.append(self.allocator, '\r') catch oom(),
+                '\\' => final.append(self.allocator, '\\') catch oom(),
+                else => return self.err(
+                    .{ .unknow_char_escape = .{ .found = no_quotes[i .. i + 1] } },
+                    span,
+                ),
+            }
+        } else final.append(self.allocator, c) catch oom();
+    }
+
+    const value = self.interner.intern(final.toOwnedSlice(self.allocator) catch oom());
+
+    return .{
+        .type = self.ti.cache.str,
+        .ti = .{ .comp_time = true },
+        .instr = self.irb.addConstant(.{ .string = value }, span.start),
+    };
 }
 
 fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Result {
     const value = try self.analyzeExpr(expr.expr, .value, ctx);
 
-    const types, const arms = switch (expr.body) {
+    const res = switch (expr.body) {
         .value => |arms| try self.matchValueArms(value.type, arms, expr.kw, expect, ctx),
         .type => @panic("TODO"),
     };
 
     return .{
-        .type = self.mergeTypes(types),
+        .type = self.mergeTypes(res.types),
         .instr = self.irb.addInstr(
             .{ .match = .{
                 .expr = value.instr,
-                .arms = arms,
+                .arms = res.arms,
+                .wildcard = res.wildcard,
                 .is_expr = expect.expects(),
             } },
             self.ast.getSpan(expr).start,
@@ -1941,116 +1970,58 @@ fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Resul
     };
 }
 
-const MatchArms = struct { []const *const Type, []const Instruction.Match.Arm };
-
 fn matchValueArms(
     self: *Self,
     ty: *const Type,
-    arms: []const Ast.Match.ValueArm,
+    expr: Ast.Match.ValueMatch,
     kw: Ast.TokenIndex,
     expect: ExprResKind,
     ctx: *Context,
-) Error!MatchArms {
-    return switch (ty.*) {
-        .@"enum" => try self.matchEnum(ty, arms, kw, expect, ctx),
+) Error!matchers.MatchArms {
+    var types: Set(*const Type) = .empty;
+    const len = expr.arms.len + @intFromBool(expr.wildcard != null);
+    var arms_instr = ArrayList(Instr.Match.Arm).initCapacity(self.allocator, len) catch oom();
+
+    var analyzer = ana: switch (ty.*) {
+        .@"enum" => |t| {
+            var ana = matchers.Enum.init(t.proto(self.allocator));
+            break :ana ana.analyzer();
+        },
         else => |t| {
             std.log.debug("Found: {any}", .{t});
             @panic("Match on anything else than enum not implemented yet");
         },
     };
-}
 
-fn matchEnum(
-    self: *Self,
-    ty: *const Type,
-    arms: []const Ast.Match.ValueArm,
-    kw: Ast.TokenIndex,
-    expect: ExprResKind,
-    ctx: *Context,
-) Error!MatchArms {
-    var had_err = false;
-    var has_wildcard = false;
-    var types: Set(*const Type) = .empty;
-    var arms_instr = ArrayList(Instruction.Match.Arm).initCapacity(self.allocator, arms.len) catch oom();
-    var proto = ty.@"enum".proto(self.allocator);
-
-    // Sets current type for enum literals
     const prev_decl_type = ctx.setAndGetPrevious(.decl_type, ty);
     defer ctx.decl_type = prev_decl_type;
 
-    for (arms, 0..) |*arm, i| {
+    for (expr.arms) |*arm| {
         const arm_span = self.ast.getSpan(arm.expr);
+        const arm_res, const body_res = try analyzer.arm(self, arm, expect, ctx);
 
-        const pat: ir.Instruction.Match.Kind = pat: switch (arm.expr) {
-            .expr => |expression| {
-                const tag, const pat = switch (expression.*) {
-                    .enum_lit => |e| .{ e, try self.enumLit(e, ctx) },
-                    .field => |*e| .{ e.field, try self.field(e, ctx) },
-                    else => return self.err(.match_enum_invalid_pat, arm_span),
-                };
+        if (arm_res.type != ty) return self.err(
+            .{ .match_arm_type_mismatch = .{ .expect = self.typeName(ty), .found = self.typeName(arm_res.type) } },
+            arm_span,
+        );
 
-                if (proto.getPtr(self.interner.intern(self.ast.toSource(tag)))) |found| {
-                    if (found.*) {
-                        return self.err(.{ .match_duplicate_arm = .{ .name = self.ast.toSource(tag) } }, arm_span);
-                    }
-                    found.* = true;
-                }
-
-                if (pat.type != ty) return self.err(
-                    .{ .match_arm_type_mismatch = .{ .expect = self.typeName(ty), .found = self.typeName(pat.type) } },
-                    arm_span,
-                );
-
-                break :pat .{ .instr = pat.instr };
-            },
-            .wildcard => {
-                if (i != arms.len - 1) {
-                    return self.err(.match_wildcard_not_last, arm_span);
-                }
-
-                check: {
-                    for (proto.values()) |val| {
-                        if (!val) break :check;
-                    }
-                    return self.err(.match_wildcard_exhaustive, arm_span);
-                }
-                has_wildcard = true;
-
-                break :pat .{ .wildcard = {} };
-            },
-        };
-
-        const body = self.analyzeNode(&arm.body, expect, ctx) catch {
-            had_err = true;
-            continue;
-        };
-
-        types.add(self.allocator, body.type) catch oom();
-        arms_instr.appendAssumeCapacity(.{ .expr = pat, .body = body.instr });
+        types.add(self.allocator, body_res.type) catch oom();
+        arms_instr.appendAssumeCapacity(.{ .expr = arm_res.instr, .body = body_res.instr });
     }
 
-    if (!has_wildcard) try self.matchValidation(&proto, self.ast.getSpan(kw));
+    const wildcard = if (expr.wildcard) |*w| w: {
+        const res = try analyzer.wildcard(self, w, expect, ctx);
+        types.add(self.allocator, res.type) catch oom();
+        break :w res.instr;
+    } else null;
 
-    return if (had_err) error.Err else .{ types.toOwned(), arms_instr.toOwnedSlice(self.allocator) catch oom() };
-}
+    try analyzer.validate(self, self.ast.getSpan(kw));
 
-fn matchValidation(self: *Self, proto: *const Type.Enum.Proto, span: Span) Error!void {
-    var missing: ArrayList(u8) = .empty;
-
-    var it = proto.iterator();
-    while (it.next()) |entry| {
-        if (!entry.value_ptr.*) {
-            if (missing.items.len > 0) {
-                missing.appendSlice(self.allocator, ", ") catch oom();
-            }
-            missing.appendSlice(self.allocator, self.interner.getKey(entry.key_ptr.*).?) catch oom();
-        }
-    }
-
-    if (missing.items.len > 0) return self.err(
-        .{ .match_non_exhaustive = .{ .kind = "match", .missing = missing.toOwnedSlice(self.allocator) catch oom() } },
-        span,
-    );
+    return .{
+        .types = types.toOwned(),
+        .arms = arms_instr.toOwnedSlice(self.allocator) catch oom(),
+        .wildcard = wildcard,
+    };
 }
 
 const Pattern = struct {
@@ -2164,7 +2135,7 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
     var proto = struct_type.proto(self.allocator);
     defer proto.deinit(self.allocator);
 
-    var values = self.allocator.alloc(Instruction.Arg, struct_type.fields.count()) catch oom();
+    var values = self.allocator.alloc(Instr.Arg, struct_type.fields.count()) catch oom();
 
     for (struct_type.fields.values(), 0..) |f, i| {
         if (f.default) |def| {
@@ -2278,12 +2249,12 @@ fn trapIdent(self: *Self, binding: Ast.Trap.Binding, err_type: Type.ErrorUnion, 
 fn trapMatch(self: *Self, expr: *Expr, err_type: Type.ErrorUnion, ctx: *Context) Result {
     const match_expr = expr.match.expr;
 
-    if (match_expr.* != .literal or match_expr.literal.tag != .identifier) {
+    if (match_expr.* != .identifier) {
         return self.err(.trap_match_not_ident, self.ast.getSpan(match_expr));
     }
 
-    const err_name = try self.internIfNotInCurrentScope(match_expr.literal.idx);
-    const binding_span = self.ast.getSpan(match_expr.literal.idx);
+    const err_name = try self.internIfNotInCurrentScope(match_expr.identifier);
+    const binding_span = self.ast.getSpan(match_expr.identifier);
 
     // If it's a `trap match`, we open another scope to discard the error at the end
     self.scope.open(self.allocator, null, false, true);
@@ -2342,7 +2313,7 @@ fn when(self: *Self, expr: *const Ast.When, expect: ExprResKind, ctx: *Context) 
     };
 }
 
-const WhenArmsRes = struct { []const *const Type, []const Instruction.When.Arm };
+const WhenArmsRes = struct { []const *const Type, []const Instr.When.Arm };
 
 fn whenArms(
     self: *Self,
@@ -2355,7 +2326,7 @@ fn whenArms(
 ) Error!WhenArmsRes {
     var had_err = false;
     var types: Set(*const Type) = .empty;
-    var arms = ArrayList(Instruction.When.Arm).initCapacity(self.allocator, arm_exprs.len) catch oom();
+    var arms = ArrayList(Instr.When.Arm).initCapacity(self.allocator, arm_exprs.len) catch oom();
 
     for (arm_exprs) |*arm| {
         const arm_span = self.ast.getSpan(arm.type);
@@ -2478,7 +2449,7 @@ fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) Error
             if (fields.len > 2) @panic("Nested types are not supported yet");
 
             const module_token = fields[0];
-            const module_infos = try self.identifier(module_token, true, ctx);
+            const module_infos = try self.resolveIdentifier(module_token, true, ctx);
             const module_type = module_infos.type;
 
             if (!module_type.is(.module)) return self.err(
@@ -2560,7 +2531,7 @@ fn mergeTypes(self: *Self, types: []const *const Type) *const Type {
     if (set.count() == 0) return self.ti.getCached(.void);
 
     const optional = set.remove(self.ti.getCached(.null));
-    const ty = if (set.count() == 1) set.values()[0] else self.ti.intern(.{ .@"union" = .{ .types = set.toOwned() } });
+    const ty = if (set.count() == 1) set.keys()[0] else self.ti.intern(.{ .@"union" = .{ .types = set.toOwned() } });
 
     return if (optional) self.ti.intern(.{ .optional = ty }) else ty;
 }

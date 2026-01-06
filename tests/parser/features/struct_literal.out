@@ -1,7 +1,7 @@
 {
     "struct_literal": {
         "structure": {
-            "literal": "A"
+            "identifier": "A"
         },
         "fields_values": [
             {
@@ -20,19 +20,19 @@
     },
     "struct_literal": {
         "structure": {
-            "literal": "B"
+            "identifier": "B"
         },
         "fields_values": []
     },
     "struct_literal": {
         "structure": {
-            "literal": "C"
+            "identifier": "C"
         },
         "fields_values": [
             {
                 "name": "x",
                 "value": {
-                    "literal": "x"
+                    "identifier": "x"
                 }
             },
             {
@@ -44,12 +44,12 @@
                 "value": {
                     "binop": {
                         "lhs": {
-                            "literal": "12"
+                            "int": "12"
                         },
                         "rhs": {
                             "fn_call": {
                                 "callee": {
-                                    "literal": "add"
+                                    "identifier": "add"
                                 },
                                 "args": []
                             }
@@ -64,7 +64,7 @@
         "structure": {
             "field": {
                 "structure": {
-                    "literal": "math"
+                    "identifier": "math"
                 },
                 "field_name": "Vec2"
             }
@@ -73,7 +73,7 @@
             {
                 "name": "x",
                 "value": {
-                    "literal": "1"
+                    "int": "1"
                 }
             },
             {

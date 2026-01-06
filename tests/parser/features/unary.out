@@ -2,7 +2,7 @@
     "unary": {
         "op": "-",
         "expr": {
-            "literal": "1"
+            "int": "1"
         }
     },
     "unary": {
@@ -11,7 +11,7 @@
             "unary": {
                 "op": "-",
                 "expr": {
-                    "literal": "1"
+                    "int": "1"
                 }
             }
         }
@@ -21,19 +21,19 @@
             "unary": {
                 "op": "-",
                 "expr": {
-                    "literal": "5"
+                    "int": "5"
                 }
             }
         },
         "rhs": {
-            "literal": "3"
+            "int": "3"
         },
         "op": "*"
     },
     "unary": {
         "op": "not",
         "expr": {
-            "literal": "true"
+            "bool": "true"
         }
     },
     "unary": {
@@ -42,7 +42,7 @@
             "block": [
                 "fn_call": {
                     "callee": {
-                        "literal": "add"
+                        "identifier": "add"
                     },
                     "args": []
                 }
@@ -55,14 +55,14 @@
             "if": {
                 "pattern: value": {
                     "expr": {
-                        "literal": "true"
+                        "bool": "true"
                     }
                 },
                 "then": {
-                    "literal": "yes"
+                    "string": "yes"
                 },
                 "else": {
-                    "literal": "no"
+                    "string": "no"
                 }
             }
         }
@@ -75,7 +75,7 @@
                 "expr": {
                     "fn_call": {
                         "callee": {
-                            "literal": "add"
+                            "identifier": "add"
                         },
                         "args": []
                     }

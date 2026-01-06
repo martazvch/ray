@@ -51,7 +51,7 @@ pub fn Set(comptime T: type) type {
             return self.set.orderedRemove(item);
         }
 
-        pub fn values(self: *const Self) []T {
+        pub fn keys(self: *const Self) []T {
             return self.set.keys();
         }
 
@@ -66,7 +66,7 @@ pub fn Set(comptime T: type) type {
         }
 
         pub fn sort(self: *Self, comptime lessThan: fn (void, T, T) bool) void {
-            std.sort.heap(T, self.values(), {}, lessThan);
+            std.sort.heap(T, self.keys(), {}, lessThan);
         }
 
         pub fn getIndex(self: *const Self, key: T) ?usize {
@@ -88,7 +88,7 @@ test Set {
     try set.add(allocator, 1);
     try set.add(allocator, 6);
 
-    try expect(std.mem.eql(i64, set.values(), &[_]i64{ 4, 6, 1 }));
+    try expect(std.mem.eql(i64, set.keys(), &[_]i64{ 4, 6, 1 }));
 }
 
 test "from slice" {
@@ -98,7 +98,7 @@ test "from slice" {
     var set: Set(i64) = try .fromSlice(allocator, &.{ 4, 6, 4, 1, 6 });
     defer set.deinit(allocator);
 
-    try expect(std.mem.eql(i64, set.values(), &[_]i64{ 4, 6, 1 }));
+    try expect(std.mem.eql(i64, set.keys(), &[_]i64{ 4, 6, 1 }));
 }
 
 test "add slice" {
@@ -110,7 +110,7 @@ test "add slice" {
 
     try set.addSlice(allocator, &.{ 4, 6, 4, 1, 6 });
 
-    try expect(std.mem.eql(i64, set.values(), &[_]i64{ 4, 6, 1 }));
+    try expect(std.mem.eql(i64, set.keys(), &[_]i64{ 4, 6, 1 }));
 }
 
 test "sort" {
@@ -127,7 +127,7 @@ test "sort" {
     }.lessThan;
 
     set.sort(sortFn);
-    try expect(std.mem.eql(i64, set.values(), &[_]i64{ 1, 4, 6 }));
+    try expect(std.mem.eql(i64, set.keys(), &[_]i64{ 1, 4, 6 }));
 }
 
 test "remove" {
@@ -137,9 +137,9 @@ test "remove" {
     var set: Set(i64) = try .fromSlice(allocator, &.{ 4, 6, 4, 1, 6 });
     defer set.deinit(allocator);
 
-    try expect(std.mem.eql(i64, set.values(), &[_]i64{ 4, 6, 1 }));
+    try expect(std.mem.eql(i64, set.keys(), &[_]i64{ 4, 6, 1 }));
     try expect(set.remove(6));
-    try expect(std.mem.eql(i64, set.values(), &[_]i64{ 4, 1 }));
+    try expect(std.mem.eql(i64, set.keys(), &[_]i64{ 4, 1 }));
 
     const sortFn = struct {
         fn lessThan(_: void, a: i64, b: i64) bool {
@@ -148,7 +148,7 @@ test "remove" {
     }.lessThan;
 
     set.sort(sortFn);
-    try expect(std.mem.eql(i64, set.values(), &[_]i64{ 1, 4 }));
+    try expect(std.mem.eql(i64, set.keys(), &[_]i64{ 1, 4 }));
     try expect(set.remove(4));
-    try expect(std.mem.eql(i64, set.values(), &[_]i64{1}));
+    try expect(std.mem.eql(i64, set.keys(), &[_]i64{1}));
 }

@@ -2,13 +2,13 @@
     "if": {
         "pattern: value": {
             "expr": {
-                "literal": "true"
+                "bool": "true"
             }
         },
         "then": {
             "block": [
                 "print": {
-                    "literal": "ok"
+                    "string": "ok"
                 }
             ]
         },
@@ -16,13 +16,13 @@
     "if": {
         "pattern: value": {
             "expr": {
-                "literal": "true"
+                "bool": "true"
             }
         },
         "then": {
             "block": [
                 "print": {
-                    "literal": "ok"
+                    "string": "ok"
                 }
             ]
         },
@@ -30,39 +30,39 @@
     "if": {
         "pattern: value": {
             "expr": {
-                "literal": "true"
+                "bool": "true"
             }
         },
         "then": {
             "block": [
                 "print": {
-                    "literal": "ok"
+                    "string": "ok"
                 }
             ]
         },
         "else": {
             "print": {
-                "literal": "ko"
+                "string": "ko"
             }
         },
     },
     "if": {
         "pattern: value": {
             "expr": {
-                "literal": "true"
+                "bool": "true"
             }
         },
         "then": {
             "block": [
                 "print": {
-                    "literal": "ok"
+                    "string": "ok"
                 }
             ]
         },
         "else": {
             "block": [
                 "print": {
-                    "literal": "ko"
+                    "string": "ko"
                 }
             ]
         },
@@ -72,16 +72,16 @@
             "expr": {
                 "block": [
                     "print": {
-                        "literal": "in cond"
+                        "string": "in cond"
                     },
-                    "literal": "false"
+                    "bool": "false"
                 ]
             }
         },
         "then": {
             "block": [
                 "print": {
-                    "literal": "ok"
+                    "string": "ok"
                 }
             ]
         },
@@ -89,47 +89,47 @@
     "if": {
         "pattern: value": {
             "expr": {
-                "literal": "true"
+                "bool": "true"
             }
         },
         "then": {
             "print": {
-                "literal": "ok"
+                "string": "ok"
             }
         },
     },
     "if": {
         "pattern: value": {
             "expr": {
-                "literal": "true"
+                "bool": "true"
             }
         },
         "then": {
             "print": {
-                "literal": "ok"
+                "string": "ok"
             }
         },
         "else": {
             "print": {
-                "literal": "ko"
+                "string": "ko"
             }
         },
     },
     "if": {
         "pattern: value": {
             "expr": {
-                "literal": "true"
+                "bool": "true"
             }
         },
         "then": {
             "print": {
-                "literal": "ok"
+                "string": "ok"
             }
         },
         "else": {
             "block": [
                 "print": {
-                    "literal": "ko"
+                    "string": "ko"
                 }
             ]
         },
@@ -137,29 +137,29 @@
     "if": {
         "pattern: value": {
             "expr": {
-                "literal": "true"
+                "bool": "true"
             }
         },
         "then": {
             "print": {
-                "literal": "ok"
+                "string": "ok"
             }
         },
         "else": {
             "if": {
                 "pattern: value": {
                     "expr": {
-                        "literal": "true"
+                        "bool": "true"
                     }
                 },
                 "then": {
                     "print": {
-                        "literal": "elseif"
+                        "string": "elseif"
                     }
                 },
                 "else": {
                     "print": {
-                        "literal": "ko"
+                        "string": "ko"
                     }
                 }
             }
@@ -172,14 +172,14 @@
             "if": {
                 "pattern: value": {
                     "expr": {
-                        "literal": "true"
+                        "bool": "true"
                     }
                 },
                 "then": {
-                    "literal": "5"
+                    "int": "5"
                 },
                 "else": {
-                    "literal": "10"
+                    "int": "10"
                 }
             }
         },

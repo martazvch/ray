@@ -1,15 +1,15 @@
 {
     "assignment": {
         "assigne": {
-            "literal": "a"
+            "identifier": "a"
         },
         "value": {
             "binop": {
                 "lhs": {
-                    "literal": "a"
+                    "identifier": "a"
                 },
                 "rhs": {
-                    "literal": "4"
+                    "int": "4"
                 },
                 "op": "+"
             }
@@ -17,15 +17,15 @@
     },
     "assignment": {
         "assigne": {
-            "literal": "a"
+            "identifier": "a"
         },
         "value": {
             "binop": {
                 "lhs": {
-                    "literal": "a"
+                    "identifier": "a"
                 },
                 "rhs": {
-                    "literal": "7"
+                    "int": "7"
                 },
                 "op": "-"
             }
@@ -33,15 +33,15 @@
     },
     "assignment": {
         "assigne": {
-            "literal": "a"
+            "identifier": "a"
         },
         "value": {
             "binop": {
                 "lhs": {
-                    "literal": "a"
+                    "identifier": "a"
                 },
                 "rhs": {
-                    "literal": "5"
+                    "int": "5"
                 },
                 "op": "*"
             }
@@ -49,15 +49,15 @@
     },
     "assignment": {
         "assigne": {
-            "literal": "a"
+            "identifier": "a"
         },
         "value": {
             "binop": {
                 "lhs": {
-                    "literal": "a"
+                    "identifier": "a"
                 },
                 "rhs": {
-                    "literal": "4"
+                    "int": "4"
                 },
                 "op": "/"
             }

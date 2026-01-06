@@ -1,13 +1,13 @@
 {
     "break": {},
     "break": {
-        "literal": "2"
+        "int": "2"
     },
     "break": {
         "label": "b"
     },
     "break": {
         "label": "b",
-        "literal": "2"
+        "int": "2"
     }
 }

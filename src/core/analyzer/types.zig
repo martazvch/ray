@@ -309,7 +309,7 @@ pub const Type = union(enum) {
                     }
                 }.lessThan);
 
-                for (set.values()) |ty| ty.hash(allocator, hasher);
+                for (set.keys()) |ty| ty.hash(allocator, hasher);
             },
         }
     }

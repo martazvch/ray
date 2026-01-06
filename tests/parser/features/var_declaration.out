@@ -11,10 +11,10 @@
         "value": {
             "binop": {
                 "lhs": {
-                    "literal": "12"
+                    "int": "12"
                 },
                 "rhs": {
-                    "literal": "4."
+                    "float": "4."
                 },
                 "op": "+"
             }
@@ -27,10 +27,10 @@
         "value": {
             "binop": {
                 "lhs": {
-                    "literal": "12"
+                    "int": "12"
                 },
                 "rhs": {
-                    "literal": "4."
+                    "float": "4."
                 },
                 "op": "+"
             }

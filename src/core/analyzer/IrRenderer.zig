@@ -404,19 +404,19 @@ fn match(self: *Self, data: *const Instruction.Match) void {
     self.indent_level += 1;
     defer self.indent_level -= 1;
     for (data.arms) |arm| {
-        switch (arm.expr) {
-            .instr => |i| {
-                self.indentAndAppendSlice("- expr:");
-                self.indent_level += 1;
-                self.parseInstr(i);
-                self.indent_level -= 1;
-            },
-            .wildcard => self.indentAndAppendSlice("- wildcard"),
-        }
+        self.indentAndAppendSlice("- expr:");
+        self.indent_level += 1;
+        self.parseInstr(arm.expr);
+        self.indent_level -= 1;
         self.indentAndAppendSlice("- body:");
         self.indent_level += 1;
         self.parseInstr(arm.body);
         self.indent_level -= 1;
+    }
+    if (data.wildcard) |wc| {
+        self.indentAndAppendSlice("- wildcard:");
+        self.indent_level += 1;
+        self.parseInstr(wc);
     }
 }
 

@@ -1,64 +1,64 @@
 {
     "fn_call": {
         "callee": {
-            "literal": "f"
+            "identifier": "f"
         },
         "args": [
-            "literal": "arg1"
+            "identifier": "arg1"
         ]
     },
     "fn_call": {
         "callee": {
-            "literal": "f"
+            "identifier": "f"
         },
         "args": [
-            "literal": "arg1",
-            "literal": "arg2",
-            "literal": "arg3"
+            "identifier": "arg1",
+            "identifier": "arg2",
+            "identifier": "arg3"
         ]
     },
     "fn_call": {
         "callee": {
-            "literal": "f"
+            "identifier": "f"
         },
         "args": [
-            "literal": "arg1"
+            "identifier": "arg1"
         ]
     },
     "fn_call": {
         "callee": {
-            "literal": "f"
+            "identifier": "f"
         },
         "args": [
-            "literal": "arg1",
-            "literal": "arg2",
-            "literal": "arg3"
+            "identifier": "arg1",
+            "identifier": "arg2",
+            "identifier": "arg3"
         ]
     },
     "fn_call": {
         "callee": {
-            "literal": "f"
+            "identifier": "f"
         },
         "args": [
-            "literal": "arg1"
+            "identifier": "arg1"
         ]
     },
     "fn_call": {
         "callee": {
-            "literal": "f"
+            "identifier": "f"
         },
         "args": [
-            "literal": "arg1"
+            "identifier": "arg1"
         ]
     },
     "fn_call": {
         "callee": {
-            "literal": "f"
+            "identifier": "f"
         },
         "args": [
-            "literal": "arg1",
-            "literal": "arg2",
-            "literal": "arg3"
+            "identifier": "arg1",
+            "identifier": "arg2",
+            "identifier": "arg3"
         ]
     }
 }

@@ -18,18 +18,18 @@
             "array": [
                 "binop": {
                     "lhs": {
-                        "literal": "1"
+                        "int": "1"
                     },
                     "rhs": {
-                        "literal": "4"
+                        "int": "4"
                     },
                     "op": "+"
                 },
-                "literal": "2",
-                "literal": "3",
+                "int": "2",
+                "int": "3",
                 "fn_call": {
                     "callee": {
-                        "literal": "get"
+                        "identifier": "get"
                     },
                     "args": []
                 }
@@ -42,9 +42,9 @@
         "type": "[]bool",
         "value": {
             "array": [
-                "literal": "true",
-                "literal": "false",
-                "literal": "true"
+                "bool": "true",
+                "bool": "false",
+                "bool": "true"
             ]
         },
         "const": "false"

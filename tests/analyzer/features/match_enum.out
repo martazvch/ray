@@ -117,6 +117,5 @@
             [Constant 11]
         - body:
             [Block pop count: 0, is_expr: false]
-        - wildcard
-        - body:
+        - wildcard:
             [Block pop count: 0, is_expr: false]

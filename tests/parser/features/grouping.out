@@ -1,19 +1,19 @@
 {
     "grouping": {
-        "literal": "5"
+        "int": "5"
     },
     "binop": {
         "lhs": {
-            "literal": "5"
+            "int": "5"
         },
         "rhs": {
             "grouping": {
                 "binop": {
                     "lhs": {
-                        "literal": "1"
+                        "int": "1"
                     },
                     "rhs": {
-                        "literal": "2"
+                        "int": "2"
                     },
                     "op": "+"
                 }
@@ -23,7 +23,7 @@
     },
     "binop": {
         "lhs": {
-            "literal": "1"
+            "int": "1"
         },
         "rhs": {
             "grouping": {
@@ -31,7 +31,7 @@
                     "lhs": {
                         "binop": {
                             "lhs": {
-                                "literal": "5"
+                                "int": "5"
                             },
                             "rhs": {
                                 "grouping": {
@@ -40,17 +40,17 @@
                                             "grouping": {
                                                 "binop": {
                                                     "lhs": {
-                                                        "literal": "6"
+                                                        "int": "6"
                                                     },
                                                     "rhs": {
-                                                        "literal": "2"
+                                                        "int": "2"
                                                     },
                                                     "op": "-"
                                                 }
                                             }
                                         },
                                         "rhs": {
-                                            "literal": "8"
+                                            "int": "8"
                                         },
                                         "op": "+"
                                     }
@@ -60,7 +60,7 @@
                         }
                     },
                     "rhs": {
-                        "literal": "2"
+                        "int": "2"
                     },
                     "op": "/"
                 }

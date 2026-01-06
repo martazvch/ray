@@ -3,23 +3,23 @@
         "if": {
             "pattern: value": {
                 "expr": {
-                    "literal": "true"
+                    "bool": "true"
                 }
             },
             "then": {
-                "literal": "5"
+                "int": "5"
             },
             "else": {
-                "literal": "10"
+                "int": "10"
             }
         }
     },
     "discard": {
-        "literal": "56"
+        "int": "56"
     },
     "discard": {
         "block": [
-            "literal": "5"
+            "int": "5"
         ]
     }
 }

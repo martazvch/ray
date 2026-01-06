@@ -1,7 +1,7 @@
 {
     "field": {
         "structure": {
-            "literal": "person"
+            "identifier": "person"
         },
         "field_name": "name"
     },
@@ -9,7 +9,7 @@
         "structure": {
             "field": {
                 "structure": {
-                    "literal": "person"
+                    "identifier": "person"
                 },
                 "field_name": "pet"
             }
@@ -17,4 +17,3 @@
         "field_name": "name"
     }
 }
-

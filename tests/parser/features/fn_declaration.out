@@ -91,7 +91,7 @@
                 "name": "tmp",
                 "type": {},
                 "value": {
-                    "literal": "5"
+                    "int": "5"
                 },
                 "const": "false"
             }
@@ -163,28 +163,28 @@
                 "name": "a",
                 "type": "void",
                 "value": {
-                    "literal": "1"
+                    "int": "1"
                 }
             },
             {
                 "name": "b",
                 "type": "void",
                 "value": {
-                    "literal": "true"
+                    "bool": "true"
                 }
             },
             {
                 "name": "c",
                 "type": "void",
                 "value": {
-                    "literal": "true"
+                    "bool": "true"
                 }
             },
             {
                 "name": "e",
                 "type": "void",
                 "value": {
-                    "literal": "Tom"
+                    "string": "Tom"
                 }
             }
         ],
@@ -208,35 +208,35 @@
                 "name": "a",
                 "type": "int",
                 "value": {
-                    "literal": "4"
+                    "int": "4"
                 }
             },
             {
                 "name": "b",
                 "type": "int",
                 "value": {
-                    "literal": "4"
+                    "int": "4"
                 }
             },
             {
                 "name": "c",
                 "type": "void",
                 "value": {
-                    "literal": "6."
+                    "float": "6."
                 }
             },
             {
                 "name": "f",
                 "type": "float",
                 "value": {
-                    "literal": "99"
+                    "int": "99"
                 }
             },
             {
                 "name": "g",
                 "type": "float",
                 "value": {
-                    "literal": "99"
+                    "int": "99"
                 }
             }
         ],

@@ -15,7 +15,7 @@
                     "return": {
                         "field": {
                             "structure": {
-                                "literal": "Self"
+                                "identifier": "Self"
                             },
                             "field_name": "cross"
                         }

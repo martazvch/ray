@@ -3,7 +3,7 @@
         "lhs": {
             "fn_call": {
                 "callee": {
-                    "literal": "func"
+                    "identifier": "func"
                 },
                 "args": []
             }
@@ -14,7 +14,7 @@
                 "body": {
                     "block": [
                         "print": {
-                            "literal": "err"
+                            "identifier": "err"
                         }
                     ]
                 }
@@ -25,7 +25,7 @@
         "lhs": {
             "fn_call": {
                 "callee": {
-                    "literal": "func"
+                    "identifier": "func"
                 },
                 "args": []
             }
@@ -43,7 +43,7 @@
         "lhs": {
             "fn_call": {
                 "callee": {
-                    "literal": "func"
+                    "identifier": "func"
                 },
                 "args": []
             }
@@ -51,7 +51,7 @@
         "rhs": {
             "match": {
                 "expression": {
-                    "literal": "binding"
+                    "identifier": "binding"
                 },
                 "arms": [
                     {

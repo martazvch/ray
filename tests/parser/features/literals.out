@@ -1,13 +1,13 @@
 {
-    "literal": "1",
-    "literal": "687945",
-    "literal": "1.5",
-    "literal": "7.",
-    "literal": ".85",
-    "literal": "0.33",
-    "literal": "true",
-    "literal": "false",
-    "literal": "null",
-    "literal": "no way",
-    "literal": "zig"
+    "int": "1",
+    "int": "687945",
+    "float": "1.5",
+    "float": "7.",
+    "float": ".85",
+    "float": "0.33",
+    "bool": "true",
+    "bool": "false",
+    "null": "{}",
+    "string": "no way",
+    "identifier": "zig"
 }

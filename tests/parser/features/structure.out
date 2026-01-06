@@ -20,7 +20,7 @@
                 "return_type": "void",
                 "body": [
                     "print": {
-                        "literal": "a"
+                        "identifier": "a"
                     }
                 ]
             },
@@ -65,14 +65,14 @@
                 "name": "number",
                 "type": {},
                 "value": {
-                    "literal": "1234"
+                    "int": "1234"
                 }
             },
             {
                 "name": "money",
                 "type": "int",
                 "value": {
-                    "literal": "120"
+                    "int": "120"
                 }
             }
         ],
@@ -95,14 +95,14 @@
                 "name": "number",
                 "type": {},
                 "value": {
-                    "literal": "1234"
+                    "int": "1234"
                 }
             },
             {
                 "name": "money",
                 "type": "int",
                 "value": {
-                    "literal": "120"
+                    "int": "120"
                 }
             }
         ],
@@ -124,7 +124,7 @@
                 "return_type": "void",
                 "body": [
                     "print": {
-                        "literal": "a"
+                        "identifier": "a"
                     }
                 ]
             },

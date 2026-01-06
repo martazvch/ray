@@ -210,7 +210,6 @@ fn captureFromExpr(self: *Self, expr: *Ast.Expr, ctx: *CaptureCtx) void {
             }
         },
         .@"break" => |e| if (e.expr) |val| self.captureFromExpr(val, ctx),
-        .enum_lit => {},
         .fail => |e| self.captureFromExpr(e.expr, ctx),
         .fn_call => |*e| {
             self.captureFromExpr(e.callee, ctx);
@@ -230,30 +229,25 @@ fn captureFromExpr(self: *Self, expr: *Ast.Expr, ctx: *CaptureCtx) void {
             self.captureFromExpr(e.expr, ctx);
             self.captureFromExpr(e.index, ctx);
         },
-        .literal => |e| {
-            if (e.tag != .identifier) return;
-
-            const interned = self.interner.intern(self.ast.toSource(e.idx));
+        .identifier => |ident| {
+            const interned = self.interner.intern(self.ast.toSource(ident));
             ctx.resolveCapture(self.allocator, interned);
         },
         .match => |*e| {
             self.captureFromExpr(e.expr, ctx);
             switch (e.body) {
-                .value => |arms| {
-                    for (arms) |*arm| {
-                        switch (arm.expr) {
-                            .expr => |pat_expr| self.captureFromExpr(pat_expr, ctx),
-                            .wildcard => {},
-                        }
+                .value => |m| {
+                    for (m.arms) |*arm| {
+                        self.captureFromExpr(arm.expr, ctx);
                         self.captureFromNode(&arm.body, ctx);
                     }
                 },
-                .type => |arms| {
-                    for (arms) |*arm| {
+                .type => |m| {
+                    for (m.arms) |*arm| {
                         switch (arm.body) {
                             .value => |*n| self.captureFromNode(n, ctx),
-                            .patmat => |sub_arms| {
-                                for (sub_arms) |*sub_arm| {
+                            .patmat => |sub_m| {
+                                for (sub_m.arms) |*sub_arm| {
                                     self.captureFromNode(&sub_arm.body, ctx);
                                 }
                             },
@@ -287,6 +281,7 @@ fn captureFromExpr(self: *Self, expr: *Ast.Expr, ctx: *CaptureCtx) void {
             }
         },
         .unary => |e| self.captureFromExpr(e.expr, ctx),
+        .bool, .enum_lit, .float, .int, .null, .self, .string => {},
     }
 }
 

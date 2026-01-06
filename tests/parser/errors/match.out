@@ -12,4 +12,8 @@ expect_expr, }
 expect_arrow_colon_before_arm_body
 expect_expr, }
 
+match_wildcard_not_last
+
+match_duplicate_wildcard
+
 expect_brace_after_match_type

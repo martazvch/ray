@@ -1202,9 +1202,9 @@ fn leftParenExprStart(self: *Self) Error!*Expr {
     return expr;
 }
 
-fn literal(self: *Self, tag: Ast.Literal.Tag) Error!*Expr {
+fn literal(self: *Self, comptime tag: @typeInfo(Ast.Expr).@"union".tag_type.?) Error!*Expr {
     const expr = self.allocator.create(Expr) catch oom();
-    expr.* = .{ .literal = .{ .tag = tag, .idx = self.token_idx - 1 } };
+    expr.* = @unionInit(Ast.Expr, @tagName(tag), self.token_idx - 1);
 
     return expr;
 }
@@ -1240,26 +1240,13 @@ fn matchExpr(self: *Self) Error!*Expr {
 }
 
 fn matchValue(self: *Self) Error!Ast.Match.Kind {
-    return .{ .value = try self.matchValueArms() };
-}
+    const arms, const wildcard = try self.matchArm(Ast.Match.ValueArm, matchValueArm);
 
-fn matchValueArms(self: *Self) Error![]Ast.Match.ValueArm {
-    var arms: ArrayList(Ast.Match.ValueArm) = .empty;
-
-    while (!self.check(.eof) and !self.check(.right_brace)) {
-        arms.append(self.allocator, try self.matchValueArm()) catch oom();
-        try self.expect(.new_line, .expect_new_line_pm_arm);
-        self.skipNewLines();
-    }
-
-    return arms.toOwnedSlice(self.allocator) catch oom();
+    return .{ .value = .{ .arms = arms, .wildcard = wildcard } };
 }
 
 fn matchValueArm(self: *Self) Error!Ast.Match.ValueArm {
-    const expr: Ast.Match.ValueArm.ArmKind = if (self.match(.underscore))
-        .{ .wildcard = self.token_idx - 1 }
-    else
-        .{ .expr = try self.parsePrecedenceExpr(0) };
+    const expr = try self.parsePrecedenceExpr(0);
     const alias = try self.getAlias(.at);
     try self.expect(.arrow_big, .expect_arrow_before_arm_body);
 
@@ -1270,23 +1257,52 @@ fn matchValueArm(self: *Self) Error!Ast.Match.ValueArm {
     };
 }
 
-fn matchType(self: *Self) Error!Ast.Match.Kind {
-    var arms: ArrayList(Ast.Match.TypeArm) = .empty;
+fn matchWildcard(self: *Self) Error!Ast.Match.Wildcard {
+    const token = self.token_idx - 1;
+    const alias = try self.getAlias(.at);
+    try self.expect(.arrow_big, .expect_arrow_before_arm_body);
+
+    return .{
+        .token = token,
+        .alias = alias,
+        .body = try self.statement(),
+    };
+}
+
+fn matchArm(self: *Self, Arm: type, parseArmFn: *const fn (*Self) Error!Arm) Error!struct { []Arm, ?Ast.Match.Wildcard } {
+    var arms: ArrayList(Arm) = .empty;
+    var wildcard: ?Ast.Match.Wildcard = null;
 
     while (!self.check(.eof) and !self.check(.right_brace)) {
-        arms.append(self.allocator, try self.matchTypeArm()) catch oom();
+        arm: {
+            if (self.match(.underscore)) {
+                if (wildcard != null) {
+                    return self.errAtCurrent(.match_duplicate_wildcard);
+                }
+
+                wildcard = try self.matchWildcard();
+                break :arm;
+            } else if (wildcard != null) {
+                return self.errAtCurrent(.match_wildcard_not_last);
+            }
+
+            arms.append(self.allocator, try parseArmFn(self)) catch oom();
+        }
+
         try self.expect(.new_line, .expect_new_line_pm_arm);
         self.skipNewLines();
     }
 
-    return .{ .type = arms.toOwnedSlice(self.allocator) catch oom() };
+    return .{ arms.toOwnedSlice(self.allocator) catch oom(), wildcard };
+}
+
+fn matchType(self: *Self) Error!Ast.Match.Kind {
+    const arms, const wildcard = try self.matchArm(Ast.Match.TypeArm, matchTypeArm);
+    return .{ .type = .{ .arms = arms, .wildcard = wildcard } };
 }
 
 fn matchTypeArm(self: *Self) Error!Ast.Match.TypeArm {
-    const ty: Ast.Match.TypeArm.ArmKind = if (self.match(.underscore))
-        .{ .wildcard = self.token_idx - 1 }
-    else
-        .{ .expr = try self.parseType() };
+    const ty = try self.parseType();
 
     const body: Ast.Match.TypeArm.BodyKind = if (self.match(.arrow_big))
         .{ .value = try self.statement() }
@@ -1303,10 +1319,10 @@ fn matchTypeSubMatch(self: *Self) Error!Ast.Match.TypeArm.BodyKind {
     try self.expectOrErrAtPrev(.left_brace, .expect_brace_before_match_type_arm);
     self.skipNewLines();
 
-    const arms = try self.matchValueArms();
+    const arms = try self.matchValue();
     try self.expect(.right_brace, .expect_brace_after_match_type);
 
-    return .{ .patmat = arms };
+    return .{ .patmat = arms.value };
 }
 
 fn returnExpr(self: *Self) Error!*Expr {
@@ -1459,7 +1475,7 @@ fn structLiteral(self: *Self, expr: *Expr) Error!*Expr {
     var fields_values: ArrayList(Ast.FieldAndValue) = .empty;
 
     check: {
-        if (expr.* == .literal and expr.literal.tag == .identifier) break :check;
+        if (expr.* == .identifier) break :check;
         if (expr.* == .field) break :check;
 
         return self.errAtPrev(.invalid_struct_literal);

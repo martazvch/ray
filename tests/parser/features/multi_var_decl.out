@@ -21,21 +21,21 @@
             "name": "d",
             "type": {},
             "value": {
-                "literal": "1"
+                "int": "1"
             },
         },
         "var_decl": {
             "name": "e",
             "type": {},
             "value": {
-                "literal": "1"
+                "int": "1"
             },
         },
         "var_decl": {
             "name": "f",
             "type": {},
             "value": {
-                "literal": "1"
+                "int": "1"
             }
         },
     ],
@@ -44,21 +44,21 @@
             "name": "g",
             "type": {},
             "value": {
-                "literal": "5"
+                "int": "5"
             },
         },
         "var_decl": {
             "name": "h",
             "type": {},
             "value": {
-                "literal": "6"
+                "int": "6"
             },
         },
         "var_decl": {
             "name": "i",
             "type": {},
             "value": {
-                "literal": "7"
+                "int": "7"
             }
         },
     ],
@@ -81,16 +81,16 @@
             "value": {
                 "binop": {
                     "lhs": {
-                        "literal": "1"
+                        "int": "1"
                     },
                     "rhs": {
                         "grouping": {
                             "binop": {
                                 "lhs": {
-                                    "literal": "56"
+                                    "int": "56"
                                 },
                                 "rhs": {
-                                    "literal": "2"
+                                    "int": "2"
                                 },
                                 "op": "-"
                             }
@@ -106,7 +106,7 @@
             "value": {
                 "fn_call": {
                     "callee": {
-                        "literal": "add"
+                        "identifier": "add"
                     },
                     "args": []
                 }

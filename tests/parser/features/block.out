@@ -1,6 +1,6 @@
 {
     "block": [
-        "literal": "5"
+        "int": "5"
     ],
     "block": [
         "var_decl": {
@@ -19,15 +19,15 @@
         },
         "assignment": {
             "assigne": {
-                "literal": "a"
+                "identifier": "a"
             },
             "value": {
                 "binop": {
                     "lhs": {
-                        "literal": "1"
+                        "int": "1"
                     },
                     "rhs": {
-                        "literal": "56"
+                        "int": "56"
                     },
                     "op": "+"
                 }
@@ -37,8 +37,7 @@
     "block": [
         "label": "blk",
         "print": {
-            "literal": "yes"
+            "string": "yes"
         }
     ]
 }
-

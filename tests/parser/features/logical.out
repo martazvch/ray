@@ -1,10 +1,10 @@
 {
     "binop": {
         "lhs": {
-            "literal": "true"
+            "bool": "true"
         },
         "rhs": {
-            "literal": "false"
+            "bool": "false"
         },
         "op": "and"
     },
@@ -14,22 +14,22 @@
                 "lhs": {
                     "binop": {
                         "lhs": {
-                            "literal": "true"
+                            "bool": "true"
                         },
                         "rhs": {
-                            "literal": "true"
+                            "bool": "true"
                         },
                         "op": "and"
                     }
                 },
                 "rhs": {
-                    "literal": "false"
+                    "bool": "false"
                 },
                 "op": "or"
             }
         },
         "rhs": {
-            "literal": "true"
+            "bool": "true"
         },
         "op": "and"
     }

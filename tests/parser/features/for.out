@@ -3,11 +3,11 @@
         "name": "v",
         "index": "null",
         "value": {
-            "literal": "arr"
+            "identifier": "arr"
         },
         "body": [
             "print": {
-                "literal": "v"
+                "identifier": "v"
             }
         ]
     },
@@ -15,7 +15,7 @@
         "name": "v",
         "index": "i",
         "value": {
-            "literal": "arr"
+            "identifier": "arr"
         },
         "body": []
     }

@@ -18,6 +18,17 @@ match value is {
     int print "oui"
 }
 
+match value {
+    _ => 1
+    0 => "other"
+}
+
+match value {
+    0 => "other"
+    _ => 1
+    _ => 1
+}
+
 match value is {
     int: {
         0 => 0

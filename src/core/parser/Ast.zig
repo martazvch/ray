@@ -10,7 +10,6 @@ token_tags: []const Token.Tag,
 token_spans: []const Span,
 nodes: []Node,
 
-const Self = @This();
 pub const TokenIndex = usize;
 
 pub const Node = union(enum) {
@@ -138,20 +137,26 @@ pub const Expr = union(enum) {
     array: Array,
     block: Block,
     binop: Binop,
+    bool: Bool,
     @"break": Break,
     closure: FnDecl,
     enum_lit: TokenIndex,
     fail: Fail,
     field: Field,
+    float: Float,
     fn_call: FnCall,
     grouping: Grouping,
+    identifier: Identifier,
     @"if": If,
     indexing: Indexing,
-    literal: Literal,
+    int: Int,
+    null: Null,
     match: Match,
     pattern: Pattern,
     range: Range,
     @"return": Return,
+    self: Self,
+    string: String,
     struct_literal: StructLiteral,
     ternary: Ternary,
     trap: Trap,
@@ -220,12 +225,13 @@ pub const Indexing = struct {
     end: TokenIndex,
 };
 
-pub const Literal = struct {
-    tag: Tag,
-    idx: TokenIndex,
-
-    pub const Tag = enum { bool, float, identifier, int, null, self, string };
-};
+pub const Bool = TokenIndex;
+pub const Float = TokenIndex;
+pub const Identifier = TokenIndex;
+pub const Int = TokenIndex;
+pub const Null = TokenIndex;
+pub const Self = TokenIndex;
+pub const String = TokenIndex;
 
 pub const Range = struct {
     start: *Expr,
@@ -253,34 +259,40 @@ pub const Match = struct {
     body: Kind,
 
     pub const Kind = union(enum) {
-        value: []ValueArm,
-        type: []TypeArm,
+        value: ValueMatch,
+        type: TypeMatch,
+    };
+
+    pub const ValueMatch = struct {
+        arms: []ValueArm,
+        wildcard: ?Wildcard,
     };
 
     pub const ValueArm = struct {
-        expr: ArmKind,
+        expr: *Expr,
         alias: ?TokenIndex,
         body: Node,
+    };
 
-        pub const ArmKind = union(enum) {
-            expr: *Expr,
-            wildcard: TokenIndex,
-        };
+    pub const TypeMatch = struct {
+        arms: []TypeArm,
+        wildcard: ?Wildcard,
     };
 
     pub const TypeArm = struct {
-        type: ArmKind,
+        type: *Type,
         body: BodyKind,
-
-        pub const ArmKind = union(enum) {
-            expr: *Type,
-            wildcard: TokenIndex,
-        };
 
         pub const BodyKind = union(enum) {
             value: Node,
-            patmat: []ValueArm,
+            patmat: ValueMatch,
         };
+    };
+
+    pub const Wildcard = struct {
+        token: TokenIndex,
+        alias: ?TokenIndex,
+        body: Node,
     };
 };
 
@@ -327,7 +339,7 @@ pub const Unary = struct {
 };
 
 /// Can be used with any `*Node`, `*Expr` or a `token index`
-pub fn toSource(self: *const Self, node: anytype) []const u8 {
+pub fn toSource(self: *const @This(), node: anytype) []const u8 {
     const span = if (@TypeOf(node) == usize)
         self.token_spans[node]
     else
@@ -337,7 +349,7 @@ pub fn toSource(self: *const Self, node: anytype) []const u8 {
 }
 
 /// Should be either a token index or a Node
-pub fn getSpan(self: *const Self, anynode: anytype) Span {
+pub fn getSpan(self: *const @This(), anynode: anytype) Span {
     const NodeType, const node = switch (@typeInfo(@TypeOf(anynode))) {
         .pointer => |ptr| .{ ptr.child, anynode.* },
         else => .{ @TypeOf(anynode), anynode },
@@ -425,14 +437,14 @@ pub fn getSpan(self: *const Self, anynode: anytype) Span {
             .start = self.getSpan(node.expr).start,
             .end = self.token_spans[node.end].end,
         },
-        Literal => self.token_spans[node.idx],
         Match => .{
             .start = self.token_spans[node.kw].start,
             .end = self.getSpan(node.expr).end,
         },
-        Match.ValueArm.ArmKind => switch (node) {
-            .expr => |e| self.getSpan(e),
-            .wildcard => |e| self.token_spans[e],
+        Match.ValueArm => self.getSpan(node.expr),
+        Match.Wildcard => .{
+            .start = self.getSpan(node.token).start,
+            .end = self.getSpan(node.body).end,
         },
         Pattern => switch (node) {
             .value => |e| if (e.alias) |alias|

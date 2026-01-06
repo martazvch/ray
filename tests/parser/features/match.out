@@ -1,7 +1,7 @@
 {
     "match": {
         "expression": {
-            "literal": "value"
+            "identifier": "value"
         },
         "arms": [
             {
@@ -9,7 +9,7 @@
                     "enum_literal": "fileNotFound"
                 },
                 "body": {
-                    "literal": "oui"
+                    "string": "oui"
                 }
             },
             {
@@ -17,26 +17,25 @@
                     "enum_literal": "otherError"
                 },
                 "body": {
-                    "literal": "non"
+                    "string": "non"
                 }
             },
-            {
-                "expr": "wildcard",
+            "wildcard": {
                 "body": {
-                    "literal": "dont know bro"
+                    "string": "dont know bro"
                 }
             }
         ]
     },
     "match": {
         "expression": {
-            "literal": "value"
+            "identifier": "value"
         },
         "arms": [
             {
                 "type": "int",
                 "body": {
-                    "literal": "5"
+                    "int": "5"
                 }
             },
             {
@@ -47,7 +46,7 @@
                             "name": "a",
                             "type": {},
                             "value": {
-                                "literal": "1"
+                                "int": "1"
                             },
                             "const": "true"
                         },
@@ -55,34 +54,33 @@
                             "name": "b",
                             "type": {},
                             "value": {
-                                "literal": "2"
+                                "int": "2"
                             },
                             "const": "true"
                         },
                         "assignment": {
                             "assigne": {
                                 "break": {
-                                    "literal": "a"
+                                    "identifier": "a"
                                 }
                             },
                             "value": {
-                                "literal": "b"
+                                "identifier": "b"
                             }
                         }
                     ]
                 }
             },
-            {
-                "expr": "wildcard",
+            "wildcard": {
                 "body": {
-                    "literal": "10"
+                    "int": "10"
                 }
             }
         ]
     },
     "match": {
         "expression": {
-            "literal": "value"
+            "identifier": "value"
         },
         "arms": [
             {
@@ -90,24 +88,23 @@
                 "arms": [
                     {
                         "expr": {
-                            "literal": "0"
+                            "int": "0"
                         },
                         "body": {
-                            "literal": "1"
+                            "int": "1"
                         }
                     },
                     {
                         "expr": {
-                            "literal": "6"
+                            "int": "6"
                         },
                         "body": {
-                            "literal": "varName"
+                            "identifier": "varName"
                         }
                     },
-                    {
-                        "expr": "wildcard",
+                    "wildcard": {
                         "body": {
-                            "literal": "oui"
+                            "string": "oui"
                         }
                     }
                 ]
@@ -117,24 +114,22 @@
                 "arms": [
                     {
                         "expr": {
-                            "literal": "1.2"
+                            "float": "1.2"
                         },
                         "body": {
-                            "literal": "4"
+                            "int": "4"
                         }
                     },
-                    {
-                        "expr": "wildcard",
+                    "wildcard": {
                         "body": {
-                            "literal": "5.6"
+                            "float": "5.6"
                         }
                     }
                 ]
             },
-            {
-                "expr": "wildcard",
+            "wildcard": {
                 "body": {
-                    "literal": "youpi"
+                    "string": "youpi"
                 }
             }
         ]

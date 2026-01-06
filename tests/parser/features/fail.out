@@ -2,7 +2,7 @@
     "fail": {
         "field": {
             "structure": {
-                "literal": "File"
+                "identifier": "File"
             },
             "field_name": "notFound"
         }

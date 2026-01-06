@@ -307,6 +307,7 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
             }, false);
             try self.closeKey(.block, comma);
         },
+        .bool => |e| try self.pushKeyValue(@tagName(expr.*), self.ast.toSource(e), comma),
         .@"break" => |e| {
             if (e.label == null and e.expr == null) {
                 try self.emptyKey("break", .block, comma);
@@ -321,6 +322,7 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
         .closure => |*e| try self.renderFnDecl("", e, comma),
         .enum_lit => |e| try self.pushKeyValue("enum_literal", self.ast.toSource(e), comma),
         .fail => |e| try self.renderSingleExpr(@tagName(expr.*), e.expr, .block, comma),
+        .float => |e| try self.pushKeyValue(@tagName(expr.*), self.ast.toSource(e), comma),
         .field => |e| {
             try self.openKey(@tagName(expr.*), .block);
             try self.renderSingleExpr("structure", e.structure, .block, true);
@@ -353,6 +355,7 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
         .grouping => |e| {
             try self.renderSingleExpr(@tagName(expr.*), e.expr, .block, comma);
         },
+        .identifier => |e| try self.pushKeyValue(@tagName(expr.*), self.ast.toSource(e), comma),
         .@"if" => |e| {
             try self.openKey(@tagName(expr.*), .block);
             try self.pattern(e.pattern, true);
@@ -368,11 +371,13 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
             try self.renderSingleExpr("index", e.index, .block, false);
             try self.closeKey(.block, comma);
         },
-        .literal => |e| {
-            const text = self.ast.toSource(e.idx);
-            const final = if (e.tag == .string) text[1 .. text.len - 1] else text;
-            try self.pushKeyValue(@tagName(expr.*), final, comma);
+        .int => |e| try self.pushKeyValue(@tagName(expr.*), self.ast.toSource(e), comma),
+        .self => try self.pushKeyValue(@tagName(expr.*), "{}", comma),
+        .string => |e| {
+            const text = self.ast.toSource(e);
+            try self.pushKeyValue(@tagName(expr.*), text[1 .. text.len - 1], comma);
         },
+        .null => try self.pushKeyValue(@tagName(expr.*), "{}", comma),
         .match => |n| try self.match(n, comma),
         .pattern => |n| try self.pattern(n, comma),
         .range => |e| {
@@ -481,38 +486,55 @@ fn match(self: *Self, expr: Ast.Match, comma: bool) !void {
     try self.closeKey(.block, comma);
 }
 
-fn matchValue(self: *Self, arms: []Ast.Match.ValueArm) !void {
-    for (arms, 0..) |arm, i| {
-        try self.openAnonKey(.block);
-        switch (arm.expr) {
-            .expr => |e| try self.renderSingleExpr("expr", e, .block, true),
-            .wildcard => try self.pushKeyValue("expr", "wildcard", true),
-        }
-        if (arm.alias) |alias| {
-            try self.pushKeyValue("alias", self.ast.toSource(alias), true);
-        }
-        try self.renderSingleNode("body", &arm.body, .block, false);
-        try self.closeKey(.block, i < arms.len - 1);
+fn matchValue(self: *Self, expr: Ast.Match.ValueMatch) !void {
+    for (expr.arms, 0..) |arm, i| {
+        try self.matchValueArm(arm, expr.wildcard != null or i < expr.arms.len - 1);
+    }
+    if (expr.wildcard) |w| {
+        try self.matchWildcard(w, false);
     }
 }
 
-fn matchType(self: *Self, arms: []Ast.Match.TypeArm) !void {
-    for (arms, 0..) |arm, i| {
-        try self.openAnonKey(.block);
-        switch (arm.type) {
-            .expr => |t| try self.pushKeyValue("type", try self.renderType(t), true),
-            .wildcard => try self.pushKeyValue("expr", "wildcard", true),
-        }
-        switch (arm.body) {
-            .value => |*n| try self.renderSingleNode("body", n, .block, false),
-            .patmat => |sub_arms| {
-                try self.openKey("arms", .list);
-                try self.matchValue(sub_arms);
-                try self.closeKey(.list, false);
-            },
-        }
-        try self.closeKey(.block, i < arms.len - 1);
+fn matchValueArm(self: *Self, arm: Ast.Match.ValueArm, comma: bool) !void {
+    try self.openAnonKey(.block);
+    try self.renderSingleExpr("expr", arm.expr, .block, true);
+    if (arm.alias) |alias| {
+        try self.pushKeyValue("alias", self.ast.toSource(alias), true);
     }
+    try self.renderSingleNode("body", &arm.body, .block, false);
+    try self.closeKey(.block, comma);
+}
+
+fn matchWildcard(self: *Self, arm: Ast.Match.Wildcard, comma: bool) !void {
+    try self.openKey("wildcard", .block);
+    if (arm.alias) |alias| {
+        try self.pushKeyValue("alias", self.ast.toSource(alias), true);
+    }
+    try self.renderSingleNode("body", &arm.body, .block, false);
+    try self.closeKey(.block, comma);
+}
+
+fn matchType(self: *Self, expr: Ast.Match.TypeMatch) !void {
+    for (expr.arms, 0..) |arm, i| {
+        try self.matchTypeArm(arm, expr.wildcard != null or i < expr.arms.len - 1);
+    }
+    if (expr.wildcard) |w| {
+        try self.matchWildcard(w, false);
+    }
+}
+
+fn matchTypeArm(self: *Self, arm: Ast.Match.TypeArm, comma: bool) !void {
+    try self.openAnonKey(.block);
+    try self.pushKeyValue("type", try self.renderType(arm.type), true);
+    switch (arm.body) {
+        .value => |*n| try self.renderSingleNode("body", n, .block, false),
+        .patmat => |sub_arms| {
+            try self.openKey("arms", .list);
+            try self.matchValue(sub_arms);
+            try self.closeKey(.list, false);
+        },
+    }
+    try self.closeKey(.block, comma);
 }
 
 fn pattern(self: *Self, pat: Ast.Pattern, comma: bool) !void {

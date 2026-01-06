@@ -4,22 +4,22 @@
             "grouping": {
                 "binop": {
                     "lhs": {
-                        "literal": "true"
+                        "bool": "true"
                     },
                     "rhs": {
-                        "literal": "false"
+                        "bool": "false"
                     },
                     "op": "or"
                 }
             }
         },
         "then": {
-            "literal": "1"
+            "int": "1"
         },
         "else": {
             "fn_call": {
                 "callee": {
-                    "literal": "getValue"
+                    "identifier": "getValue"
                 },
                 "args": []
             }

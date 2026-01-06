@@ -187,10 +187,10 @@ pub const Instruction = struct {
     pub const Match = struct {
         expr: Index,
         arms: []const Arm,
+        wildcard: ?Index,
         is_expr: bool,
 
-        pub const Kind = union(enum) { instr: Index, wildcard: void };
-        pub const Arm = struct { expr: Kind, body: Index };
+        pub const Arm = struct { expr: Index, body: Index };
     };
     pub const MultiVarDecl = struct { decls: []const Index };
     pub const ObjFn = struct { obj: Index, fn_index: usize, kind: enum { array } };

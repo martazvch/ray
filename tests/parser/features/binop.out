@@ -1,10 +1,10 @@
 {
     "binop": {
         "lhs": {
-            "literal": "1"
+            "int": "1"
         },
         "rhs": {
-            "literal": "7"
+            "int": "7"
         },
         "op": "+"
     },
@@ -12,23 +12,23 @@
         "lhs": {
             "binop": {
                 "lhs": {
-                    "literal": "5"
+                    "int": "5"
                 },
                 "rhs": {
                     "binop": {
                         "lhs": {
                             "binop": {
                                 "lhs": {
-                                    "literal": "2"
+                                    "int": "2"
                                 },
                                 "rhs": {
-                                    "literal": "3"
+                                    "int": "3"
                                 },
                                 "op": "*"
                             }
                         },
                         "rhs": {
-                            "literal": "4"
+                            "int": "4"
                         },
                         "op": "/"
                     }
@@ -37,13 +37,13 @@
             }
         },
         "rhs": {
-            "literal": "6"
+            "int": "6"
         },
         "op": "-"
     },
     "binop": {
         "lhs": {
-            "literal": "1"
+            "int": "1"
         },
         "rhs": {
             "unary": {
@@ -55,7 +55,7 @@
                             "unary": {
                                 "op": "-",
                                 "expr": {
-                                    "literal": "5"
+                                    "int": "5"
                                 }
                             }
                         }
@@ -67,64 +67,64 @@
     },
     "binop": {
         "lhs": {
-            "literal": "1"
+            "int": "1"
         },
         "rhs": {
-            "literal": "5"
+            "int": "5"
         },
         "op": "<"
     },
     "binop": {
         "lhs": {
-            "literal": "5"
+            "int": "5"
         },
         "rhs": {
-            "literal": "6"
+            "int": "6"
         },
         "op": "<="
     },
     "binop": {
         "lhs": {
-            "literal": "6"
+            "int": "6"
         },
         "rhs": {
-            "literal": "9"
+            "int": "9"
         },
         "op": ">"
     },
     "binop": {
         "lhs": {
-            "literal": "8"
+            "int": "8"
         },
         "rhs": {
-            "literal": "10"
+            "int": "10"
         },
         "op": ">="
     },
     "binop": {
         "lhs": {
-            "literal": "1"
+            "int": "1"
         },
         "rhs": {
-            "literal": "2"
+            "int": "2"
         },
         "op": "=="
     },
     "binop": {
         "lhs": {
-            "literal": "1"
+            "int": "1"
         },
         "rhs": {
-            "literal": "2"
+            "int": "2"
         },
         "op": "!="
     },
     "binop": {
         "lhs": {
-            "literal": "4"
+            "int": "4"
         },
         "rhs": {
-            "literal": "6"
+            "int": "6"
         },
         "op": "%"
     }

@@ -1,7 +1,7 @@
 {
     "return": {},
     "return": {
-        "literal": "56"
+        "int": "56"
     }
 }
 

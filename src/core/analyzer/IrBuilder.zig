@@ -38,6 +38,10 @@ pub fn addInstr(self: *Self, instr_data: Instruction.Data, offset: usize) usize 
     return self.instructions.len - 1;
 }
 
+pub fn getInstr(self: *Self, index: ir.Index) Instruction.Data {
+    return self.instructions.items(.data)[index];
+}
+
 pub fn addRootInstr(self: *Self, index: ir.Index) void {
     self.roots.append(self.allocator, index) catch oom();
 }

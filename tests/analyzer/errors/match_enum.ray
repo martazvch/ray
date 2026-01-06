@@ -51,12 +51,5 @@ fn main() {
         .none => {}
         _ => {}
     }
-
-    match marker {
-        .circle => {}
-        _ => {}
-        .cross => {}
-        .none => {}
-    }
 }
 

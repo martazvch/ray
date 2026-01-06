@@ -1,22 +1,22 @@
 {
     "fn_call": {
         "callee": {
-            "literal": "add"
+            "identifier": "add"
         },
         "args": [
             "block": [
                 "binop": {
                     "lhs": {
-                        "literal": "1"
+                        "int": "1"
                     },
                     "rhs": {
                         "fn_call": {
                             "callee": {
-                                "literal": "add"
+                                "identifier": "add"
                             },
                             "args": [
-                                "literal": "2",
-                                "literal": "3"
+                                "int": "2",
+                                "int": "3"
                             ]
                         }
                     },
@@ -26,14 +26,14 @@
             "if": {
                 "pattern: value": {
                     "expr": {
-                        "literal": "true"
+                        "bool": "true"
                     }
                 },
                 "then": {
-                    "literal": "8"
+                    "int": "8"
                 },
                 "else": {
-                    "literal": "24"
+                    "int": "24"
                 }
             }
         ]
@@ -43,7 +43,7 @@
             "block": [
                 "fn_call": {
                     "callee": {
-                        "literal": "get_fn"
+                        "identifier": "get_fn"
                     },
                     "args": []
                 }
@@ -55,7 +55,7 @@
         "callee": {
             "fn_call": {
                 "callee": {
-                    "literal": "add"
+                    "identifier": "add"
                 },
                 "args": []
             }
