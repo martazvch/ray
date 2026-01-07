@@ -71,6 +71,7 @@ pub const OpCode = enum(u8) {
     index_range_arr,
     index_range_str,
     index_str,
+    in_range,
     is_bool,
     is_float,
     is_int,

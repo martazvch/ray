@@ -41,10 +41,12 @@ pub const AnalyzerMsg = union(enum) {
     invalid_logical: struct { found: []const u8 },
     invalid_unary: struct { found: []const u8 },
     iter_non_iterable: struct { found: []const u8 },
-    match_arm_type_mismatch: struct { expect: []const u8, found: []const u8 },
     match_duplicate_arm: struct { name: []const u8 },
     match_enum_invalid_pat,
+    match_partial_overlap,
     match_non_exhaustive: struct { missing: []const u8 },
+    match_num_no_wildcard,
+    match_unreachable_arm,
     match_wildcard_exhaustive,
     missing_symbol_in_module: struct { symbol: []const u8, module: []const u8 },
     missing_else_clause: struct { if_type: []const u8 },
@@ -134,10 +136,12 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_logical => writer.writeAll("logical operators must be used with booleans"),
             .invalid_unary => writer.writeAll("invalid unary operation"),
             .iter_non_iterable => |e| writer.print("can't iterate over type '{s}'", .{e.found}),
-            .match_arm_type_mismatch => |e| writer.print("match arm type mismatch, expect '{s}' but found '{s}'", .{ e.expect, e.found }),
             .match_duplicate_arm => |e| writer.print("arm '{s}' is used multiple times", .{e.name}),
             .match_enum_invalid_pat => writer.writeAll("invalid pattern for matching enums"),
             .match_non_exhaustive => |e| writer.print("non-exhaustive pattern matching, missing: '{s}'", .{e.missing}),
+            .match_num_no_wildcard => writer.writeAll("no wildcard pattern for numeric type"),
+            .match_partial_overlap => writer.writeAll("partial arm overlapping"),
+            .match_unreachable_arm => writer.writeAll("unreachable arm"),
             .match_wildcard_exhaustive => writer.writeAll("can't use wildcard with an exhaustive pattern match"),
             .missing_symbol_in_module => |e| writer.print("no symbol named '{s}' in module '{s}'", .{ e.symbol, e.module }),
             .missing_else_clause => writer.writeAll("'if' is missing an 'else' clause"),
@@ -215,10 +219,11 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_logical => |e| writer.print("this expression resolves to a '{s}'", .{e.found}),
             .invalid_unary, .non_bool_cond => writer.writeAll("expression is not a boolean type"),
             .iter_non_iterable => writer.writeAll("this doesn't have Iterator trait"),
-            .match_arm_type_mismatch => |e| writer.print("this is of type '{s}'", .{e.found}),
             .match_duplicate_arm => writer.writeAll("this case"),
             .match_enum_invalid_pat => writer.writeAll("here"),
             .match_non_exhaustive => writer.writeAll("this expression"),
+            .match_num_no_wildcard => writer.writeAll("non-exhaustive match"),
+            .match_partial_overlap, .match_unreachable_arm => writer.writeAll("this arm"),
             .match_wildcard_exhaustive => writer.writeAll("wildcard useless"),
             .missing_symbol_in_module => writer.writeAll("this symbol is unknown"),
             .missing_else_clause => |e| writer.print("'if' expression is of type '{s}'", .{e.if_type}),
@@ -321,7 +326,6 @@ pub const AnalyzerMsg = union(enum) {
                 \\it is only possible to iterate over builtin types array, string, range and maps and over types
                 \\that implement the Iterator trait
             ),
-            .match_arm_type_mismatch => writer.writeAll("refer to type's definition"),
             .match_duplicate_arm => writer.writeAll("delete the duplicated arm"),
             .match_enum_invalid_pat => writer.writeAll(
                 \\to match on an enum use either enum literals like or direct access on type:
@@ -333,6 +337,12 @@ pub const AnalyzerMsg = union(enum) {
             .match_non_exhaustive => writer.writeAll(
                 "all pattern matching must be exhaustive. You can use '_' as the last arm to catch all the remaining possibilities",
             ),
+            .match_num_no_wildcard => writer.writeAll("int, float and string types must have a wildcard pattern as is can't be exhaustive"),
+            .match_partial_overlap => writer.writeAll(
+                \\this arm's patterns are partially covererd by other arms.
+                \\In such case, order of declaration of arms matter as the first one will be executed
+            ),
+            .match_unreachable_arm => writer.writeAll("this arm's patterns are already fully covered by other arms"),
             .match_wildcard_exhaustive => writer.writeAll("can't use wildcard prong with an exhaustive pattern match"),
             .missing_symbol_in_module => writer.writeAll("refer to module's source code or documentation to ge the list of available symbols"),
             .missing_else_clause => writer.writeAll("add an 'else' block that evaluate to the expected type"),

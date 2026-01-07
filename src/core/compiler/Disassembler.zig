@@ -102,6 +102,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, offset: usize) usize {
         .index_arr_cow => self.simpleInstruction(writer, "index_arr_cow", offset),
         .index_range_str => self.simpleInstruction(writer, "index_range_str", offset),
         .index_str => self.simpleInstruction(writer, "index_str", offset),
+        .in_range => self.simpleInstruction(writer, "in_range", offset),
         .is_bool => self.simpleInstruction(writer, "is_bool", offset),
         .is_float => self.simpleInstruction(writer, "is_float", offset),
         .is_int => self.simpleInstruction(writer, "is_int", offset),

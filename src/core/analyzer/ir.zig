@@ -189,8 +189,10 @@ pub const Instruction = struct {
         arms: []const Arm,
         wildcard: ?Index,
         is_expr: bool,
+        kind: Kind,
 
         pub const Arm = struct { expr: Index, body: Index };
+        pub const Kind = enum { bool, float, int, @"enum", string };
     };
     pub const MultiVarDecl = struct { decls: []const Index };
     pub const ObjFn = struct { obj: Index, fn_index: usize, kind: enum { array } };

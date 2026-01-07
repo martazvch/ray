@@ -25,6 +25,7 @@ const Type = type_mod.Type;
 const TypeInterner = type_mod.TypeInterner;
 const TypeIds = type_mod.TypeIds;
 
+const Matcher = @import("Matcher.zig");
 const matchers = @import("matchers.zig");
 
 const misc = @import("misc");
@@ -166,7 +167,7 @@ pub fn err(self: *Self, kind: AnalyzerMsg, span: Span) Error {
     return error.Err;
 }
 
-fn warn(self: *Self, kind: AnalyzerMsg, span: Span) void {
+pub fn warn(self: *Self, kind: AnalyzerMsg, span: Span) void {
     self.warns.append(self.allocator, AnalyzerReport.warn(kind, span.start, span.end)) catch oom();
 }
 
@@ -1951,8 +1952,23 @@ pub fn string(self: *Self, expr: Ast.String) Result {
 fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Result {
     const value = try self.analyzeExpr(expr.expr, .value, ctx);
 
+    const kind: Instr.Match.Kind, var matcher = ana: switch (value.type.*) {
+        .@"enum" => |t| {
+            var matcher = matchers.Enum.init(t.proto(self.allocator));
+            break :ana .{ .@"enum", matcher.matcher() };
+        },
+        .int => {
+            var matcher = matchers.Int.init();
+            break :ana .{ .int, matcher.matcher() };
+        },
+        else => |t| {
+            std.log.debug("Found: {any}", .{t});
+            @panic("Match on that type is not implemented yet");
+        },
+    };
+
     const res = switch (expr.body) {
-        .value => |arms| try self.matchValueArms(value.type, arms, expr.kw, expect, ctx),
+        .value => |arms| try self.matchValueArms(&matcher, value.type, arms, expr.kw, expect, ctx),
         .type => @panic("TODO"),
     };
 
@@ -1964,6 +1980,7 @@ fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Resul
                 .arms = res.arms,
                 .wildcard = res.wildcard,
                 .is_expr = expect.expects(),
+                .kind = kind,
             } },
             self.ast.getSpan(expr).start,
         ),
@@ -1972,37 +1989,26 @@ fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Resul
 
 fn matchValueArms(
     self: *Self,
+    analyzer: *Matcher,
     ty: *const Type,
     expr: Ast.Match.ValueMatch,
     kw: Ast.TokenIndex,
     expect: ExprResKind,
     ctx: *Context,
-) Error!matchers.MatchArms {
+) Error!Matcher.MatchArms {
     var types: Set(*const Type) = .empty;
     const len = expr.arms.len + @intFromBool(expr.wildcard != null);
     var arms_instr = ArrayList(Instr.Match.Arm).initCapacity(self.allocator, len) catch oom();
-
-    var analyzer = ana: switch (ty.*) {
-        .@"enum" => |t| {
-            var ana = matchers.Enum.init(t.proto(self.allocator));
-            break :ana ana.analyzer();
-        },
-        else => |t| {
-            std.log.debug("Found: {any}", .{t});
-            @panic("Match on anything else than enum not implemented yet");
-        },
-    };
 
     const prev_decl_type = ctx.setAndGetPrevious(.decl_type, ty);
     defer ctx.decl_type = prev_decl_type;
 
     for (expr.arms) |*arm| {
-        const arm_span = self.ast.getSpan(arm.expr);
         const arm_res, const body_res = try analyzer.arm(self, arm, expect, ctx);
 
         if (arm_res.type != ty) return self.err(
-            .{ .match_arm_type_mismatch = .{ .expect = self.typeName(ty), .found = self.typeName(arm_res.type) } },
-            arm_span,
+            .{ .type_mismatch = .{ .expect = self.typeName(ty), .found = self.typeName(arm_res.type) } },
+            self.ast.getSpan(arm.expr),
         );
 
         types.add(self.allocator, body_res.type) catch oom();
@@ -2064,7 +2070,7 @@ fn nullablePattern(self: *Self, pat: Ast.Pattern.Nullable, ctx: *Context) Result
     };
 }
 
-fn range(self: *Self, expr: Ast.Range, ctx: *Context) Result {
+pub fn range(self: *Self, expr: Ast.Range, ctx: *Context) Result {
     const start = try self.analyzeExpr(expr.start, .value, ctx);
     const end = try self.analyzeExpr(expr.end, .value, ctx);
 
@@ -2714,7 +2720,7 @@ fn checkArrayOfUnion(self: *Self, decl: *const Type.Union, value: *const Type) b
     return false;
 }
 
-fn typeName(self: *const Self, ty: *const Type) []const u8 {
+pub fn typeName(self: *const Self, ty: *const Type) []const u8 {
     return ty.toString(self.allocator, self.interner, self.mod_name);
 }
 

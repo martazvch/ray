@@ -1,0 +1,18 @@
+fn matchValue(value: int) {
+    print match value {
+        -1 => -10
+        0 => 10
+        2 => 30
+        3 => 30
+        1..8 => 90
+        _ => 100
+    }
+}
+
+fn main() {
+    matchValue(-1) // -10
+    matchValue(2)  // 30
+    matchValue(7)  // 90
+    matchValue(25) // 100
+}
+

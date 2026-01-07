@@ -395,7 +395,7 @@ fn loadSymbol(self: *Self, data: *const Instruction.LoadSymbol) void {
 }
 
 fn match(self: *Self, data: *const Instruction.Match) void {
-    self.indentAndAppendSlice("[Match]");
+    self.indentAndPrintSlice("[Match {t}]", .{data.kind});
     self.indentAndAppendSlice("- expression:");
     self.indent_level += 1;
     self.parseInstr(data.expr);

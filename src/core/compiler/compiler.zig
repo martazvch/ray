@@ -819,14 +819,34 @@ const Compiler = struct {
     }
 
     fn match(self: *Self, data: *const Instruction.Match) Error!void {
-        try self.tagId(data.expr);
+        if (data.kind == .@"enum") {
+            try self.tagId(data.expr);
+        } else {
+            try self.compileInstr(data.expr);
+        }
 
         var exit_jumps = ArrayList(usize).initCapacity(self.manager.allocator, data.arms.len) catch oom();
 
         for (data.arms) |arm| {
             self.writeOp(.dup);
-            try self.tagId(arm.expr);
-            self.writeOp(.eq_int);
+
+            switch (data.kind) {
+                .bool => unreachable,
+                .@"enum" => {
+                    try self.tagId(arm.expr);
+                    self.writeOp(.eq_int);
+                },
+                .float => unreachable,
+                .int => {
+                    try self.compileInstr(arm.expr);
+                    if (self.manager.instr_data[arm.expr] == .range) {
+                        self.writeOp(.in_range);
+                    } else {
+                        self.writeOp(.eq_int);
+                    }
+                },
+                .string => unreachable,
+            }
 
             const arm_jump = self.emitJump(.jump_false);
             // Pops the condition

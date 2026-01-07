@@ -1,6 +1,6 @@
 match_non_exhaustive, none
 match_non_exhaustive, cross
-match_arm_type_mismatch, Marker, Bar
+type_mismatch, Marker, Bar
 match_duplicate_arm, circle
 match_enum_invalid_pat
 match_wildcard_exhaustive

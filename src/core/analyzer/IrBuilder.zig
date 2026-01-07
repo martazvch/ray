@@ -42,6 +42,11 @@ pub fn getInstr(self: *Self, index: ir.Index) Instruction.Data {
     return self.instructions.items(.data)[index];
 }
 
+pub fn getConstant(self: *Self, index: ir.Index) Instruction.Data {
+    const instr = self.getInstr(index).constant.instr;
+    return self.getInstr(instr);
+}
+
 pub fn addRootInstr(self: *Self, index: ir.Index) void {
     self.roots.append(self.allocator, index) catch oom();
 }

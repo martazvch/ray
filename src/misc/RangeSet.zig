@@ -17,7 +17,7 @@ pub const Range = struct {
 };
 
 const Self = @This();
-pub const Error = error{ partial, unreach };
+pub const Error = error{ partial, unreached };
 pub const empty: Self = .{ .ranges = .empty };
 
 pub fn deinit(self: *Self, allocator: Allocator) void {
@@ -125,7 +125,7 @@ pub fn checkRange(self: *Self, allocator: Allocator, range: Range) Error!void {
     defer uncovered.deinit(allocator);
 
     if (uncovered.items.len == 0) {
-        return error.unreach;
+        return error.unreached;
     }
 
     if (uncovered.items.len != 1 or
@@ -218,7 +218,7 @@ test "errors" {
         .{ .low = 3, .high = 6 }, .{ .low = 7, .high = 9 }, .{ .low = 5, .high = 6 },
     };
     _ = runTestCheck(ranges) catch |err| {
-        try std.testing.expect(err == Error.unreach);
+        try std.testing.expect(err == Error.unreached);
     };
 }
 

@@ -15,7 +15,7 @@
                 [Load symbol 1 module 0]
                 - tag
                 0
-    [Match]
+    [Match enum]
     - expression:
         [Variable index: 0, scope: local]
     - arms:
@@ -52,7 +52,7 @@
             [Print]
                 [Constant 10]
                     [String none]
-    [Match]
+    [Match enum]
     - expression:
         [Variable index: 0, scope: local]
     - arms:
@@ -82,7 +82,7 @@
             [Print]
                 [Constant 10]
     [Variable declaration index: 2, scope: local]
-        [Match]
+        [Match enum]
         - expression:
             [Variable index: 0, scope: local]
         - arms:
@@ -109,7 +109,7 @@
                     [Break depth: 0]
                         [Constant 17]
                             [Int 3]
-    [Match]
+    [Match enum]
     - expression:
         [Variable index: 0, scope: local]
     - arms:

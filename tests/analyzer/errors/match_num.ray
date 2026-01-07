@@ -1,0 +1,23 @@
+fn main() {
+    let value = 2
+
+    print match value {
+        0 => 10
+        2 => 30
+        2 => 3
+    }
+
+    print match value {
+        0 => 10
+        1 => 20
+        4 => 30
+        2..6 => 40
+        _ => 50
+    }
+
+    print match value {
+        0 => 10
+        1 => 20
+    }
+}
+

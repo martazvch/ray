@@ -2,46 +2,17 @@ const std = @import("std");
 const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 const Analyzer = @import("Analyzer.zig");
+const Matcher = @import("Matcher.zig");
 const ExprResKind = Analyzer.ExprResKind;
 const Error = Analyzer.Error;
 const Context = Analyzer.Context;
 const InstrInfos = Analyzer.InstrInfos;
-const ir = @import("ir.zig");
-const InstrIndex = ir.Index;
-const Instr = ir.Instruction;
 const Type = @import("types.zig").Type;
 const Ast = @import("../parser/Ast.zig");
 const Span = @import("../parser/Lexer.zig").Span;
 const misc = @import("misc");
 const oom = misc.oom;
 const RangeSet = misc.RangeSet;
-
-pub const MatchArms = struct {
-    types: []const *const Type,
-    arms: []const Instr.Match.Arm,
-    wildcard: ?InstrIndex,
-};
-
-const VTable = struct {
-    ptr: *anyopaque,
-    armFn: *const fn (*anyopaque, *Analyzer, *const Ast.Match.ValueArm, ExprResKind, *Context) ArmRes,
-    wildcardFn: *const fn (*anyopaque, *Analyzer, *const Ast.Match.Wildcard, ExprResKind, *Context) Error!InstrInfos,
-    validateFn: *const fn (*anyopaque, *Analyzer, Span) Error!void,
-
-    const ArmRes = Error!struct { InstrInfos, InstrInfos };
-
-    pub fn arm(self: *VTable, ana: *Analyzer, arm_expr: *const Ast.Match.ValueArm, expect: ExprResKind, ctx: *Context) ArmRes {
-        return self.armFn(self.ptr, ana, arm_expr, expect, ctx);
-    }
-
-    pub fn wildcard(self: *VTable, ana: *Analyzer, arm_expr: *const Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {
-        return self.wildcardFn(self.ptr, ana, arm_expr, expect, ctx);
-    }
-
-    pub fn validate(self: *VTable, ana: *Analyzer, span: Span) Error!void {
-        return self.validateFn(self.ptr, ana, span);
-    }
-};
 
 pub const Enum = struct {
     proto: Type.Enum.Proto,
@@ -53,7 +24,7 @@ pub const Enum = struct {
         return .{ .proto = proto };
     }
 
-    fn arm(self_opaque: *anyopaque, ana: *Analyzer, value_arm: *const Ast.Match.ValueArm, expect: ExprResKind, ctx: *Context) VTable.ArmRes {
+    fn arm(self_opaque: *anyopaque, ana: *Analyzer, value_arm: *const Ast.Match.ValueArm, expect: ExprResKind, ctx: *Context) Matcher.ArmRes {
         var self: *Self = @ptrCast(@alignCast(self_opaque));
 
         const arm_span = ana.ast.getSpan(value_arm.expr);
@@ -118,20 +89,20 @@ pub const Enum = struct {
         );
     }
 
-    pub fn analyzer(self: *Self) VTable {
+    pub fn matcher(self: *Self) Matcher {
         return .{
             .ptr = self,
-            .armFn = arm,
-            .wildcardFn = wildcard,
-            .validateFn = validate,
+            .vtable = &.{
+                .armFn = arm,
+                .wildcardFn = wildcard,
+                .validateFn = validate,
+            },
         };
     }
 };
 
 pub const Int = struct {
     covered: RangeSet,
-    /// Whenever we encounter a runtime expression, we can no longer statically check ranges
-    is_runtime: bool = false,
     has_wildcard: bool = false,
 
     const Self = @This();
@@ -144,34 +115,47 @@ pub const Int = struct {
         self.ranges.deinit(allocator);
     }
 
-    fn arm(self_opaque: *anyopaque, ana: *Analyzer, value_arm: *const Ast.Match.ValueArm, expect: ExprResKind, ctx: *Context) VTable.ArmRes {
+    fn arm(self_opaque: *anyopaque, ana: *Analyzer, value_arm: *const Ast.Match.ValueArm, expect: ExprResKind, ctx: *Context) Matcher.ArmRes {
         var self: *Self = @ptrCast(@alignCast(self_opaque));
 
         const arm_span = ana.ast.getSpan(value_arm.expr);
-        _ = arm_span; // autofix
 
-        const range: ?RangeSet.Range, const arm_res = b: switch (value_arm.expr.*) {
+        const arm_res = b: switch (value_arm.expr.*) {
             .int => |e| {
-                const res = try ana.intLit(e, ctx);
-                break :b .unit(ana.irb.getInstr(res.instr).int);
+                const res = try ana.intLit(e);
+                try self.checkRange(ana, .unit(ana.irb.getConstant(res.instr).int), arm_span);
+                break :b res;
             },
-            else => |e| {
-                self.is_runtime = true;
-                const res = try ana.analyzeExpr(e, expect, ctx);
+            .range => |e| {
+                var res = try ana.range(e, ctx);
+                res.type = ana.ti.cache.int;
 
-                if (!res.type.is(.int)) @panic("wrong type");
+                // If range is made of comptime known literals, we check the range
+                if (e.start.* == .int and e.end.* == .int) {
+                    const instr = ana.irb.getInstr(res.instr).range;
 
-                break :b .{ null, res };
+                    const range: RangeSet.Range = .{
+                        .low = ana.irb.getConstant(instr.start).int,
+                        .high = ana.irb.getConstant(instr.end).int,
+                    };
+                    try self.checkRange(ana, range, arm_span);
+                }
+
+                break :b res;
             },
-        };
-
-        if (!self.is_runtime) if (range) |r| {
-            try self.covered.checkRange(ana.allocator, r);
+            else => |*e| try ana.analyzeExpr(e, expect, ctx),
         };
 
         const body = try ana.analyzeNode(&value_arm.body, expect, ctx);
 
         return .{ arm_res, body };
+    }
+
+    fn checkRange(self: *Self, ana: *Analyzer, range: RangeSet.Range, span: Span) Error!void {
+        self.covered.checkRange(ana.allocator, range) catch |err| switch (err) {
+            error.partial => ana.warn(.match_partial_overlap, span),
+            error.unreached => return ana.err(.match_unreachable_arm, span),
+        };
     }
 
     fn wildcard(self_opaque: *anyopaque, ana: *Analyzer, wc: *const Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {
@@ -182,34 +166,21 @@ pub const Int = struct {
     }
 
     fn validate(self_opaque: *anyopaque, ana: *Analyzer, span: Span) Error!void {
-        var self: *Self = @ptrCast(@alignCast(self_opaque));
+        const self: *Self = @ptrCast(@alignCast(self_opaque));
 
-        if (self.has_wildcard) return;
-
-        var missing: ArrayList(u8) = .empty;
-
-        var it = self.proto.iterator();
-        while (it.next()) |entry| {
-            if (!entry.value_ptr.*) {
-                if (missing.items.len > 0) {
-                    missing.appendSlice(ana.allocator, ", ") catch oom();
-                }
-                missing.appendSlice(ana.allocator, ana.interner.getKey(entry.key_ptr.*).?) catch oom();
-            }
+        if (!self.has_wildcard) {
+            return ana.err(.match_num_no_wildcard, span);
         }
-
-        if (missing.items.len > 0) return ana.err(
-            .{ .match_non_exhaustive = .{ .missing = missing.toOwnedSlice(ana.allocator) catch oom() } },
-            span,
-        );
     }
 
-    pub fn analyzer(self: *Self) VTable {
+    pub fn matcher(self: *Self) Matcher {
         return .{
             .ptr = self,
-            .armFn = arm,
-            .wildcardFn = wildcard,
-            .validateFn = validate,
+            .vtable = &.{
+                .armFn = arm,
+                .wildcardFn = wildcard,
+                .validateFn = validate,
+            },
         };
     }
 };

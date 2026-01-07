@@ -339,6 +339,11 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
                 const start, const end = checkRangeIndex(string.chars.len, index);
                 self.stack.push(.makeObj(Obj.String.takeCopy(self, string.chars[start..end]).asObj()));
             },
+            .in_range => {
+                const range = self.stack.pop().range;
+                const value = self.stack.pop().int;
+                self.stack.push(.makeBool(value >= range.start and value <= range.end));
+            },
             .is_bool => self.stack.push(.makeBool(self.stack.peek(0) == .bool)),
             .is_float => self.stack.push(.makeBool(self.stack.peek(0) == .float)),
             .is_int => self.stack.push(.makeBool(self.stack.peek(0) == .int)),
