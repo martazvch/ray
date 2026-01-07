@@ -2,6 +2,7 @@ fn main() {
     let value = 2
 
     print match value {
+        -1 => -10
         0 => 10
         2 => 30
         3 => 30

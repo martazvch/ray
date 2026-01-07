@@ -831,7 +831,10 @@ const Compiler = struct {
             self.writeOp(.dup);
 
             switch (data.kind) {
-                .bool => unreachable,
+                .bool => {
+                    try self.compileInstr(arm.expr);
+                    self.writeOp(.eq_bool);
+                },
                 .@"enum" => {
                     try self.tagId(arm.expr);
                     self.writeOp(.eq_int);

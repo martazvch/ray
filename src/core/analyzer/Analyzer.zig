@@ -1953,6 +1953,10 @@ fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Resul
     const value = try self.analyzeExpr(expr.expr, .value, ctx);
 
     const kind: Instr.Match.Kind, var matcher = ana: switch (value.type.*) {
+        .bool => {
+            var matcher = matchers.Bool.init();
+            break :ana .{ .bool, matcher.matcher() };
+        },
         .@"enum" => |t| {
             var matcher = matchers.Enum.init(t.proto(self.allocator));
             break :ana .{ .@"enum", matcher.matcher() };

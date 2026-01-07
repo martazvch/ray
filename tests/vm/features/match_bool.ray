@@ -1,0 +1,26 @@
+fn main() {
+    var value = true
+    match value {
+        true => print true
+        false => print false
+    }
+
+    value = false
+    match value {
+        true => print true
+        false => print false
+    }
+
+    value = false
+    match value {
+        true => print true
+        _ => print false
+    }
+
+    value = true
+    match value {
+        true => print true
+        _ => print false
+    }
+}
+

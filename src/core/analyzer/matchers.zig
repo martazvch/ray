@@ -27,17 +27,17 @@ pub const Enum = struct {
     fn arm(self_opaque: *anyopaque, ana: *Analyzer, value_arm: *const Ast.Match.ValueArm, expect: ExprResKind, ctx: *Context) Matcher.ArmRes {
         var self: *Self = @ptrCast(@alignCast(self_opaque));
 
-        const arm_span = ana.ast.getSpan(value_arm.expr);
+        const span = ana.ast.getSpan(value_arm.expr);
 
         const tag, const arm_res = switch (value_arm.expr.*) {
             .enum_lit => |e| .{ e, try ana.enumLit(e, ctx) },
             .field => |*e| .{ e.field, try ana.field(e, ctx) },
-            else => return ana.err(.match_enum_invalid_pat, arm_span),
+            else => return ana.err(.match_enum_invalid_pat, span),
         };
 
         if (self.proto.getPtr(ana.interner.intern(ana.ast.toSource(tag)))) |found| {
             if (found.*) {
-                return ana.err(.{ .match_duplicate_arm = .{ .name = ana.ast.toSource(tag) } }, arm_span);
+                return ana.err(.match_duplicate_arm, span);
             }
             found.* = true;
         }
@@ -118,12 +118,12 @@ pub const Int = struct {
     fn arm(self_opaque: *anyopaque, ana: *Analyzer, value_arm: *const Ast.Match.ValueArm, expect: ExprResKind, ctx: *Context) Matcher.ArmRes {
         var self: *Self = @ptrCast(@alignCast(self_opaque));
 
-        const arm_span = ana.ast.getSpan(value_arm.expr);
+        const span = ana.ast.getSpan(value_arm.expr);
 
         const arm_res = b: switch (value_arm.expr.*) {
             .int => |e| {
                 const res = try ana.intLit(e);
-                try self.checkRange(ana, .unit(ana.irb.getConstant(res.instr).int), arm_span);
+                try self.checkRange(ana, .unit(ana.irb.getConstant(res.instr).int), span);
                 break :b res;
             },
             .range => |e| {
@@ -138,12 +138,19 @@ pub const Int = struct {
                         .low = ana.irb.getConstant(instr.start).int,
                         .high = ana.irb.getConstant(instr.end).int,
                     };
-                    try self.checkRange(ana, range, arm_span);
+                    try self.checkRange(ana, range, span);
                 }
 
                 break :b res;
             },
-            else => |*e| try ana.analyzeExpr(e, expect, ctx),
+            else => |*e| {
+                const res = try ana.analyzeExpr(e, expect, ctx);
+
+                if (!res.ti.comp_time) {
+                    return ana.err(.match_int_non_literal, span);
+                }
+                break :b res;
+            },
         };
 
         const body = try ana.analyzeNode(&value_arm.body, expect, ctx);
@@ -171,6 +178,80 @@ pub const Int = struct {
         if (!self.has_wildcard) {
             return ana.err(.match_num_no_wildcard, span);
         }
+    }
+
+    pub fn matcher(self: *Self) Matcher {
+        return .{
+            .ptr = self,
+            .vtable = &.{
+                .armFn = arm,
+                .wildcardFn = wildcard,
+                .validateFn = validate,
+            },
+        };
+    }
+};
+
+pub const Bool = struct {
+    has_true: bool = false,
+    has_false: bool = false,
+    has_wildcard: bool = false,
+
+    const Self = @This();
+
+    pub fn init() Self {
+        return .{};
+    }
+
+    pub fn deinit(_: *Self, _: Allocator) void {}
+
+    fn arm(self_opaque: *anyopaque, ana: *Analyzer, value_arm: *const Ast.Match.ValueArm, expect: ExprResKind, ctx: *Context) Matcher.ArmRes {
+        var self: *Self = @ptrCast(@alignCast(self_opaque));
+
+        const span = ana.ast.getSpan(value_arm.expr);
+
+        const arm_res = b: switch (value_arm.expr.*) {
+            .bool => |e| {
+                const res = try ana.boolLit(e);
+                const constant = ana.irb.getConstant(res.instr).bool;
+
+                if (constant) {
+                    if (self.has_true) return ana.err(.match_duplicate_arm, span);
+                    self.has_true = true;
+                } else {
+                    if (self.has_false) return ana.err(.match_duplicate_arm, span);
+                    self.has_false = true;
+                }
+
+                break :b res;
+            },
+            else => return ana.err(.match_bool_non_literal, span),
+        };
+
+        const body = try ana.analyzeNode(&value_arm.body, expect, ctx);
+
+        return .{ arm_res, body };
+    }
+
+    fn wildcard(self_opaque: *anyopaque, ana: *Analyzer, wc: *const Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {
+        var self: *Self = @ptrCast(@alignCast(self_opaque));
+
+        if (self.has_true and self.has_false) {
+            return ana.err(.match_wildcard_exhaustive, ana.ast.getSpan(wc));
+        }
+
+        self.has_wildcard = true;
+
+        return ana.analyzeNode(&wc.body, expect, ctx);
+    }
+
+    fn validate(self_opaque: *anyopaque, ana: *Analyzer, span: Span) Error!void {
+        const self: *Self = @ptrCast(@alignCast(self_opaque));
+
+        if (self.has_wildcard or (self.has_true and self.has_false)) return;
+
+        const missing = if (self.has_true) "false" else if (self.has_false) "true" else "true, false";
+        return ana.err(.{ .match_non_exhaustive = .{ .missing = missing } }, span);
     }
 
     pub fn matcher(self: *Self) Matcher {

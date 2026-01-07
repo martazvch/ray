@@ -41,8 +41,10 @@ pub const AnalyzerMsg = union(enum) {
     invalid_logical: struct { found: []const u8 },
     invalid_unary: struct { found: []const u8 },
     iter_non_iterable: struct { found: []const u8 },
-    match_duplicate_arm: struct { name: []const u8 },
+    match_bool_non_literal,
+    match_duplicate_arm,
     match_enum_invalid_pat,
+    match_int_non_literal,
     match_partial_overlap,
     match_non_exhaustive: struct { missing: []const u8 },
     match_num_no_wildcard,
@@ -136,8 +138,10 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_logical => writer.writeAll("logical operators must be used with booleans"),
             .invalid_unary => writer.writeAll("invalid unary operation"),
             .iter_non_iterable => |e| writer.print("can't iterate over type '{s}'", .{e.found}),
-            .match_duplicate_arm => |e| writer.print("arm '{s}' is used multiple times", .{e.name}),
+            .match_bool_non_literal => writer.writeAll("invalid boolean pattern"),
+            .match_duplicate_arm => writer.writeAll("arm is defined multiple times"),
             .match_enum_invalid_pat => writer.writeAll("invalid pattern for matching enums"),
+            .match_int_non_literal => writer.writeAll("invalid integer pattern"),
             .match_non_exhaustive => |e| writer.print("non-exhaustive pattern matching, missing: '{s}'", .{e.missing}),
             .match_num_no_wildcard => writer.writeAll("no wildcard pattern for numeric type"),
             .match_partial_overlap => writer.writeAll("partial arm overlapping"),
@@ -219,6 +223,7 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_logical => |e| writer.print("this expression resolves to a '{s}'", .{e.found}),
             .invalid_unary, .non_bool_cond => writer.writeAll("expression is not a boolean type"),
             .iter_non_iterable => writer.writeAll("this doesn't have Iterator trait"),
+            .match_bool_non_literal, .match_int_non_literal => writer.writeAll("this is not a literal"),
             .match_duplicate_arm => writer.writeAll("this case"),
             .match_enum_invalid_pat => writer.writeAll("here"),
             .match_non_exhaustive => writer.writeAll("this expression"),
@@ -326,6 +331,7 @@ pub const AnalyzerMsg = union(enum) {
                 \\it is only possible to iterate over builtin types array, string, range and maps and over types
                 \\that implement the Iterator trait
             ),
+            .match_bool_non_literal => writer.writeAll("pattern matching on booleans expect only 'true' or 'false' patterns (or '_')"),
             .match_duplicate_arm => writer.writeAll("delete the duplicated arm"),
             .match_enum_invalid_pat => writer.writeAll(
                 \\to match on an enum use either enum literals like or direct access on type:
@@ -333,6 +339,9 @@ pub const AnalyzerMsg = union(enum) {
                 \\      .circle => ...
                 \\      Shape.rectangle => ...
                 \\  }
+            ),
+            .match_int_non_literal => writer.writeAll(
+                \\pattern matching on integers expect only literals like '1' or ranges like: '1..8' patterns (or '_')
             ),
             .match_non_exhaustive => writer.writeAll(
                 "all pattern matching must be exhaustive. You can use '_' as the last arm to catch all the remaining possibilities",
