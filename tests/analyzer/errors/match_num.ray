@@ -26,5 +26,25 @@ fn main() {
         getValue() => 10
         1 => 20
     }
+
+    print match value {
+        -5 => -10
+        -8..-2 => 20
+        _ => 100
+    }
+
+    print match value {
+        -8..-2 => 20
+        -5 => -10
+        _ => 100
+    }
+
+    match value {
+        5..2 => {}
+    }
+
+    match value {
+        -5..-20 => {}
+    }
 }
 

@@ -120,38 +120,60 @@ pub const Int = struct {
 
         const span = ana.ast.getSpan(value_arm.expr);
 
-        const arm_res = b: switch (value_arm.expr.*) {
-            .int => |e| {
-                const res = try ana.intLit(e, false);
-                try self.checkRange(ana, .unit(ana.irb.getConstant(res.instr).int), span);
-                break :b res;
-            },
-            .range => |e| {
-                var res = try ana.range(e, ctx);
-                res.type = ana.ti.cache.int;
+        const arm_res, const range: ?RangeSet.Range = b: {
+            switch (value_arm.expr.*) {
+                .int => |e| {
+                    const res = try ana.intLit(e, false);
+                    break :b .{ res, .unit(ana.irb.getConstant(res.instr).int) };
+                },
+                .range => |e| {
+                    var res = try ana.range(e, ctx);
+                    res.type = ana.ti.cache.int;
 
-                // If range is made of comptime known literals, we check the range
-                if (e.start.* == .int and e.end.* == .int) {
-                    const instr = ana.irb.getInstr(res.instr).range;
+                    // If range is made of comptime known literals, we check the range
+                    if (res.ti.comp_time) {
+                        const instr = ana.irb.getInstr(res.instr).range;
 
-                    const range: RangeSet.Range = .{
-                        .low = ana.irb.getConstant(instr.start).int,
-                        .high = ana.irb.getConstant(instr.end).int,
+                        // TODO: allow contant identifier that have a constant value literal to be used here
+                        if (ana.irb.getInstr(instr.start) == .constant and ana.irb.getInstr(instr.end) == .constant) {
+                            const range: RangeSet.Range = .{
+                                .low = ana.irb.getConstant(instr.start).int,
+                                .high = ana.irb.getConstant(instr.end).int,
+                            };
+
+                            break :b .{ res, range };
+                        }
+                    }
+                },
+                .unary => |*e| {
+                    const res = try switch (e.expr.*) {
+                        .int => |i| ana.intLit(i, true),
+                        else => ana.analyzeExpr(e.expr, .value, ctx),
                     };
-                    try self.checkRange(ana, range, span);
-                }
 
-                break :b res;
-            },
-            else => |*e| {
-                const res = try ana.analyzeExpr(e, expect, ctx);
+                    if (res.ti.comp_time) {
+                        break :b .{ res, .unit(ana.irb.getConstant(res.instr).int) };
+                    }
+                },
+                else => |*e| {
+                    const res = try ana.analyzeExpr(e, expect, ctx);
 
-                if (!res.ti.comp_time) {
-                    return ana.err(.match_int_non_literal, span);
-                }
-                break :b res;
-            },
+                    if (res.ti.comp_time) {
+                        break :b .{ res, null };
+                    }
+                },
+            }
+
+            return ana.err(.match_num_non_literal, span);
         };
+
+        if (range) |r| {
+            if (!r.isIncreasing()) {
+                return ana.err(.match_num_decrease_range, span);
+            }
+
+            try self.checkRange(ana, r, span);
+        }
 
         const body = try ana.analyzeNode(&value_arm.body, expect, ctx);
 

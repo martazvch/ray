@@ -14,6 +14,10 @@ pub const Range = struct {
     pub fn unit(value: i64) Range {
         return .{ .low = value, .high = value };
     }
+
+    pub fn isIncreasing(self: Range) bool {
+        return self.low <= self.high;
+    }
 };
 
 const Self = @This();

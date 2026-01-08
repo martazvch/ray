@@ -1,6 +1,7 @@
 fn matchValue(value: int) {
     print match value {
-        -1 => -10
+        -5 => -20
+        -8..-2 => -10
         0 => 10
         2 => 30
         3 => 30
@@ -10,7 +11,8 @@ fn matchValue(value: int) {
 }
 
 fn main() {
-    matchValue(-1) // -10
+    matchValue(-5) // -20
+    matchValue(-6) // -10
     matchValue(2)  // 30
     matchValue(7)  // 90
     matchValue(25) // 100

@@ -44,10 +44,11 @@ pub const AnalyzerMsg = union(enum) {
     match_bool_non_literal,
     match_duplicate_arm,
     match_enum_invalid_pat,
-    match_int_non_literal,
+    match_num_non_literal,
     match_partial_overlap,
     match_non_exhaustive: struct { missing: []const u8 },
     match_num_no_wildcard,
+    match_num_decrease_range,
     match_unreachable_arm,
     match_wildcard_exhaustive,
     missing_symbol_in_module: struct { symbol: []const u8, module: []const u8 },
@@ -141,9 +142,10 @@ pub const AnalyzerMsg = union(enum) {
             .match_bool_non_literal => writer.writeAll("invalid boolean pattern"),
             .match_duplicate_arm => writer.writeAll("arm is defined multiple times"),
             .match_enum_invalid_pat => writer.writeAll("invalid pattern for matching enums"),
-            .match_int_non_literal => writer.writeAll("invalid integer pattern"),
+            .match_num_non_literal => writer.writeAll("invalid numeric value pattern"),
             .match_non_exhaustive => |e| writer.print("non-exhaustive pattern matching, missing: '{s}'", .{e.missing}),
             .match_num_no_wildcard => writer.writeAll("no wildcard pattern for numeric type"),
+            .match_num_decrease_range => writer.writeAll("start of range must be less than end"),
             .match_partial_overlap => writer.writeAll("partial arm overlapping"),
             .match_unreachable_arm => writer.writeAll("unreachable arm"),
             .match_wildcard_exhaustive => writer.writeAll("can't use wildcard with an exhaustive pattern match"),
@@ -223,11 +225,12 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_logical => |e| writer.print("this expression resolves to a '{s}'", .{e.found}),
             .invalid_unary, .non_bool_cond => writer.writeAll("expression is not a boolean type"),
             .iter_non_iterable => writer.writeAll("this doesn't have Iterator trait"),
-            .match_bool_non_literal, .match_int_non_literal => writer.writeAll("this is not a literal"),
+            .match_bool_non_literal, .match_num_non_literal => writer.writeAll("this is not a literal"),
             .match_duplicate_arm => writer.writeAll("this case"),
             .match_enum_invalid_pat => writer.writeAll("here"),
             .match_non_exhaustive => writer.writeAll("this expression"),
             .match_num_no_wildcard => writer.writeAll("non-exhaustive match"),
+            .match_num_decrease_range => writer.writeAll("this range is decreasing"),
             .match_partial_overlap, .match_unreachable_arm => writer.writeAll("this arm"),
             .match_wildcard_exhaustive => writer.writeAll("wildcard useless"),
             .missing_symbol_in_module => writer.writeAll("this symbol is unknown"),
@@ -340,9 +343,10 @@ pub const AnalyzerMsg = union(enum) {
                 \\      Shape.rectangle => ...
                 \\  }
             ),
-            .match_int_non_literal => writer.writeAll(
-                \\pattern matching on integers expect only literals like '1' or ranges like: '1..8' patterns (or '_')
+            .match_num_non_literal => writer.writeAll(
+                \\pattern matching on numeric types expect only literals like '1' or ranges like: '1.2..8.1' patterns (or '_')
             ),
+            .match_num_decrease_range => writer.writeAll("ranges used as patterns must be increasing. Revert range's bounds"),
             .match_non_exhaustive => writer.writeAll(
                 "all pattern matching must be exhaustive. You can use '_' as the last arm to catch all the remaining possibilities",
             ),

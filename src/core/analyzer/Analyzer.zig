@@ -2083,6 +2083,7 @@ pub fn range(self: *Self, expr: Ast.Range, ctx: *Context) Result {
 
     return .{
         .type = self.ti.getCached(.range),
+        .ti = .{ .comp_time = start.ti.comp_time and end.ti.comp_time },
         .instr = self.irb.addInstr(
             .{ .range = .{ .start = start.instr, .end = end.instr } },
             self.ast.getSpan(expr).start,
