@@ -7,16 +7,16 @@ fn main() {
     for a in arr {
         print a
     }
-
     print "----"
+
     for i in [1, 2, 3] {
         print i
         for j in [4, 5] {
             print j
         }
     }
-
     print "----"
+
     for c in "Martin" {
         print c
     }
@@ -25,21 +25,44 @@ fn main() {
     for c in string {
         print c
     }
-
     print "----"
+
     for c in "Martin" {
         print c
         for cc in "Tom" {
             print cc
         }
     }
-
     print "----"
+
     for c in "Martin" {
         print c
         for j in [4, 5] {
             print j
         }
     }
+    print "----"
+
+    for i in 0..5 {
+        print i
+    }
+    print "----"
+
+    for i in 5..0 {
+        print i
+    }
+    print "----"
+
+    let a = 6
+
+    for i in 0..a {
+        print i
+    }
+    print "----"
+
+    for i in a..0 {
+        print i
+    }
+    print "----"
 }
 

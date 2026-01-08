@@ -21,4 +21,8 @@ fn main() {
         print i
         print v
     }
+
+    for v in 0..5 {
+        print v
+    }
 }

@@ -20,5 +20,9 @@ fn main() {
     for i, v in [] {
         print i
     }
+
+    for v in 0..5 {
+        print v
+    }
 }
 
