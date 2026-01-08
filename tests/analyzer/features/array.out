@@ -35,20 +35,19 @@
     [Print]
         [Indexing array]
             - index
-            [Unary minus]
-                [Constant 3]
+            [Constant 8]
+                [Int -2]
             - expr
             [Variable index: 0, scope: local]
-    [Constant 8]
+    [Constant 9]
         [Int 99]
     [Indexing assignment, array]
         - index
         [Call symbol 1]
         - expr
         [Variable index: 0, scope: local]
-    [Unary minus]
-        [Constant 9]
-            [Int 9]
+    [Constant 10]
+        [Int -9]
     [Indexing assignment, array]
         - index
         [Call symbol 1]

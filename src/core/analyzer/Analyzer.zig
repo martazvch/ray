@@ -849,13 +849,13 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
         .enum_lit => |e| self.enumLit(e, ctx),
         .fail => |e| self.fail(e, ctx),
         .field => |*e| self.field(e, ctx),
-        .float => |e| self.floatLit(e),
+        .float => |e| self.floatLit(e, false),
         .fn_call => |*e| self.call(e, ctx),
         .grouping => |*e| self.analyzeExpr(e.expr, expect, ctx),
         .identifier => |e| self.identifier(e, ctx),
         .@"if" => |*e| self.ifExpr(e, expect, ctx),
         .indexing => |*e| self.indexing(e, ctx),
-        .int => |e| self.intLit(e),
+        .int => |e| self.intLit(e, false),
         .match => |e| self.match(e, expect, ctx),
         .null => |e| self.nullLit(e),
         .pattern => |e| self.pattern(e, ctx),
@@ -1866,7 +1866,7 @@ pub fn boolLit(self: *Self, expr: Ast.Bool) Result {
     };
 }
 
-pub fn floatLit(self: *Self, expr: Ast.Float) Result {
+pub fn floatLit(self: *Self, expr: Ast.Float, negate: bool) Result {
     const value = std.fmt.parseFloat(f64, self.ast.toSource(expr)) catch blk: {
         // TODO: error handling, only one possible it's invalid char
         std.debug.print("Error parsing float\n", .{});
@@ -1876,11 +1876,11 @@ pub fn floatLit(self: *Self, expr: Ast.Float) Result {
     return .{
         .type = self.ti.cache.float,
         .ti = .{ .comp_time = true },
-        .instr = self.irb.addConstant(.{ .float = value }, self.ast.getSpan(expr).start),
+        .instr = self.irb.addConstant(.{ .float = if (negate) -value else value }, self.ast.getSpan(expr).start),
     };
 }
 
-pub fn intLit(self: *Self, expr: Ast.Int) Result {
+pub fn intLit(self: *Self, expr: Ast.Int, negate: bool) Result {
     const value = std.fmt.parseInt(i64, self.ast.toSource(expr), 10) catch blk: {
         // TODO: error handling, only one possible it's invalid char
         std.debug.print("Error parsing integer\n", .{});
@@ -1890,7 +1890,7 @@ pub fn intLit(self: *Self, expr: Ast.Int) Result {
     return .{
         .type = self.ti.cache.int,
         .ti = .{ .comp_time = true },
-        .instr = self.irb.addConstant(.{ .int = value }, self.ast.getSpan(expr).start),
+        .instr = self.irb.addConstant(.{ .int = if (negate) -value else value }, self.ast.getSpan(expr).start),
     };
 }
 
@@ -2278,7 +2278,11 @@ fn unary(self: *Self, expr: *const Ast.Unary, ctx: *Context) Result {
     const span = self.ast.getSpan(expr);
     const op = self.ast.token_tags[expr.op];
 
-    const rhs = try self.analyzeExpr(expr.expr, .value, ctx);
+    const rhs = switch (expr.expr.*) {
+        .int => |i| return self.intLit(i, true),
+        .float => |f| return self.floatLit(f, true),
+        else => try self.analyzeExpr(expr.expr, .value, ctx),
+    };
     const ty = rhs.type;
 
     if (op == .not and !ty.is(.bool)) {

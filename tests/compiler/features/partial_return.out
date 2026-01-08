@@ -184,8 +184,7 @@ load_constant index 14, value 8.5
 call_sym index 2, arity 1, <function shortcut>
 print
 
-load_constant index 16, value 18.5
-neg_float
+load_constant index 16, value -18.5
 call_sym index 3, arity 1, <function shortcut_bis>
 print
 

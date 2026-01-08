@@ -77,6 +77,30 @@ pop
 loop 113 -> 105
 pop2
 
+load_constant index 6, value 5
+load_constant index 13, value -1
+range_new
+iter_new_range
+iter_next
+jump_null 124 -> 134
+get_local index 3
+print
+pop
+loop 131 -> 123
+pop2
+
+load_constant index 15, value -5
+load_constant index 14, value -8
+range_new
+iter_new_range
+iter_next
+jump_null 142 -> 152
+get_local index 3
+print
+pop
+loop 149 -> 141
+pop2
+
 ret_naked
 
 -- global scope --

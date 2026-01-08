@@ -19,5 +19,36 @@
         "end": {
             "identifier": "end"
         }
+    },
+    "range": {
+        "start": {
+            "unary": {
+                "op": "-",
+                "expr": {
+                    "int": "4"
+                }
+            }
+        },
+        "end": {
+            "int": "3"
+        }
+    },
+    "range": {
+        "start": {
+            "unary": {
+                "op": "-",
+                "expr": {
+                    "int": "4"
+                }
+            }
+        },
+        "end": {
+            "unary": {
+                "op": "-",
+                "expr": {
+                    "int": "3"
+                }
+            }
+        }
     }
 }

@@ -25,4 +25,12 @@ fn main() {
     for v in 0..5 {
         print v
     }
+    
+    for i in -1..5 {
+        print i
+    }
+
+    for i in -8..-5 {
+        print i
+    }
 }

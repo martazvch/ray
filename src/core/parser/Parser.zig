@@ -1343,7 +1343,17 @@ fn returnExpr(self: *Self) Error!*Expr {
 fn unary(self: *Self) Error!*Expr {
     const expr = self.allocator.create(Expr) catch oom();
     self.advance();
-    expr.* = .{ .unary = .{ .op = self.token_idx - 2, .expr = try self.parseExpr() } };
+
+    const op = self.token_idx - 2;
+    const rhs = try self.parseExpr();
+
+    if (rhs.* == .range) {
+        const range_start = self.allocator.create(Expr) catch oom();
+        range_start.* = .{ .unary = .{ .op = op, .expr = rhs.range.start } };
+        expr.* = .{ .range = .{ .start = range_start, .end = rhs.range.end } };
+    } else {
+        expr.* = .{ .unary = .{ .op = op, .expr = rhs } };
+    }
 
     return expr;
 }

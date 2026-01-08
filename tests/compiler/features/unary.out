@@ -1,16 +1,14 @@
 -- main --
-load_constant index 3, value 1
+load_constant index 3, value -1
+pop
+
+load_constant index 3, value -1
+neg_int
+neg_int
 neg_int
 pop
 
-load_constant index 3, value 1
-neg_int
-neg_int
-neg_int
-neg_int
-pop
-
-load_constant index 4, value 65.82
+load_constant index 4, value -65.82
 neg_float
 pop
 

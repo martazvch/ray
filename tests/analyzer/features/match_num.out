@@ -8,38 +8,38 @@
             [Variable index: 0, scope: local]
         - arms:
             - expr:
-                [Unary minus]
-                    [Constant 4]
-                        [Int 1]
+                [Constant 4]
+                    [Int -1]
             - body:
-                [Unary minus]
-                    [Constant 5]
-                        [Int 10]
+                [Constant 5]
+                    [Int -10]
             - expr:
                 [Constant 6]
                     [Int 0]
             - body:
-                [Constant 5]
+                [Constant 7]
+                    [Int 10]
             - expr:
                 [Constant 3]
             - body:
-                [Constant 7]
+                [Constant 8]
                     [Int 30]
             - expr:
-                [Constant 8]
+                [Constant 9]
                     [Int 3]
             - body:
-                [Constant 7]
+                [Constant 8]
             - expr:
                 [Range]
                 - start:
-                [Constant 4]
+                [Constant 10]
+                    [Int 1]
                 - end:
-                [Constant 9]
+                [Constant 11]
                     [Int 8]
             - body:
-                [Constant 10]
+                [Constant 12]
                     [Int 90]
             - wildcard:
-                [Constant 11]
+                [Constant 13]
                     [Int 100]

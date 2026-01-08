@@ -54,7 +54,6 @@
         [Block pop count: 2, is_expr: false]
             [Print]
                 [Variable index: 3, scope: local]
-
     [For]
     - expr:
         [Range]
@@ -63,6 +62,31 @@
             [Int 0]
         - end:
         [Constant 6]
+    - body:
+        [Block pop count: 1, is_expr: false]
+            [Print]
+                [Variable index: 3, scope: local]
+    [For]
+    - expr:
+        [Range]
+        - start:
+        [Constant 13]
+            [Int -1]
+        - end:
+        [Constant 6]
+    - body:
+        [Block pop count: 1, is_expr: false]
+            [Print]
+                [Variable index: 3, scope: local]
+    [For]
+    - expr:
+        [Range]
+        - start:
+        [Constant 14]
+            [Int -8]
+        - end:
+        [Constant 15]
+            [Int -5]
     - body:
         [Block pop count: 1, is_expr: false]
             [Print]

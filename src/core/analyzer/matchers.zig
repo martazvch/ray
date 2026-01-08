@@ -122,7 +122,7 @@ pub const Int = struct {
 
         const arm_res = b: switch (value_arm.expr.*) {
             .int => |e| {
-                const res = try ana.intLit(e);
+                const res = try ana.intLit(e, false);
                 try self.checkRange(ana, .unit(ana.irb.getConstant(res.instr).int), span);
                 break :b res;
             },
