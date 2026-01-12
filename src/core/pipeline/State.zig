@@ -18,6 +18,7 @@ type_interner: TypeInterner,
 path_builder: Sb,
 module_interner: ModuleInterner,
 native_reg: NativeRegister,
+strings: std.AutoHashMapUnmanaged(usize, *Obj.String),
 array_fns: ObjFns,
 string_fns: ObjFns,
 
@@ -31,6 +32,7 @@ pub fn new(allocator: Allocator, config: Config) Self {
         .path_builder = .empty,
         .module_interner = .init(allocator),
         .native_reg = .empty,
+        .strings = .empty,
         .array_fns = Obj.Array.getFns(allocator),
         .string_fns = Obj.String.getFns(allocator),
     };

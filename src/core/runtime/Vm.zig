@@ -20,7 +20,7 @@ ip: [*]u8,
 allocator: Allocator,
 arena_comptime: std.heap.ArenaAllocator,
 gc_alloc: Allocator,
-strings: std.AutoHashMap(usize, *Obj.String),
+strings: *std.AutoHashMapUnmanaged(usize, *Obj.String),
 objects: ?*Obj,
 modules: []CompiledModule,
 natives: []Value,
@@ -28,7 +28,7 @@ natives: []Value,
 const Self = @This();
 const Error = error{StackOverflow} || Allocator.Error;
 
-pub fn init(self: *Self, allocator: Allocator, state: *const State) void {
+pub fn init(self: *Self, allocator: Allocator, state: *State) void {
     self.arena_comptime = .init(allocator);
     self.allocator = self.arena_comptime.allocator();
 
@@ -36,7 +36,8 @@ pub fn init(self: *Self, allocator: Allocator, state: *const State) void {
     self.gc = .init(self, allocator);
     self.gc_alloc = self.gc.allocator();
     self.stack.init();
-    self.strings = .init(self.allocator);
+    self.strings = &state.strings;
+
     self.stack = .empty;
     self.stack.init();
     self.frame_stack = .empty;

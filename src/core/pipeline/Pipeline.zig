@@ -29,7 +29,6 @@ allocator: Allocator,
 state: *State,
 instr_count: usize,
 is_sub: bool,
-strings: std.AutoHashMapUnmanaged(usize, *Obj.String),
 
 const Self = @This();
 const Error = error{ExitOnPrint};
@@ -40,7 +39,6 @@ pub fn init(allocator: Allocator, state: *State) Self {
         .state = state,
         .instr_count = 0,
         .is_sub = false,
-        .strings = .empty,
     };
 }
 
@@ -73,7 +71,7 @@ pub fn run(self: *Self, file_name: []const u8, path: []const u8, source: [:0]con
     var compiler = CompilationUnit.init(
         self.allocator,
         file_name,
-        &self.strings,
+        &self.state.strings,
         &self.state.interner,
         if (!self.state.config.print_bytecode) .none else if (options.test_mode) .@"test" else .normal,
         analyzer.scope.current.variables.count(),

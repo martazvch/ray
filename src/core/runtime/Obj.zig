@@ -316,7 +316,7 @@ pub const String = struct {
         // as a root
         vm.gc.pushTmpRoot(obj.asObj());
         defer vm.gc.popTmpRoot();
-        vm.strings.put(hash, obj) catch oom();
+        vm.strings.put(vm.allocator, hash, obj) catch oom();
 
         if (options.log_gc) obj.asObj().log();
 
@@ -327,6 +327,7 @@ pub const String = struct {
     pub fn comptimeCopy(allocator: Allocator, interned: *std.AutoHashMapUnmanaged(usize, *Obj.String), str: []const u8) *String {
         const hash = String.hashString(str);
         const gop = interned.getOrPut(allocator, hash) catch oom();
+        // TODO: as we intern constants at compile time, we are sure to not find an existing one
         if (gop.found_existing) {
             return gop.value_ptr.*;
         }
@@ -337,6 +338,9 @@ pub const String = struct {
         var obj = Obj.allocateComptime(allocator, Self, undefined);
         obj.chars = chars;
         obj.hash = hash;
+
+        // Comptime constants have maximum lifetime
+        obj.obj.is_marked = true;
 
         gop.value_ptr.* = obj;
 

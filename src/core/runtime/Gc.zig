@@ -67,7 +67,7 @@ pub fn collect(self: *Self) Allocator.Error!void {
 
     try self.markRoots();
     try self.traceRef();
-    self.markStrings(&self.vm.strings);
+    self.markStrings(self.vm.strings);
 
     self.sweep();
 
@@ -103,7 +103,7 @@ fn traceRef(self: *Self) Allocator.Error!void {
     }
 }
 
-fn markStrings(self: *Self, strings: *const std.AutoHashMap(usize, *Obj.String)) void {
+fn markStrings(self: *Self, strings: *const std.AutoHashMapUnmanaged(usize, *Obj.String)) void {
     var it = strings.iterator();
 
     while (it.next()) |entry| {
