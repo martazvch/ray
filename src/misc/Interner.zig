@@ -12,7 +12,7 @@ pub const Index = usize;
 
 pub fn init(allocator: Allocator) Self {
     return .{
-        .map = StringHashMap(usize).init(allocator),
+        .map = .init(allocator),
         .refs = .empty,
     };
 }
@@ -26,13 +26,13 @@ pub fn deinit(self: *Self, allocator: Allocator) void {
 }
 
 pub fn intern(self: *Self, str: []const u8) Index {
-    const entry = self.map.getOrPut(str) catch oom();
+    const gop = self.map.getOrPut(str) catch oom();
 
-    if (!entry.found_existing) {
-        entry.value_ptr.* = self.map.count() - 1;
+    if (!gop.found_existing) {
+        gop.value_ptr.* = self.map.count() - 1;
     }
 
-    return entry.value_ptr.*;
+    return gop.value_ptr.*;
 }
 
 /// Duplicates the string to store a reference to it

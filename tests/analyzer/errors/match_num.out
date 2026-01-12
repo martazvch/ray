@@ -2,8 +2,8 @@ match_partial_overlap
 match_partial_overlap
 
 match_unreachable_arm
-match_num_no_wildcard
-match_num_non_literal
+match_no_wildcard
+match_non_literal
 
 match_unreachable_arm
 

@@ -42,6 +42,7 @@ pub fn getInstr(self: *Self, index: ir.Index) Instruction.Data {
     return self.instructions.items(.data)[index];
 }
 
+/// Assumes that you known the instruction index points to a `constant` instruction
 pub fn getConstant(self: *Self, index: ir.Index) Instruction.Data {
     const instr = self.getInstr(index).constant.instr;
     return self.getInstr(instr);

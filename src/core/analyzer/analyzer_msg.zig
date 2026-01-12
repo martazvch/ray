@@ -41,13 +41,12 @@ pub const AnalyzerMsg = union(enum) {
     invalid_logical: struct { found: []const u8 },
     invalid_unary: struct { found: []const u8 },
     iter_non_iterable: struct { found: []const u8 },
-    match_bool_non_literal,
     match_duplicate_arm,
     match_enum_invalid_pat,
-    match_num_non_literal,
+    match_non_literal,
     match_partial_overlap,
     match_non_exhaustive: struct { missing: []const u8 },
-    match_num_no_wildcard,
+    match_no_wildcard,
     match_num_decrease_range,
     match_unreachable_arm,
     match_wildcard_exhaustive,
@@ -139,12 +138,11 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_logical => writer.writeAll("logical operators must be used with booleans"),
             .invalid_unary => writer.writeAll("invalid unary operation"),
             .iter_non_iterable => |e| writer.print("can't iterate over type '{s}'", .{e.found}),
-            .match_bool_non_literal => writer.writeAll("invalid boolean pattern"),
             .match_duplicate_arm => writer.writeAll("arm is defined multiple times"),
             .match_enum_invalid_pat => writer.writeAll("invalid pattern for matching enums"),
-            .match_num_non_literal => writer.writeAll("invalid numeric value pattern"),
+            .match_non_literal => writer.writeAll("expect a constant or a literal in patterns"),
             .match_non_exhaustive => |e| writer.print("non-exhaustive pattern matching, missing: '{s}'", .{e.missing}),
-            .match_num_no_wildcard => writer.writeAll("no wildcard pattern for numeric type"),
+            .match_no_wildcard => writer.writeAll("expect wildcard pattern"),
             .match_num_decrease_range => writer.writeAll("start of range must be less than end"),
             .match_partial_overlap => writer.writeAll("partial arm overlapping"),
             .match_unreachable_arm => writer.writeAll("unreachable arm"),
@@ -225,11 +223,11 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_logical => |e| writer.print("this expression resolves to a '{s}'", .{e.found}),
             .invalid_unary, .non_bool_cond => writer.writeAll("expression is not a boolean type"),
             .iter_non_iterable => writer.writeAll("this doesn't have Iterator trait"),
-            .match_bool_non_literal, .match_num_non_literal => writer.writeAll("this is not a literal"),
+            .match_non_literal => writer.writeAll("this is not a literal"),
             .match_duplicate_arm => writer.writeAll("this case"),
             .match_enum_invalid_pat => writer.writeAll("here"),
             .match_non_exhaustive => writer.writeAll("this expression"),
-            .match_num_no_wildcard => writer.writeAll("non-exhaustive match"),
+            .match_no_wildcard => writer.writeAll("non-exhaustive match"),
             .match_num_decrease_range => writer.writeAll("this range is decreasing"),
             .match_partial_overlap, .match_unreachable_arm => writer.writeAll("this arm"),
             .match_wildcard_exhaustive => writer.writeAll("wildcard useless"),
@@ -334,7 +332,6 @@ pub const AnalyzerMsg = union(enum) {
                 \\it is only possible to iterate over builtin types array, string, range and maps and over types
                 \\that implement the Iterator trait
             ),
-            .match_bool_non_literal => writer.writeAll("pattern matching on booleans expect only 'true' or 'false' patterns (or '_')"),
             .match_duplicate_arm => writer.writeAll("delete the duplicated arm"),
             .match_enum_invalid_pat => writer.writeAll(
                 \\to match on an enum use either enum literals like or direct access on type:
@@ -343,14 +340,12 @@ pub const AnalyzerMsg = union(enum) {
                 \\      Shape.rectangle => ...
                 \\  }
             ),
-            .match_num_non_literal => writer.writeAll(
-                \\pattern matching on numeric types expect only literals like '1' or ranges like: '1.2..8.1' patterns (or '_')
-            ),
+            .match_non_literal => writer.writeAll("non-constant variables and non-literals aren't a valid pattern"),
             .match_num_decrease_range => writer.writeAll("ranges used as patterns must be increasing. Revert range's bounds"),
             .match_non_exhaustive => writer.writeAll(
                 "all pattern matching must be exhaustive. You can use '_' as the last arm to catch all the remaining possibilities",
             ),
-            .match_num_no_wildcard => writer.writeAll("int, float and string types must have a wildcard pattern as is can't be exhaustive"),
+            .match_no_wildcard => writer.writeAll("int, float and string types must have a wildcard pattern as is can't be exhaustive"),
             .match_partial_overlap => writer.writeAll(
                 \\this arm's patterns are partially covererd by other arms.
                 \\In such case, order of declaration of arms matter as the first one will be executed

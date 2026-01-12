@@ -848,7 +848,10 @@ const Compiler = struct {
                         self.writeOp(.eq_int);
                     }
                 },
-                .string => unreachable,
+                .string => {
+                    try self.compileInstr(arm.expr);
+                    self.writeOp(.eq_str);
+                },
             }
 
             const arm_jump = self.emitJump(.jump_false);

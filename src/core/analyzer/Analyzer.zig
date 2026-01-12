@@ -1965,6 +1965,10 @@ fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Resul
             var matcher = matchers.Int.init();
             break :ana .{ .int, matcher.matcher() };
         },
+        .str => {
+            var matcher = matchers.String.init();
+            break :ana .{ .string, matcher.matcher() };
+        },
         else => |t| {
             std.log.debug("Found: {any}", .{t});
             @panic("Match on that type is not implemented yet");
@@ -2768,4 +2772,24 @@ fn openContainer(self: *Self, name: Ast.TokenIndex) Error!void {
 fn closeContainer(self: *Self) void {
     _ = self.scope.close();
     _ = self.containers.pop();
+}
+
+/// Tries to fetch a constant value from either a `constant` instruction or a compile time literal bound to an identifier
+pub fn tryGetConstant(self: *Self, index: ir.Index) ?Instr.Data {
+    return switch (self.irb.getInstr(index)) {
+        .constant => self.irb.getConstant(index),
+        .identifier => |i| {
+            const scope = switch (i.scope) {
+                .local => self.scope.current,
+                .global => &self.scope.scopes.items[0],
+                .builtin => unreachable,
+            };
+            const ident = scope.variables.values()[i.index];
+
+            std.log.debug("Comptime: {}", .{ident.comp_time});
+
+            @panic("TODO");
+        },
+        else => null,
+    };
 }

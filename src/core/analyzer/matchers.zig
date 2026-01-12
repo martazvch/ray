@@ -12,7 +12,9 @@ const Ast = @import("../parser/Ast.zig");
 const Span = @import("../parser/Lexer.zig").Span;
 const misc = @import("misc");
 const oom = misc.oom;
+const Interner = misc.Interner;
 const RangeSet = misc.RangeSet;
+const Set = misc.Set;
 
 pub const Enum = struct {
     proto: Type.Enum.Proto,
@@ -134,7 +136,6 @@ pub const Int = struct {
                     if (res.ti.comp_time) {
                         const instr = ana.irb.getInstr(res.instr).range;
 
-                        // TODO: allow contant identifier that have a constant value literal to be used here
                         if (ana.irb.getInstr(instr.start) == .constant and ana.irb.getInstr(instr.end) == .constant) {
                             const range: RangeSet.Range = .{
                                 .low = ana.irb.getConstant(instr.start).int,
@@ -164,7 +165,7 @@ pub const Int = struct {
                 },
             }
 
-            return ana.err(.match_num_non_literal, span);
+            return ana.err(.match_non_literal, span);
         };
 
         if (range) |r| {
@@ -198,7 +199,7 @@ pub const Int = struct {
         const self: *Self = @ptrCast(@alignCast(self_opaque));
 
         if (!self.has_wildcard) {
-            return ana.err(.match_num_no_wildcard, span);
+            return ana.err(.match_no_wildcard, span);
         }
     }
 
@@ -247,7 +248,7 @@ pub const Bool = struct {
 
                 break :b res;
             },
-            else => return ana.err(.match_bool_non_literal, span),
+            else => return ana.err(.match_non_literal, span),
         };
 
         const body = try ana.analyzeNode(&value_arm.body, expect, ctx);
@@ -274,6 +275,71 @@ pub const Bool = struct {
 
         const missing = if (self.has_true) "false" else if (self.has_false) "true" else "true, false";
         return ana.err(.{ .match_non_exhaustive = .{ .missing = missing } }, span);
+    }
+
+    pub fn matcher(self: *Self) Matcher {
+        return .{
+            .ptr = self,
+            .vtable = &.{
+                .armFn = arm,
+                .wildcardFn = wildcard,
+                .validateFn = validate,
+            },
+        };
+    }
+};
+
+pub const String = struct {
+    covered: Set(Interner.Index),
+    has_wildcard: bool = false,
+
+    const Self = @This();
+
+    pub fn init() Self {
+        return .{ .covered = .empty };
+    }
+
+    pub fn deinit(self: *Self, allocator: Allocator) void {
+        self.set.deinit(allocator);
+    }
+
+    fn arm(self_opaque: *anyopaque, ana: *Analyzer, value_arm: *const Ast.Match.ValueArm, expect: ExprResKind, ctx: *Context) Matcher.ArmRes {
+        var self: *Self = @ptrCast(@alignCast(self_opaque));
+
+        const span = ana.ast.getSpan(value_arm.expr);
+
+        const arm_res = switch (value_arm.expr.*) {
+            .string => |s| b: {
+                const res = try ana.string(s);
+                const constant = ana.irb.getConstant(res.instr).string;
+
+                if (self.covered.has(constant)) {
+                    return ana.err(.match_duplicate_arm, span);
+                }
+
+                break :b res;
+            },
+            else => return ana.err(.match_non_literal, span),
+        };
+
+        const body = try ana.analyzeNode(&value_arm.body, expect, ctx);
+
+        return .{ arm_res, body };
+    }
+
+    fn wildcard(self_opaque: *anyopaque, ana: *Analyzer, wc: *const Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {
+        var self: *Self = @ptrCast(@alignCast(self_opaque));
+        self.has_wildcard = true;
+
+        return ana.analyzeNode(&wc.body, expect, ctx);
+    }
+
+    fn validate(self_opaque: *anyopaque, ana: *Analyzer, span: Span) Error!void {
+        const self: *Self = @ptrCast(@alignCast(self_opaque));
+
+        if (!self.has_wildcard) {
+            return ana.err(.match_no_wildcard, span);
+        }
     }
 
     pub fn matcher(self: *Self) Matcher {
