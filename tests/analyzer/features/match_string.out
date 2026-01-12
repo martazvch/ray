@@ -1,0 +1,21 @@
+[Function declaration main]
+    [Print]
+        [Match string]
+        - expression:
+            [Constant 3]
+                [String Tom]
+        - arms:
+            - expr:
+                [Constant 4]
+                    [String To]
+            - body:
+                [Constant 5]
+                    [String nop]
+            - expr:
+                [Constant 3]
+            - body:
+                [Constant 6]
+                    [String atLeast]
+            - wildcard:
+                [Constant 7]
+                    [String retry]

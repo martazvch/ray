@@ -1,0 +1,12 @@
+fn main() {
+    match "any" {
+        "one" => {}
+        "two" => {}
+        "one" => {}
+        _ => {}
+    }
+
+    match "any" {
+        "one" => {}
+    }
+}

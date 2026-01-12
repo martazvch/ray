@@ -316,6 +316,7 @@ pub const String = struct {
                 if (self.covered.has(constant)) {
                     return ana.err(.match_duplicate_arm, span);
                 }
+                self.covered.add(ana.allocator, constant) catch oom();
 
                 break :b res;
             },

@@ -1,0 +1,16 @@
+fn testString(s: str) {
+    print match s {
+        "To" => "yup"
+        "Martin" => "lom"
+        "Tom" => "atLeast"
+        _ => "z"
+    }
+}
+
+fn main() {
+    testString("Tom"[0..2])
+    testString("Martin")
+    testString("Tor")
+    testString("Tom")
+}
+

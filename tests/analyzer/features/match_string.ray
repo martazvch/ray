@@ -1,0 +1,7 @@
+fn main() {
+    print match "Tom" {
+        "To" => "nop"
+        "Tom" => "atLeast"
+        _ => "retry"
+    }
+}
