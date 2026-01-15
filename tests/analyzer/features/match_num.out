@@ -43,3 +43,44 @@
             - wildcard:
                 [Constant 13]
                     [Int 100]
+
+        [Variable declaration index: 1, scope: local]
+            [Constant 14]
+                [Float 2]
+        [Print]
+            [Match float]
+            - expression:
+                [Variable index: 1, scope: local]
+            - arms:
+                - expr:
+                    [Constant 15]
+                        [Float -1.2]
+                - body:
+                    [Constant 5]
+                - expr:
+                    [Constant 16]
+                        [Float 0.1]
+                - body:
+                    [Constant 7]
+                - expr:
+                    [Range]
+                    - start:
+                    [Constant 17]
+                        [Float 1.3]
+                    - end:
+                    [Constant 18]
+                        [Float 8.1]
+                - body:
+                    [Constant 12]
+                - expr:
+                    [Range]
+                    - start:
+                    [Constant 19]
+                        [Float -10.3]
+                    - end:
+                    [Constant 20]
+                        [Float -8.1]
+                - body:
+                    [Constant 12]
+                - wildcard:
+                    [Constant 13]

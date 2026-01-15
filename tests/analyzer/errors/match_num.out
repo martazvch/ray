@@ -1,5 +1,6 @@
 match_partial_overlap
 match_partial_overlap
+match_partial_overlap
 
 match_unreachable_arm
 match_no_wildcard
@@ -9,3 +10,12 @@ match_unreachable_arm
 
 match_num_decrease_range
 match_num_decrease_range
+type_mismatch, int, float
+
+match_unreachable_arm
+match_no_wildcard
+match_num_decrease_range
+match_non_literal
+match_num_invalid_unary
+match_num_invalid_unary
+type_mismatch, float, int

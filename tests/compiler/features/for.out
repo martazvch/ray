@@ -67,7 +67,7 @@ pop3
 
 load_constant index 6, value 5
 load_constant index 12, value 0
-range_new
+range_new_int
 iter_new_range
 iter_next
 jump_null 106 -> 116
@@ -79,7 +79,7 @@ pop2
 
 load_constant index 6, value 5
 load_constant index 13, value -1
-range_new
+range_new_int
 iter_new_range
 iter_next
 jump_null 124 -> 134
@@ -91,7 +91,7 @@ pop2
 
 load_constant index 15, value -5
 load_constant index 14, value -8
-range_new
+range_new_int
 iter_new_range
 iter_next
 jump_null 142 -> 152

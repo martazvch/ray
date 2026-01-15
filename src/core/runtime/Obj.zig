@@ -805,7 +805,7 @@ pub const RangeIterator = struct {
 
     const Self = @This();
 
-    pub fn create(vm: *Vm, range: Value.Range) *Obj {
+    pub fn create(vm: *Vm, range: Value.RangeInt) *Obj {
         var self: *Self = vm.gc_alloc.create(Self) catch oom();
         self.end = range.end;
         self.current = range.start;

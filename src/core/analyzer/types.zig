@@ -21,7 +21,7 @@ pub const Type = union(enum) {
     bool,
     str,
     null,
-    range,
+    range: *const Type,
     array: Array,
     @"enum": Enum,
     error_union: ErrorUnion,
@@ -258,7 +258,7 @@ pub const Type = union(enum) {
         hasher.update(asBytes(&@intFromEnum(self)));
 
         switch (self) {
-            .never, .void, .int, .float, .bool, .str, .null, .range => {},
+            .never, .void, .int, .float, .bool, .str, .null => {},
             .array => |ty| ty.child.hash(allocator, hasher),
             .@"enum" => |*ty| {
                 hasher.update(asBytes(&ty.is_err));
@@ -288,6 +288,7 @@ pub const Type = union(enum) {
             },
             .module => |interned| hasher.update(asBytes(&interned)),
             .optional => |child| child.hash(allocator, hasher),
+            .range => |r| r.hash(allocator, hasher),
             .structure => |ty| {
                 if (ty.loc) |loc| {
                     hasher.update(asBytes(&loc.name));
@@ -411,7 +412,7 @@ pub const TypeInterner = struct {
     ids: Set(*const Type),
     cache: Cache,
 
-    const CacheList: []const Type = &.{ .float, .int, .bool, .str, .null, .void, .never, .range };
+    const CacheList: []const Type = &.{ .float, .int, .bool, .str, .null, .void, .never };
     pub const Cache = CreateCache(CacheList);
 
     pub fn init(allocator: Allocator) TypeInterner {

@@ -9,4 +9,6 @@ fn main() {
 
     let v = 8
     for i, v in [true] {}
+
+    for s in 1.2..5.6 {}
 }

@@ -196,7 +196,13 @@ pub const Instruction = struct {
     };
     pub const MultiVarDecl = struct { decls: []const Index };
     pub const ObjFn = struct { obj: Index, fn_index: usize, kind: enum { array } };
-    pub const Range = struct { start: Index, end: Index };
+    pub const Range = struct {
+        start: Index,
+        end: Index,
+        kind: Kind,
+
+        pub const Kind = enum { int, float };
+    };
     pub const Return = struct { value: ?Index };
     pub const StructDecl = struct {
         // Interner index

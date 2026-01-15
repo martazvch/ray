@@ -33,6 +33,7 @@ pub const AnalyzerMsg = union(enum) {
     fail_outside_fn,
     float_equal,
     fn_expect_value: struct { expect: []const u8 },
+    for_iter_non_int_range,
     index_assign_str,
     invalid_arithmetic: struct { found: []const u8 },
     invalid_assign_target,
@@ -48,6 +49,7 @@ pub const AnalyzerMsg = union(enum) {
     match_non_exhaustive: struct { missing: []const u8 },
     match_no_wildcard,
     match_num_decrease_range,
+    match_num_invalid_unary,
     match_unreachable_arm,
     match_wildcard_exhaustive,
     missing_symbol_in_module: struct { symbol: []const u8, module: []const u8 },
@@ -64,7 +66,8 @@ pub const AnalyzerMsg = union(enum) {
     non_struct_field_access: struct { found: []const u8 },
     non_struct_struct_literal,
     null_assign_to_non_optional: struct { expect: []const u8 },
-    range_non_int: struct { found: []const u8 },
+    range_non_num: struct { found: []const u8 },
+    range_mix_int_float,
     return_outside_fn,
     self_outside_decl,
     ternary_cond_non_bool: struct { found: []const u8 },
@@ -130,6 +133,7 @@ pub const AnalyzerMsg = union(enum) {
             .fail_outside_fn => writer.writeAll("fail outside of a function"),
             .float_equal => writer.writeAll("floating-point values equality is unsafe"),
             .fn_expect_value => |e| writer.print("no value returned from function expecting '{s}'", .{e.expect}),
+            .for_iter_non_int_range => writer.writeAll("can't iterate a non-int range"),
             .index_assign_str => writer.writeAll("string type does not support indexing assignment"),
             .invalid_arithmetic => |e| writer.print("invalid arithmetic operation on type '{s}'", .{e.found}),
             .invalid_assign_target => writer.writeAll("invalid assignment target"),
@@ -144,6 +148,7 @@ pub const AnalyzerMsg = union(enum) {
             .match_non_exhaustive => |e| writer.print("non-exhaustive pattern matching, missing: '{s}'", .{e.missing}),
             .match_no_wildcard => writer.writeAll("expect wildcard pattern"),
             .match_num_decrease_range => writer.writeAll("start of range must be less than end"),
+            .match_num_invalid_unary => writer.writeAll("unary pattern can only be a negative numeric value"),
             .match_partial_overlap => writer.writeAll("partial arm overlapping"),
             .match_unreachable_arm => writer.writeAll("unreachable arm"),
             .match_wildcard_exhaustive => writer.writeAll("can't use wildcard with an exhaustive pattern match"),
@@ -161,7 +166,8 @@ pub const AnalyzerMsg = union(enum) {
             .non_struct_field_access => writer.writeAll("attempting to access a field on a non structure type"),
             .non_struct_struct_literal => writer.writeAll("expect a structure type in structure literal expressions"),
             .null_assign_to_non_optional => |e| writer.print("can't assign 'null' to non-optional type '{s}'", .{e.expect}),
-            .range_non_int => |e| writer.print("range values must be 'int', found '{s}'", .{e.found}),
+            .range_mix_int_float => writer.writeAll("found a mix of 'int' and 'float' types in range"),
+            .range_non_num => |e| writer.print("range values must be 'int' or float, found '{s}'", .{e.found}),
             .return_outside_fn => writer.writeAll("return outside of a function"),
             .self_outside_decl => writer.writeAll("can't use 'self' reserved parameter outside a declaration"),
             .ternary_cond_non_bool => |e| writer.print("ternary's condition must be a boolean, found '{s}'", .{e.found}),
@@ -215,6 +221,7 @@ pub const AnalyzerMsg = union(enum) {
             .expect_value_found_type => writer.writeAll("this is not a runtime value"),
             .float_equal => writer.writeAll("both sides are 'floats'"),
             .fn_expect_value => writer.writeAll("last expression didn't return a value"),
+            .for_iter_non_int_range => writer.writeAll("this range is made of floats"),
             .index_assign_str => writer.writeAll("this is a string"),
             .invalid_arithmetic => writer.writeAll("expression is not a numeric type"),
             .invalid_assign_target => writer.writeAll("cannot assign to this expression"),
@@ -229,6 +236,7 @@ pub const AnalyzerMsg = union(enum) {
             .match_non_exhaustive => writer.writeAll("this expression"),
             .match_no_wildcard => writer.writeAll("non-exhaustive match"),
             .match_num_decrease_range => writer.writeAll("this range is decreasing"),
+            .match_num_invalid_unary => writer.writeAll("this pattern"),
             .match_partial_overlap, .match_unreachable_arm => writer.writeAll("this arm"),
             .match_wildcard_exhaustive => writer.writeAll("wildcard useless"),
             .missing_symbol_in_module => writer.writeAll("this symbol is unknown"),
@@ -245,7 +253,8 @@ pub const AnalyzerMsg = union(enum) {
             .non_struct_field_access => |e| writer.print("expect a structure but found '{s}'", .{e.found}),
             .non_struct_struct_literal => writer.writeAll("this is not a structure"),
             .null_assign_to_non_optional => writer.writeAll("this is not an optinal type"),
-            .range_non_int => writer.writeAll("this is not an int"),
+            .range_mix_int_float => writer.writeAll("range's bound don't share type"),
+            .range_non_num => writer.writeAll("this is not a numeric type"),
             .fail_no_err => writer.writeAll("this is not an error"),
             .fail_outside_fn, .return_outside_fn, .self_outside_decl => writer.writeAll("here"),
             .ternary_cond_non_bool => writer.writeAll("this is not a bool"),
@@ -321,6 +330,13 @@ pub const AnalyzerMsg = union(enum) {
                 \\   value - other < 1e-6  instead of  value < other
             ),
             .fn_expect_value => writer.writeAll("refer to function's declaration to return the correct type with 'return'"),
+            .for_iter_non_int_range => writer.writeAll(
+                \\only integer ranges can be used as a for-loop iterator. Ranges made of floats can be used in:
+                \\  if:      if value in 1.2..5.6 {}
+                \\  pattern: match value {
+                \\              1.2..5.6 => ...
+                \\           }
+            ),
             .index_assign_str => writer.writeAll("strings are immutable, you can't change the underlying data"),
             .invalid_arithmetic => writer.writeAll("expect a numeric type"),
             .invalid_assign_target => writer.writeAll("can only assign to variables"),
@@ -342,6 +358,9 @@ pub const AnalyzerMsg = union(enum) {
             ),
             .match_non_literal => writer.writeAll("non-constant variables and non-literals aren't a valid pattern"),
             .match_num_decrease_range => writer.writeAll("ranges used as patterns must be increasing. Revert range's bounds"),
+            .match_num_invalid_unary => writer.writeAll(
+                \\logical unary 'not' is not allowed, use 'true' or 'false' and unary '-' can only be used on numeric values
+            ),
             .match_non_exhaustive => writer.writeAll(
                 "all pattern matching must be exhaustive. You can use '_' as the last arm to catch all the remaining possibilities",
             ),
@@ -374,7 +393,10 @@ pub const AnalyzerMsg = union(enum) {
             .non_struct_field_access => writer.writeAll("refer to variable's definition to know its type"),
             .non_struct_struct_literal => writer.writeAll("refer to type's definition"),
             .null_assign_to_non_optional => writer.writeAll("only optional types declared with '?' can be assigned 'null'"),
-            .range_non_int => writer.writeAll("ranges can only be constructed with integers values"),
+            .range_mix_int_float => writer.writeAll("a range must be made of 'int' or 'float' and both bounds must share the same type"),
+            .range_non_num => writer.writeAll(
+                \\ranges can only be constructed with numeric values and float ranges can only be used in pattern matching
+            ),
             .return_outside_fn => writer.writeAll(
                 "return statements are only allow to exit a function's body. In loops, use 'break' otherwise remove the return",
             ),

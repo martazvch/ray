@@ -839,11 +839,18 @@ const Compiler = struct {
                     try self.tagId(arm.expr);
                     self.writeOp(.eq_int);
                 },
-                .float => unreachable,
+                .float => {
+                    try self.compileInstr(arm.expr);
+                    if (self.at(arm.expr) == .range) {
+                        self.writeOp(.in_range_float);
+                    } else {
+                        self.writeOp(.eq_float);
+                    }
+                },
                 .int => {
                     try self.compileInstr(arm.expr);
-                    if (self.manager.instr_data[arm.expr] == .range) {
-                        self.writeOp(.in_range);
+                    if (self.at(arm.expr) == .range) {
+                        self.writeOp(.in_range_int);
                     } else {
                         self.writeOp(.eq_int);
                     }
@@ -895,7 +902,7 @@ const Compiler = struct {
     fn range(self: *Self, data: Instruction.Range) Error!void {
         try self.compileInstr(data.end);
         try self.compileInstr(data.start);
-        self.writeOp(.range_new);
+        self.writeOp(if (data.kind == .int) .range_new_int else .range_new_float);
     }
 
     fn returnInstr(self: *Self, data: Instruction.Return) Error!void {

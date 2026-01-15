@@ -378,7 +378,13 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
 
     const kind: Instr.For.Kind, const elem_type = switch (res.type.*) {
         .array => |t| .{ .array, t.child },
-        .range => .{ .range, self.ti.getCached(.int) },
+        .range => |r| b: {
+            if (r != self.ti.getCached(.int)) {
+                return self.err(.for_iter_non_int_range, self.ast.getSpan(node.expr));
+            }
+
+            break :b .{ .range, self.ti.getCached(.int) };
+        },
         .str => .{ .str, res.type },
         else => |*t| return self.err(.{ .iter_non_iterable = .{ .found = self.typeName(t) } }, self.ast.getSpan(node.expr)),
     };
@@ -1961,8 +1967,12 @@ fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Resul
             var matcher = matchers.Enum.init(t.proto(self.allocator));
             break :ana .{ .@"enum", matcher.matcher() };
         },
+        .float => {
+            var matcher = matchers.Num(f64).init();
+            break :ana .{ .float, matcher.matcher() };
+        },
         .int => {
-            var matcher = matchers.Int.init();
+            var matcher = matchers.Num(i64).init();
             break :ana .{ .int, matcher.matcher() };
         },
         .str => {
@@ -2082,22 +2092,31 @@ pub fn range(self: *Self, expr: Ast.Range, ctx: *Context) Result {
     const start = try self.analyzeExpr(expr.start, .value, ctx);
     const end = try self.analyzeExpr(expr.end, .value, ctx);
 
-    try self.validateRange(start.type, self.ast.getSpan(expr.start));
-    try self.validateRange(end.type, self.ast.getSpan(expr.end));
+    try self.validateRange(start.type, end.type, self.ast.getSpan(expr.start));
 
     return .{
-        .type = self.ti.getCached(.range),
+        .type = self.ti.intern(.{ .range = start.type }),
         .ti = .{ .comp_time = start.ti.comp_time and end.ti.comp_time },
         .instr = self.irb.addInstr(
-            .{ .range = .{ .start = start.instr, .end = end.instr } },
+            .{ .range = .{
+                .start = start.instr,
+                .end = end.instr,
+                .kind = if (start.type.is(.int)) .int else .float,
+            } },
             self.ast.getSpan(expr).start,
         ),
     };
 }
 
-fn validateRange(self: *Self, ty: *const Type, span: Span) Error!void {
-    if (!ty.is(.int)) {
-        return self.err(.{ .range_non_int = .{ .found = self.typeName(ty) } }, span);
+fn validateRange(self: *Self, low: *const Type, high: *const Type, span: Span) Error!void {
+    if (!low.is(.int) and !low.is(.float)) {
+        return self.err(.{ .range_non_num = .{ .found = self.typeName(low) } }, span);
+    }
+    if (!high.is(.int) and !high.is(.float)) {
+        return self.err(.{ .range_non_num = .{ .found = self.typeName(high) } }, span);
+    }
+    if (low != high) {
+        return self.err(.range_mix_int_float, span);
     }
 }
 

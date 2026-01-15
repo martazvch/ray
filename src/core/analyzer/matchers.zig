@@ -103,117 +103,156 @@ pub const Enum = struct {
     }
 };
 
-pub const Int = struct {
-    covered: RangeSet,
-    has_wildcard: bool = false,
-
-    const Self = @This();
-
-    pub fn init() Self {
-        return .{ .covered = .empty };
+pub fn Num(T: type) type {
+    if (T != i64 and T != f64) {
+        @compileError("Numeric matcher can only accept i64 or f64 types");
     }
 
-    pub fn deinit(self: *Self, allocator: Allocator) void {
-        self.ranges.deinit(allocator);
-    }
+    return struct {
+        covered: RangeSetType,
+        has_wildcard: bool = false,
 
-    fn arm(self_opaque: *anyopaque, ana: *Analyzer, value_arm: *const Ast.Match.ValueArm, expect: ExprResKind, ctx: *Context) Matcher.ArmRes {
-        var self: *Self = @ptrCast(@alignCast(self_opaque));
+        const Self = @This();
+        const RangeSetType = RangeSet(T);
+        const RangeType = RangeSetType.InnerRange;
 
-        const span = ana.ast.getSpan(value_arm.expr);
+        pub fn init() Self {
+            return .{ .covered = .empty };
+        }
 
-        const arm_res, const range: ?RangeSet.Range = b: {
-            switch (value_arm.expr.*) {
-                .int => |e| {
-                    const res = try ana.intLit(e, false);
-                    break :b .{ res, .unit(ana.irb.getConstant(res.instr).int) };
-                },
-                .range => |e| {
-                    var res = try ana.range(e, ctx);
-                    res.type = ana.ti.cache.int;
+        pub fn deinit(self: *Self, allocator: Allocator) void {
+            self.ranges.deinit(allocator);
+        }
 
-                    // If range is made of comptime known literals, we check the range
-                    if (res.ti.comp_time) {
-                        const instr = ana.irb.getInstr(res.instr).range;
+        fn arm(self_opaque: *anyopaque, ana: *Analyzer, value_arm: *const Ast.Match.ValueArm, expect: ExprResKind, ctx: *Context) Matcher.ArmRes {
+            var self: *Self = @ptrCast(@alignCast(self_opaque));
 
-                        if (ana.irb.getInstr(instr.start) == .constant and ana.irb.getInstr(instr.end) == .constant) {
-                            const range: RangeSet.Range = .{
-                                .low = ana.irb.getConstant(instr.start).int,
-                                .high = ana.irb.getConstant(instr.end).int,
-                            };
+            const span = ana.ast.getSpan(value_arm.expr);
 
-                            break :b .{ res, range };
+            const arm_res, const range: ?RangeType = b: {
+                switch (value_arm.expr.*) {
+                    .float => |e| {
+                        const res = try ana.floatLit(e, false);
+                        break :b .{ res, .unit(constantValue(ana, res.instr)) };
+                    },
+                    .int => |e| {
+                        const res = try ana.intLit(e, false);
+                        break :b .{ res, .unit(constantValue(ana, res.instr)) };
+                    },
+                    .range => |e| {
+                        var res = try ana.range(e, ctx);
+                        res.type = res.type.range;
+
+                        // If range is made of comptime known literals, we check the range
+                        if (res.ti.comp_time) {
+                            const instr = ana.irb.getInstr(res.instr).range;
+
+                            if (ana.irb.getInstr(instr.start) == .constant and ana.irb.getInstr(instr.end) == .constant) {
+                                const range: RangeType = .{
+                                    .low = constantValue(ana, instr.start),
+                                    .high = constantValue(ana, instr.end),
+                                };
+
+                                break :b .{ res, range };
+                            }
                         }
-                    }
-                },
-                .unary => |*e| {
-                    const res = try switch (e.expr.*) {
-                        .int => |i| ana.intLit(i, true),
-                        else => ana.analyzeExpr(e.expr, .value, ctx),
-                    };
+                    },
+                    .unary => |*e| {
+                        if (ana.ast.token_tags[e.op] != .minus) {
+                            return ana.err(.match_num_invalid_unary, span);
+                        }
 
-                    if (res.ti.comp_time) {
-                        break :b .{ res, .unit(ana.irb.getConstant(res.instr).int) };
-                    }
-                },
-                else => |*e| {
-                    const res = try ana.analyzeExpr(e, expect, ctx);
+                        const res = try switch (e.expr.*) {
+                            .int => |i| res: {
+                                if (T != i64) return ana.err(
+                                    .{ .type_mismatch = .{ .expect = "float", .found = "int" } },
+                                    span,
+                                );
 
-                    if (res.ti.comp_time) {
-                        break :b .{ res, null };
-                    }
-                },
+                                break :res ana.intLit(i, true);
+                            },
+                            .float => |f| res: {
+                                if (T != f64) return ana.err(
+                                    .{ .type_mismatch = .{ .expect = "int", .found = "float" } },
+                                    span,
+                                );
+
+                                break :res ana.floatLit(f, true);
+                            },
+                            else => return ana.err(.match_num_invalid_unary, span),
+                        };
+
+                        if (res.ti.comp_time) {
+                            break :b .{ res, .unit(constantValue(ana, res.instr)) };
+                        }
+                    },
+                    else => |*e| {
+                        const res = try ana.analyzeExpr(e, expect, ctx);
+
+                        if (res.ti.comp_time) {
+                            break :b .{ res, null };
+                        }
+                    },
+                }
+
+                return ana.err(.match_non_literal, span);
+            };
+
+            if (range) |r| {
+                if (!r.isIncreasing()) {
+                    return ana.err(.match_num_decrease_range, span);
+                }
+
+                try self.checkRange(ana, r, span);
             }
 
-            return ana.err(.match_non_literal, span);
-        };
+            const body = try ana.analyzeNode(&value_arm.body, expect, ctx);
 
-        if (range) |r| {
-            if (!r.isIncreasing()) {
-                return ana.err(.match_num_decrease_range, span);
+            return .{ arm_res, body };
+        }
+
+        fn checkRange(self: *Self, ana: *Analyzer, range: RangeType, span: Span) Error!void {
+            self.covered.checkRange(ana.allocator, range) catch |err| switch (err) {
+                error.partial => ana.warn(.match_partial_overlap, span),
+                error.unreached => return ana.err(.match_unreachable_arm, span),
+            };
+        }
+
+        fn constantValue(ana: *const Analyzer, instr: usize) T {
+            return switch (T) {
+                f64 => ana.irb.getConstant(instr).float,
+                i64 => ana.irb.getConstant(instr).int,
+                else => unreachable,
+            };
+        }
+
+        fn wildcard(self_opaque: *anyopaque, ana: *Analyzer, wc: *const Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {
+            var self: *Self = @ptrCast(@alignCast(self_opaque));
+            self.has_wildcard = true;
+
+            return ana.analyzeNode(&wc.body, expect, ctx);
+        }
+
+        fn validate(self_opaque: *anyopaque, ana: *Analyzer, span: Span) Error!void {
+            const self: *Self = @ptrCast(@alignCast(self_opaque));
+
+            if (!self.has_wildcard) {
+                return ana.err(.match_no_wildcard, span);
             }
-
-            try self.checkRange(ana, r, span);
         }
 
-        const body = try ana.analyzeNode(&value_arm.body, expect, ctx);
-
-        return .{ arm_res, body };
-    }
-
-    fn checkRange(self: *Self, ana: *Analyzer, range: RangeSet.Range, span: Span) Error!void {
-        self.covered.checkRange(ana.allocator, range) catch |err| switch (err) {
-            error.partial => ana.warn(.match_partial_overlap, span),
-            error.unreached => return ana.err(.match_unreachable_arm, span),
-        };
-    }
-
-    fn wildcard(self_opaque: *anyopaque, ana: *Analyzer, wc: *const Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {
-        var self: *Self = @ptrCast(@alignCast(self_opaque));
-        self.has_wildcard = true;
-
-        return ana.analyzeNode(&wc.body, expect, ctx);
-    }
-
-    fn validate(self_opaque: *anyopaque, ana: *Analyzer, span: Span) Error!void {
-        const self: *Self = @ptrCast(@alignCast(self_opaque));
-
-        if (!self.has_wildcard) {
-            return ana.err(.match_no_wildcard, span);
+        pub fn matcher(self: *Self) Matcher {
+            return .{
+                .ptr = self,
+                .vtable = &.{
+                    .armFn = arm,
+                    .wildcardFn = wildcard,
+                    .validateFn = validate,
+                },
+            };
         }
-    }
-
-    pub fn matcher(self: *Self) Matcher {
-        return .{
-            .ptr = self,
-            .vtable = &.{
-                .armFn = arm,
-                .wildcardFn = wildcard,
-                .validateFn = validate,
-            },
-        };
-    }
-};
+    };
+}
 
 pub const Bool = struct {
     has_true: bool = false,

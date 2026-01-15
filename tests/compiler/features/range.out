@@ -1,7 +1,7 @@
 -- main --
 load_constant index 4, value 5
 load_constant index 3, value 0
-range_new
+range_new_int
 iter_new_range
 iter_next
 jump_null 7 -> 35
@@ -9,7 +9,7 @@ get_local index 1
 print
 load_constant index 6, value 8
 load_constant index 5, value 6
-range_new
+range_new_int
 iter_new_range
 iter_next
 jump_null 20 -> 30
@@ -23,7 +23,7 @@ loop 32 -> 6
 pop2
 load_constant index 3, value 0
 load_constant index 4, value 5
-range_new
+range_new_int
 iter_new_range
 iter_next
 jump_null 43 -> 53
