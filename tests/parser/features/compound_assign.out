@@ -62,5 +62,21 @@
                 "op": "/"
             }
         }
+    },
+    "assignment": {
+        "assigne": {
+            "identifier": "a"
+        },
+        "value": {
+            "binop": {
+                "lhs": {
+                    "identifier": "a"
+                },
+                "rhs": {
+                    "int": "9"
+                },
+                "op": "%"
+            }
+        }
     }
 }

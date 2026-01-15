@@ -730,7 +730,11 @@ fn statement(self: *Self) Error!Node {
 
         return if (self.match(.equal))
             self.assignment(assigne)
-        else if (self.match(.plus_equal) or self.match(.minus_equal) or self.match(.star_equal) or self.match(.slash_equal))
+        else if (self.match(.plus_equal) or
+            self.match(.minus_equal) or
+            self.match(.star_equal) or
+            self.match(.slash_equal) or
+            self.match(.modulo_equal))
             self.compoundAssignment(assigne)
         else
             .{ .expr = assigne };
@@ -754,6 +758,7 @@ fn compoundAssignment(self: *Self, assigne: *Expr) Error!Node {
         .op = switch (op) {
             .plus_equal => .plus,
             .minus_equal => .minus,
+            .modulo_equal => .modulo,
             .star_equal => .star,
             .slash_equal => .slash,
             else => unreachable,

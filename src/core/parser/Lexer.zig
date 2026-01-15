@@ -110,6 +110,7 @@ pub const Token = struct {
         minus,
         minus_equal,
         modulo,
+        modulo_equal,
         new_line,
         not,
         null,
@@ -284,8 +285,15 @@ pub fn next(self: *Self) Token {
                     } else res.tag = .star;
                 },
                 '%' => {
-                    res.tag = .modulo;
                     self.index += 1;
+
+                    switch (self.source[self.index]) {
+                        '=' => {
+                            self.index += 1;
+                            res.tag = .modulo_equal;
+                        },
+                        else => res.tag = .modulo,
+                    }
                 },
                 '/' => continue :state .slash,
                 '\n' => {
@@ -609,14 +617,14 @@ test "numbers" {
 test "tokens" {
     var lexer = Self.init(std.testing.allocator);
     defer lexer.deinit();
-    lexer.lex("(){}.:,=!< ><= >= !=+-*/ += -= *= /=[]|@%");
+    lexer.lex("(){}.:,=!< ><= >= !=+-*/ += -= *= /= [] | @ % %=");
 
     const res = [_]Token.Tag{
-        .left_paren,    .right_paren, .left_brace, .right_brace, .dot,          .colon,
-        .comma,         .equal,       .bang,       .less,        .greater,      .less_equal,
-        .greater_equal, .bang_equal,  .plus,       .minus,       .star,         .slash,
-        .plus_equal,    .minus_equal, .star_equal, .slash_equal, .left_bracket, .right_bracket,
-        .pipe,          .at,          .modulo,
+        .left_paren,    .right_paren, .left_brace, .right_brace,  .dot,          .colon,
+        .comma,         .equal,       .bang,       .less,         .greater,      .less_equal,
+        .greater_equal, .bang_equal,  .plus,       .minus,        .star,         .slash,
+        .plus_equal,    .minus_equal, .star_equal, .slash_equal,  .left_bracket, .right_bracket,
+        .pipe,          .at,          .modulo,     .modulo_equal,
     };
 
     for (0..res.len) |i| {
@@ -716,9 +724,9 @@ test "dot" {
 test "range" {
     var lexer = Self.init(std.testing.allocator);
     defer lexer.deinit();
-    lexer.lex("1..2");
+    lexer.lex("1..2 -4.5..56.7");
 
-    const res = [_]Token.Tag{ .int, .dot_dot, .int };
+    const res = [_]Token.Tag{ .int, .dot_dot, .int, .minus, .float, .dot_dot, .float };
 
     for (0..res.len) |i| {
         const tag = lexer.tokens.items(.tag)[i];
