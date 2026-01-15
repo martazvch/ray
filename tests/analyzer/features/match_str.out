@@ -1,0 +1,29 @@
+[Function declaration main]
+    [Variable declaration index: 0, scope: local]
+        [Constant 3]
+            [String value]
+    [Print]
+        [Match string]
+        - expression:
+            [Variable index: 0, scope: local]
+        - arms:
+            - expr:
+                [Constant 4]
+                    [String volue]
+            - body:
+                [Constant 5]
+                    [Int 1]
+            - expr:
+                [Constant 6]
+                    [String valuee]
+            - body:
+                [Constant 7]
+                    [Int 2]
+            - expr:
+                [Constant 3]
+            - body:
+                [Constant 8]
+                    [Int 3]
+            - wildcard:
+                [Constant 9]
+                    [String oooo]

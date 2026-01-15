@@ -12,5 +12,13 @@ fn main() {
     testString("Martin")
     testString("Tor")
     testString("Tom")
+
+    print match "Tom" {
+        "To" => "yup"
+        "Martin" => "Tom"
+        "Tom" => "atLeast"
+        _ => "z"
+    }
 }
+
 
