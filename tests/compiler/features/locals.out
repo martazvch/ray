@@ -11,8 +11,7 @@ pop
 
 get_local index 0
 set_local index 1
-pop
-pop
+pop2
 
 load_constant index 9, value still global
 set_global index 0

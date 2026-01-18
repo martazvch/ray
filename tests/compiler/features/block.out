@@ -19,14 +19,13 @@ pop
 load_constant index 3, value 5
 get_local index 1
 print
-pop
-pop
+pop2
 
 load_constant index 7, value 7
 get_local index 0
 store_blk_val
 pop
-jump 34 -> 38
+jump 33 -> 37
 pop
 
 load_blk_val
@@ -37,12 +36,9 @@ load_constant index 10, value 90
 get_local index 3
 store_blk_val
 popn index 4
-jump 52 -> 59
+jump 51 -> 56
 
-pop
-pop
-pop
-pop
+popn index 4
 load_blk_val
 ret_naked
 

@@ -28,23 +28,22 @@ load_constant index 3, value 0
 range_new_int
 iter_new_range
 iter_next
-jump_null 45 -> 74
+jump_null 45 -> 73
 
 load_constant index 6, value 6
 load_constant index 4, value 3
 range_new_int
 iter_new_range
 iter_next
-jump_null 55 -> 69
+jump_null 55 -> 68
 load_constant index 7, value 1
 pop2
 loop 61 -> 54
-pop
-pop
-loop 66 -> 54
+pop2
+loop 65 -> 54
 pop2
 pop
-loop 71 -> 44
+loop 70 -> 44
 pop2
 
 load_constant index 4, value 3
@@ -52,24 +51,22 @@ load_constant index 3, value 0
 range_new_int
 iter_new_range
 iter_next
-jump_null 82 -> 115
+jump_null 81 -> 112
 load_constant index 7, value 1
 load_constant index 6, value 6
 load_constant index 4, value 3
 range_new_int
 iter_new_range
 iter_next
-jump_null 94 -> 109
+jump_null 93 -> 107
 load_constant index 8, value 2
 popn index 5
-loop 101 -> 81
-pop
-pop
-loop 106 -> 93
+loop 100 -> 80
 pop2
-pop
-pop
-loop 112 -> 81
+loop 104 -> 92
+pop2
+pop2
+loop 109 -> 80
 pop2
 
 load_constant index 3, value 0
@@ -77,60 +74,60 @@ load_constant index 3, value 0
 get_local index 0
 load_constant index 9, value 4
 lt_int
-jump_false 123 -> 133
+jump_false 120 -> 130
 pop
-loop 127 -> 118
-loop 130 -> 118
+loop 124 -> 115
+loop 127 -> 115
 pop
 
 get_local index 0
 load_constant index 9, value 4
 lt_int
-jump_false 139 -> 149
+jump_false 136 -> 146
 pop
-loop 143 -> 134
-loop 146 -> 134
+loop 140 -> 131
+loop 143 -> 131
 pop
 
 get_local index 0
 load_constant index 6, value 6
 lt_int
-jump_false 155 -> 182
+jump_false 152 -> 179
 pop
 
 get_local index 0
 load_constant index 9, value 4
 lt_int
-jump_false 164 -> 178
+jump_false 161 -> 175
 pop
 load_constant index 7, value 1
 pop
-loop 171 -> 159
+loop 168 -> 156
 pop
-loop 175 -> 159
+loop 172 -> 156
 pop
-loop 179 -> 150
+loop 176 -> 147
 pop
 
 get_local index 0
 load_constant index 9, value 4
 lt_int
-jump_false 188 -> 218
+jump_false 185 -> 215
 pop
 load_constant index 7, value 1
 get_local index 0
 load_constant index 9, value 4
 lt_int
-jump_false 199 -> 213
+jump_false 196 -> 210
 pop
 load_constant index 8, value 2
 pop2
-loop 206 -> 183
+loop 203 -> 180
 pop
-loop 210 -> 194
+loop 207 -> 191
 pop
 pop
-loop 215 -> 183
+loop 212 -> 180
 pop
 ret_naked
 

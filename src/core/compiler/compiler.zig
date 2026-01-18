@@ -540,10 +540,7 @@ const Compiler = struct {
             try self.compileInstr(instr);
         }
 
-        // PERF: horrible perf, just emit a stack.top -= count
-        for (0..data.pop_count) |_| {
-            self.writeOp(.pop);
-        }
+        self.writePops(data.pop_count);
         try self.closeAndPatchBlock();
 
         if (data.is_expr) self.writeOp(.load_blk_val);
@@ -799,12 +796,7 @@ const Compiler = struct {
         // We patch them before cleaning the scope and then looping so that each continue don't do it
         try self.patchContinueInBlock(loop_start);
 
-        // PERF:
-        if (body.pop_count > 0) {
-            for (0..body.pop_count) |_| {
-                self.writeOp(.pop);
-            }
-        }
+        self.writePops(body.pop_count);
 
         try self.emitLoop(loop_start);
         try self.patchJump(iter_end);
@@ -1148,10 +1140,7 @@ const Compiler = struct {
         // We patch them before cleaning the scope and then looping so that each continue don't do it
         try self.patchContinueInBlock(loop_start);
 
-        // PERF:
-        for (0..body.pop_count) |_| {
-            self.writeOp(.pop);
-        }
+        self.writePops(body.pop_count);
 
         try self.emitLoop(loop_start);
         try self.patchJump(exit_jump);
