@@ -461,6 +461,10 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             .pop => self.stack.top -= 1,
             .pop2 => self.stack.top -= 2,
             .pop3 => self.stack.top -= 3,
+            .popn => {
+                const count = frame.readByte();
+                self.stack.top -= count;
+            },
             .print => {
                 self.stack.pop().print(stdout);
                 stdout.writeAll("\n") catch oom();

@@ -18,11 +18,11 @@
                 [Bool false]
         - then:
             [Block pop count: 0, is_expr: true]
-                [Break depth: 0]
+                [Break depth: 0, pop: 0]
                     [Constant 3]
         - else:
             [Block pop count: 0, is_expr: true]
-                [Break depth: 0]
+                [Break depth: 0, pop: 0]
                     [Constant 4]
 [Function declaration add2, returns]
     [Variable declaration index: 0, scope: local]

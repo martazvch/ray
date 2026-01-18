@@ -89,7 +89,7 @@ eq_int
 jump_false 116 -> 125
 pop
 load_constant index 13, value 1
-jump 122 -> 167
+jump 122 -> 168
 pop
 
 dup
@@ -99,24 +99,25 @@ eq_int
 jump_false 131 -> 140
 pop
 load_constant index 14, value 2
-jump 137 -> 167
+jump 137 -> 168
 pop
 
 dup
 load_constant index 3, value <enum Marker, tag 2>
 get_tag
 eq_int
-jump_false 146 -> 166
+jump_false 146 -> 167
 pop
 load_constant index 15, value 4
 load_constant index 16, value 6
 load_constant index 17, value 3
 store_blk_val
-jump 157 -> 160
+pop2
+jump 158 -> 163
 pop
 pop
 load_blk_val
-jump 163 -> 167
+jump 164 -> 168
 pop
 
 // Because pattern match is an expression
@@ -128,21 +129,21 @@ dup
 load_constant index 11, value <enum Marker, tag 1>
 get_tag
 eq_int
-jump_false 176 -> 186
+jump_false 177 -> 187
 pop
 load_constant index 6, value circle
 print
-jump 183 -> 205
+jump 184 -> 206
 pop
 dup
 load_constant index 12, value <enum Marker, tag 0>
 get_tag
 eq_int
-jump_false 192 -> 202
+jump_false 193 -> 203
 pop
 load_constant index 8, value cross
 print
-jump 199 -> 205
+jump 200 -> 206
 pop
 load_constant index 18, value invalid
 pop

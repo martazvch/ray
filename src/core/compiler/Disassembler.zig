@@ -146,6 +146,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, offset: usize) usize {
         .pop => self.simpleInstruction(writer, "pop", offset),
         .pop2 => self.simpleInstruction(writer, "pop2", offset),
         .pop3 => self.simpleInstruction(writer, "pop3", offset),
+        .popn => self.indexInstruction(writer, "popn", offset),
         .print => self.simpleInstruction(writer, "print", offset),
         .push_false => self.simpleInstruction(writer, "push_false", offset),
         .push_null => self.simpleInstruction(writer, "push_null", offset),

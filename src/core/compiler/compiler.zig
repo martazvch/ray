@@ -133,22 +133,31 @@ const Compiler = struct {
 
     const Self = @This();
     const BlockStack = struct {
-        stack: ArrayList(Breaks),
+        stack: ArrayList(Block),
 
-        const Breaks = ArrayList(usize);
+        const Block = struct {
+            jumps: ArrayList(Jump),
+        };
+        const Jump = struct {
+            kind: Kind,
+            instr: usize,
+
+            const Kind = enum { @"break", @"continue" };
+        };
+
         pub const empty: BlockStack = .{ .stack = .empty };
 
         pub fn open(self: *BlockStack, allocator: Allocator) void {
-            self.stack.append(allocator, .empty) catch oom();
+            self.stack.append(allocator, .{ .jumps = .empty }) catch oom();
         }
 
-        pub fn close(self: *BlockStack) Breaks {
+        pub fn close(self: *BlockStack) Block {
             return self.stack.pop().?;
         }
 
-        /// Depth is generated from bottom to top in *Analyzer*
-        pub fn add(self: *BlockStack, allocator: Allocator, instr: usize, depth: usize) void {
-            self.stack.items[self.stack.items.len - 1 - depth].append(allocator, instr) catch oom();
+        /// Adds a jump in the block at `depth`. `depth` is generated from bottom to top in *Analyzer*
+        pub fn add(self: *BlockStack, allocator: Allocator, kind: Jump.Kind, instr: usize, depth: usize) void {
+            self.stack.items[self.stack.items.len - 1 - depth].jumps.append(allocator, .{ .kind = kind, .instr = instr }) catch oom();
         }
     };
     const Error = CompilationUnit.Error;
@@ -267,19 +276,33 @@ const Compiler = struct {
     }
 
     fn emitLoop(self: *Self, loop_start: usize) Error!void {
-        const offset = self.manager.line;
-        const chunk = &self.function.chunk;
-        chunk.writeOp(self.manager.allocator, .loop, offset);
+        self.writeOp(.loop);
         // +2 for loop own operands (jump offset on 16bits)
-        const jump_offset = chunk.code.items.len - loop_start + 2;
+        const jump_offset = self.function.chunk.code.items.len - loop_start + 2;
 
         // TODO: Error handling
         if (jump_offset > std.math.maxInt(u16)) {
             @panic("loop body too large\n");
         }
 
-        chunk.writeByte(self.manager.allocator, @as(u8, @intCast(jump_offset >> 8)) & 0xff, offset);
-        chunk.writeByte(self.manager.allocator, @intCast(jump_offset & 0xff), offset);
+        self.writeByte(@intCast(jump_offset >> 8));
+        self.writeByte(@intCast(jump_offset & 0xff));
+    }
+
+    fn patchLoop(self: *Self, offset: usize, loop_start: usize) Error!void {
+        const chunk = &self.function.chunk;
+        // +2 for the two 8bits jump value (cf emit jump)
+        const jump_offset = offset - loop_start + 2;
+        std.log.debug("Offset: {}, loop_start: {}", .{ offset, loop_start });
+        std.log.debug("Jump offset: {}", .{jump_offset});
+
+        // TODO: Error handling
+        if (jump_offset > std.math.maxInt(u16)) {
+            @panic("loop body too large\n");
+        }
+
+        chunk.code.items[offset] = @as(u8, @intCast(jump_offset >> 8));
+        chunk.code.items[offset + 1] = @intCast(jump_offset & 0xff);
     }
 
     pub fn end(self: *Self) Error!*Obj.Function {
@@ -306,6 +329,17 @@ const Compiler = struct {
         return self.function;
     }
 
+    fn writePops(self: *Self, count: usize) void {
+        // TODO: error
+        switch (count) {
+            0 => {},
+            1 => self.writeOp(.pop),
+            2 => self.writeOp(.pop2),
+            3 => self.writeOp(.pop3),
+            else => |c| self.writeOpAndByte(.popn, @intCast(c)),
+        }
+    }
+
     fn compileInstr(self: *Self, instr: ir.Index) Error!void {
         self.manager.line = self.manager.instr_lines[instr];
 
@@ -320,6 +354,7 @@ const Compiler = struct {
             .call => |*data| self.call(data),
 
             .constant => |data| self.constant(data, true),
+            .@"continue" => |data| self.continueInstr(data),
             .discard => |index| self.wrappedInstr(.pop, index),
 
             .enum_create => |*data| self.enumCreate(data),
@@ -505,14 +540,11 @@ const Compiler = struct {
             try self.compileInstr(instr);
         }
 
-        for (self.block_stack.close().items) |b| {
-            try self.patchJump(b);
-        }
-
         // PERF: horrible perf, just emit a stack.top -= count
         for (0..data.pop_count) |_| {
             self.writeOp(.pop);
         }
+        try self.closeAndPatchBlock();
 
         if (data.is_expr) self.writeOp(.load_blk_val);
     }
@@ -526,10 +558,12 @@ const Compiler = struct {
     fn breakInstr(self: *Self, data: Instruction.Break) Error!void {
         if (data.instr) |instr| {
             try self.compileInstr(instr);
+            // Load is done by end of `block`
             self.writeOp(.store_blk_val);
         }
 
-        self.block_stack.add(self.manager.allocator, self.emitJump(.jump), data.depth);
+        self.writePops(data.pop_count);
+        self.block_stack.add(self.manager.allocator, .@"break", self.emitJump(.jump), data.depth);
     }
 
     fn call(self: *Self, data: *const Instruction.Call) Error!void {
@@ -710,6 +744,11 @@ const Compiler = struct {
         }
     }
 
+    fn continueInstr(self: *Self, data: Instruction.Continue) Error!void {
+        self.writePops(data.pop_count);
+        self.block_stack.add(self.manager.allocator, .@"continue", self.emitJump(.loop), data.depth);
+    }
+
     fn enumCreate(self: *Self, data: *const Instruction.EnumCreate) Error!void {
         // TODO:
         // PERF: could do like structure literal, no need to push the symbol to stack
@@ -746,8 +785,8 @@ const Compiler = struct {
         });
 
         self.block_stack.open(self.manager.allocator);
-
         const loop_start = self.function.chunk.code.items.len;
+
         self.writeOp(if (data.use_index) .iter_next_index else .iter_next);
         const iter_end = self.emitJump(.jump_null);
 
@@ -756,6 +795,9 @@ const Compiler = struct {
         for (body.instrs) |instr| {
             try self.compileInstr(instr);
         }
+
+        // We patch them before cleaning the scope and then looping so that each continue don't do it
+        try self.patchContinueInBlock(loop_start);
 
         // PERF:
         if (body.pop_count > 0) {
@@ -767,12 +809,28 @@ const Compiler = struct {
         try self.emitLoop(loop_start);
         try self.patchJump(iter_end);
 
-        for (self.block_stack.close().items) |b| {
-            try self.patchJump(b);
-        }
-
         // Null value and iterator
         self.writeOp(if (data.use_index) .pop3 else .pop2);
+
+        try self.closeAndPatchBlock();
+    }
+
+    fn closeAndPatchBlock(self: *Self) Error!void {
+        const popped = self.block_stack.close();
+
+        for (popped.jumps.items) |jump| {
+            if (jump.kind == .@"break") {
+                try self.patchJump(jump.instr);
+            }
+        }
+    }
+
+    fn patchContinueInBlock(self: *Self, loop_start: usize) Error!void {
+        for (self.block_stack.stack.getLast().jumps.items) |jump| {
+            if (jump.kind == .@"continue") {
+                try self.patchLoop(jump.instr, loop_start);
+            }
+        }
     }
 
     fn identifier(self: *Self, data: *const Instruction.Variable) Error!void {
@@ -1071,8 +1129,8 @@ const Compiler = struct {
 
     fn whileInstr(self: *Self, data: Instruction.While) Error!void {
         const is_null_pat = self.manager.instr_data[data.cond] == .pat_nullable;
-        self.block_stack.open(self.manager.allocator);
 
+        self.block_stack.open(self.manager.allocator);
         const loop_start = self.function.chunk.code.items.len;
 
         try self.compileInstr(data.cond);
@@ -1087,21 +1145,21 @@ const Compiler = struct {
             try self.compileInstr(instr);
         }
 
+        // We patch them before cleaning the scope and then looping so that each continue don't do it
+        try self.patchContinueInBlock(loop_start);
+
         // PERF:
         for (0..body.pop_count) |_| {
             self.writeOp(.pop);
         }
 
         try self.emitLoop(loop_start);
-
         try self.patchJump(exit_jump);
         // If false
         // If the condition was null pattern, the variable tested against `null` is still on
         // top of stack so we have to remove it
         self.writeOp(if (is_null_pat) .pop2 else .pop);
 
-        for (self.block_stack.close().items) |b| {
-            try self.patchJump(b);
-        }
+        try self.closeAndPatchBlock();
     }
 };

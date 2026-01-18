@@ -74,6 +74,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .@"break" => |data| self.breakInstr(data),
         .call => |*data| self.call(data),
         .constant => |data| self.constant(data),
+        .@"continue" => |data| self.continueInstr(data),
         .discard => |index| self.indexInstr("Discard", index),
         .enum_create => |data| self.enumCreate(data),
         .enum_decl => |*data| self.enumDecl(data),
@@ -200,7 +201,7 @@ fn boundMethod(self: *Self, data: Instruction.BoundMethod) void {
 }
 
 fn breakInstr(self: *Self, data: Instruction.Break) void {
-    self.indentAndPrintSlice("[Break depth: {}]", .{data.depth});
+    self.indentAndPrintSlice("[Break depth: {}, pop: {}]", .{ data.depth, data.pop_count });
     if (data.instr) |instr| {
         self.indent_level += 1;
         defer self.indent_level -= 1;
@@ -291,6 +292,10 @@ fn constant(self: *Self, data: Instruction.Constant) void {
         defer self.indent_level -= 1;
         self.parseInstr(data.instr);
     }
+}
+
+fn continueInstr(self: *Self, data: Instruction.Continue) void {
+    self.indentAndPrintSlice("[Continue depth: {}, pop: {}]", .{ data.depth, data.pop_count });
 }
 
 fn enumCreate(self: *Self, data: Instruction.EnumCreate) void {

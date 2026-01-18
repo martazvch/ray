@@ -16,7 +16,7 @@
             [Constant 0]
         - then:
             [Block pop count: 0, is_expr: true]
-                [Break depth: 0]
+                [Break depth: 0, pop: 0]
                     [Constant 4]
         - else:
             [Constant 3]
@@ -26,7 +26,7 @@
             [Constant 0]
         - then:
             [Block pop count: 0, is_expr: true]
-                [Break depth: 0]
+                [Break depth: 0, pop: 0]
                     [Constant 5]
                         [Float 8.7]
         - else:
@@ -35,7 +35,7 @@
                 [Constant 0]
             - then:
                 [Block pop count: 0, is_expr: true]
-                    [Break depth: 0]
+                    [Break depth: 0, pop: 0]
                         [Constant 6]
                             [Int 6]
             - else:
@@ -46,7 +46,7 @@
             [Constant 0]
         - then:
             [Block pop count: 0, is_expr: true]
-                [Break depth: 0]
+                [Break depth: 0, pop: 0]
                     [Constant 7]
                         [String ok]
         - else:
@@ -69,7 +69,7 @@
                 [Bool false]
         - else:
             [Block pop count: 0, is_expr: true]
-                [Break depth: 0]
+                [Break depth: 0, pop: 0]
                     [Constant 0]
     [Discard]
         [If]
@@ -82,7 +82,7 @@
                         [Float 5.5]
                 [Variable declaration index: 1, scope: local]
                     [Constant 5]
-                [Break depth: 0]
+                [Break depth: 0, pop: 2]
                     [Binop type: add_float]
                         [Variable index: 3, scope: local]
                         [Variable index: 4, scope: local]
@@ -97,20 +97,20 @@
                 [Variable declaration index: 1, scope: local]
                     [Constant 10]
                         [Int 1]
-                [Break depth: 0]
+                [Break depth: 0, pop: 2]
                     [Variable index: 3, scope: local]
         - then:
             [Constant 11]
                 [Float 1.5]
         - else:
             [Block pop count: 0, is_expr: true]
-                [Break depth: 0]
+                [Break depth: 0, pop: 0]
                     [Constant 3]
     [Discard]
         [If]
         - condition:
             [Block pop count: 0, is_expr: true]
-                [Break depth: 0]
+                [Break depth: 0, pop: 0]
                     [If]
                     - condition:
                         [Constant 0]
@@ -140,4 +140,4 @@
         [Constant 0]
     - then:
         [Block pop count: 0, is_expr: false]
-            [Break depth: 0]
+            [Break depth: 0, pop: 0]

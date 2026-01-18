@@ -1,11 +1,16 @@
 fn main() {
     outer: {
+        let a = 1
+        let b = 2
+
         inner: {
+            let c = 3
             {
                 if true do break
                 if true do break :outer
                 if true do break :inner
             }
+            let d = 4
             break :inner
         }
     }

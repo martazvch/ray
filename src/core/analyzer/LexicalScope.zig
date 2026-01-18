@@ -76,20 +76,26 @@ pub const Scope = struct {
     /// Offset to apply to any index in this scope. Correspond to the numbers of locals
     /// in parent scopes (represents stack at runtime)
     offset: usize,
-    /// It means you can't go to upper scope from this one
-    barrier: bool,
-    /// This scopes is expected to return a value
-    exp_val: bool,
+    opts: Options,
+
+    pub const Options = struct {
+        /// It means you can't go to upper scope from this one
+        barrier: bool = false,
+        /// This scopes is expected to return a value
+        exp_val: bool = false,
+        /// Can use `continue` statments inside this block
+        can_continue: bool = false,
+    };
 };
 
 /// Opens a new scope. It can be the scope of a symbol like a function, closure or structure
 /// declaration. In that case, **barrier** should be `true` as you can access outter scope from
 /// those and the name should be `null`.
 /// Otherwise, you can name the scope as it might just be a regular block
-pub fn open(self: *Self, allocator: Allocator, name: ?InternerIdx, barrier: bool, exp_val: bool) void {
-    const offset = if (barrier) 0 else self.current.variables.count() + self.current.offset;
+pub fn open(self: *Self, allocator: Allocator, name: ?InternerIdx, opts: Scope.Options) void {
+    const offset = if (opts.barrier) 0 else self.current.variables.count() + self.current.offset;
 
-    var scope: Scope = .{ .name = name, .offset = offset, .barrier = barrier, .exp_val = exp_val };
+    var scope: Scope = .{ .name = name, .offset = offset, .opts = opts };
 
     // If variables have been forwarded, for declare them now
     if (self.scopes.items.len > 0) {
@@ -136,7 +142,7 @@ pub fn close(self: *Self) struct { usize, []const Break } {
 }
 
 pub fn initGlobalScope(self: *Self, allocator: Allocator, state: *State) void {
-    self.open(allocator, null, true, false);
+    self.open(allocator, null, .{ .barrier = true });
     const builtins = std.meta.fields(@TypeOf(state.type_interner.cache));
     self.builtins.ensureUnusedCapacity(allocator, builtins.len) catch oom();
 
@@ -302,15 +308,16 @@ pub fn getModule(self: *const Self, name: InternerIdx) ?*const Type {
     return null;
 }
 
+/// Searches a scope by its name or return the last one if `label` is null
 /// Returns the index (start from 0) and the depth (start from scopes.len) of the scope if found
-pub fn getScopeByName(self: *const Self, label: ?InstrIndex) error{UnknownLabel}!struct { usize, usize } {
+pub fn getScope(self: *const Self, label: ?InstrIndex) error{UnknownLabel}!struct { usize, usize } {
     const lbl = label orelse return .{ self.scopes.items.len - 1, 0 };
 
     var depth: usize = 0;
     var it = self.iterator();
     while (it.next()) |scope| : (depth += 1) {
         // We hit a function or structure's declaration scope
-        if (scope.barrier) break;
+        if (scope.opts.barrier) break;
 
         if (scope.name) |sn| {
             if (sn != lbl) continue;
@@ -319,6 +326,41 @@ pub fn getScopeByName(self: *const Self, label: ?InstrIndex) error{UnknownLabel}
     }
 
     return error.UnknownLabel;
+}
+
+/// Searches a scope by its name or return the last one if `label` is null
+/// Returns the index (start from 0) and the depth (start from scopes.len) of the scope if found
+pub const ContinueScopeErr = error{
+    /// Didn't find any scope corresponding to provided label
+    UnknownLabel,
+    /// Found a labelled scope but it isn't continuable
+    CantContinue,
+    /// Didn't find any continuable scope
+    NoContinueScope,
+};
+pub fn getScopeContinuable(self: *const Self, label: ?InstrIndex) ContinueScopeErr!struct { *const Scope, usize } {
+    var depth: usize = 0;
+    var it = self.iterator();
+    while (it.next()) |scope| : (depth += 1) {
+        // We hit a function or structure's declaration scope
+        if (scope.opts.barrier) break;
+
+        if (label) |lbl| {
+            if (scope.name) |sn| {
+                if (sn != lbl) continue;
+                if (!scope.opts.can_continue) return error.CantContinue;
+                return .{ scope, depth };
+            }
+        } else if (scope.opts.can_continue) {
+            return .{ scope, depth };
+        }
+    }
+
+    return if (label != null) error.UnknownLabel else error.NoContinueScope;
+}
+
+pub fn stackDiffWithCurrent(self: *const Self, other: *const Scope) usize {
+    return self.current.offset + self.current.variables.count() - other.offset;
 }
 
 // TODO: shouldn't it be in type interner?

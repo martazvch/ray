@@ -38,6 +38,7 @@ pub const Token = struct {
         .{ "and", .@"and" },
         .{ "as", .as },
         .{ "break", .@"break" },
+        .{ "continue", .@"continue" },
         .{ "do", .do },
         .{ "else", .@"else" },
         .{ "enum", .@"enum" },
@@ -76,6 +77,7 @@ pub const Token = struct {
         @"break",
         colon,
         comma,
+        @"continue",
         do,
         dot,
         dot_dot,
@@ -639,14 +641,14 @@ test "keywords" {
     lexer.lex(
         \\\and else false for fn if null or print return 
         \\\self struct true var while not do use break 
-        \\\as enum match let in fail trap is
+        \\\as enum match let in fail trap is continue
     );
 
     const res = [_]Token.Tag{
-        .@"and",    .@"else",  .false,    .@"for",    .@"fn",   .@"if",  .null,     .@"or", .print,
-        .@"return", .new_line, .self,     .@"struct", .true,    .@"var", .@"while", .not,   .do,
-        .use,       .@"break", .new_line, .as,        .@"enum", .match,  .let,      .in,    .fail,
-        .trap,      .is,       .eof,
+        .@"and",    .@"else",  .false,       .@"for",    .@"fn",   .@"if",  .null,     .@"or", .print,
+        .@"return", .new_line, .self,        .@"struct", .true,    .@"var", .@"while", .not,   .do,
+        .use,       .@"break", .new_line,    .as,        .@"enum", .match,  .let,      .in,    .fail,
+        .trap,      .is,       .@"continue", .eof,
     };
 
     for (0..res.len) |i| {

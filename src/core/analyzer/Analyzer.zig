@@ -47,12 +47,14 @@ pub const Context = struct {
     fn_type: ?*const Type,
     self_type: ?*const Type,
     in_call: bool,
+    in_for: bool,
 
     pub const empty: Context = .{
         .decl_type = null,
         .fn_type = null,
         .self_type = null,
         .in_call = false,
+        .in_for = false,
     };
 
     const ContextSnapshot = struct {
@@ -278,10 +280,30 @@ fn assignment(self: *Self, node: *const Ast.Assignment, ctx: *Context) StmtResul
 }
 
 fn continueStmt(self: *Self, node: Ast.Continue, ctx: *const Context) StmtResult {
-    _ = self; // autofix
-    _ = node; // autofix
-    _ = ctx; // autofix
-    unreachable;
+    const span = self.ast.getSpan(node);
+
+    const scope, const depth = self.scope.getScopeContinuable(self.internLabel(node.label)) catch |e| {
+        return switch (e) {
+            error.CantContinue => self.err(
+                .{ .cant_continue_scope = .{ .name = self.ast.toSource(node.label.?) } },
+                self.ast.getSpan(node.label.?),
+            ),
+            error.NoContinueScope => self.err(.no_continuable_scope, span),
+            error.UnknownLabel => self.err(
+                .{ .undeclared_block_label = .{ .name = self.ast.toSource(node.label.?) } },
+                self.ast.getSpan(node.label.?),
+            ),
+        };
+    };
+
+    // If we are in a `for` loop, we don't discard the added iterator
+    return self.irb.addInstr(
+        .{ .@"continue" = .{
+            .depth = depth,
+            .pop_count = self.scope.stackDiffWithCurrent(scope) - @intFromBool(ctx.in_for),
+        } },
+        span.start,
+    );
 }
 
 fn discard(self: *Self, expr: *const Expr, ctx: *Context) StmtResult {
@@ -399,7 +421,10 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
     }
 
     try self.forwardDeclareVariable(binding, elem_type, false, self.ast.getSpan(node.binding));
-    const body_res = try self.block(&node.body, 1, .none, ctx);
+
+    const prev_in_for = ctx.setAndGetPrevious(.in_for, true);
+    defer ctx.in_for = prev_in_for;
+    const body_res = try self.block(&node.body, 1, .{ .can_continue = true }, ctx);
 
     return self.irb.addInstr(
         .{ .for_loop = .{
@@ -427,7 +452,7 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
     // Forward declaration in outer scope for recursion
     var sym = self.scope.forwardDeclareSymbol(self.allocator, name);
 
-    self.scope.open(self.allocator, null, true, false);
+    self.scope.open(self.allocator, null, .{ .barrier = true });
     errdefer _ = self.scope.close();
 
     self.containers.append(self.allocator, self.ast.toSource(node.name));
@@ -832,7 +857,7 @@ fn whileStmt(self: *Self, node: *const Ast.While, ctx: *Context) StmtResult {
         .{ .non_bool_cond = .{ .what = "while", .found = self.typeName(cond_res.type) } },
         span,
     );
-    const body_res = try self.block(&node.body, 0, .none, ctx);
+    const body_res = try self.block(&node.body, 0, .{ .can_continue = true }, ctx);
 
     return self.irb.addInstr(.{ .@"while" = .{ .cond = cond_res.instr, .body = body_res.instr } }, span.start);
 }
@@ -852,7 +877,7 @@ pub const ExprResKind = enum {
 pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Context) Result {
     const res = try switch (expr.*) {
         .array => |*e| self.array(e, ctx),
-        .block => |*e| self.block(e, 0, expect, ctx),
+        .block => |*e| self.block(e, 0, .{ .exp_val = expect == .value }, ctx),
         .binop => |*e| self.binop(e, ctx),
         .bool => |e| self.boolLit(e),
         .@"break" => |*e| self.breakExpr(e, ctx),
@@ -937,8 +962,8 @@ fn array(self: *Self, expr: *const Ast.Array, ctx: *Context) Result {
 }
 
 /// `pop_offset` is used to pop that amount less variables at scope closure
-fn block(self: *Self, expr: *const Ast.Block, pop_offset: usize, expect: ExprResKind, ctx: *Context) Result {
-    self.scope.open(self.allocator, self.internLabel(expr.label), false, expect == .value);
+fn block(self: *Self, expr: *const Ast.Block, pop_offset: usize, opts: LexScope.Scope.Options, ctx: *Context) Result {
+    self.scope.open(self.allocator, self.internLabel(expr.label), opts);
 
     var instrs: ArrayList(InstrIndex) = .empty;
     instrs.ensureTotalCapacity(self.allocator, expr.nodes.len) catch oom();
@@ -974,7 +999,7 @@ fn block(self: *Self, expr: *const Ast.Block, pop_offset: usize, expect: ExprRes
         // If the block partially or doesn't return, if we expect a value it's an error otherwise we
         // choose the safe option to return void
         if (cf == .none) {
-            if (expect == .value) {
+            if (opts.exp_val) {
                 return self.err(.block_all_path_dont_return, self.ast.getSpan(expr));
             }
 
@@ -1170,11 +1195,12 @@ fn getComparisonOp(op: TokenTag, ty: *const Type) Instr.Binop.Op {
 fn breakExpr(self: *Self, expr: *const Ast.Break, ctx: *Context) Result {
     const span = self.ast.getSpan(expr);
 
-    const scope, const depth = self.scope.getScopeByName(self.internLabel(expr.label)) catch return self.err(
+    // We take scope's index because evaluating the possible `break` expression can invalidate a pointer to scope
+    const scope_index, const depth = self.scope.getScope(self.internLabel(expr.label)) catch return self.err(
         .{ .undeclared_block_label = .{ .name = self.ast.toSource(expr.label.?) } },
         self.ast.getSpan(expr.label.?),
     );
-    const scope_exp_val = self.scope.scopes.items[scope].exp_val;
+    const scope_exp_val = self.scope.scopes.items[scope_index].opts.exp_val;
 
     const ty, const expr_instr = brk: {
         const e = expr.expr orelse break :brk .{ self.ti.getCached(.void), null };
@@ -1187,8 +1213,17 @@ fn breakExpr(self: *Self, expr: *const Ast.Break, ctx: *Context) Result {
         break :brk .{ res.type, res.instr };
     };
 
-    const instr = self.irb.addInstr(.{ .@"break" = .{ .instr = expr_instr, .depth = depth } }, span.start);
-    self.scope.scopes.items[scope].breaks.append(self.allocator, ty) catch oom();
+    const scope = &self.scope.scopes.items[scope_index];
+
+    const instr = self.irb.addInstr(
+        .{ .@"break" = .{
+            .instr = expr_instr,
+            .depth = depth,
+            .pop_count = self.scope.stackDiffWithCurrent(scope),
+        } },
+        span.start,
+    );
+    scope.breaks.append(self.allocator, ty) catch oom();
 
     // Break always return void because its value escapes scope
     return .{
@@ -1202,7 +1237,7 @@ fn closure(self: *Self, expr: *const Ast.FnDecl, ctx: *Context) Result {
     // TODO: create an anonymus name generator mechanism
     var sym = self.scope.forwardDeclareSymbol(self.allocator, self.interner.intern("azert"));
 
-    self.scope.open(self.allocator, null, true, false);
+    self.scope.open(self.allocator, null, .{ .barrier = true });
     defer _ = self.scope.close();
 
     const captures = try self.loadFunctionCaptures(&expr.meta.captures);
@@ -2297,7 +2332,7 @@ fn trapMatch(self: *Self, expr: *Expr, err_type: Type.ErrorUnion, ctx: *Context)
     const binding_span = self.ast.getSpan(match_expr.identifier);
 
     // If it's a `trap match`, we open another scope to discard the error at the end
-    self.scope.open(self.allocator, null, false, true);
+    self.scope.open(self.allocator, null, .{ .exp_val = true });
     defer _ = self.scope.close();
 
     _ = try self.declareVariable(err_name, err_type.err, false, true, true, false, null, binding_span);
@@ -2790,7 +2825,7 @@ fn forwardDeclareVariable(self: *Self, name: InternerIdx, ty: *const Type, captu
 }
 
 fn openContainer(self: *Self, name: Ast.TokenIndex) Error!void {
-    self.scope.open(self.allocator, null, true, false);
+    self.scope.open(self.allocator, null, .{ .barrier = true });
     self.containers.append(self.allocator, self.ast.toSource(name));
 }
 

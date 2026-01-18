@@ -25,7 +25,8 @@ pop
 load_constant index 7, value 7
 get_local index 0
 store_blk_val
-jump 33 -> 36
+pop
+jump 34 -> 38
 pop
 
 load_blk_val
@@ -35,12 +36,13 @@ load_constant index 7, value 7
 load_constant index 10, value 90
 get_local index 3
 store_blk_val
-jump 49 -> 52
-pop
-pop
-pop
-pop
+popn index 4
+jump 52 -> 59
 
+pop
+pop
+pop
+pop
 load_blk_val
 ret_naked
 

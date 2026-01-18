@@ -115,6 +115,7 @@ pub const OpCode = enum(u8) {
     pop,
     pop2,
     pop3,
+    popn,
     print,
     push_false,
     push_null,

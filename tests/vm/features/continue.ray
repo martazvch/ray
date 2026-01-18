@@ -1,0 +1,77 @@
+fn main() {
+    // For
+    for i in 0..3 {
+        print i
+        continue
+    }
+    print "----"
+
+    loop: for i in 0..5 {
+        cond: if i > 2 {
+            continue :loop
+        }
+
+        print i
+    }
+    print "----"
+
+    let a = 1
+    outer: for i in 0..3 {
+        inner: for j in 3..6 {
+            print j
+            continue :inner
+        }
+        print i
+    }
+    print "----"
+
+    outer: for i in 0..3 {
+        inner: for j in 3..6 {
+            print j
+            continue :outer
+        }
+        print i
+    }
+    print "----"
+
+    // While
+    var i = 0
+    loop: while i < 4 {
+        print i
+        i += 1
+        continue
+    }
+    print "----"
+
+    i = 0
+    loop: while i < 4 {
+        print i
+        i += 1
+        continue :loop
+    }
+    print "----"
+
+    i = 0
+    cond1: while i < 6 {
+        cond2: while i < 4 {
+            print i
+            i += 1
+            continue :cond2
+        }
+        print "outside cond2"
+        i += 1
+    }
+    print "----"
+
+    i = 0
+    cond1: while i < 4 {
+        cond2: while i < 4 {
+            print i
+            i += 1
+            continue :cond1
+            print "inside cond1"
+        }
+        print "outside cond2"
+    }
+    print "----"
+}

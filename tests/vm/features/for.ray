@@ -74,35 +74,5 @@ fn main() {
         print i
     }
     print "----"
-
-    // Labelled
-    loop: for val in [1, 2, 3] {
-        print val
-        if val == 2 do break :loop
-    }
-    loop: for val in [1, 2, 3] {
-        print val
-        if val == 2 do break
-    }
-    print "----"
-
-    outer: {
-        loop: for val in [1, 2, 3] {
-            print val
-            if val == 1 do break
-        }
-
-        print "outer"
-    }
-
-    outer: {
-        loop: for val in [1, 2, 3] {
-            print val
-            if val == 1 do break :outer
-        }
-
-        print "outer"
-    }
-    print "----"
 }
 

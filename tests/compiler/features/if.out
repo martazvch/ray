@@ -71,7 +71,7 @@ add_int
 store_blk_val
 jump 110 -> 113
 load_blk_val
-jump 114 -> 141
+jump 114 -> 142
 pop
 
 load_constant index 5, value 1
@@ -85,7 +85,8 @@ add_int
 get_local index 2
 add_int
 store_blk_val
-jump 136 -> 139
+pop
+jump 137 -> 141
 pop
 load_blk_val
 

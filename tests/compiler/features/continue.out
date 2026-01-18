@@ -1,0 +1,138 @@
+-- main --
+load_constant index 4, value 3
+load_constant index 3, value 0
+range_new_int
+iter_new_range
+iter_next
+jump_null 7 -> 18
+pop
+loop 11 -> 6
+pop
+loop 15 -> 6
+pop2
+
+load_constant index 5, value 5
+load_constant index 3, value 0
+range_new_int
+iter_new_range
+iter_next
+jump_null 26 -> 37
+pop
+loop 30 -> 25
+pop
+loop 34 -> 25
+pop2
+
+load_constant index 4, value 3
+load_constant index 3, value 0
+range_new_int
+iter_new_range
+iter_next
+jump_null 45 -> 74
+
+load_constant index 6, value 6
+load_constant index 4, value 3
+range_new_int
+iter_new_range
+iter_next
+jump_null 55 -> 69
+load_constant index 7, value 1
+pop2
+loop 61 -> 54
+pop
+pop
+loop 66 -> 54
+pop2
+pop
+loop 71 -> 44
+pop2
+
+load_constant index 4, value 3
+load_constant index 3, value 0
+range_new_int
+iter_new_range
+iter_next
+jump_null 82 -> 115
+load_constant index 7, value 1
+load_constant index 6, value 6
+load_constant index 4, value 3
+range_new_int
+iter_new_range
+iter_next
+jump_null 94 -> 109
+load_constant index 8, value 2
+popn index 5
+loop 101 -> 81
+pop
+pop
+loop 106 -> 93
+pop2
+pop
+pop
+loop 112 -> 81
+pop2
+
+load_constant index 3, value 0
+
+get_local index 0
+load_constant index 9, value 4
+lt_int
+jump_false 123 -> 133
+pop
+loop 127 -> 118
+loop 130 -> 118
+pop
+
+get_local index 0
+load_constant index 9, value 4
+lt_int
+jump_false 139 -> 149
+pop
+loop 143 -> 134
+loop 146 -> 134
+pop
+
+get_local index 0
+load_constant index 6, value 6
+lt_int
+jump_false 155 -> 182
+pop
+
+get_local index 0
+load_constant index 9, value 4
+lt_int
+jump_false 164 -> 178
+pop
+load_constant index 7, value 1
+pop
+loop 171 -> 159
+pop
+loop 175 -> 159
+pop
+loop 179 -> 150
+pop
+
+get_local index 0
+load_constant index 9, value 4
+lt_int
+jump_false 188 -> 218
+pop
+load_constant index 7, value 1
+get_local index 0
+load_constant index 9, value 4
+lt_int
+jump_false 199 -> 213
+pop
+load_constant index 8, value 2
+pop2
+loop 206 -> 183
+pop
+loop 210 -> 194
+pop
+pop
+loop 215 -> 183
+pop
+ret_naked
+
+-- global scope --
+call_sym index 0, arity 0, <function main>

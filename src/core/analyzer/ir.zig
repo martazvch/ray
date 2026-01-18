@@ -20,6 +20,7 @@ pub const Instruction = struct {
         bound_method: BoundMethod,
         @"break": Break,
         call: Call,
+        @"continue": Continue,
         constant: Constant,
         discard: Index,
         enum_create: EnumCreate,
@@ -124,7 +125,7 @@ pub const Instruction = struct {
         is_expr: bool,
     };
     pub const BoundMethod = struct { structure: Index, index: usize };
-    pub const Break = struct { instr: ?Index, depth: usize };
+    pub const Break = struct { instr: ?Index, depth: usize, pop_count: usize };
     pub const Call = struct {
         callee: Index,
         args: []const Arg,
@@ -135,6 +136,7 @@ pub const Instruction = struct {
         instr: Index,
         default: struct { const_index: usize, mod: ?usize },
     };
+    pub const Continue = struct { depth: usize, pop_count: usize };
     pub const Constant = struct {
         index: usize,
         instr: Index,

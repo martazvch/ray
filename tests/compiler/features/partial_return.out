@@ -16,12 +16,13 @@ get_local index 0
 load_constant index 6, value 2
 add_int
 ret
-jump 26 -> 40
+jump 26 -> 41
 pop
 load_constant index 7, value 56.4
 load_constant index 8, value champ
 store_blk_val
-jump 35 -> 38
+pop
+jump 36 -> 40
 pop
 load_blk_val
 
@@ -29,52 +30,52 @@ get_local index 1
 print
 
 push_false
-jump_false 44 -> 54
+jump_false 45 -> 55
 pop
 load_constant index 9, value 8
 ret
-jump 51 -> 55
+jump 52 -> 56
 pop
 
 push_true
-jump_false 56 -> 88
+jump_false 57 -> 89
 pop
 push_true
-jump_false 61 -> 77
+jump_false 62 -> 78
 pop
 load_constant index 10, value 1
 store_blk_val
-jump 68 -> 71
+jump 69 -> 72
 load_blk_val
 ret
 pop
-jump 74 -> 80
+jump 75 -> 81
 pop
 load_constant index 4, value 5
 store_blk_val
-jump 81 -> 84
+jump 82 -> 85
 load_blk_val
-jump 85 -> 122
+jump 86 -> 123
 pop
 push_false
-jump_false 90 -> 114
+jump_false 91 -> 115
 pop
 push_true
-jump_false 95 -> 106
+jump_false 96 -> 107
 pop
 load_constant index 3, value 4
 ret
 pop
-jump 103 -> 109
+jump 104 -> 110
 pop
 load_constant index 11, value 3
 ret
 pop
-jump 111 -> 117
+jump 112 -> 118
 pop
 load_constant index 9, value 8
 store_blk_val
-jump 118 -> 121
+jump 119 -> 122
 load_blk_val
 ret
 

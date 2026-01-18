@@ -96,4 +96,14 @@
         [Constant 11]
     - body:
         [Block pop count: 1, is_expr: false]
-            [Break depth: 0]
+            [Break depth: 0, pop: 2]
+
+    [Block pop count: 1, is_expr: false]
+        [Variable declaration index: 0, scope: local]
+            [Constant 3]
+        [For]
+        - expr:
+            [Constant 11]
+        - body:
+            [Block pop count: 1, is_expr: false]
+                [Break depth: 1, pop: 3]

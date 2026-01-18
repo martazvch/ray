@@ -12,5 +12,5 @@
                 [Constant 5]
                     [Int 5]
             [Assignment index: 1, scope: local]
-            [Break depth: 0]
+            [Break depth: 0, pop: 2]
                 [Variable index: 0, scope: local]

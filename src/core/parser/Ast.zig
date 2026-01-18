@@ -14,6 +14,7 @@ pub const TokenIndex = usize;
 
 pub const Node = union(enum) {
     assignment: Assignment,
+    @"continue": Continue,
     discard: *Expr,
     enum_decl: EnumDecl,
     fn_decl: FnDecl,
@@ -30,6 +31,11 @@ pub const Node = union(enum) {
 pub const Assignment = struct {
     assigne: *Expr,
     value: *Expr,
+};
+
+pub const Continue = struct {
+    tk: TokenIndex,
+    label: ?TokenIndex,
 };
 
 pub const EnumDecl = struct {
@@ -213,7 +219,6 @@ pub const Grouping = struct {
 
 pub const If = struct {
     pattern: Pattern,
-    alias: ?TokenIndex,
     then: Node,
     @"else": ?Node,
     if_token: TokenIndex,
@@ -363,6 +368,10 @@ pub fn getSpan(self: *const @This(), anynode: anytype) Span {
         Assignment => .{
             .start = self.getSpan(node.assigne.*).start,
             .end = self.getSpan(node.value.*).end,
+        },
+        Continue => .{
+            .start = self.getSpan(node.tk).start,
+            .end = self.getSpan(node.label orelse node.tk).end,
         },
         EnumDecl => if (node.name) |name|
             self.token_spans[name]

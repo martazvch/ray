@@ -106,7 +106,7 @@
                     [Variable declaration index: 1, scope: local]
                         [Constant 16]
                             [Int 6]
-                    [Break depth: 0]
+                    [Break depth: 0, pop: 2]
                         [Constant 17]
                             [Int 3]
     [Match enum]

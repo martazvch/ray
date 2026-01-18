@@ -36,5 +36,12 @@ fn main() {
     loop: for c in "Martin" {
         break :loop
     }
+
+    b: {
+        let a = 1
+        loop: for c in "Martin" {
+            break :b
+        }
+    }
 }
 

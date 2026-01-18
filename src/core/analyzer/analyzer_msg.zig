@@ -14,6 +14,7 @@ pub const AnalyzerMsg = union(enum) {
     break_val_in_non_val_block,
     call_method_on_type: struct { name: []const u8 },
     call_static_on_instance: struct { name: []const u8 },
+    cant_continue_scope: struct { name: []const u8 },
     cant_infer_array_type,
     pat_null_non_optional: struct { found: []const u8 },
     dead_code,
@@ -58,6 +59,7 @@ pub const AnalyzerMsg = union(enum) {
     missing_file_in_module: struct { file: []const u8 },
     missing_function_param: struct { name: []const u8 },
     named_arg_in_bounded,
+    no_continuable_scope,
     no_main,
     non_bool_cond: struct { what: []const u8, found: []const u8 },
     non_indexable_type: struct { found: []const u8 },
@@ -114,6 +116,7 @@ pub const AnalyzerMsg = union(enum) {
             .break_val_in_non_val_block => writer.writeAll("can't return a value from this scope"),
             .call_method_on_type => |e| writer.print("method '{s}' called on a type", .{e.name}),
             .call_static_on_instance => |e| writer.print("static function '{s}' called on an instance", .{e.name}),
+            .cant_continue_scope => |e| writer.print("block '{s}' isn't continuable", .{e.name}),
             .cant_infer_array_type => writer.writeAll("can't infer array type with empty array and not declared type"),
             .pat_null_non_optional => |e| writer.print("can't use the 'if let' / 'if var' pattern on a non nullable type, found: '{s}", .{e.found}),
             .dead_code => writer.writeAll("unreachable code"),
@@ -158,6 +161,7 @@ pub const AnalyzerMsg = union(enum) {
             .missing_file_in_module => |e| writer.print("module doesn't contain file '{s}'", .{e.file}),
             .missing_function_param => |e| writer.print("missing argument '{s}'", .{e.name}),
             .named_arg_in_bounded => writer.writeAll("named argument are not allowed with bounded functions"),
+            .no_continuable_scope => writer.writeAll("no continuable block found in current scope"),
             .no_main => writer.writeAll("no main function found"),
             .non_indexable_type => |e| writer.print("can't index type '{s}'", .{e.found}),
             .non_bool_cond => |e| writer.print("non boolean condition, found type '{s}'", .{e.found}),
@@ -205,6 +209,7 @@ pub const AnalyzerMsg = union(enum) {
             .block_all_path_dont_return => writer.writeAll("this block"),
             .break_val_in_non_val_block => writer.writeAll("can't have this expression"),
             .call_method_on_type, .call_static_on_instance => writer.writeAll("wrong calling convention"),
+            .cant_continue_scope, .no_continuable_scope => writer.writeAll("invalid continue"),
             .cant_infer_array_type => writer.writeAll("empty arrays don't convey any type information"),
             .pat_null_non_optional => writer.writeAll("this isn't a nullable type"),
             .dead_code => writer.writeAll("code after this expression can't be reached"),
@@ -293,6 +298,7 @@ pub const AnalyzerMsg = union(enum) {
             .call_method_on_type, .call_static_on_instance => writer.writeAll(
                 "static functions can only be called on types and methods can only be called on instances",
             ),
+            .cant_continue_scope, .no_continuable_scope => writer.writeAll("'continue' can only be used with 'for' and 'while' statements"),
             .cant_infer_array_type => writer.writeAll(
                 \\can't extract any type information from an empty array '[]'. you must either declare a type in variable's
                 \\signature like: 'var arr: [int] = []' or initialize the array with at least one value (not possible every time).

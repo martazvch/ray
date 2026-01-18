@@ -1,0 +1,67 @@
+fn main() {
+    // For
+    loop: for val in [1, 2, 3] {
+        print val
+        if val == 2 do break :loop
+    }
+    loop: for val in [1, 2, 3] {
+        print val
+        if val == 2 do break
+    }
+    print "----"
+
+    outer: {
+        loop: for val in [1, 2, 3] {
+            print val
+            if val == 1 do break
+        }
+
+        print "outer"
+    }
+
+    outer: {
+        loop: for val in [1, 2, 3] {
+            print val
+            if val == 1 do break :outer
+        }
+
+        print "outer"
+    }
+    print "----"
+
+    // While
+    var i = 0
+    loop: while true {
+        if i == 12 do break
+        i += 1
+    }
+    print i // expect 12
+
+    i = 0
+    loop: while true {
+        if i == 15 do break :loop
+        i += 1
+    }
+    print i // expect 15
+
+    i = 0
+    outer: {
+        loop: while true {
+            if i == 18 do break :loop
+            i += 1
+        }
+        print "outer"
+    }
+    print i // expect 18
+
+    i = 0
+    outer: {
+        loop: while true {
+            if i == 20 do break :outer
+            i += 1
+        }
+        print "outer"
+    }
+    print i // expect 20
+    print "----"
+}

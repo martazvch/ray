@@ -4,5 +4,16 @@ fn main() {
         i += 1
     }
 
-    while true { break }
+    while true {
+        let a = 1
+        break
+    }
+
+    b: {
+        let a = 1
+        while true {
+            let b = 1
+            break :b
+        }
+    }
 }

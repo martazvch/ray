@@ -46,7 +46,7 @@
                     [Variable declaration index: 0, scope: local]
                         [Constant 7]
                             [Float 56.4]
-                    [Break depth: 0]
+                    [Break depth: 0, pop: 1]
                         [Constant 8]
                             [String champ]
         [If]
@@ -70,11 +70,11 @@
                             [Pop]
                                 [Return]
                                     [Block pop count: 0, is_expr: true]
-                                        [Break depth: 0]
+                                        [Break depth: 0, pop: 0]
                                             [Constant 10]
                                                 [Int 1]
                     - else:
-                        [Break depth: 0]
+                        [Break depth: 0, pop: 0]
                             [Constant 4]
             - else:
                 [Block pop count: 0, is_expr: true]
@@ -97,5 +97,5 @@
                                         [Constant 11]
                                             [Int 3]
                     - else:
-                        [Break depth: 0]
+                        [Break depth: 0, pop: 0]
                             [Constant 9]
