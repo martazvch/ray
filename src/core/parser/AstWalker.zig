@@ -258,10 +258,6 @@ fn captureFromExpr(self: *Self, expr: *Ast.Expr, ctx: *CaptureCtx) void {
             }
         },
         .pattern => |e| self.captureFromPattern(e, ctx),
-        .range => |e| {
-            self.captureFromExpr(e.start, ctx);
-            self.captureFromExpr(e.end, ctx);
-        },
         .@"return" => |e| if (e.expr) |val| self.captureFromExpr(val, ctx),
         .struct_literal => |e| {
             self.captureFromExpr(e.structure, ctx);

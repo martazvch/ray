@@ -296,6 +296,7 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
             try self.renderSingleExpr("lhs", e.lhs, .block, true);
             try self.renderSingleExpr("rhs", e.rhs, .block, true);
             try self.pushKeyValue("op", switch (e.op) {
+                .dot_dot => "..",
                 .greater => ">",
                 .greater_equal => ">=",
                 .less => "<",
@@ -385,12 +386,6 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
         .null => try self.pushKeyValue(@tagName(expr.*), "{}", comma),
         .match => |n| try self.match(n, comma),
         .pattern => |n| try self.pattern(n, comma),
-        .range => |e| {
-            try self.openKey(@tagName(expr.*), .block);
-            try self.renderSingleExpr("start", e.start, .block, true);
-            try self.renderSingleExpr("end", e.end, .block, false);
-            try self.closeKey(.block, comma);
-        },
         .@"return" => |e| {
             if (e.expr) |data| {
                 try self.renderSingleExpr(@tagName(expr.*), data, .block, comma);

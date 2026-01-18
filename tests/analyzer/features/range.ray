@@ -5,4 +5,6 @@ fn main() {
 
     let end = 150
     getInt()..end
+
+    -1+1..40-5
 }

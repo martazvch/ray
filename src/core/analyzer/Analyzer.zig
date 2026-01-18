@@ -878,7 +878,7 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
     const res = try switch (expr.*) {
         .array => |*e| self.array(e, ctx),
         .block => |*e| self.block(e, 0, .{ .exp_val = expect == .value }, ctx),
-        .binop => |*e| self.binop(e, ctx),
+        .binop => |e| self.binop(e, ctx),
         .bool => |e| self.boolLit(e),
         .@"break" => |*e| self.breakExpr(e, ctx),
         .closure => |*e| self.closure(e, ctx),
@@ -895,7 +895,6 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
         .match => |e| self.match(e, expect, ctx),
         .null => |e| self.nullLit(e),
         .pattern => |e| self.pattern(e, ctx),
-        .range => |e| self.range(e, ctx),
         .@"return" => |*e| self.returnExpr(e, ctx),
         .self => |e| self.identifier(e, ctx),
         .string => |e| self.string(e),
@@ -1031,7 +1030,11 @@ fn internLabel(self: *Self, label: ?Ast.TokenIndex) ?InternerIdx {
     return self.interner.intern(self.ast.toSource(lbl));
 }
 
-fn binop(self: *Self, expr: *const Ast.Binop, ctx: *Context) Result {
+fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
+    if (expr.op == .dot_dot) {
+        return self.range(expr, ctx);
+    }
+
     const lhs = try self.analyzeExpr(expr.lhs, .value, ctx);
 
     // For enum literals
@@ -2129,11 +2132,11 @@ fn nullablePattern(self: *Self, pat: Ast.Pattern.Nullable, ctx: *Context) Result
     };
 }
 
-pub fn range(self: *Self, expr: Ast.Range, ctx: *Context) Result {
-    const start = try self.analyzeExpr(expr.start, .value, ctx);
-    const end = try self.analyzeExpr(expr.end, .value, ctx);
+pub fn range(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
+    const start = try self.analyzeExpr(expr.lhs, .value, ctx);
+    const end = try self.analyzeExpr(expr.rhs, .value, ctx);
 
-    try self.validateRange(start.type, end.type, self.ast.getSpan(expr.start));
+    try self.validateRange(start.type, end.type, self.ast.getSpan(expr.lhs));
 
     return .{
         .type = self.ti.intern(.{ .range = start.type }),

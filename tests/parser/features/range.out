@@ -1,14 +1,15 @@
 {
-    "range": {
-        "start": {
+    "binop": {
+        "lhs": {
             "int": "0"
         },
-        "end": {
+        "rhs": {
             "int": "5"
-        }
+        },
+        "op": ".."
     },
-    "range": {
-        "start": {
+    "binop": {
+        "lhs": {
             "fn_call": {
                 "callee": {
                     "identifier": "getValue"
@@ -16,12 +17,13 @@
                 "args": []
             }
         },
-        "end": {
+        "rhs": {
             "identifier": "end"
-        }
+        },
+        "op": ".."
     },
-    "range": {
-        "start": {
+    "binop": {
+        "lhs": {
             "unary": {
                 "op": "-",
                 "expr": {
@@ -29,12 +31,13 @@
                 }
             }
         },
-        "end": {
+        "rhs": {
             "int": "3"
-        }
+        },
+        "op": ".."
     },
-    "range": {
-        "start": {
+    "binop": {
+        "lhs": {
             "unary": {
                 "op": "-",
                 "expr": {
@@ -42,13 +45,14 @@
                 }
             }
         },
-        "end": {
+        "rhs": {
             "unary": {
                 "op": "-",
                 "expr": {
                     "int": "3"
                 }
             }
-        }
+        },
+        "op": ".."
     }
 }

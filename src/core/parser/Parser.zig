@@ -903,6 +903,8 @@ const rules = std.enums.directEnumArrayDefault(Token.Tag, Rule, .{ .prec = -1 },
     .less = .{ .prec = 40, .assoc = .none },
     .less_equal = .{ .prec = 40, .assoc = .none },
 
+    .dot_dot = .{ .prec = 50, .assoc = .none },
+
     .minus = .{ .prec = 60 },
     .plus = .{ .prec = 60 },
 
@@ -1376,14 +1378,7 @@ fn unary(self: *Self) Error!*Expr {
 
     const op = self.token_idx - 2;
     const rhs = try self.parseExpr();
-
-    if (rhs.* == .range) {
-        const range_start = self.allocator.create(Expr) catch oom();
-        range_start.* = .{ .unary = .{ .op = op, .expr = rhs.range.start } };
-        expr.* = .{ .range = .{ .start = range_start, .end = rhs.range.end } };
-    } else {
-        expr.* = .{ .unary = .{ .op = op, .expr = rhs } };
-    }
+    expr.* = .{ .unary = .{ .op = op, .expr = rhs } };
 
     return expr;
 }
@@ -1418,10 +1413,6 @@ fn postfix(self: *Self, prefixExpr: *Expr) Error!*Expr {
         // Trap
         else if (self.match(.trap)) {
             return self.trap(expr);
-        }
-        // Range
-        else if (self.match(.dot_dot)) {
-            return self.range(expr);
         } else break;
     }
 
@@ -1497,16 +1488,6 @@ fn indexing(self: *Self, expr: *Expr) Error!*Expr {
     } };
 
     return indexing_expr;
-}
-
-fn range(self: *Self, start: *Expr) Error!*Expr {
-    const expr = self.allocator.create(Expr) catch oom();
-    expr.* = .{ .range = .{
-        .start = start,
-        .end = try self.parsePrecedenceExpr(0),
-    } };
-
-    return expr;
 }
 
 fn structLiteral(self: *Self, expr: *Expr) Error!*Expr {

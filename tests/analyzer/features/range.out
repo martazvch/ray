@@ -20,3 +20,16 @@
         [Call symbol 0]
         - end:
         [Variable index: 0, scope: local]
+    [Pop]
+        [Range]
+        - start:
+        [Binop type: add_int]
+            [Constant 7]
+                [Int -1]
+            [Constant 8]
+                [Int 1]
+        - end:
+        [Binop type: sub_int]
+            [Constant 9]
+                [Int 40]
+            [Constant 5]
