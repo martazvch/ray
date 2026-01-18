@@ -18,8 +18,10 @@
         "int": "56"
     },
     "discard": {
-        "block": [
-            "int": "5"
-        ]
+        "block": {
+            "exprs": [
+                "int": "5"
+            ]
+        }
     }
 }

@@ -3,7 +3,7 @@ fn main() {
         break :b
     }
 
-    var a: int = :value {
+    var a: int = value: {
         {
             var trash: float = 4.5
             break :value trash

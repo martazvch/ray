@@ -35,4 +35,8 @@ fn main() {
         return 2
     }
     _ = add()
+
+    cond: if true {
+        break :cond
+    }
 }

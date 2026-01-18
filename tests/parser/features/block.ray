@@ -4,6 +4,6 @@
 { var a: int
 a = 1+56}
 
-:blk {
+blk: {
     print "yes"
 }

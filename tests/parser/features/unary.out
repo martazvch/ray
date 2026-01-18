@@ -39,14 +39,16 @@
     "unary": {
         "op": "-",
         "expr": {
-            "block": [
-                "fn_call": {
-                    "callee": {
-                        "identifier": "add"
-                    },
-                    "args": []
-                }
-            ]
+            "block": {
+                "exprs": [
+                    "fn_call": {
+                        "callee": {
+                            "identifier": "add"
+                        },
+                        "args": []
+                    }
+                ]
+            }
         }
     },
     "unary": {

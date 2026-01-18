@@ -157,6 +157,7 @@ const Compiler = struct {
     // TODO: could make a generic construct with only flags like this (share with other contexts)
     const State = struct {
         cow: bool = false,
+        in_cf: bool = false,
 
         pub fn setAndGetPrev(self: *State, comptime f: FieldEnum(State), value: @FieldType(State, @tagName(f))) @TypeOf(value) {
             const prev = @field(self, @tagName(f));
@@ -743,12 +744,33 @@ const Compiler = struct {
             .range => .iter_new_range,
             .str => .iter_new_str,
         });
+
+        self.block_stack.open(self.manager.allocator);
+
         const loop_start = self.function.chunk.code.items.len;
         self.writeOp(if (data.use_index) .iter_next_index else .iter_next);
         const iter_end = self.emitJump(.jump_null);
-        try self.compileInstr(data.body);
+
+        const body = self.manager.instr_data[data.body].block;
+
+        for (body.instrs) |instr| {
+            try self.compileInstr(instr);
+        }
+
+        // PERF:
+        if (body.pop_count > 0) {
+            for (0..body.pop_count) |_| {
+                self.writeOp(.pop);
+            }
+        }
+
         try self.emitLoop(loop_start);
         try self.patchJump(iter_end);
+
+        for (self.block_stack.close().items) |b| {
+            try self.patchJump(b);
+        }
+
         // Null value and iterator
         self.writeOp(if (data.use_index) .pop3 else .pop2);
     }

@@ -1,43 +1,51 @@
 {
-    "block": [
-        "int": "5"
-    ],
-    "block": [
-        "var_decl": {
-            "name": "a",
-            "type": "float",
-            "value": {},
-            "const": "false"
-        }
-    ],
-    "block": [
-        "var_decl": {
-            "name": "a",
-            "type": "int",
-            "value": {},
-            "const": "false"
-        },
-        "assignment": {
-            "assigne": {
-                "identifier": "a"
+    "block": {
+        "exprs": [
+            "int": "5"
+        ]
+    },
+    "block": {
+        "exprs": [
+            "var_decl": {
+                "name": "a",
+                "type": "float",
+                "value": {},
+                "const": "false"
+            }
+        ]
+    },
+    "block": {
+        "exprs": [
+            "var_decl": {
+                "name": "a",
+                "type": "int",
+                "value": {},
+                "const": "false"
             },
-            "value": {
-                "binop": {
-                    "lhs": {
-                        "int": "1"
-                    },
-                    "rhs": {
-                        "int": "56"
-                    },
-                    "op": "+"
+            "assignment": {
+                "assigne": {
+                    "identifier": "a"
+                },
+                "value": {
+                    "binop": {
+                        "lhs": {
+                            "int": "1"
+                        },
+                        "rhs": {
+                            "int": "56"
+                        },
+                        "op": "+"
+                    }
                 }
             }
-        }
-    ],
-    "block": [
+        ]
+    },
+    "block": {
         "label": "blk",
-        "print": {
-            "string": "yes"
-        }
-    ]
+        "exprs": [
+            "print": {
+                "string": "yes"
+            }
+        ]
+    }
 }

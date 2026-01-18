@@ -41,34 +41,36 @@
             {
                 "type": "float",
                 "body": {
-                    "block": [
-                        "var_decl": {
-                            "name": "a",
-                            "type": {},
-                            "value": {
-                                "int": "1"
+                    "block": {
+                        "exprs": [
+                            "var_decl": {
+                                "name": "a",
+                                "type": {},
+                                "value": {
+                                    "int": "1"
+                                },
+                                "const": "true"
                             },
-                            "const": "true"
-                        },
-                        "var_decl": {
-                            "name": "b",
-                            "type": {},
-                            "value": {
-                                "int": "2"
+                            "var_decl": {
+                                "name": "b",
+                                "type": {},
+                                "value": {
+                                    "int": "2"
+                                },
+                                "const": "true"
                             },
-                            "const": "true"
-                        },
-                        "assignment": {
-                            "assigne": {
-                                "break": {
-                                    "identifier": "a"
+                            "assignment": {
+                                "assigne": {
+                                    "break": {
+                                        "identifier": "a"
+                                    }
+                                },
+                                "value": {
+                                    "identifier": "b"
                                 }
-                            },
-                            "value": {
-                                "identifier": "b"
                             }
-                        }
-                    ]
+                        ]
+                    }
                 }
             },
             "wildcard": {

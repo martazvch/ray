@@ -6,84 +6,98 @@
             }
         },
         "then": {
-            "block": [
-                "print": {
-                    "string": "ok"
-                }
-            ]
-        },
-    },
-    "if": {
-        "pattern: value": {
-            "expr": {
-                "bool": "true"
-            }
-        },
-        "then": {
-            "block": [
-                "print": {
-                    "string": "ok"
-                }
-            ]
-        },
-    },
-    "if": {
-        "pattern: value": {
-            "expr": {
-                "bool": "true"
-            }
-        },
-        "then": {
-            "block": [
-                "print": {
-                    "string": "ok"
-                }
-            ]
-        },
-        "else": {
-            "print": {
-                "string": "ko"
-            }
-        },
-    },
-    "if": {
-        "pattern: value": {
-            "expr": {
-                "bool": "true"
-            }
-        },
-        "then": {
-            "block": [
-                "print": {
-                    "string": "ok"
-                }
-            ]
-        },
-        "else": {
-            "block": [
-                "print": {
-                    "string": "ko"
-                }
-            ]
-        },
-    },
-    "if": {
-        "pattern: value": {
-            "expr": {
-                "block": [
+            "block": {
+                "exprs": [
                     "print": {
-                        "string": "in cond"
-                    },
-                    "bool": "false"
+                        "string": "ok"
+                    }
                 ]
             }
         },
+    },
+    "if": {
+        "pattern: value": {
+            "expr": {
+                "bool": "true"
+            }
+        },
         "then": {
-            "block": [
-                "print": {
-                    "string": "ok"
+            "block": {
+                "exprs": [
+                    "print": {
+                        "string": "ok"
+                    }
+                ]
+            }
+        },
+    },
+    "if": {
+        "pattern: value": {
+            "expr": {
+                "bool": "true"
+            }
+        },
+        "then": {
+            "block": {
+                "exprs": [
+                    "print": {
+                        "string": "ok"
+                    }
+                ]
+            }
+        },
+        "else": {
+            "print": {
+                "string": "ko"
+            }
+        },
+    },
+    "if": {
+        "pattern: value": {
+            "expr": {
+                "bool": "true"
+            }
+        },
+        "then": {
+            "block": {
+                "exprs": [
+                    "print": {
+                        "string": "ok"
+                    }
+                ]
+            }
+        },
+        "else": {
+            "block": {
+                "exprs": [
+                    "print": {
+                        "string": "ko"
+                    }
+                ]
+            }
+        },
+    },
+    "if": {
+        "pattern: value": {
+            "expr": {
+                "block": {
+                    "exprs": [
+                        "print": {
+                            "string": "in cond"
+                        },
+                        "bool": "false"
+                    ]
                 }
-            ]
+            }
+        },
+        "then": {
+            "block": {
+                "exprs": [
+                    "print": {
+                        "string": "ok"
+                    }
+                ]
+            }
         },
     },
     "if": {
@@ -127,11 +141,13 @@
             }
         },
         "else": {
-            "block": [
-                "print": {
-                    "string": "ko"
-                }
-            ]
+            "block": {
+                "exprs": [
+                    "print": {
+                        "string": "ko"
+                    }
+                ]
+            }
         },
     },
     "if": {
@@ -184,5 +200,17 @@
             }
         },
         "const": "false"
+    },
+    "if": {
+        "pattern: value": {
+            "expr": {
+                "bool": "true"
+            }
+        },
+        "then": {
+            "print": {
+                "string": "ok"
+            }
+        },
     }
 }

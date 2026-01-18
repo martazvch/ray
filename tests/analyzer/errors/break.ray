@@ -3,7 +3,7 @@ fn main() {
         break 4
     }
 
-    :b {
+    b: {
         break :b 5
     }
 }

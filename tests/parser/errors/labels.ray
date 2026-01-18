@@ -2,10 +2,10 @@ break :1 5
 
 print oui
 
-:1 {
-
-}
+b: 
 
 print oui
 
-:b 
+b: 1 + 2
+
+

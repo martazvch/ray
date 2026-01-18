@@ -10,6 +10,7 @@ fn main() {
         print i
         i = i + 1
     }
+    print "----"
 
     // local with condition manipulation
     {
@@ -25,6 +26,7 @@ fn main() {
             if i > 10 do i = 1
         }
     }
+    print "----"
 
     // local with stack manipulation
     var offset = 3
@@ -41,4 +43,41 @@ fn main() {
             i = i + offset
         }
     }
+    print "----"
+
+    // Labelled
+    var i = 0
+    loop: while true {
+        if i == 12 do break
+        i += 1
+    }
+    print i // expect 12
+
+    i = 0
+    loop: while true {
+        if i == 15 do break :loop
+        i += 1
+    }
+    print i // expect 15
+
+    i = 0
+    outer: {
+        loop: while true {
+            if i == 18 do break :loop
+            i += 1
+        }
+        print "outer"
+    }
+    print i // expect 18
+
+    i = 0
+    outer: {
+        loop: while true {
+            if i == 20 do break :outer
+            i += 1
+        }
+        print "outer"
+    }
+    print i // expect 20
+    print "----"
 }

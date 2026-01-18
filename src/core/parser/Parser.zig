@@ -30,11 +30,13 @@ const Context = struct {
     panic_mode: bool,
     in_cond: bool,
     in_group: bool,
+    label: ?TokenIndex,
 
     pub const empty: Context = .{
         .panic_mode = false,
         .in_cond = false,
         .in_group = false,
+        .label = null,
     };
 
     pub fn setAndGetPrevious(self: *Context, comptime f: FieldEnum(Context), value: @FieldType(Context, @tagName(f))) @TypeOf(value) {
@@ -298,7 +300,7 @@ fn fnDecl(self: *Self) Error!Node {
     self.skipNewLines();
     try self.expect(.left_brace, .expect_brace_before_fn_body);
 
-    const body, const has_callable = try self.block(null);
+    const body, const has_callable = try self.block();
 
     return .{ .fn_decl = .{
         .name = name,
@@ -717,12 +719,16 @@ fn getAlias(self: *Self, token: Token.Tag) Error!?TokenIndex {
 }
 
 fn statement(self: *Self) Error!Node {
+    self.ctx.label = self.openningLabel();
+
     return if (self.match(.@"for"))
         self.forLoop()
-    else if (self.match(.print))
-        self.print()
     else if (self.match(.@"while"))
         self.whileStmt()
+    else if (self.match(.@"continue"))
+        self.continueStmt()
+    else if (self.match(.print))
+        self.print()
     else if (self.match(.underscore))
         self.discard()
     else {
@@ -769,6 +775,13 @@ fn compoundAssignment(self: *Self, assigne: *Expr) Error!Node {
     return .{ .assignment = .{ .assigne = assigne, .value = binop } };
 }
 
+fn continueStmt(self: *Self) Error!Node {
+    return .{ .@"continue" = .{
+        .tk = self.token_idx - 1,
+        .label = try self.closingLabel(),
+    } };
+}
+
 fn discard(self: *Self) Error!Node {
     try self.expect(.equal, .invalid_discard);
 
@@ -777,6 +790,7 @@ fn discard(self: *Self) Error!Node {
 
 fn forLoop(self: *Self) Error!Node {
     const for_tk = self.token_idx - 1;
+    const label = self.ctx.setAndGetPrevious(.label, null);
     var index_token: ?TokenIndex = null;
     var binding_token: TokenIndex = undefined;
 
@@ -797,7 +811,7 @@ fn forLoop(self: *Self) Error!Node {
     const expr = try self.parsePrecedenceExpr(0);
 
     try self.expect(.left_brace, .expect_brace_before_for_body);
-    const body, _ = try self.block(null);
+    const body = try self.blockExpr(label);
 
     return .{ .for_loop = .{
         .for_tk = for_tk,
@@ -813,6 +827,7 @@ fn print(self: *Self) Error!Node {
 }
 
 fn whileStmt(self: *Self) Error!Node {
+    const label = self.ctx.setAndGetPrevious(.label, null);
     const cond = cond: {
         const save_in_cond = self.ctx.setAndGetPrevious(.in_cond, true);
         defer {
@@ -822,7 +837,7 @@ fn whileStmt(self: *Self) Error!Node {
     };
 
     const body = if (self.isAtBlock())
-        try self.blockExpr()
+        try self.blockExpr(label)
     else
         return self.errAtCurrent(.expect_brace_after_while_cond);
 
@@ -897,6 +912,10 @@ const rules = std.enums.directEnumArrayDefault(Token.Tag, Rule, .{ .prec = -1 },
 });
 
 fn parsePrecedenceExpr(self: *Self, prec_min: i8) Error!*Expr {
+    if (self.ctx.label == null) {
+        self.ctx.label = self.openningLabel();
+    }
+
     self.advance();
     var left = try self.parseExpr();
 
@@ -941,9 +960,14 @@ fn parsePrecedenceExpr(self: *Self, prec_min: i8) Error!*Expr {
 
 /// Parses expressions (prefix + sufix)
 fn parseExpr(self: *Self) Error!*Expr {
+    if (self.ctx.label) |label| {
+        if (self.prev(.tag) != .left_brace and self.prev(.tag) != .@"if") {
+            return self.errAt(label, .invalid_label);
+        }
+    }
+
     const expr = try switch (self.prev(.tag)) {
         .@"break" => self.breakExpr(),
-        .colon => self.labelledBlock(),
         .dot => self.enumLit(),
         .fail => self.fail(),
         .false => self.literal(.bool),
@@ -951,7 +975,7 @@ fn parseExpr(self: *Self) Error!*Expr {
         .@"if" => self.ifExpr(),
         .identifier => self.literal(.identifier),
         .int => self.literal(.int),
-        .left_brace => (try self.block(null)).@"0",
+        .left_brace => (try self.block()).@"0",
         .left_bracket => self.array(),
         .left_paren => self.leftParenExprStart(),
         .match => self.matchExpr(),
@@ -1006,27 +1030,17 @@ fn isAtBlock(self: *Self) bool {
 }
 
 /// Parses either a labelled or not block
-fn blockExpr(self: *Self) Error!*Expr {
-    if (self.prev(.tag) == .colon) return self.labelledBlock();
-
-    const body, _ = try self.block(null);
+fn blockExpr(self: *Self, label: ?TokenIndex) Error!*Expr {
+    var body, _ = try self.block();
+    body.block.label = label;
 
     return body;
 }
 
-/// Parses a labelled block assuming we're passed ':'
-fn labelledBlock(self: *Self) Error!*Expr {
-    if (!self.match(.identifier)) return self.errAtCurrent(.non_ident_label);
-
-    const label = self.token_idx - 1;
-    if (!self.match(.left_brace)) return self.errAtCurrent(.missing_brace_after_label);
-
-    return (try self.block(label)).@"0";
-}
-
 /// Returns the block expression and a flag to indicate if a function or closure was
 /// defined in it
-fn block(self: *Self, label: ?TokenIndex) Error!struct { *Expr, bool } {
+fn block(self: *Self) Error!struct { *Expr, bool } {
+    const label = self.ctx.setAndGetPrevious(.label, null);
     const openning_brace = self.token_idx - 1;
     const expr = self.allocator.create(Expr) catch oom();
     var exprs: ArrayList(Node) = .empty;
@@ -1061,7 +1075,7 @@ fn block(self: *Self, label: ?TokenIndex) Error!struct { *Expr, bool } {
 
 fn breakExpr(self: *Self) Error!*Expr {
     const kw = self.token_idx - 1;
-    const label = try self.parseLabel();
+    const label = try self.closingLabel();
     const expr = self.allocator.create(Expr) catch oom();
 
     expr.* = .{ .@"break" = .{
@@ -1076,8 +1090,22 @@ fn breakExpr(self: *Self) Error!*Expr {
     return expr;
 }
 
-/// Parses a label if possible, otherwise returns `null`
-fn parseLabel(self: *Self) Error!?TokenIndex {
+/// Parses an openning label `label:` if possible and advances if so, otherwise returns `null`
+fn openningLabel(self: *Self) ?TokenIndex {
+    if (!self.check(.identifier)) return null;
+    if (self.token_idx > self.token_tags.len - 2) return null;
+
+    self.token_idx += 1;
+    if (!self.match(.colon)) {
+        self.token_idx -= 1;
+        return null;
+    }
+
+    return self.token_idx - 2;
+}
+
+/// Parses a closing label `:label` if possible and advances if so, otherwise returns `null`
+fn closingLabel(self: *Self) Error!?TokenIndex {
     if (self.match(.colon)) {
         if (!self.match(.identifier)) return self.errAtCurrent(.non_ident_label);
         return self.token_idx - 1;
@@ -1096,7 +1124,7 @@ fn closure(self: *Self) Error!*Expr {
     self.skipNewLines();
     try self.expect(.left_brace, .expect_brace_before_fn_body);
 
-    const body, _ = try self.block(null);
+    const body, _ = try self.block();
 
     expr.* = .{ .closure = .{
         .name = opening,
@@ -1130,6 +1158,7 @@ fn fail(self: *Self) Error!*Expr {
 
 fn ifExpr(self: *Self) Error!*Expr {
     const tk = self.token_idx - 1;
+    const label = self.ctx.setAndGetPrevious(.label, null);
 
     const pat = pat: {
         const save_cond = self.ctx.setAndGetPrevious(.in_cond, true);
@@ -1138,14 +1167,11 @@ fn ifExpr(self: *Self) Error!*Expr {
         break :pat try self.pattern();
     };
 
-    // TODO: remove
-    const alias = try self.getAlias(.as);
-
     self.skipNewLines();
 
     // TODO: Warning for unnecessary 'do' if there is a block after
     const then: Node = if (self.isAtBlock())
-        .{ .expr = try self.blockExpr() }
+        .{ .expr = try self.blockExpr(label) }
     else if (self.matchAndSkip(.do))
         try self.statement()
     else
@@ -1158,7 +1184,7 @@ fn ifExpr(self: *Self) Error!*Expr {
     // tested in the main caller
     const else_body: ?Node = if (self.matchAndSkip(.@"else"))
         if (self.matchAndSkip(.left_brace))
-            .{ .expr = try self.blockExpr() }
+            .{ .expr = try self.blockExpr(label) }
         else
             try self.statement()
     else blk: {
@@ -1169,7 +1195,6 @@ fn ifExpr(self: *Self) Error!*Expr {
     const expr = self.allocator.create(Expr) catch oom();
     expr.* = .{ .@"if" = .{
         .pattern = pat,
-        .alias = alias,
         .then = then,
         .@"else" = else_body,
         .if_token = tk,
@@ -1558,7 +1583,7 @@ fn trap(self: *Self, expr: *Expr) Error!*Expr {
 
             break :rhs .{ .binding = .{
                 .token = token,
-                .body = try self.blockExpr(),
+                .body = try self.blockExpr(null),
             } };
         },
         else => {

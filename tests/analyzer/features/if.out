@@ -135,3 +135,9 @@
                 [Int 2]
     [Discard]
         [Call symbol 1]
+    [If]
+    - condition:
+        [Constant 0]
+    - then:
+        [Block pop count: 0, is_expr: false]
+            [Break depth: 0]

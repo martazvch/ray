@@ -53,4 +53,10 @@ fn main() {
     } else -8
 
     print h // expect: 21
+
+    // Labelled
+    cond: if true {
+        if 1 == 1 do break :cond
+        print "unreachable"
+    }
 }

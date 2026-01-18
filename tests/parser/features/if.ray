@@ -46,3 +46,5 @@ else print "ko"
 
 var _res = if true do 5 else 10
 
+// Labelled
+cond: if true do print "ok"

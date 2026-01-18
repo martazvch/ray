@@ -1,6 +1,6 @@
 fn main() {
-    :outer {
-        :inner {
+    outer: {
+        inner: {
             {
                 if true do break
                 if true do break :outer
@@ -10,7 +10,7 @@ fn main() {
         }
     }
 
-    var a: float = :value {
+    var a: float = value: {
         {
             if true do break :value 4.5
         }
@@ -19,7 +19,7 @@ fn main() {
     }
 
     // If blocks
-    var b = if true do :b { 
+    var b = b: if true { 
         {
             {
                 break :b 1

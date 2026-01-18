@@ -48,6 +48,11 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
             try self.renderSingleExpr("value", n.value, .block, false);
             try self.closeKey(.block, comma);
         },
+        .@"continue" => |n| {
+            try self.openKey(@tagName(node.*), .block);
+            try self.pushKeyValue("label", if (n.label) |l| self.ast.toSource(l) else "null", false);
+            try self.closeKey(.block, comma);
+        },
         .discard => |n| {
             try self.renderSingleExpr(@tagName(node.*), n, .block, comma);
         },
@@ -199,7 +204,7 @@ fn renderFnDecl(self: *Self, name: []const u8, decl: *const Ast.FnDecl, comma: b
     }
 
     try self.pushKeyValue("return_type", if (decl.return_type) |ret| try self.renderType(ret) else "void", true);
-    try self.renderBlock(&decl.body, "body", false);
+    try self.renderAnonBlock(&decl.body, "body", false);
     try self.closeKey(.block, comma);
 }
 
@@ -458,13 +463,27 @@ fn renderSingleExpr(self: *Self, name: ?[]const u8, expr: *const Ast.Expr, tag: 
 fn renderBlock(self: *Self, block: *const Ast.Block, name: ?[]const u8, comma: bool) !void {
     if (block.nodes.len == 0) {
         if (block.label) |label| {
-            try self.openKey(name orelse "block", .list);
+            try self.openKey(name orelse "block", .block);
             try self.pushKeyValue("label", self.ast.toSource(label), false);
-            try self.closeKey(.list, comma);
-        } else try self.emptyKey(name orelse "block", .list, comma);
+            try self.closeKey(.block, comma);
+        } else try self.emptyKey(name orelse "block", .block, comma);
+    } else {
+        try self.openKey(name orelse "block", .block);
+        if (block.label) |label| try self.pushKeyValue("label", self.ast.toSource(label), true);
+        try self.openKey("exprs", .list);
+        for (block.nodes, 0..) |*data, i| {
+            try self.renderNode(data, i != block.nodes.len - 1);
+        }
+        try self.closeKey(.list, false);
+        try self.closeKey(.block, comma);
+    }
+}
+
+fn renderAnonBlock(self: *Self, block: *const Ast.Block, name: ?[]const u8, comma: bool) !void {
+    if (block.nodes.len == 0) {
+        try self.emptyKey(name orelse "block", .list, comma);
     } else {
         try self.openKey(name orelse "block", .list);
-        if (block.label) |label| try self.pushKeyValue("label", self.ast.toSource(label), true);
         for (block.nodes, 0..) |*data, i| {
             try self.renderNode(data, i != block.nodes.len - 1);
         }

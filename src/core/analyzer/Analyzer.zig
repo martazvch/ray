@@ -207,6 +207,7 @@ pub fn analyze(self: *Self, ast: *const Ast, module_name: []const u8, expect_mai
 pub fn analyzeNode(self: *Self, node: *const Node, expect: ExprResKind, ctx: *Context) Result {
     const instr = switch (node.*) {
         .assignment => |*n| try self.assignment(n, ctx),
+        .@"continue" => |n| try self.continueStmt(n, ctx),
         .discard => |n| try self.discard(n, ctx),
         .enum_decl => |*n| try self.enumDeclaration(n, ctx),
         .for_loop => |*n| try self.forLoop(n, ctx),
@@ -274,6 +275,13 @@ fn assignment(self: *Self, node: *const Ast.Assignment, ctx: *Context) StmtResul
         .{ .assignment = .{ .assigne = assigne.instr, .value = value_res.instr, .cow = assigne.type.isHeap() } },
         span.start,
     );
+}
+
+fn continueStmt(self: *Self, node: Ast.Continue, ctx: *const Context) StmtResult {
+    _ = self; // autofix
+    _ = node; // autofix
+    _ = ctx; // autofix
+    unreachable;
 }
 
 fn discard(self: *Self, expr: *const Expr, ctx: *Context) StmtResult {
@@ -371,10 +379,7 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
     const res = try self.analyzeExpr(node.expr, .value, ctx);
 
     // Virtual scope to declare the iterator
-    self.scope.open(self.allocator, null, false, false);
-    defer _ = self.scope.close();
-
-    _ = try self.declareVariable(0, undefined, false, true, false, false, null, undefined);
+    _ = try self.forwardDeclareVariable(0, undefined, false, undefined);
 
     const kind: Instr.For.Kind, const elem_type = switch (res.type.*) {
         .array => |t| .{ .array, t.child },
@@ -394,7 +399,7 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
     }
 
     try self.forwardDeclareVariable(binding, elem_type, false, self.ast.getSpan(node.binding));
-    const body_res = try self.block(&node.body, .none, ctx);
+    const body_res = try self.block(&node.body, 1, .none, ctx);
 
     return self.irb.addInstr(
         .{ .for_loop = .{
@@ -827,7 +832,7 @@ fn whileStmt(self: *Self, node: *const Ast.While, ctx: *Context) StmtResult {
         .{ .non_bool_cond = .{ .what = "while", .found = self.typeName(cond_res.type) } },
         span,
     );
-    const body_res = try self.block(&node.body, .none, ctx);
+    const body_res = try self.block(&node.body, 0, .none, ctx);
 
     return self.irb.addInstr(.{ .@"while" = .{ .cond = cond_res.instr, .body = body_res.instr } }, span.start);
 }
@@ -847,7 +852,7 @@ pub const ExprResKind = enum {
 pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Context) Result {
     const res = try switch (expr.*) {
         .array => |*e| self.array(e, ctx),
-        .block => |*e| self.block(e, expect, ctx),
+        .block => |*e| self.block(e, 0, expect, ctx),
         .binop => |*e| self.binop(e, ctx),
         .bool => |e| self.boolLit(e),
         .@"break" => |*e| self.breakExpr(e, ctx),
@@ -931,7 +936,8 @@ fn array(self: *Self, expr: *const Ast.Array, ctx: *Context) Result {
     };
 }
 
-fn block(self: *Self, expr: *const Ast.Block, expect: ExprResKind, ctx: *Context) Result {
+/// `pop_offset` is used to pop that amount less variables at scope closure
+fn block(self: *Self, expr: *const Ast.Block, pop_offset: usize, expect: ExprResKind, ctx: *Context) Result {
     self.scope.open(self.allocator, self.internLabel(expr.label), false, expect == .value);
 
     var instrs: ArrayList(InstrIndex) = .empty;
@@ -987,7 +993,7 @@ fn block(self: *Self, expr: *const Ast.Block, expect: ExprResKind, ctx: *Context
         .instr = self.irb.addInstr(
             .{ .block = .{
                 .instrs = instrs.toOwnedSlice(self.allocator) catch oom(),
-                .pop_count = @intCast(pop_count),
+                .pop_count = @intCast(pop_count - pop_offset),
                 .is_expr = !final.is(.void) and !final.is(.never),
             } },
             self.ast.getSpan(expr).start,

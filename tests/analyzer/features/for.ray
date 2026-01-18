@@ -32,5 +32,9 @@ fn main() {
     for i in -8..-5 {
         print i
     }
+
+    loop: for c in "Martin" {
+        break :loop
+    }
 }
 

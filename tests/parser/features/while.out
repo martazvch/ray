@@ -5,34 +5,48 @@
                 "bool": "true"
             }
         },
-        "body": []
+        "body": {}
     },
     "while": {
         "pattern: value": {
             "expr": {
-                "block": [
-                    "bool": "true"
-                ]
+                "bool": "true"
             }
         },
-        "body": [
-            "var_decl": {
-                "name": "tmp",
-                "type": {},
-                "value": {
-                    "binop": {
-                        "lhs": {
-                            "int": "1"
-                        },
-                        "rhs": {
-                            "int": "5"
-                        },
-                        "op": "+"
-                    }
-                },
-                "const": "false"
+        "body": {
+            "label": "loop"
+        }
+    },
+    "while": {
+        "pattern: value": {
+            "expr": {
+                "block": {
+                    "exprs": [
+                        "bool": "true"
+                    ]
+                }
             }
-        ]
+        },
+        "body": {
+            "exprs": [
+                "var_decl": {
+                    "name": "tmp",
+                    "type": {},
+                    "value": {
+                        "binop": {
+                            "lhs": {
+                                "int": "1"
+                            },
+                            "rhs": {
+                                "int": "5"
+                            },
+                            "op": "+"
+                        }
+                    },
+                    "const": "false"
+                }
+            ]
+        }
     },
     "while": {
         "pattern: nullable": {
@@ -42,6 +56,6 @@
             },
             "constant": "true"
         },
-        "body": []
+        "body": {}
     }
 }

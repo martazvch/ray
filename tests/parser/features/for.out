@@ -5,11 +5,13 @@
         "value": {
             "identifier": "arr"
         },
-        "body": [
-            "print": {
-                "identifier": "v"
-            }
-        ]
+        "body": {
+            "exprs": [
+                "print": {
+                    "identifier": "v"
+                }
+            ]
+        }
     },
     "for_loop": {
         "name": "v",
@@ -17,6 +19,16 @@
         "value": {
             "identifier": "arr"
         },
-        "body": []
+        "body": {}
+    },
+    "for_loop": {
+        "name": "v",
+        "index": "null",
+        "value": {
+            "identifier": "arr"
+        },
+        "body": {
+            "label": "loop"
+        }
     }
 }

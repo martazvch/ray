@@ -4,25 +4,27 @@
             "identifier": "add"
         },
         "args": [
-            "block": [
-                "binop": {
-                    "lhs": {
-                        "int": "1"
-                    },
-                    "rhs": {
-                        "fn_call": {
-                            "callee": {
-                                "identifier": "add"
-                            },
-                            "args": [
-                                "int": "2",
-                                "int": "3"
-                            ]
-                        }
-                    },
-                    "op": "+"
-                }
-            ],
+            "block": {
+                "exprs": [
+                    "binop": {
+                        "lhs": {
+                            "int": "1"
+                        },
+                        "rhs": {
+                            "fn_call": {
+                                "callee": {
+                                    "identifier": "add"
+                                },
+                                "args": [
+                                    "int": "2",
+                                    "int": "3"
+                                ]
+                            }
+                        },
+                        "op": "+"
+                    }
+                ]
+            },
             "if": {
                 "pattern: value": {
                     "expr": {
@@ -40,14 +42,16 @@
     },
     "fn_call": {
         "callee": {
-            "block": [
-                "fn_call": {
-                    "callee": {
-                        "identifier": "get_fn"
-                    },
-                    "args": []
-                }
-            ]
+            "block": {
+                "exprs": [
+                    "fn_call": {
+                        "callee": {
+                            "identifier": "get_fn"
+                        },
+                        "args": []
+                    }
+                ]
+            }
         },
         "args": []
     },

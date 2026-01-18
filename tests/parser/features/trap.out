@@ -12,11 +12,13 @@
             "binding": {
                 "name": "err",
                 "body": {
-                    "block": [
-                        "print": {
-                            "identifier": "err"
-                        }
-                    ]
+                    "block": {
+                        "exprs": [
+                            "print": {
+                                "identifier": "err"
+                            }
+                        ]
+                    }
                 }
             }
         }
@@ -34,7 +36,7 @@
             "binding": {
                 "name": "_",
                 "body": {
-                    "block": []
+                    "block": {}
                 }
             }
         }
@@ -59,7 +61,7 @@
                             "enum_literal": "fileNotFound"
                         },
                         "body": {
-                            "block": []
+                            "block": {}
                         }
                     }
                 ]

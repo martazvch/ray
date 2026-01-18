@@ -3,3 +3,6 @@ for v in arr {
 }
 
 for i, v in arr {}
+
+loop: for v in arr {}
+
