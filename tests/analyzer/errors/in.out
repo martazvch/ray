@@ -1,0 +1,12 @@
+invalid_in_type, int
+invalid_in_type, float
+invalid_in_type, bool
+expect_value_found_type, Foo
+expect_value_found_type, Bar
+invalid_in_type, fn() -> void
+invalid_in_type, Foo
+invalid_in_type, Bar
+
+type_mismatch, float, int
+type_mismatch, str, bool
+type_mismatch, int, float

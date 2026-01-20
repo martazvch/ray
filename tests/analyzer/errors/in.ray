@@ -1,0 +1,21 @@
+enum Foo {a}
+struct Bar {}
+fn buz() {}
+
+fn main() {
+    let a = Foo.a
+    let b = Bar{}
+
+    print 1 in 4
+    print 2.3 in 4.5
+    print 5 in true
+    print 1 in Foo
+    print 1 in Bar
+    print 1 in buz
+    print 1 in a
+    print 1 in b
+
+    print 1 in [4.5, 5.6]
+    print true in "text"
+    print 5.5 in 4..5
+}

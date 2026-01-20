@@ -1033,6 +1033,8 @@ fn internLabel(self: *Self, label: ?Ast.TokenIndex) ?InternerIdx {
 fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
     if (expr.op == .dot_dot) {
         return self.range(expr, ctx);
+    } else if (expr.op == .in) {
+        return self.in(expr, ctx);
     }
 
     const lhs = try self.analyzeExpr(expr.lhs, .value, ctx);
@@ -1860,6 +1862,42 @@ fn checkBranch(self: *Self, ty: *const Type, cf: InstrInfos.ControlFlow, expect:
     if (expect == .value and ty.is(.void)) return self.err(.void_value, span);
 
     return ty;
+}
+
+fn in(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
+    const span = self.ast.getSpan(expr);
+    const needle_res = try self.analyzeExpr(expr.lhs, .value, ctx);
+    const haystack_res = try self.analyzeExpr(expr.rhs, .value, ctx);
+
+    const exp_type, const kind: Instr.In.Kind = switch (haystack_res.type.*) {
+        .array => |t| .{ t.child, .array },
+        .range => |t| .{ t, if (t == self.ti.getCached(.int)) .range_int else .range_float },
+        .str => .{ self.ti.getCached(.str), .string },
+        else => |*t| return self.err(
+            .{ .invalid_in_type = .{ .found = self.typeName(t) } },
+            self.ast.getSpan(expr.rhs),
+        ),
+    };
+
+    if (needle_res.type != exp_type) return self.err(
+        .{ .type_mismatch = .{
+            .expect = self.typeName(exp_type),
+            .found = self.typeName(needle_res.type),
+        } },
+        span,
+    );
+
+    return .{
+        .type = needle_res.type,
+        .instr = self.irb.addInstr(
+            .{ .in = .{
+                .needle = needle_res.instr,
+                .haystack = haystack_res.instr,
+                .kind = kind,
+            } },
+            span.start,
+        ),
+    };
 }
 
 fn indexing(self: *Self, expr: *const Ast.Indexing, ctx: *Context) Result {

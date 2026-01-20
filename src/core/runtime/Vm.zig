@@ -340,6 +340,19 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
                 const start, const end = checkRangeIndex(string.chars.len, index);
                 self.stack.push(.makeObj(Obj.String.takeCopy(self, string.chars[start..end]).asObj()));
             },
+            .in_array => {
+                const array = self.stack.pop();
+                const value = self.stack.pop();
+                check: {
+                    for (array.obj.as(Obj.Array).values.items) |v| {
+                        if (value.eq(v)) {
+                            self.stack.push(.true_);
+                            break :check;
+                        }
+                    }
+                    self.stack.push(.false_);
+                }
+            },
             .in_range_float => {
                 const range = self.stack.pop().range_float;
                 const value = self.stack.pop().float;
@@ -349,6 +362,11 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
                 const range = self.stack.pop().range_int;
                 const value = self.stack.pop().int;
                 self.stack.push(.makeBool(value >= range.start and value <= range.end));
+            },
+            .in_str => {
+                const string = self.stack.pop().obj.as(Obj.String);
+                const value = self.stack.pop().obj.as(Obj.String);
+                self.stack.push(.makeBool(std.mem.containsAtLeast(u8, string.chars, 1, value.chars)));
             },
             .is_bool => self.stack.push(.makeBool(self.stack.peek(0) == .bool)),
             .is_float => self.stack.push(.makeBool(self.stack.peek(0) == .float)),

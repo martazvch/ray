@@ -297,6 +297,7 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
             try self.renderSingleExpr("rhs", e.rhs, .block, true);
             try self.pushKeyValue("op", switch (e.op) {
                 .dot_dot => "..",
+                .in => "in",
                 .greater => ">",
                 .greater_equal => ">=",
                 .less => "<",

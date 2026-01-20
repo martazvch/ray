@@ -1,7 +1,7 @@
 const Writer = @import("std").Io.Writer;
 
 pub const ParserMsg = union(enum) {
-    chaining_cmp_op,
+    cant_chain_op,
     default_value_self,
     enum_lit_non_ident,
     err_type_not_ident,
@@ -72,7 +72,7 @@ pub const ParserMsg = union(enum) {
 
     pub fn getMsg(self: Self, writer: *Writer) !void {
         try switch (self) {
-            .chaining_cmp_op => writer.writeAll("chaining comparison operators"),
+            .cant_chain_op => writer.writeAll("can't chain this operator"),
             .default_value_self => writer.writeAll("can't assign a default value to 'self'"),
             .enum_lit_non_ident => writer.writeAll("expect an identifier for enum literal"),
             .err_type_not_ident => writer.writeAll("expect identifier when parsing error types"),
@@ -146,7 +146,7 @@ pub const ParserMsg = union(enum) {
 
     pub fn getHint(self: Self, writer: *Writer) !void {
         try switch (self) {
-            .chaining_cmp_op => writer.writeAll("this one is not allowed"),
+            .cant_chain_op => writer.writeAll("this one is not allowed"),
             .err_type_not_ident => writer.writeAll("this is not an identifier"),
             .expect_brace_end_container,
             .expect_brace_after_match_type,
@@ -213,7 +213,7 @@ pub const ParserMsg = union(enum) {
 
     pub fn getHelp(self: Self, writer: *Writer) !void {
         try switch (self) {
-            .chaining_cmp_op => writer.writeAll("split your comparison with 'and' and 'or' operators"),
+            .cant_chain_op => writer.writeAll("if using comparisons, split them with 'and' and 'or' operators"),
             .default_value_self => writer.writeAll(
                 "'self' is the only parameter than can't have a default value, as it's value is infered by the compiler",
             ),

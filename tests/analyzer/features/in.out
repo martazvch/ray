@@ -1,0 +1,45 @@
+[Function declaration main]
+    [Print]
+        [In string]
+            - needle:
+            [Constant 3]
+                [String c]
+            - haystack:
+            [Constant 4]
+                [String string]
+    [Print]
+        [In range_int]
+            - needle:
+            [Constant 5]
+                [Int 1]
+            - haystack:
+            [Range]
+            - start:
+            [Constant 6]
+                [Int 4]
+            - end:
+            [Constant 7]
+                [Int 6]
+    [Print]
+        [In range_float]
+            - needle:
+            [Constant 8]
+                [Float 1.2]
+            - haystack:
+            [Range]
+            - start:
+            [Constant 9]
+                [Float 4.1]
+            - end:
+            [Constant 10]
+                [Float 6.9]
+    [Print]
+        [In array]
+            - needle:
+            [Constant 11]
+                [Int 45]
+            - haystack:
+            [Array]
+                [Constant 12]
+                    [Int 43]
+                [Constant 11]

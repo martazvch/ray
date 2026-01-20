@@ -41,6 +41,7 @@ pub const AnalyzerMsg = union(enum) {
     invalid_call_target,
     invalid_comparison: struct { found1: []const u8, found2: []const u8 },
     invalid_logical: struct { found: []const u8 },
+    invalid_in_type: struct { found: []const u8 },
     invalid_unary: struct { found: []const u8 },
     iter_non_iterable: struct { found: []const u8 },
     match_duplicate_arm,
@@ -143,6 +144,7 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_call_target => writer.writeAll("invalid call target, can only call functions and methods"),
             .invalid_comparison => |e| writer.print("invalid comparison between types '{s}' and '{s}'", .{ e.found1, e.found2 }),
             .invalid_logical => writer.writeAll("logical operators must be used with booleans"),
+            .invalid_in_type => |e| writer.print("can't use 'in' expression with '{s}' type", .{e.found}),
             .invalid_unary => writer.writeAll("invalid unary operation"),
             .iter_non_iterable => |e| writer.print("can't iterate over type '{s}'", .{e.found}),
             .match_duplicate_arm => writer.writeAll("arm is defined multiple times"),
@@ -233,6 +235,7 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_call_target => writer.writeAll("this is neither a function neither a method"),
             .invalid_comparison => writer.writeAll("expressions have different types"),
             .invalid_logical => |e| writer.print("this expression resolves to a '{s}'", .{e.found}),
+            .invalid_in_type => writer.writeAll("invalid type"),
             .invalid_unary, .non_bool_cond => writer.writeAll("expression is not a boolean type"),
             .iter_non_iterable => writer.writeAll("this doesn't have Iterator trait"),
             .match_non_literal => writer.writeAll("this is not a literal"),
@@ -349,6 +352,7 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_call_target => writer.writeAll("change call target to a function or a method or remove the call"),
             .invalid_comparison => writer.writeAll("expressions must have the same type when compared"),
             .invalid_logical => writer.writeAll("modify the logic to operate on booleans"),
+            .invalid_in_type => writer.writeAll("can only use 'in' with int and float ranges, arrays and strings"),
             .invalid_unary => |e| writer.print("can only negate boolean type, found '{s}'", .{e.found}),
             .iter_non_iterable => writer.writeAll(
                 \\it is only possible to iterate over builtin types array, string, range and maps and over types

@@ -1,0 +1,31 @@
+-- main --
+load_constant index 3, value c
+load_constant index 4, value string
+in_str
+print
+
+load_constant index 5, value 1
+load_constant index 7, value 6
+load_constant index 6, value 4
+range_new_int
+in_range_int
+print
+
+load_constant index 8, value 1.2
+load_constant index 10, value 6.9
+load_constant index 9, value 4.1
+range_new_float
+in_range_float
+print
+
+load_constant index 11, value 45
+load_constant index 12, value 43
+load_constant index 11, value 45
+array_new index 2
+in_array
+print
+
+ret_naked
+
+-- global scope --
+call_sym index 0, arity 0, <function main>

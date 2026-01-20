@@ -365,6 +365,7 @@ const Compiler = struct {
             .for_loop => |data| self.forLoop(data),
             .identifier => |*data| self.identifier(data),
             .@"if" => |*data| self.ifInstr(data),
+            .in => |data| self.in(data),
             .incr_rc => |index| self.wrappedInstr(.incr_ref, index),
             .indexing => |data| self.indexing(data),
             // TODO: protect the cast
@@ -856,6 +857,18 @@ const Compiler = struct {
         }
 
         try self.patchJump(else_jump);
+    }
+
+    fn in(self: *Self, data: Instruction.In) Error!void {
+        try self.compileInstr(data.needle);
+        try self.compileInstr(data.haystack);
+
+        self.writeOp(switch (data.kind) {
+            .array => .in_array,
+            .range_int => .in_range_int,
+            .range_float => .in_range_float,
+            .string => .in_str,
+        });
     }
 
     fn indexing(self: *Self, data: Instruction.Indexing) Error!void {

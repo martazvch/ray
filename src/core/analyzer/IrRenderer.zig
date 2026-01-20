@@ -85,6 +85,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .for_loop => |data| self.forLoop(data),
         .identifier => |*data| self.identifier(data),
         .@"if" => |*data| self.ifInstr(data),
+        .in => |data| self.in(data),
         .int => |data| self.intInstr(data),
         .incr_rc => |index| self.indexInstr("Incr rc", index),
         .indexing => |data| self.indexing(data, false, false),
@@ -385,6 +386,16 @@ fn ifInstr(self: *Self, data: *const Instruction.If) void {
         self.parseInstr(instr);
         self.indent_level -= 1;
     }
+}
+
+fn in(self: *Self, data: Instruction.In) void {
+    self.indentAndPrintSlice("[In {t}]", .{data.kind});
+    self.indent_level += 1;
+    self.indentAndAppendSlice("- needle:");
+    self.parseInstr(data.needle);
+    self.indentAndAppendSlice("- haystack:");
+    self.parseInstr(data.haystack);
+    self.indent_level -= 1;
 }
 
 fn intInstr(self: *Self, data: isize) void {

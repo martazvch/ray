@@ -1,0 +1,30 @@
+fn main() {
+    print "c" in "string"
+    print "c" in "strcng"
+    print "in" in "string"
+
+    let c = "c"
+    let inn = "in"
+    let str1 = "string"
+    let str2 = "strinc"
+
+    print c in str1
+    print c in str2
+    print inn in str1
+
+    print 1 in 4..6
+    print 1 in -4..6
+
+    print 1.2 in 4.1..6.9
+    print 1.2 in -4.1..6.9
+
+    print 45 in [43, 44, 47]
+    print 45 in [43, 45]
+
+    let v = 42
+    let arr1 = [1, 2, 3, 4]
+    let arr2 = [1, 2, 42, 3, 4]
+    print v in arr1
+    print v in arr2
+}
+

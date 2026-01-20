@@ -895,6 +895,8 @@ const rules = std.enums.directEnumArrayDefault(Token.Tag, Rule, .{ .prec = -1 },
     .@"and" = .{ .prec = 20 },
     .@"or" = .{ .prec = 20 },
 
+    .in = .{ .prec = 25 },
+
     .equal_equal = .{ .prec = 30, .assoc = .none },
     .bang_equal = .{ .prec = 30, .assoc = .none },
 
@@ -930,7 +932,7 @@ fn parsePrecedenceExpr(self: *Self, prec_min: i8) Error!*Expr {
         if (next_rule.prec < prec_min) break;
 
         if (next_rule.prec == banned_prec) {
-            return self.errAtCurrent(.chaining_cmp_op);
+            return self.errAtCurrent(.cant_chain_op);
         }
 
         // Here, we can safely use it

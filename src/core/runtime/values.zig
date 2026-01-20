@@ -46,6 +46,20 @@ pub const Value = union(enum) {
         return .{ .obj = object };
     }
 
+    pub fn eq(self: Value, other: Value) bool {
+        if (std.meta.activeTag(self) != std.meta.activeTag(other)) return false;
+
+        return switch (self) {
+            .bool => |v| v == other.bool,
+            .int => |v| v == other.int,
+            .float => |v| v == other.float,
+            .null => true,
+            .range_int => |v| v.start == other.range_int.start and v.end == other.range_int.end,
+            .range_float => |v| v.start == other.range_float.start and v.end == other.range_float.end,
+            .obj => |v| v == other.obj,
+        };
+    }
+
     // Safety garenteed by the analyzer
     pub fn not(self: *Self) void {
         self.bool = !self.bool;

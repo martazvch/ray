@@ -127,5 +127,44 @@
             "int": "6"
         },
         "op": "%"
+    },
+    "binop": {
+        "lhs": {
+            "binop": {
+                "lhs": {
+                    "int": "1"
+                },
+                "rhs": {
+                    "int": "2"
+                },
+                "op": "+"
+            }
+        },
+        "rhs": {
+            "binop": {
+                "lhs": {
+                    "unary": {
+                        "op": "-",
+                        "expr": {
+                            "int": "3"
+                        }
+                    }
+                },
+                "rhs": {
+                    "int": "2"
+                },
+                "op": "*"
+            }
+        },
+        "op": ".."
+    },
+    "binop": {
+        "lhs": {
+            "string": "x"
+        },
+        "rhs": {
+            "string": "str"
+        },
+        "op": "in"
     }
 }

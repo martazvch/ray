@@ -32,6 +32,7 @@ pub const Instruction = struct {
         for_loop: For,
         identifier: Variable,
         @"if": If,
+        in: In,
         incr_rc: Index,
         indexing: Indexing,
         int: i64,
@@ -181,6 +182,13 @@ pub const Instruction = struct {
         cond: Index,
         then: Index,
         @"else": ?Index,
+    };
+    pub const In = struct {
+        needle: Index,
+        haystack: Index,
+        kind: Kind,
+
+        pub const Kind = enum { array, range_int, range_float, string };
     };
     pub const LoadSymbol = struct {
         module_index: ?usize,
