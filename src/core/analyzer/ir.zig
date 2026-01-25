@@ -1,3 +1,5 @@
+const ConstIdx = @import("ConstantInterner.zig").ConstIdx;
+
 pub const Scope = enum { builtin, global, local };
 pub const Type = enum(u2) { float, int };
 
@@ -15,7 +17,6 @@ pub const Instruction = struct {
         assignment: Assignment,
         binop: Binop,
         block: Block,
-        bool: bool,
         box: Index,
         bound_method: BoundMethod,
         @"break": Break,
@@ -27,7 +28,6 @@ pub const Instruction = struct {
         enum_decl: EnumDecl,
         fail: Return,
         field: Field,
-        float: f64,
         fn_decl: FnDecl,
         for_loop: For,
         identifier: Variable,
@@ -35,19 +35,16 @@ pub const Instruction = struct {
         in: In,
         incr_rc: Index,
         indexing: Indexing,
-        int: i64,
         load_symbol: LoadSymbol,
         load_builtin: usize,
         match: Match,
         multiple_var_decl: MultiVarDecl,
-        null,
         obj_func: ObjFn,
         pat_nullable: Index,
         pop: Index,
         print: Index,
         range: Range,
         @"return": Return,
-        string: usize,
         struct_decl: StructDecl,
         struct_literal: StructLiteral,
         trap: Trap,
@@ -135,12 +132,14 @@ pub const Instruction = struct {
     };
     pub const Arg = union(enum) {
         instr: Index,
-        default: struct { const_index: usize, mod: ?usize },
+        default: struct {
+            const_index: ConstIdx,
+            mod: ?usize,
+        },
     };
     pub const Continue = struct { depth: usize, pop_count: usize };
     pub const Constant = struct {
-        index: usize,
-        instr: Index,
+        index: ConstIdx,
     };
     pub const EnumCreate = struct {
         sym: LoadSymbol,

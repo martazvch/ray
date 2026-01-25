@@ -5,6 +5,8 @@ const MultiArrayList = std.MultiArrayList;
 
 const ir = @import("ir.zig");
 const Instruction = ir.Instruction;
+const ConstInterner = @import("ConstantInterner.zig");
+const Constant = ConstInterner.Constant;
 const misc = @import("misc");
 const oom = misc.oom;
 
@@ -18,15 +20,15 @@ pub const Mode = union(enum) {
 allocator: Allocator,
 instructions: MultiArrayList(Instruction),
 roots: ArrayList(ir.Index),
-constants: ConstInterner,
+const_interner: ConstInterner,
 
 pub fn init(allocator: Allocator) Self {
-    var constants: ConstInterner = .empty;
-    _ = constants.add(allocator, .{ .bool = true });
-    _ = constants.add(allocator, .{ .bool = false });
-    _ = constants.add(allocator, .{ .null = {} });
-
-    return .{ .allocator = allocator, .instructions = .empty, .roots = .empty, .constants = constants };
+    return .{
+        .allocator = allocator,
+        .instructions = .empty,
+        .roots = .empty,
+        .const_interner = .init(allocator),
+    };
 }
 
 pub fn count(self: *const Self) usize {
@@ -43,18 +45,23 @@ pub fn getInstr(self: *const Self, index: ir.Index) Instruction.Data {
 }
 
 /// Assumes that you known the instruction index points to a `constant` instruction
-pub fn getConstant(self: *const Self, index: ir.Index) Instruction.Data {
-    const instr = self.getInstr(index).constant.instr;
-    return self.getInstr(instr);
+pub fn getConstant(self: *const Self, instr: ir.Index) Constant {
+    const index = self.getInstr(instr).constant.index;
+
+    return self.const_interner.constants.items[index.toInt()];
 }
 
 pub fn addRootInstr(self: *Self, index: ir.Index) void {
     self.roots.append(self.allocator, index) catch oom();
 }
 
-pub fn addConstant(self: *Self, instr_data: Instruction.Data, offset: usize) usize {
-    const gop = self.constants.add(self.allocator, instr_data);
-    return self.addInstr(.{ .constant = .{ .instr = self.addInstr(instr_data, offset), .index = gop.index } }, offset);
+pub fn addConstant(self: *Self, cte: Constant, offset: usize) usize {
+    const index = self.const_interner.add(self.allocator, cte);
+
+    return self.addInstr(
+        .{ .constant = .{ .index = index } },
+        offset,
+    );
 }
 
 pub fn wrapPreviousInstr(self: *Self, comptime instr: std.meta.FieldEnum(Instruction.Data)) usize {
@@ -130,45 +137,3 @@ pub fn computeLineFromOffsets(self: *Self, source: [:0]const u8) []const usize {
 
     return list.toOwnedSlice(self.allocator) catch oom();
 }
-
-const ConstInterner = struct {
-    constants: misc.Set(u64),
-
-    pub const AddRes = struct { found: bool, index: usize };
-    pub const empty: ConstInterner = .{ .constants = .empty };
-
-    pub fn add(self: *ConstInterner, allocator: Allocator, instr_data: Instruction.Data) AddRes {
-        const hashed = hash(instr_data);
-
-        if (self.constants.getIndex(hashed)) |index| {
-            return .{ .found = true, .index = index };
-        }
-
-        self.constants.add(allocator, hashed) catch oom();
-        return .{ .found = false, .index = self.constants.count() - 1 };
-    }
-
-    fn hash(instr_data: Instruction.Data) u64 {
-        var hasher = std.hash.Wyhash.init(0);
-        const asBytes = std.mem.asBytes;
-
-        hasher.update(asBytes(&@intFromEnum(instr_data)));
-
-        switch (instr_data) {
-            .bool => |*i| hasher.update(asBytes(i)),
-            .int => |*i| hasher.update(asBytes(i)),
-            .float => |*f| hasher.update(asBytes(f)),
-            .string => |*s| hasher.update(asBytes(s)),
-            .null => {},
-            .enum_create => |e| {
-                hasher.update(asBytes(&e.sym.module_index));
-                hasher.update(asBytes(&e.sym.symbol_index));
-                hasher.update(asBytes(&e.tag_index));
-            },
-            // TODO: error
-            else => @panic("Not a constant"),
-        }
-
-        return hasher.final();
-    }
-};

@@ -1,10 +1,9 @@
-//-- test.ray --
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
         [Native fn call]
             [Builtin symbol: 3]
             - args
-            [Constant 3]
+            [Constant index 3]
                 [String natives.ray]
     [Print]
         [Field access 2]

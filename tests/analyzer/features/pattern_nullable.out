@@ -1,6 +1,6 @@
 [Function declaration getValue, returns]
     [Return]
-        [Constant 3]
+        [Constant index 3]
             [Float 5]
 [Function declaration main]
     [If]

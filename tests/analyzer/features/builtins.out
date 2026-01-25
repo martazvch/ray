@@ -3,31 +3,31 @@
         [Native fn call]
             [Builtin symbol: 0]
             - args
-            [Constant 3]
+            [Constant index 3]
                 [Float 5.6]
     [Native fn call]
         [Builtin symbol: 0]
         - args
-        [Constant 4]
+        [Constant index 4]
             [Int 5]
     [Assignment index: 0, scope: local]
     [Variable declaration index: 1, scope: local]
         [Native fn call]
             [Builtin symbol: 1]
             - args
-            [Constant 5]
+            [Constant index 5]
                 [Int 6]
     [Native fn call]
         [Builtin symbol: 1]
         - args
-        [Constant 6]
+        [Constant index 6]
             [Float 6.4]
     [Assignment index: 1, scope: local]
-
     [Variable declaration index: 2, scope: local]
         [Builtin symbol: 0]
     [Print]
         [Fn call]
             [Variable index: 2, scope: local]
             - args
-            [Constant 3]
+            [Constant index 3]
+                [Float 5.6]

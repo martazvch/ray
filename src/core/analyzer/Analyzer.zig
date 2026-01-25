@@ -19,6 +19,7 @@ const InstrIndex = ir.Index;
 const Instr = ir.Instruction;
 const Span = @import("../parser/Lexer.zig").Span;
 const TokenTag = @import("../parser/Lexer.zig").Token.Tag;
+const ConstIdx = @import("ConstantInterner.zig").ConstIdx;
 
 const type_mod = @import("types.zig");
 const Type = type_mod.Type;
@@ -554,7 +555,7 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
             return self.err(.{ .already_declared_param = .{ .name = self.ast.toSource(p.name) } }, span);
         }
 
-        var const_index: ?usize = null;
+        var const_index: ?ConstIdx = null;
         var param_type = try self.checkAndGetType(p.typ, ctx);
 
         if (p.value) |val| {
@@ -622,7 +623,7 @@ fn fnBody(self: *Self, body: []Node, fn_type: *const Type.Function, name_span: S
 }
 
 /// Kind has to be either `param` or `field`
-fn defaultValue(self: *Self, decl_type: *const Type, val: *const Expr, kind: anytype, ctx: *Context) Error!struct { InstrInfos, usize } {
+fn defaultValue(self: *Self, decl_type: *const Type, val: *const Expr, kind: anytype, ctx: *Context) Error!struct { InstrInfos, ?ConstIdx } {
     var value_res = try self.analyzeExpr(val, .value, ctx);
     value_res.type = try self.performTypeCoercion(decl_type, value_res.type, false, self.ast.getSpan(val));
 
@@ -1306,7 +1307,7 @@ pub fn enumLit(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result {
         .ti = .{ .comp_time = enum_ty.tags.get(tag_name).?.is(.void) },
         .instr = self.irb.addConstant(
             // TODO: protect the cast
-            .{ .enum_create = .{
+            .{ .enum_instance = .{
                 .sym = .{ .module_index = 0, .symbol_index = @intCast(sym.sym.index) },
                 .tag_index = @intCast(tag_index),
             } },
@@ -1474,7 +1475,7 @@ fn enumAccess(self: *Self, enum_info: InstrInfos, ty: Type.Enum, tag_tk: Ast.Tok
                 .type = self.ti.intern(.{ .@"enum" = ty }),
                 .ti = .{ .comp_time = ty.tags.get(tag_name).?.is(.void) },
                 .instr = self.irb.addConstant(
-                    .{ .enum_create = .{
+                    .{ .enum_instance = .{
                         .sym = self.irb.data(enum_info.instr).load_symbol,
                         .tag_index = index,
                     } },

@@ -1,31 +1,34 @@
 [Enum declaration Marker]
 [Structure declaration Cell]
     - default values
-    [Constant 3]
+    [Constant index 3]
         [Enum create]
             - enum
             [Load symbol 0]
             - tag
             0
-    [Constant 7]
+    [Constant index 7]
         [Enum create]
             - enum
             [Load symbol 0 module 0]
             - tag
             1
-
 [Function declaration markerStuff]
     - default params
-    [Constant 3]
+    [Constant index 3]
+        [Enum create]
+            - enum
+            [Load symbol 0]
+            - tag
+            0
     - body
     [Print]
         [Field access 1]
             [Variable index: 0, scope: local]
         [Invoke symbol 1]
-
 [Function declaration markerStuff2]
     - default params
-    [Constant 5]
+    [Constant index 5]
         [Enum create]
             - enum
             [Load symbol 0]
@@ -36,14 +39,17 @@
         [Field access 1]
             [Variable index: 0, scope: local]
         [Invoke symbol 1]
-
 [Function declaration getMarker, returns]
     [Return]
-        [Constant 7]
-
+        [Constant index 7]
+            [Enum create]
+                - enum
+                [Load symbol 0 module 0]
+                - tag
+                1
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
-        [Constant 8]
+        [Constant index 8]
             [Enum create]
                 - enum
                 [Load symbol 0 module 0]
@@ -51,16 +57,26 @@
                 2
     [Print]
         [Variable index: 0, scope: local]
-    [Constant 7]
+    [Constant index 7]
+        [Enum create]
+            - enum
+            [Load symbol 0 module 0]
+            - tag
+            1
     [Assignment index: 0, scope: local, cow]
     [Print]
         [Variable index: 0, scope: local]
     [Call symbol 3]
         - args
-        [Constant 7]
+        [Constant index 7]
+            [Enum create]
+                - enum
+                [Load symbol 0 module 0]
+                - tag
+                1
     [Call symbol 4]
         - args
-        [Constant 9]
+        [Constant index 9]
             [Enum create]
                 - enum
                 [Load symbol 0 module 0]
@@ -73,7 +89,12 @@
             - args
             [Default field constant index 3]
             [Default field constant index 7]
-    [Constant 7]
+    [Constant index 7]
+        [Enum create]
+            - enum
+            [Load symbol 0 module 0]
+            - tag
+            1
     [Field assignment]
         [Field access 0, cow]
             [Variable index: 1, scope: local]
@@ -87,9 +108,19 @@
         [Binop type: eq_tag]
             [Field access 0]
                 [Variable index: 1, scope: local]
-            [Constant 7]
+            [Constant index 7]
+                [Enum create]
+                    - enum
+                    [Load symbol 0 module 0]
+                    - tag
+                    1
     [Print]
         [Binop type: ne_tag]
             [Field access 0]
                 [Variable index: 1, scope: local]
-            [Constant 7]
+            [Constant index 7]
+                [Enum create]
+                    - enum
+                    [Load symbol 0 module 0]
+                    - tag
+                    1

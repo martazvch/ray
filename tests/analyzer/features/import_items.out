@@ -8,7 +8,7 @@
                     [Variable index: 0, scope: local]
 [Function declaration introduce]
     [Print]
-        [Constant 3]
+        [Constant index 3]
             [String This is a mathematical module]
 [Function declaration getVecFromPos, returns]
     [Return]
@@ -20,11 +20,11 @@
             [Variable index: 1, scope: local]
 [Function declaration getInt, returns]
     [Return]
-        [Constant 4]
+        [Constant index 4]
             [Int 12]
 [Function declaration getIntDefault, returns]
     - default params
-    [Constant 5]
+    [Constant index 5]
         [Int 9]
     - body
     [Return]
@@ -54,7 +54,7 @@
                 [Variable index: 0, scope: local]
 [Function declaration introduce]
     [Print]
-        [Constant 3]
+        [Constant index 3]
             [String module for basic geometry]
 [Structure declaration Square]
     [Function declaration moveCenter, returns]
@@ -87,18 +87,18 @@
             - structure
             [Load symbol 0 module 0]
             - args
-            [Constant 3]
+            [Constant index 3]
                 [Int 3]
-            [Constant 4]
+            [Constant index 4]
                 [Int 9]
     [Variable declaration index: 1, scope: local]
         [Structure literal]
             - structure
             [Load symbol 0 module 1]
             - args
-            [Constant 5]
+            [Constant index 5]
                 [Int 5]
-            [Constant 6]
+            [Constant index 6]
                 [Int 8]
     [Block pop count: 1, is_expr: false]
         [Variable declaration index: 0, scope: local]
@@ -106,8 +106,8 @@
                 - structure
                 [Load symbol 0 module 0]
                 - args
-                [Constant 7]
+                [Constant index 7]
                     [Int 55]
-                [Constant 8]
+                [Constant index 8]
                     [Int 333]
     [Call symbol 2 module 0]

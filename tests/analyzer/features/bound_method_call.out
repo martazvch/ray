@@ -20,9 +20,9 @@
             - structure
             [Load symbol 0]
             - args
-            [Constant 3]
+            [Constant index 3]
                 [Int 5]
-            [Constant 4]
+            [Constant index 4]
                 [String Tom]
     [Variable declaration index: 1, scope: local]
         [Null]
@@ -40,5 +40,5 @@
         [Fn call]
             [Variable index: 4, scope: local]
             - args
-            [Constant 5]
+            [Constant index 5]
                 [Int 10]

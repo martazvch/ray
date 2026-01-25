@@ -2,7 +2,7 @@
     [Return]
 [Function declaration sub, returns]
     [Return]
-        [Constant 3]
+        [Constant index 3]
             [Int 5]
 [Function declaration mul, returns]
     [Return]

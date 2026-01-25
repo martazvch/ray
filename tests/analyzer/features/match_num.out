@@ -1,6 +1,6 @@
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
-        [Constant 3]
+        [Constant index 3]
             [Int 2]
     [Print]
         [Match int]
@@ -8,44 +8,45 @@
             [Variable index: 0, scope: local]
         - arms:
             - expr:
-                [Constant 4]
+                [Constant index 4]
                     [Int -1]
             - body:
-                [Constant 5]
+                [Constant index 5]
                     [Int -10]
             - expr:
-                [Constant 6]
+                [Constant index 6]
                     [Int 0]
             - body:
-                [Constant 7]
+                [Constant index 7]
                     [Int 10]
             - expr:
-                [Constant 3]
+                [Constant index 3]
+                    [Int 2]
             - body:
-                [Constant 8]
+                [Constant index 8]
                     [Int 30]
             - expr:
-                [Constant 9]
+                [Constant index 9]
                     [Int 3]
             - body:
-                [Constant 8]
+                [Constant index 8]
+                    [Int 30]
             - expr:
                 [Range]
                 - start:
-                [Constant 10]
+                [Constant index 10]
                     [Int 1]
                 - end:
-                [Constant 11]
+                [Constant index 11]
                     [Int 8]
             - body:
-                [Constant 12]
+                [Constant index 12]
                     [Int 90]
             - wildcard:
-                [Constant 13]
+                [Constant index 13]
                     [Int 100]
-
         [Variable declaration index: 1, scope: local]
-            [Constant 14]
+            [Constant index 14]
                 [Float 2]
         [Print]
             [Match float]
@@ -53,34 +54,39 @@
                 [Variable index: 1, scope: local]
             - arms:
                 - expr:
-                    [Constant 15]
+                    [Constant index 15]
                         [Float -1.2]
                 - body:
-                    [Constant 5]
+                    [Constant index 5]
+                        [Int -10]
                 - expr:
-                    [Constant 16]
+                    [Constant index 16]
                         [Float 0.1]
                 - body:
-                    [Constant 7]
+                    [Constant index 7]
+                        [Int 10]
                 - expr:
                     [Range]
                     - start:
-                    [Constant 17]
+                    [Constant index 17]
                         [Float 1.3]
                     - end:
-                    [Constant 18]
+                    [Constant index 18]
                         [Float 8.1]
                 - body:
-                    [Constant 12]
+                    [Constant index 12]
+                        [Int 90]
                 - expr:
                     [Range]
                     - start:
-                    [Constant 19]
+                    [Constant index 19]
                         [Float -10.3]
                     - end:
-                    [Constant 20]
+                    [Constant index 20]
                         [Float -8.1]
                 - body:
-                    [Constant 12]
+                    [Constant index 12]
+                        [Int 90]
                 - wildcard:
-                    [Constant 13]
+                    [Constant index 13]
+                        [Int 100]

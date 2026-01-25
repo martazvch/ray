@@ -8,6 +8,7 @@ const InstrIndex = @import("ir.zig").Index;
 const misc = @import("misc");
 const Interner = misc.Interner;
 const InternerIdx = Interner.Index;
+const ConstIdx = @import("ConstantInterner.zig").ConstIdx;
 const Set = misc.Set;
 const oom = misc.oom;
 
@@ -107,9 +108,9 @@ pub const Type = union(enum) {
         kind: Kind,
 
         pub const Kind = enum { normal, method, bound, native, native_method };
-        pub const Parameter = struct { name: ?InternerIdx, type: *const Type, default: ?InstrIndex, captured: bool };
+        pub const Parameter = struct { name: ?InternerIdx, type: *const Type, default: ?ConstIdx, captured: bool };
         pub const ParamsMap = ArrayMap(InternerIdx, Parameter);
-        pub const Proto = ArrayMap(InternerIdx, struct { done: bool = false, default: ?InstrIndex = null });
+        pub const Proto = ArrayMap(InternerIdx, struct { done: bool = false, default: ?ConstIdx = null });
 
         pub fn proto(self: *const Function, allocator: Allocator) Proto {
             var res: Proto = .empty;
@@ -161,9 +162,9 @@ pub const Type = union(enum) {
         pub const FieldsMap = ArrayMap(InternerIdx, Field);
         pub const Field = struct {
             type: *const Type,
-            default: ?InstrIndex,
+            default: ?ConstIdx,
         };
-        pub const Proto = ArrayMap(InternerIdx, struct { done: bool = false, default: ?InstrIndex = null });
+        pub const Proto = ArrayMap(InternerIdx, struct { done: bool = false, default: ?ConstIdx = null });
 
         pub fn proto(self: *const Structure, allocator: Allocator) Proto {
             var res: Proto = .empty;

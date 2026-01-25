@@ -13,6 +13,9 @@ const Vm = @import("../runtime/Vm.zig");
 const Chunk = @import("Chunk.zig");
 const OpCode = Chunk.OpCode;
 const CompilerMsg = @import("compiler_msg.zig").CompilerMsg;
+const ConstInterner = @import("../analyzer/ConstantInterner.zig");
+const Constant = ConstInterner.Constant;
+const ConstIdx = ConstInterner.ConstIdx;
 
 const misc = @import("misc");
 const Interner = misc.Interner;
@@ -48,6 +51,7 @@ pub const CompilationUnit = struct {
     errs: ArrayList(CompilerReport),
     instr_data: []const Instruction.Data,
     instr_lines: []const usize,
+    constants: []const Constant,
     render_mode: Disassembler.RenderMode,
     module: CompiledModule,
     line: usize,
@@ -70,7 +74,7 @@ pub const CompilationUnit = struct {
         render_mode: Disassembler.RenderMode,
         global_count: usize,
         symbol_count: usize,
-        constants_count: usize,
+        constants: []const Constant,
         native_funcs: []const Value,
     ) Self {
         return .{
@@ -80,8 +84,9 @@ pub const CompilationUnit = struct {
             .errs = .empty,
             .instr_data = undefined,
             .instr_lines = undefined,
+            .constants = constants,
             .render_mode = render_mode,
-            .module = .init(allocator, name, global_count, symbol_count, constants_count),
+            .module = .init(allocator, name, global_count, symbol_count, constants.len),
             .line = 0,
             .compiled_constants = .empty,
             .native_funcs = native_funcs,
@@ -353,7 +358,7 @@ const Compiler = struct {
             .@"break" => |data| self.breakInstr(data),
             .call => |*data| self.call(data),
 
-            .constant => |data| self.constant(data, true),
+            .constant => |data| self.constant(data.index, null, true),
             .@"continue" => |data| self.continueInstr(data),
             .discard => |index| self.wrappedInstr(.pop, index),
 
@@ -395,8 +400,6 @@ const Compiler = struct {
             .when => |*data| self.when(data),
             .@"while" => |data| self.whileInstr(data),
 
-            // TODO: maybe remove them from IR
-            .int, .float, .string, .null, .bool => unreachable,
             .noop => {},
         };
     }
@@ -620,25 +623,7 @@ const Compiler = struct {
         // TODO: protext casts
         for (args) |arg| {
             switch (arg) {
-                .default => |def| {
-                    // Index 0, 1 and 2 are reserved by the IR builder for true, false and null
-                    // to allow this optimization instead of pulling those constants from an array
-                    // at runtime
-                    if (def.const_index == 0) {
-                        self.writeOp(.push_true);
-                    } else if (def.const_index == 1) {
-                        self.writeOp(.push_false);
-                    } else if (def.const_index == 2) {
-                        self.writeOp(.push_null);
-                    } else {
-                        if (def.mod) |mod| {
-                            self.writeOpAndByte(.load_ext_constant, @intCast(def.const_index));
-                            self.writeByte(@intCast(mod));
-                        } else {
-                            self.writeOpAndByte(.load_constant, @intCast(def.const_index));
-                        }
-                    }
-                },
+                .default => |def| try self.constant(def.const_index, def.mod, true),
                 .instr => |instr| try self.compileInstr(instr),
             }
         }
@@ -702,43 +687,58 @@ const Compiler = struct {
         }
     }
 
-    fn constant(self: *Self, data: Instruction.Constant, load: bool) Error!void {
-        if (data.index == std.math.maxInt(CompilationUnit.ConstIndex) + 1) {
+    fn compileConstant(self: *Self, index: ConstIdx) Error!void {
+        if (self.manager.constants.len >= std.math.maxInt(CompilationUnit.ConstIndex) + 1) {
             return error.TooManyConst;
         }
 
-        const gop = self.manager.compiled_constants.getOrPut(self.manager.allocator, data.index) catch oom();
+        const idx = index.toInt();
+        const cte = self.manager.constants[idx];
 
-        if (!gop.found_existing) b: {
-            // We ignore bools and null as we handle them with special op codes for optimization
-            const value = switch (self.at(data.instr)) {
-                .bool, .null => break :b,
-                .enum_create => |val| Value.makeObj(Obj.EnumInstance.createComptime(
+        const gop = self.manager.compiled_constants.getOrPut(self.manager.allocator, idx) catch oom();
+        if (!gop.found_existing) {
+            const value = switch (cte) {
+                .bool => |c| Value.makeBool(c),
+                .int => |val| Value.makeInt(val),
+                .float => |val| Value.makeFloat(val),
+                .enum_instance => |val| Value.makeObj(Obj.EnumInstance.createComptime(
                     self.manager.allocator,
                     self.manager.module.symbols[val.sym.symbol_index].obj.as(Obj.Enum),
                     @intCast(val.tag_index),
                     Value.null_,
                 ).asObj()),
-                .int => |val| Value.makeInt(val),
-                .float => |val| Value.makeFloat(val),
+                .null => Value.null_,
                 .string => |val| Value.makeObj(Obj.String.comptimeCopy(
                     self.manager.allocator,
                     self.manager.interned_strings,
                     self.manager.interner.getKey(val).?,
                 ).asObj()),
-                else => unreachable,
             };
 
-            self.manager.module.constants[data.index] = value;
+            self.manager.module.constants[idx] = value;
+        }
+    }
+
+    fn constant(self: *Self, index: ConstIdx, ext_mod: ?usize, load: bool) Error!void {
+        if (ext_mod == null) {
+            try self.compileConstant(index);
         }
 
-        if (load) {
-            switch (self.at(data.instr)) {
-                .bool => |b| self.writeOp(if (b) .push_true else .push_false),
-                .null => self.writeOp(.push_null),
-                // TODO: protect the cast
-                else => self.writeOpAndByte(.load_constant, @intCast(data.index)),
-            }
+        if (!load) return;
+
+        switch (index) {
+            .true => self.writeOp(.push_true),
+            .false => self.writeOp(.push_false),
+            .null => self.writeOp(.push_null),
+            else => |i| {
+                const idx = i.toInt();
+                if (ext_mod) |mod| {
+                    self.writeOpAndByte(.load_ext_constant, @intCast(idx));
+                    self.writeByte(@intCast(mod));
+                } else {
+                    self.writeOpAndByte(.load_constant, @intCast(idx));
+                }
+            },
         }
     }
 
@@ -1019,8 +1019,8 @@ const Compiler = struct {
     fn defaults(self: *Self, instrs: []const ir.Index) Error!void {
         for (instrs) |instr| {
             // TODO: protect this
-            const const_data = self.manager.instr_data[instr].constant;
-            try self.constant(const_data, false);
+            const const_data = self.at(instr).constant;
+            try self.constant(const_data.index, null, false);
         }
     }
 

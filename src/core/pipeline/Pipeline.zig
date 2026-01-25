@@ -76,7 +76,7 @@ pub fn run(self: *Self, file_name: []const u8, path: []const u8, source: [:0]con
         if (!self.state.config.print_bytecode) .none else if (options.test_mode) .@"test" else .normal,
         analyzer.scope.current.variables.count(),
         analyzer.scope.symbol_count,
-        analyzer.irb.constants.constants.count(),
+        analyzer.irb.const_interner.constants.items,
         self.state.native_reg.funcs.items,
     );
 
@@ -203,6 +203,7 @@ fn printIr(self: *Self, allocator: Allocator, file_name: []const u8, analyzer: *
     var ir_renderer = IrRenderer.init(
         allocator,
         analyzer.irb.instructions.items(.data)[start..],
+        analyzer.irb.const_interner.constants.items,
         &self.state.interner,
     );
     try stdout.writeAll(try ir_renderer.renderIr(file_name, analyzer.irb.roots.items[start..]));

@@ -1,6 +1,6 @@
 [Function declaration dead_code, returns]
     [Variable declaration index: 0, scope: local]
-        [Constant 3]
+        [Constant index 3]
             [Int 1]
     [Return]
 [Function declaration main]

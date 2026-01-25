@@ -4,10 +4,10 @@
     [Null]
 [Function declaration set_vars]
     [Variable declaration index: 0, scope: local]
-        [Constant 3]
+        [Constant index 3]
             [String init]
     [Function declaration set]
-        [Constant 4]
+        [Constant index 4]
             [String updated]
         [Assignment index: 0, scope: local, unbox]
         - captures

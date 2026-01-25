@@ -1,8 +1,9 @@
 [Structure declaration Foo]
     - default values
-    [Constant 3]
+    [Constant index 3]
         [Int 0]
-    [Constant 3]
+    [Constant index 3]
+        [Int 0]
     [Function declaration init, returns]
         [Return]
             [Structure literal]
@@ -19,17 +20,18 @@
                 [Load symbol 2]
                 - args
                 [Array]
-                    [Constant 0]
+                    [Constant index 0]
                         [Bool true]
 [Function declaration main]
     [Structure declaration Baz]
         - default values
-        [Constant 0]
+        [Constant index 0]
+            [Bool true]
         [Function declaration init, returns]
             [Return]
                 [Structure literal]
                     - structure
                     [Load symbol 5]
                     - args
-                    [Constant 1]
+                    [Constant index 1]
                         [Bool false]

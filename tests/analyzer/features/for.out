@@ -2,11 +2,11 @@
     [For]
     - expr:
         [Array]
-            [Constant 3]
+            [Constant index 3]
                 [Int 1]
-            [Constant 4]
+            [Constant index 4]
                 [Int 2]
-            [Constant 5]
+            [Constant index 5]
                 [Int 3]
     - body:
         [Block pop count: 1, is_expr: false]
@@ -14,13 +14,13 @@
                 [Variable index: 1, scope: local]
     [Variable declaration index: 0, scope: local]
         [Array]
-            [Constant 6]
+            [Constant index 6]
                 [Int 5]
-            [Constant 7]
+            [Constant index 7]
                 [Int 6]
-            [Constant 8]
+            [Constant index 8]
                 [Int 7]
-            [Constant 9]
+            [Constant index 9]
                 [Int 8]
     [For]
     - expr:
@@ -30,7 +30,7 @@
             [Print]
                 [Variable index: 2, scope: local]
     [Variable declaration index: 1, scope: local]
-        [Constant 10]
+        [Constant index 10]
             [String Tom]
     [For]
     - expr:
@@ -41,7 +41,7 @@
                 [Variable index: 3, scope: local]
     [For]
     - expr:
-        [Constant 11]
+        [Constant index 11]
             [String Martin]
     - body:
         [Block pop count: 1, is_expr: false]
@@ -58,10 +58,11 @@
     - expr:
         [Range]
         - start:
-        [Constant 12]
+        [Constant index 12]
             [Int 0]
         - end:
-        [Constant 6]
+        [Constant index 6]
+            [Int 5]
     - body:
         [Block pop count: 1, is_expr: false]
             [Print]
@@ -70,10 +71,11 @@
     - expr:
         [Range]
         - start:
-        [Constant 13]
+        [Constant index 13]
             [Int -1]
         - end:
-        [Constant 6]
+        [Constant index 6]
+            [Int 5]
     - body:
         [Block pop count: 1, is_expr: false]
             [Print]
@@ -82,10 +84,10 @@
     - expr:
         [Range]
         - start:
-        [Constant 14]
+        [Constant index 14]
             [Int -8]
         - end:
-        [Constant 15]
+        [Constant index 15]
             [Int -5]
     - body:
         [Block pop count: 1, is_expr: false]
@@ -93,17 +95,19 @@
                 [Variable index: 3, scope: local]
     [For]
     - expr:
-        [Constant 11]
+        [Constant index 11]
+            [String Martin]
     - body:
         [Block pop count: 1, is_expr: false]
             [Break depth: 0, pop: 2]
-
     [Block pop count: 1, is_expr: false]
         [Variable declaration index: 0, scope: local]
-            [Constant 3]
+            [Constant index 3]
+                [Int 1]
         [For]
         - expr:
-            [Constant 11]
+            [Constant index 11]
+                [String Martin]
         - body:
             [Block pop count: 1, is_expr: false]
                 [Break depth: 1, pop: 3]

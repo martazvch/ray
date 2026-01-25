@@ -249,7 +249,7 @@ fn extConstantInstruction(self: *Self, writer: *Writer, name: []const u8, offset
     if (self.render_mode == .@"test") {
         try writer.print("{s} index {}, module {}\n", .{ name, constant, mod });
     } else {
-        try writer.print("{s:<20} index {:>4}, mode {:>4}\n", .{ name, constant, mod });
+        try writer.print("{s:<20} index {:>4}, module {:>4}\n", .{ name, constant, mod });
     }
 
     return offset + 3;

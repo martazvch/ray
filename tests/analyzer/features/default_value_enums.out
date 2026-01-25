@@ -1,13 +1,13 @@
 [Enum declaration Marker]
 [Structure declaration Cell]
     - default values
-    [Constant 3]
+    [Constant index 3]
         [Enum create]
             - enum
             [Load symbol 0]
             - tag
             0
-    [Constant 5]
+    [Constant index 5]
         [Enum create]
             - enum
             [Load symbol 0]
@@ -15,7 +15,12 @@
             1
 [Function declaration markerStuff]
     - default params
-    [Constant 5]
+    [Constant index 5]
+        [Enum create]
+            - enum
+            [Load symbol 0]
+            - tag
+            1
     - body
     [Print]
         [Field access 2]
@@ -23,7 +28,12 @@
         [Invoke symbol 2]
 [Function declaration markerStuff2]
     - default params
-    [Constant 3]
+    [Constant index 3]
+        [Enum create]
+            - enum
+            [Load symbol 0]
+            - tag
+            0
     - body
     [Print]
         [Field access 2]

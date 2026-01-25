@@ -7,6 +7,7 @@ const Arg = clarg.Arg;
 const misc = @import("misc");
 const oom = misc.oom;
 const RevIterator = misc.RevIterator;
+const ConstIdx = @import("../core/analyzer/ConstantInterner.zig").ConstIdx;
 
 const ir = @import("../core/analyzer/ir.zig");
 const Instr = ir.Instruction;
@@ -362,17 +363,7 @@ fn transpileInstr(self: *Self, instr: usize, interner: *const misc.Interner) !vo
             }
         },
         .constant => |n| {
-            try self.transpileInstr(n.instr, interner);
-            self.constants.append(self.allocator, n.instr) catch oom();
-        },
-        .bool => |n| {
-            self.appendSlice(if (n) "true" else "false", .none);
-        },
-        .int => |n| {
-            self.printSlice("{}", .{n}, .none);
-        },
-        .string => |n| {
-            self.printSlice("\"{s}\"", .{interner.getKey(n).?}, .none);
+            try self.transpileConstant(n.index, interner);
         },
         else => |n| {
             std.log.debug("Got: {any}", .{n});
@@ -381,13 +372,16 @@ fn transpileInstr(self: *Self, instr: usize, interner: *const misc.Interner) !vo
     }
 }
 
-// TODO: rewrite? This is because in Irb we add 3 constants at the beginning that we don't have in the list of instructions
-fn transpileConstant(self: *Self, const_index: usize, interner: *const misc.Interner) anyerror!void {
+fn transpileConstant(self: *Self, const_index: ConstIdx, interner: *const misc.Interner) anyerror!void {
+    try self.transpileInstr(self.constants.items[const_index.toInt()], interner);
     switch (const_index) {
-        0 => self.appendSlice("true", .none),
-        1 => self.appendSlice("false", .none),
-        2 => self.appendSlice("null", .none),
-        else => try self.transpileInstr(self.constants.items[if (const_index > 2) const_index - 3 else const_index], interner),
+        .true => self.appendSlice("true", .none),
+        .false => self.appendSlice("false", .none),
+        .null => self.appendSlice("null", .none),
+        else => {
+            const idx = const_index.toInt();
+            try self.transpileInstr(self.constants.items[if (idx > 2) idx - 3 else idx], interner);
+        },
     }
 }
 

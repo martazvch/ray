@@ -5,7 +5,7 @@
 [Function declaration factory1, returns]
     [Function declaration capture, returns]
         [Return]
-            [Constant 3]
+            [Constant index 3]
                 [Int 4]
     [Return]
         [Load symbol 3]

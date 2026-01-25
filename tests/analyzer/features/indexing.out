@@ -1,22 +1,23 @@
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
         [Array]
-            [Constant 3]
+            [Constant index 3]
                 [Int 1]
-            [Constant 4]
+            [Constant index 4]
                 [Int 2]
-            [Constant 5]
+            [Constant index 5]
                 [Int 3]
     [Print]
         [Indexing array]
             - index
-            [Constant 3]
+            [Constant index 3]
+                [Int 1]
             - expr
             [Variable index: 0, scope: local]
     [Print]
         [Indexing array]
             - index
-            [Constant 6]
+            [Constant index 6]
                 [Int -1]
             - expr
             [Variable index: 0, scope: local]
@@ -25,39 +26,46 @@
             - index
             [Range]
             - start:
-            [Constant 7]
+            [Constant index 7]
                 [Int 0]
             - end:
-            [Constant 3]
+            [Constant index 3]
+                [Int 1]
             - expr
             [Variable index: 0, scope: local]
     [Variable declaration index: 1, scope: local]
         [Array]
             [Array]
-                [Constant 3]
-                [Constant 4]
-                [Constant 5]
+                [Constant index 3]
+                    [Int 1]
+                [Constant index 4]
+                    [Int 2]
+                [Constant index 5]
+                    [Int 3]
             [Array]
-                [Constant 8]
+                [Constant index 8]
                     [Int 4]
-                [Constant 9]
+                [Constant index 9]
                     [Int 5]
-                [Constant 10]
+                [Constant index 10]
                     [Int 6]
     [Print]
         [Indexing array]
             - index
-            [Constant 3]
+            [Constant index 3]
+                [Int 1]
             - expr
             [Variable index: 1, scope: local]
     [Print]
         [Indexing array]
             - index
-            [Constant 4]
+            [Constant index 4]
+                [Int 2]
             - expr
             [Indexing array]
                 - index
-                [Constant 3]
+                [Constant index 3]
+                    [Int 1]
                 - expr
                 [Variable index: 1, scope: local]
     [Print]
@@ -65,9 +73,11 @@
             - index
             [Range]
             - start:
-            [Constant 7]
+            [Constant index 7]
+                [Int 0]
             - end:
-            [Constant 3]
+            [Constant index 3]
+                [Int 1]
             - expr
             [Variable index: 1, scope: local]
     [Print]
@@ -75,22 +85,26 @@
             - index
             [Range]
             - start:
-            [Constant 3]
+            [Constant index 3]
+                [Int 1]
             - end:
-            [Constant 4]
+            [Constant index 4]
+                [Int 2]
             - expr
             [Indexing array]
                 - index
-                [Constant 7]
+                [Constant index 7]
+                    [Int 0]
                 - expr
                 [Variable index: 1, scope: local]
     [Variable declaration index: 2, scope: local]
-        [Constant 11]
+        [Constant index 11]
             [String Tom]
     [Print]
         [Indexing str]
             - index
-            [Constant 3]
+            [Constant index 3]
+                [Int 1]
             - expr
             [Variable index: 2, scope: local]
     [Print]
@@ -98,8 +112,10 @@
             - index
             [Range]
             - start:
-            [Constant 3]
+            [Constant index 3]
+                [Int 1]
             - end:
-            [Constant 4]
+            [Constant index 4]
+                [Int 2]
             - expr
             [Variable index: 2, scope: local]

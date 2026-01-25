@@ -1,11 +1,11 @@
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
-        [Constant 3]
+        [Constant index 3]
             [String Tom]
     [Print]
         [Indexing str]
             - index
-            [Constant 4]
+            [Constant index 4]
                 [Int 1]
             - expr
             [Variable index: 0, scope: local]

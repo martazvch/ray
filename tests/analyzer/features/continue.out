@@ -3,10 +3,10 @@
     - expr:
         [Range]
         - start:
-        [Constant 3]
+        [Constant index 3]
             [Int 0]
         - end:
-        [Constant 4]
+        [Constant index 4]
             [Int 3]
     - body:
         [Block pop count: 1, is_expr: false]
@@ -15,9 +15,10 @@
     - expr:
         [Range]
         - start:
-        [Constant 3]
+        [Constant index 3]
+            [Int 0]
         - end:
-        [Constant 5]
+        [Constant index 5]
             [Int 5]
     - body:
         [Block pop count: 1, is_expr: false]
@@ -26,58 +27,65 @@
     - expr:
         [Range]
         - start:
-        [Constant 3]
+        [Constant index 3]
+            [Int 0]
         - end:
-        [Constant 4]
+        [Constant index 4]
+            [Int 3]
     - body:
         [Block pop count: 1, is_expr: false]
             [For]
             - expr:
                 [Range]
                 - start:
-                [Constant 4]
+                [Constant index 4]
+                    [Int 3]
                 - end:
-                [Constant 6]
+                [Constant index 6]
                     [Int 6]
             - body:
                 [Block pop count: 2, is_expr: false]
                     [Variable declaration index: 2, scope: local]
-                        [Constant 7]
+                        [Constant index 7]
                             [Int 1]
                     [Continue depth: 0, pop: 2]
     [For]
     - expr:
         [Range]
         - start:
-        [Constant 3]
+        [Constant index 3]
+            [Int 0]
         - end:
-        [Constant 4]
+        [Constant index 4]
+            [Int 3]
     - body:
         [Block pop count: 2, is_expr: false]
             [Variable declaration index: 2, scope: local]
-                [Constant 7]
+                [Constant index 7]
+                    [Int 1]
             [For]
             - expr:
                 [Range]
                 - start:
-                [Constant 4]
+                [Constant index 4]
+                    [Int 3]
                 - end:
-                [Constant 6]
+                [Constant index 6]
+                    [Int 6]
             - body:
                 [Block pop count: 2, is_expr: false]
                     [Variable declaration index: 2, scope: local]
-                        [Constant 8]
+                        [Constant index 8]
                             [Int 2]
                     [Continue depth: 1, pop: 5]
-
     [Variable declaration index: 0, scope: local]
-        [Constant 3]
-
+        [Constant index 3]
+            [Int 0]
     [While]
     - condition:
         [Binop type: lt_int]
             [Variable index: 0, scope: local]
-            [Constant 9]
+            [Constant index 9]
                 [Int 4]
     - body:
         [Block pop count: 0, is_expr: false]
@@ -86,7 +94,8 @@
     - condition:
         [Binop type: lt_int]
             [Variable index: 0, scope: local]
-            [Constant 9]
+            [Constant index 9]
+                [Int 4]
     - body:
         [Block pop count: 0, is_expr: false]
             [Continue depth: 0, pop: 0]
@@ -94,35 +103,42 @@
     - condition:
         [Binop type: lt_int]
             [Variable index: 0, scope: local]
-            [Constant 6]
+            [Constant index 6]
+                [Int 6]
     - body:
         [Block pop count: 0, is_expr: false]
             [While]
             - condition:
                 [Binop type: lt_int]
                     [Variable index: 0, scope: local]
-                    [Constant 9]
+                    [Constant index 9]
+                        [Int 4]
             - body:
                 [Block pop count: 1, is_expr: false]
                     [Variable declaration index: 0, scope: local]
-                        [Constant 7]
+                        [Constant index 7]
+                            [Int 1]
                     [Continue depth: 0, pop: 1]
     [While]
     - condition:
         [Binop type: lt_int]
             [Variable index: 0, scope: local]
-            [Constant 9]
+            [Constant index 9]
+                [Int 4]
     - body:
         [Block pop count: 1, is_expr: false]
             [Variable declaration index: 0, scope: local]
-                [Constant 7]
+                [Constant index 7]
+                    [Int 1]
             [While]
             - condition:
                 [Binop type: lt_int]
                     [Variable index: 0, scope: local]
-                    [Constant 9]
+                    [Constant index 9]
+                        [Int 4]
             - body:
                 [Block pop count: 1, is_expr: false]
                     [Variable declaration index: 0, scope: local]
-                        [Constant 8]
+                        [Constant index 8]
+                            [Int 2]
                     [Continue depth: 1, pop: 2]

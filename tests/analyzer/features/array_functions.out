@@ -1,15 +1,14 @@
-//-- test.ray --
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
         [Array]
-            [Constant 3]
+            [Constant index 3]
                 [Int 1]
-            [Constant 4]
+            [Constant index 4]
                 [Int 2]
     [Call array function 0]
         [Variable index: 0, scope: local]
         - args
-        [Constant 5]
+        [Constant index 5]
             [Int 5]
     [Print]
         [Call array function 2]

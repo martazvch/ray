@@ -16,6 +16,7 @@ const Instruction = ir.Instruction;
 const Type = ir.Type;
 const Span = @import("../parser/Lexer.zig").Span;
 const Token = @import("../parser/Lexer.zig").Token;
+const Constant = @import("ConstantInterner.zig").Constant;
 
 const Labels = struct { depth: usize, msg: []const u8 };
 
@@ -25,7 +26,7 @@ instrs: []const Instruction.Data,
 indent_level: u8,
 tree: ArrayList(u8),
 writer: std.ArrayList(u8).Writer,
-compiled_constants: Set(usize),
+constants: []const Constant,
 
 const indent_size: u8 = 4;
 const spaces: [1024]u8 = [_]u8{' '} ** 1024;
@@ -33,7 +34,7 @@ const spaces: [1024]u8 = [_]u8{' '} ** 1024;
 const Error = Allocator.Error || std.fmt.BufPrintError;
 const Self = @This();
 
-pub fn init(allocator: Allocator, instrs: []const Instruction.Data, interner: *const Interner) Self {
+pub fn init(allocator: Allocator, instrs: []const Instruction.Data, constants: []const Constant, interner: *const Interner) Self {
     return .{
         .allocator = allocator,
         .interner = interner,
@@ -41,7 +42,7 @@ pub fn init(allocator: Allocator, instrs: []const Instruction.Data, interner: *c
         .tree = .empty,
         .writer = undefined,
         .indent_level = 0,
-        .compiled_constants = .empty,
+        .constants = constants,
     };
 }
 
@@ -68,7 +69,6 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .assignment => |*data| self.assignment(data),
         .binop => |*data| self.binop(data),
         .block => |*data| self.block(data),
-        .bool => |data| self.boolInstr(data),
         .box => |data| self.indexInstr("Box", data),
         .bound_method => |data| self.boundMethod(data),
         .@"break" => |data| self.breakInstr(data),
@@ -80,20 +80,17 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .enum_decl => |*data| self.enumDecl(data),
         .fail => |data| self.returnInstr("Fail", data),
         .field => |data| self.getField(data, false),
-        .float => |data| self.floatInstr(data),
         .fn_decl => |*data| self.fnDeclaration(data),
         .for_loop => |data| self.forLoop(data),
         .identifier => |*data| self.identifier(data),
         .@"if" => |*data| self.ifInstr(data),
         .in => |data| self.in(data),
-        .int => |data| self.intInstr(data),
         .incr_rc => |index| self.indexInstr("Incr rc", index),
         .indexing => |data| self.indexing(data, false, false),
         .load_symbol => |*data| self.loadSymbol(data),
         .load_builtin => |index| self.indentAndPrintSlice("[Builtin symbol: {}]", .{index}),
         .match => |*data| self.match(data),
         .multiple_var_decl => |*data| self.multipleVarDecl(data),
-        .null => self.indentAndAppendSlice("[Null]"),
         // Accessed only via `call`
         .obj_func => unreachable,
         .pat_nullable => |index| self.indexInstr("Nullable pattern", index),
@@ -101,7 +98,6 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .print => |index| self.indexInstr("Print", index),
         .range => |data| self.range(data),
         .@"return" => |data| self.returnInstr("Return", data),
-        .string => |data| self.stringInstr(data),
         .struct_decl => |*data| self.structDecl(data),
         .struct_literal => |*data| self.structLiteral(data),
         .trap => |data| self.trap(data),
@@ -271,9 +267,9 @@ fn argsList(self: *Self, kind: []const u8, args: []const Instruction.Arg) void {
         switch (arg) {
             .default => |def| {
                 if (def.mod) |mod| {
-                    self.indentAndPrintSlice("[Default {s} constant index {}, module {}]", .{ kind, def.const_index, mod });
+                    self.indentAndPrintSlice("[Default {s} constant index {}, module {}]", .{ kind, def.const_index.toInt(), mod });
                 } else {
-                    self.indentAndPrintSlice("[Default {s} constant index {}]", .{ kind, def.const_index });
+                    self.indentAndPrintSlice("[Default {s} constant index {}]", .{ kind, def.const_index.toInt() });
                 }
             },
             .instr => |i| self.parseInstr(i),
@@ -286,13 +282,17 @@ fn capture(self: *Self, data: *const Instruction.Capture) void {
 }
 
 fn constant(self: *Self, data: Instruction.Constant) void {
-    self.indentAndPrintSlice("[Constant {}]", .{data.index});
-    const gop = self.compiled_constants.getOrPut(self.allocator, data.index) catch oom();
-    if (!gop.found_existing) {
-        self.indent_level += 1;
-        defer self.indent_level -= 1;
-        self.parseInstr(data.instr);
+    self.indentAndPrintSlice("[Constant index {}]", .{data.index.toInt()});
+    self.indent_level += 1;
+    switch (self.constants[data.index.toInt()]) {
+        .bool => |c| self.indentAndPrintSlice("[Bool {}]", .{c}),
+        .int => |c| self.indentAndPrintSlice("[Int {}]", .{c}),
+        .float => |c| self.indentAndPrintSlice("[Float {}]", .{c}),
+        .null => self.indentAndAppendSlice("[Null]"),
+        .string => |c| self.indentAndPrintSlice("[String {s}]", .{self.interner.getKey(c).?}),
+        .enum_instance => |c| self.enumCreate(c),
     }
+    self.indent_level -= 1;
 }
 
 fn continueInstr(self: *Self, data: Instruction.Continue) void {
