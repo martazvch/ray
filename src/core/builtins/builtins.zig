@@ -1,3 +1,4 @@
+const std = @import("std");
 const ffi = @import("ffi.zig");
 const Value = @import("../runtime/values.zig").Value;
 const Vm = @import("../runtime/Vm.zig");
@@ -14,16 +15,18 @@ pub const module: ffi.ZigModule = .{
     },
 };
 
-fn int(_: *Vm, value: union(enum) { float: f64, int: i64 }) i64 {
+fn int(_: *Vm, value: ffi.Union(&.{ .int, .float, .str })) i64 {
     return switch (value) {
         .int => |i| i,
-        .float => @intFromFloat(value.float),
+        .float => |f| @intFromFloat(f),
+        .str => |s| std.fmt.parseInt(ffi.Int, s, 10) catch unreachable,
     };
 }
 
-fn float(_: *Vm, value: union(enum) { float: f64, int: i64 }) f64 {
+fn float(_: *Vm, value: ffi.Union(&.{ .int, .float, .str })) f64 {
     return switch (value) {
-        .int => @floatFromInt(value.int),
+        .int => |i| @floatFromInt(i),
         .float => |f| f,
+        .str => |s| std.fmt.parseFloat(ffi.Float, s) catch unreachable,
     };
 }

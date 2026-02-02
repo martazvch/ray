@@ -3,10 +3,12 @@ fn main() {
     print a
     a = int(8)
     print a
+    print int("67")
 
     var b: float = float(6)
     print b
     b = float(8.4)
     print b
+    print float("23.45")
 }
 

@@ -3,6 +3,53 @@ const Value = @import("../runtime/values.zig").Value;
 const Obj = @import("../runtime/Obj.zig");
 const Vm = @import("../runtime/Vm.zig");
 
+// -------
+//  Types
+// -------
+pub const Int = i64;
+pub const Float = f64;
+pub const Bool = bool;
+pub const Str = []const u8;
+
+pub const All = union(enum) {
+    bool: Bool,
+    int: Int,
+    float: Float,
+    str: Str,
+};
+
+pub fn Union(types: []const std.meta.FieldEnum(All)) type {
+    var fields: [types.len]std.builtin.Type.UnionField = undefined;
+    var enum_fields: [types.len]std.builtin.Type.EnumField = undefined;
+
+    inline for (types, 0..) |t, i| {
+        const name = @tagName(t);
+        const T = @FieldType(All, name);
+
+        fields[i] = .{
+            .alignment = @alignOf(T),
+            .name = name,
+            .type = T,
+        };
+        enum_fields[i] = .{
+            .name = name,
+            .value = i,
+        };
+    }
+
+    return @Type(.{ .@"union" = .{
+        .layout = .auto,
+        .tag_type = @Type(.{ .@"enum" = .{
+            .tag_type = usize,
+            .decls = &.{},
+            .fields = &enum_fields,
+            .is_exhaustive = true,
+        } }),
+        .decls = &.{},
+        .fields = &fields,
+    } });
+}
+
 pub const ZigModule = struct {
     name: ?[]const u8 = null,
     is_module: bool = true,
@@ -103,12 +150,7 @@ pub fn makeNative(func: anytype) ZigFn {
                 .float => value.float,
                 .int => value.int,
                 .bool => value.bool,
-                // TODO: make this generic
-                .@"union" => switch (value) {
-                    .int => .{ .int = value.int },
-                    .float => .{ .float = value.float },
-                    else => unreachable,
-                },
+                .@"union" => handleUnion(T, value),
                 .pointer => |ptr| {
                     return switch (ptr.child) {
                         u8 => value.obj.as(Obj.String).chars,
@@ -122,6 +164,25 @@ pub fn makeNative(func: anytype) ZigFn {
                 },
                 else => @compileError("FFI: Unsupported type in auto conversion: " ++ @typeName(T)),
             };
+        }
+
+        fn handleUnion(U: type, value: Value) U {
+            // Unwrap is same because type checking is done in Analyzer
+            return switch (value) {
+                .bool => |v| createUnionIfField(U, "bool", v),
+                .int => |v| createUnionIfField(U, "int", v),
+                .float => |v| createUnionIfField(U, "float", v),
+                .obj => |v| createUnionIfField(U, "str", v.as(Obj.String).chars),
+                else => unreachable,
+            } orelse unreachable;
+        }
+
+        fn createUnionIfField(U: type, comptime name: []const u8, value: anytype) ?U {
+            if (@hasField(U, name)) {
+                return @unionInit(U, name, value);
+            }
+
+            return null;
         }
 
         fn toValue(vm: *Vm, value: anytype) Value {
