@@ -1,4 +1,9 @@
 fn main() {
     print "abcd".len()
+
+    let string = "ab cd ef eaaa1"
+    for s in string.split(" ") {
+        print s
+    }
 }
 

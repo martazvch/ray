@@ -23,6 +23,7 @@ bytes_allocated: usize,
 next_gc: usize,
 active: bool,
 tmp_roots: ArrayList(*Obj),
+tmp_buf: []const Value,
 
 const Self = @This();
 const GROW_FACTOR = 2;
@@ -36,6 +37,7 @@ pub fn init(vm: *Vm, parent_allocator: Allocator) Self {
         .next_gc = 1024 * 1024,
         .active = false,
         .tmp_roots = .empty,
+        .tmp_buf = &.{},
     };
 }
 
@@ -56,6 +58,16 @@ pub fn popTmpRoot(self: *Self) void {
 
 pub fn popTmpRootMany(self: *Self, count: usize) void {
     self.tmp_roots.shrinkRetainingCapacity(self.tmp_roots.items.len - count);
+}
+
+/// Pushes a reference to a slice of Value
+pub fn pushTmpBuf(self: *Self, buf: []const Value) void {
+    self.tmp_buf = buf;
+}
+
+/// Removes a temporary reference to a buffer of Value
+pub fn popTmpBuf(self: *Self) void {
+    self.tmp_buf = &.{};
 }
 
 pub fn collect(self: *Self) Allocator.Error!void {
@@ -88,6 +100,7 @@ fn markRoots(self: *Self) Allocator.Error!void {
     for (self.tmp_roots.items) |root| {
         try self.markObject(root);
     }
+    try self.markArray(self.tmp_buf);
 
     var value = self.vm.stack.values[0..].ptr;
 

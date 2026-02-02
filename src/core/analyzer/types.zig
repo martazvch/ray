@@ -530,6 +530,9 @@ pub const ObjFnType = enum {
     str,
     generic,
     void,
+    array_int,
+    array_float,
+    array_str,
 };
 
 test "inline union" {

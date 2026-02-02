@@ -1448,6 +1448,9 @@ fn runtimeObjToType(self: *Self, ty: type_mod.ObjFnType, current_generic: *const
         .str => self.ti.getCached(.str),
         .void => self.ti.getCached(.void),
         .generic => current_generic,
+        .array_int => self.ti.intern(.{ .array = .{ .child = self.ti.getCached(.int) } }),
+        .array_float => self.ti.intern(.{ .array = .{ .child = self.ti.getCached(.float) } }),
+        .array_str => self.ti.intern(.{ .array = .{ .child = self.ti.getCached(.str) } }),
     };
 }
 

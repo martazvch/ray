@@ -437,6 +437,24 @@ pub const String = struct {
     pub fn _api_len(self: *Self, _: *Vm, _: []Value) ?Value {
         return .makeInt(@intCast(self.chars.len));
     }
+
+    pub const _defapi_split: ObjFnTypeInfo = .{ .params = &.{.str}, .return_type = .array_str };
+    pub fn _api_split(self: *Self, vm: *Vm, stack: []Value) ?Value {
+        const sep = stack[0].obj.as(String).chars;
+        var split = std.mem.splitSequence(u8, self.chars, sep);
+
+        var chunks: ArrayList(Value) = .empty;
+        defer chunks.deinit(vm.allocator);
+
+        while (split.next()) |chunk| {
+            const s = String.takeCopy(vm, chunk).asObj();
+            chunks.append(vm.allocator, .makeObj(s)) catch oom();
+            vm.gc.pushTmpBuf(chunks.items);
+        }
+        defer vm.gc.popTmpBuf();
+
+        return .makeObj(Array.create(vm, chunks.items).asObj());
+    }
 };
 
 pub const Function = struct {
