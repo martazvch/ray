@@ -1,0 +1,8 @@
+-- main --
+load_constant index 3, value abcd
+call_string_fn index 0, arity 0
+print
+ret_naked
+
+-- global scope --
+call_sym index 0, arity 0, <function main>

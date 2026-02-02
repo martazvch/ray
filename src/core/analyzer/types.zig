@@ -513,8 +513,12 @@ pub const TypeInterner = struct {
 };
 
 // Type for runtime object
-pub const ObjFns = std.StringArrayHashMapUnmanaged(ObjFnInfos);
+pub const ObjFns = std.StaticStringMap(ObjFnInfos);
 pub const ObjFnInfos = struct {
+    index: usize,
+    type_info: ObjFnTypeInfo,
+};
+pub const ObjFnTypeInfo = struct {
     params: []const ObjFnType,
     return_type: ObjFnType,
 };

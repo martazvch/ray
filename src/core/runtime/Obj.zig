@@ -9,6 +9,7 @@ const options = @import("options");
 const type_mod = @import("../analyzer/types.zig");
 const TypeId = type_mod.TypeId;
 const ObjFnInfos = type_mod.ObjFnInfos;
+const ObjFnTypeInfo = type_mod.ObjFnTypeInfo;
 const ObjFns = type_mod.ObjFns;
 
 const Chunk = @import("../compiler/Chunk.zig");
@@ -210,10 +211,51 @@ pub fn log(self: *Obj) void {
     }
 }
 
+fn BuiltinFn(T: type) type {
+    return *const fn (*T, *Vm, []Value) ?Value;
+}
+
+fn getApiFns(T: type) []const BuiltinFn(T) {
+    const info = @typeInfo(T).@"struct";
+    comptime var fns: []const BuiltinFn(T) = &.{};
+
+    inline for (info.decls) |decl| {
+        if (comptime std.mem.startsWith(u8, decl.name, "_api_")) {
+            comptime fns = fns ++ .{@field(T, decl.name)};
+        }
+    }
+
+    return fns;
+}
+
+const KV = struct { []const u8, ObjFnInfos };
+
+fn getDefApiFns(T: type) std.StaticStringMap(ObjFnInfos) {
+    const info = @typeInfo(T).@"struct";
+    comptime var i: usize = 0;
+    comptime var kvs: []const KV = &.{};
+
+    inline for (info.decls) |decl| {
+        if (comptime std.mem.startsWith(u8, decl.name, "_api_")) {
+            const name = decl.name[5..];
+            const def_name = "_defapi_" ++ name;
+
+            if (!@hasDecl(T, def_name)) {
+                @compileError("Missing API type definition for function: " ++ name);
+            }
+
+            kvs = kvs ++ .{KV{ name, .{ .index = i, .type_info = @field(T, def_name) } }};
+            i += 1;
+        }
+    }
+
+    return .initComptime(kvs);
+}
+
 pub const Array = struct {
     obj: Obj,
     values: ArrayList(Value),
-    funcs: []const *const fn (*Self, *Vm, []Value) ?Value,
+    funcs: []const BuiltinFn(Self),
 
     const Self = @This();
 
@@ -227,12 +269,7 @@ pub const Array = struct {
         defer vm.gc.popTmpRoot();
 
         obj.values.ensureTotalCapacity(vm.gc_alloc, values.len) catch oom();
-
-        obj.funcs = &.{
-            push,
-            pop,
-            len,
-        };
+        obj.funcs = getApiFns(Self);
 
         for (values) |val| {
             obj.values.appendAssumeCapacity(val);
@@ -274,27 +311,23 @@ pub const Array = struct {
         return self.funcs[fn_index](self, vm, stack);
     }
 
-    pub fn getFns(allocator: Allocator) ObjFns {
-        errdefer oom();
-
-        var map = ObjFns.empty;
-        try map.put(allocator, "push", .{ .params = &.{.generic}, .return_type = .void });
-        try map.put(allocator, "pop", .{ .params = &.{}, .return_type = .generic });
-        try map.put(allocator, "len", .{ .params = &.{}, .return_type = .int });
-
-        return map;
+    pub fn getFns() ObjFns {
+        return getDefApiFns(Self);
     }
 
-    fn push(self: *Self, vm: *Vm, stack: []Value) ?Value {
+    pub const _defapi_push: ObjFnTypeInfo = .{ .params = &.{.generic}, .return_type = .void };
+    pub fn _api_push(self: *Self, vm: *Vm, stack: []Value) ?Value {
         self.values.append(vm.gc_alloc, stack[0]) catch oom();
         return null;
     }
 
-    fn pop(self: *Self, _: *Vm, _: []Value) ?Value {
+    pub const _defapi_pop: ObjFnTypeInfo = .{ .params = &.{}, .return_type = .generic };
+    pub fn _api_pop(self: *Self, _: *Vm, _: []Value) ?Value {
         return self.values.pop();
     }
 
-    fn len(self: *Self, _: *Vm, _: []Value) ?Value {
+    pub const _defapi_len: ObjFnTypeInfo = .{ .params = &.{}, .return_type = .int };
+    pub fn _api_len(self: *Self, _: *Vm, _: []Value) ?Value {
         return .makeInt(@intCast(self.values.items.len));
     }
 };
@@ -303,6 +336,7 @@ pub const String = struct {
     obj: Obj,
     chars: []const u8,
     hash: u32,
+    funcs: []const BuiltinFn(Self),
 
     const Self = @This();
 
@@ -310,6 +344,7 @@ pub const String = struct {
         var obj = Obj.allocate(vm, Self, undefined);
         obj.chars = str;
         obj.hash = hash;
+        obj.funcs = getApiFns(Self);
 
         // The set method can trigger a GC to grow hashmap before
         // inserting. We put the value on the stack so that it is marked
@@ -338,6 +373,7 @@ pub const String = struct {
         var obj = Obj.allocateComptime(allocator, Self, undefined);
         obj.chars = chars;
         obj.hash = hash;
+        obj.funcs = getApiFns(Self);
 
         // Comptime constants have maximum lifetime
         obj.obj.is_marked = true;
@@ -388,12 +424,18 @@ pub const String = struct {
         allocator.destroy(self);
     }
 
-    pub fn getFns(_: Allocator) ObjFns {
-        errdefer oom();
+    // Api
+    pub fn call(self: *Self, vm: *Vm, stack: []Value, fn_index: usize) ?Value {
+        return self.funcs[fn_index](self, vm, stack);
+    }
 
-        const map = ObjFns.empty;
+    pub fn getFns() ObjFns {
+        return getDefApiFns(Self);
+    }
 
-        return map;
+    pub const _defapi_len: ObjFnTypeInfo = .{ .params = &.{}, .return_type = .int };
+    pub fn _api_len(self: *Self, _: *Vm, _: []Value) ?Value {
+        return .makeInt(@intCast(self.chars.len));
     }
 };
 

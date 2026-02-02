@@ -1353,7 +1353,8 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
         },
         .structure => |*ty| try self.structureAccess(expr.field, ty, struct_res.ti.is_sym, ctx.in_call),
         .module => |ty| return self.moduleAccess(expr.field, ty),
-        .array => |ty| return self.arrayFnAccess(struct_res.instr, expr.field, ty),
+        .array => return self.runtimeObjFnAccess(.array, struct_res.instr, expr.field, struct_res.type),
+        .str => return self.runtimeObjFnAccess(.string, struct_res.instr, expr.field, struct_res.type),
         else => return self.err(
             .{ .non_struct_field_access = .{ .found = self.typeName(struct_res.type) } },
             span,
@@ -1390,29 +1391,31 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
     };
 }
 
-fn arrayFnAccess(self: *Self, array_instr: InstrIndex, fn_tk: Ast.TokenIndex, array_type: Type.Array) Result {
+fn runtimeObjFnAccess(self: *Self, kind: Instr.ObjFn.Kind, instr: InstrIndex, fn_tk: Ast.TokenIndex, ty: *const Type) Result {
     const func_name = self.ast.toSource(fn_tk);
-    const func = self.pipeline.state.array_fns.get(func_name) orelse return self.err(
+    const map, const generic = switch (kind) {
+        .array => .{ &self.pipeline.state.array_fns, ty.array.child },
+        .string => .{ &self.pipeline.state.string_fns, self.ti.getCached(.void) },
+    };
+    const func = map.get(func_name) orelse return self.err(
         .{ .undeclared_field_access = .{ .name = func_name } },
         self.ast.getSpan(fn_tk),
     );
 
-    const ty = self.runtimeFnToType(func, array_type.child);
-
     return .{
-        .type = ty,
+        .type = self.runtimeFnToType(func.type_info, generic),
         .instr = self.irb.addInstr(
             .{ .obj_func = .{
-                .obj = array_instr,
-                .fn_index = self.pipeline.state.array_fns.getIndex(func_name).?,
-                .kind = .array,
+                .obj = instr,
+                .fn_index = func.index,
+                .kind = kind,
             } },
             self.ast.getSpan(fn_tk).start,
         ),
     };
 }
 
-fn runtimeFnToType(self: *Self, func: type_mod.ObjFnInfos, current_generic: *const Type) *const Type {
+fn runtimeFnToType(self: *Self, func: type_mod.ObjFnTypeInfo, current_generic: *const Type) *const Type {
     var params: Type.Function.ParamsMap = .empty;
     params.ensureTotalCapacity(self.allocator, func.params.len + 1) catch oom();
     params.putAssumeCapacity(

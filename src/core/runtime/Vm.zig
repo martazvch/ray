@@ -158,6 +158,15 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
                 self.stack.top -= arity + 1;
                 if (result) |res| self.stack.push(res);
             },
+            .call_str_fn => {
+                const index = frame.readByte();
+                const arity = frame.readByte();
+                const string = self.stack.peekRef(arity).obj.as(Obj.String);
+                const result = string.funcs[index](string, self, (self.stack.top - arity)[0..arity]);
+
+                self.stack.top -= arity + 1;
+                if (result) |res| self.stack.push(res);
+            },
             .array_set => {
                 const index = self.stack.pop().int;
                 const array = self.stack.pop().obj.as(Obj.Array);

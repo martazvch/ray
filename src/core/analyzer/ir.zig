@@ -204,7 +204,13 @@ pub const Instruction = struct {
         pub const Kind = enum { bool, float, int, @"enum", string };
     };
     pub const MultiVarDecl = struct { decls: []const Index };
-    pub const ObjFn = struct { obj: Index, fn_index: usize, kind: enum { array } };
+    pub const ObjFn = struct {
+        obj: Index,
+        fn_index: usize,
+        kind: Kind,
+
+        pub const Kind = enum { array, string };
+    };
     pub const Range = struct {
         start: Index,
         end: Index,

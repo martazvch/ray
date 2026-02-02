@@ -33,8 +33,8 @@ pub fn new(allocator: Allocator, config: Config) Self {
         .module_interner = .init(allocator),
         .native_reg = .empty,
         .strings = .empty,
-        .array_fns = Obj.Array.getFns(allocator),
-        .string_fns = Obj.String.getFns(allocator),
+        .array_fns = Obj.Array.getFns(),
+        .string_fns = Obj.String.getFns(),
     };
 
     ctx.type_interner.cacheFrequentTypes();

@@ -631,7 +631,7 @@ const Compiler = struct {
     fn callObjFn(self: *Self, data: Instruction.ObjFn, args: []const Instruction.Arg) Error!void {
         try self.compileInstr(data.obj);
         try self.compileArgs(args);
-        self.writeOpAndByte(.call_array_fn, @intCast(data.fn_index));
+        self.writeOpAndByte(if (data.kind == .array) .call_array_fn else .call_str_fn, @intCast(data.fn_index));
         self.writeByte(@intCast(args.len));
     }
 

@@ -65,6 +65,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
     var offset = base_offset;
     try self.lineHeader(writer, offset);
 
+    self.wide = false;
     var op: OpCode = @enumFromInt(self.chunk.code.items[offset]);
 
     if (op == .wide) {
@@ -84,6 +85,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .box => self.simpleInstruction(writer, "box", offset),
         .call => self.indexInstruction(writer, "call", offset),
         .call_array_fn => self.callObjFn(writer, .array, offset),
+        .call_str_fn => self.callObjFn(writer, .string, offset),
         .call_sym => self.callSym(writer, offset),
         .call_sym_ext => self.callExtSym(writer, offset),
         .call_native => self.callNativeSym(writer, offset),
@@ -211,7 +213,6 @@ fn simpleInstruction(self: *Self, writer: *Writer, name: []const u8, offset: usi
 }
 
 fn indexInstruction(self: *Self, writer: *Writer, name: []const u8, offset: usize) Writer.Error!usize {
-    // const index = self.chunk.code.items[offset + 1];
     const index = self.getIndex(offset);
 
     if (self.render_mode == .@"test") {
@@ -256,7 +257,6 @@ fn getGlobal(self: *Self, writer: *Writer, cow: bool, offset: usize) Writer.Erro
 }
 
 fn constantInstruction(self: *Self, writer: *Writer, name: []const u8, offset: usize) Writer.Error!usize {
-    // const constant = self.chunk.code.items[offset + 1];
     const index = self.getIndex(offset);
     const value = self.constants[index.value];
 
@@ -379,7 +379,7 @@ fn callNativeSym(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize
     return offset + 3;
 }
 
-fn callObjFn(self: *Self, writer: *Writer, kind: enum { array }, offset: usize) Writer.Error!usize {
+fn callObjFn(self: *Self, writer: *Writer, comptime kind: enum { array, string }, offset: usize) Writer.Error!usize {
     const text = "call_" ++ @tagName(kind) ++ "_fn";
     const index = self.chunk.code.items[offset + 1];
     const arity = self.chunk.code.items[offset + 2];
