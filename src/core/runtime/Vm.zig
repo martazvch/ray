@@ -126,7 +126,13 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
         }
 
         const instruction = frame.readByte();
-        const op: OpCode = @enumFromInt(instruction);
+        var op: OpCode = @enumFromInt(instruction);
+        var wide = false;
+
+        if (op == .wide) {
+            wide = true;
+            op = @enumFromInt(frame.readByte());
+        }
 
         switch (op) {
             .add_float => {
@@ -138,7 +144,7 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
                 self.stack.peekRef(0).int += rhs;
             },
             .array_new => {
-                const len = frame.readByte();
+                const len = frame.readMaybeShort(wide);
                 const array = Obj.Array.create(self, (self.stack.top - len)[0..len]);
                 self.stack.top -= len;
                 self.stack.push(Value.makeObj(array.asObj()));
@@ -420,7 +426,7 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             .le_float => self.stack.push(Value.makeBool(self.stack.pop().float >= self.stack.pop().float)),
             .le_int => self.stack.push(Value.makeBool(self.stack.pop().int >= self.stack.pop().int)),
             .load_blk_val => self.stack.push(frame.blk_val),
-            .load_constant => self.stack.push(frame.readConstant()),
+            .load_constant => self.stack.push(frame.readConstant(wide)),
             .load_ext_constant => {
                 const const_index = frame.readByte();
                 const mod_index = frame.readByte();
@@ -569,6 +575,7 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
                 self.stack.top -= 1;
             },
             .unbox => self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.Box).value,
+            .wide => unreachable,
         }
     }
 }
@@ -704,9 +711,10 @@ pub const CallFrame = struct {
         return self.ip[0];
     }
 
-    pub fn readConstant(self: *CallFrame) Value {
+    pub fn readConstant(self: *CallFrame, wide: bool) Value {
         // TODO: Compiler bug: https://github.com/ziglang/zig/issues/13938?
-        return self.module.constants[self.readByte()];
+        const index = self.readMaybeShort(wide);
+        return self.module.constants[index];
     }
 
     pub fn readShort(self: *CallFrame) u16 {
@@ -714,6 +722,10 @@ pub const CallFrame = struct {
         const part2 = self.readByte();
 
         return (@as(u16, part1) << 8) | part2;
+    }
+
+    pub fn readMaybeShort(self: *CallFrame, wide: bool) usize {
+        return if (wide) self.readShort() else self.readByte();
     }
 
     /// Sets the call to the provided function

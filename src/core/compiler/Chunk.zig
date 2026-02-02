@@ -139,4 +139,5 @@ pub const OpCode = enum(u8) {
     sub_int,
     swap_pop,
     unbox,
+    wide,
 };

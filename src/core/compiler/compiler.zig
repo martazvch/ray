@@ -64,7 +64,6 @@ pub const CompilationUnit = struct {
     const Self = @This();
     const Error = error{ Err, TooManyConst } || std.posix.WriteError;
     const CompilerReport = GenReport(CompilerMsg);
-    const ConstIndex = u8;
 
     pub fn init(
         allocator: Allocator,
@@ -223,6 +222,24 @@ const Compiler = struct {
     fn writeOpAndByte(self: *Self, op: OpCode, byte: u8) void {
         self.writeOp(op);
         self.writeByte(byte);
+    }
+
+    /// Writes a u16 value in two separate bytes
+    fn writeShort(self: *Self, value: u16) void {
+        self.writeByte(@as(u8, @intCast(value >> 8)));
+        self.writeByte(@intCast(value & 0xff));
+    }
+
+    fn writeOpAndMaybeShort(self: *Self, op: OpCode, value: usize) Error!void {
+        if (value >= std.math.maxInt(u16) + 1) {
+            return error.TooManyConst;
+        } else if (value >= std.math.maxInt(u8) + 1) {
+            self.writeOp(.wide);
+            self.writeOp(op);
+            self.writeShort(@intCast(value));
+        } else {
+            self.writeOpAndByte(op, @intCast(value));
+        }
     }
 
     fn addGlobal(self: *Self, index: usize, global: Value) void {
@@ -413,8 +430,7 @@ const Compiler = struct {
         for (data.values) |value| {
             try self.compileInstr(value);
         }
-        // TODO: protect cast
-        self.writeOpAndByte(.array_new, @intCast(data.values.len));
+        try self.writeOpAndMaybeShort(.array_new, data.values.len);
     }
 
     fn arrayAssign(self: *Self, data: Instruction.Indexing) Error!void {
@@ -688,10 +704,6 @@ const Compiler = struct {
     }
 
     fn compileConstant(self: *Self, index: ConstIdx) Error!void {
-        if (self.manager.constants.len >= std.math.maxInt(CompilationUnit.ConstIndex) + 1) {
-            return error.TooManyConst;
-        }
-
         const idx = index.toInt();
         const cte = self.manager.constants[idx];
 
@@ -736,7 +748,7 @@ const Compiler = struct {
                     self.writeOpAndByte(.load_ext_constant, @intCast(idx));
                     self.writeByte(@intCast(mod));
                 } else {
-                    self.writeOpAndByte(.load_constant, @intCast(idx));
+                    try self.writeOpAndMaybeShort(.load_constant, idx);
                 }
             },
         }

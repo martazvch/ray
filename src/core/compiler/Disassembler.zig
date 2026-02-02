@@ -15,6 +15,7 @@ symbols: []const Value,
 constants: []const Value,
 natives: []const Value,
 render_mode: RenderMode,
+wide: bool,
 
 prev_line: usize = 0,
 
@@ -29,6 +30,7 @@ pub fn init(chunk: *const Chunk, module: *const Module, natives: []const Value, 
         .constants = module.constants,
         .render_mode = render_mode,
         .natives = natives,
+        .wide = false,
     };
 }
 
@@ -45,7 +47,7 @@ pub fn disSlice(self: *Self, writer: *Writer, name: []const u8, start: usize) vo
     }
 }
 
-pub fn disInstruction(self: *Self, writer: *Writer, offset: usize) usize {
+fn lineHeader(self: *Self, writer: *Writer, offset: usize) !void {
     if (self.render_mode == .normal) {
         writer.print(" {:0>4}  ", .{offset}) catch oom();
 
@@ -57,8 +59,22 @@ pub fn disInstruction(self: *Self, writer: *Writer, offset: usize) usize {
             writer.writeAll("   |  ") catch oom();
         }
     }
+}
 
-    const op: OpCode = @enumFromInt(self.chunk.code.items[offset]);
+pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
+    var offset = base_offset;
+    try self.lineHeader(writer, offset);
+
+    var op: OpCode = @enumFromInt(self.chunk.code.items[offset]);
+
+    if (op == .wide) {
+        self.wide = true;
+        offset += 1;
+        op = @enumFromInt(self.chunk.code.items[offset]);
+        _ = writer.writeAll("wide\n") catch unreachable;
+        try self.lineHeader(writer, offset);
+    }
+
     return switch (op) {
         .add_float => self.simpleInstruction(writer, "add_float", offset),
         .add_int => self.simpleInstruction(writer, "add_int", offset),
@@ -170,7 +186,18 @@ pub fn disInstruction(self: *Self, writer: *Writer, offset: usize) usize {
         .sub_int => self.simpleInstruction(writer, "sub_int", offset),
         .swap_pop => self.simpleInstruction(writer, "swap_pop", offset),
         .unbox => self.simpleInstruction(writer, "unbox", offset),
+        .wide => unreachable,
     } catch oom();
+}
+
+fn getIndex(self: *const Self, offset: usize) struct { value: usize, bytes: usize } {
+    if (self.wide) {
+        var index = @as(u16, self.chunk.code.items[offset + 1]) << 8;
+        index |= self.chunk.code.items[offset + 2];
+        return .{ .value = index, .bytes = 2 };
+    } else {
+        return .{ .value = self.chunk.code.items[offset + 1], .bytes = 1 };
+    }
 }
 
 fn simpleInstruction(self: *Self, writer: *Writer, name: []const u8, offset: usize) Writer.Error!usize {
@@ -184,15 +211,16 @@ fn simpleInstruction(self: *Self, writer: *Writer, name: []const u8, offset: usi
 }
 
 fn indexInstruction(self: *Self, writer: *Writer, name: []const u8, offset: usize) Writer.Error!usize {
-    const index = self.chunk.code.items[offset + 1];
+    // const index = self.chunk.code.items[offset + 1];
+    const index = self.getIndex(offset);
 
     if (self.render_mode == .@"test") {
-        try writer.print("{s} index {}\n", .{ name, index });
+        try writer.print("{s} index {}\n", .{ name, index.value });
     } else {
-        try writer.print("{s:<20} index {:>4}\n", .{ name, index });
+        try writer.print("{s:<20} index {:>4}\n", .{ name, index.value });
     }
 
-    return offset + 2;
+    return offset + 1 + index.bytes;
 }
 
 fn indexExternInstruction(self: *Self, writer: *Writer, name: []const u8, offset: usize) Writer.Error!usize {
@@ -228,18 +256,19 @@ fn getGlobal(self: *Self, writer: *Writer, cow: bool, offset: usize) Writer.Erro
 }
 
 fn constantInstruction(self: *Self, writer: *Writer, name: []const u8, offset: usize) Writer.Error!usize {
-    const constant = self.chunk.code.items[offset + 1];
-    const value = self.constants[constant];
+    // const constant = self.chunk.code.items[offset + 1];
+    const index = self.getIndex(offset);
+    const value = self.constants[index.value];
 
     if (self.render_mode == .@"test") {
-        try writer.print("{s} index {}, value ", .{ name, constant });
+        try writer.print("{s} index {}, value ", .{ name, index.value });
     } else {
-        try writer.print("{s:<20} index {:>4}, value ", .{ name, constant });
+        try writer.print("{s:<20} index {:>4}, value ", .{ name, index.value });
     }
 
     value.print(writer);
     try writer.print("\n", .{});
-    return offset + 2;
+    return offset + 1 + index.bytes;
 }
 
 fn extConstantInstruction(self: *Self, writer: *Writer, name: []const u8, offset: usize) Writer.Error!usize {
