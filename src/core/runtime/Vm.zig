@@ -26,7 +26,12 @@ modules: []CompiledModule,
 natives: []Value,
 
 const Self = @This();
-const Error = error{StackOverflow} || Allocator.Error;
+const Error = error{
+    StackOverflow,
+    OutOfBound,
+    ModuloWith0,
+    RangeIndexDecrease,
+} || Allocator.Error;
 
 pub fn init(self: *Self, allocator: Allocator, state: *State) void {
     self.arena_comptime = .init(allocator);
@@ -71,32 +76,35 @@ fn freeObjects(self: *Self) void {
 
 /// Returns the error gave in `kind` parameter and prints backtrace
 fn err(self: *Self, kind: Error) Error {
-    for (0..self.frame_stack.count) |i| {
+    var buf: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&buf);
+    const stderr = &stderr_writer.interface;
+    defer stderr.flush() catch oom();
+
+    const msg = switch (kind) {
+        error.OutOfBound => "out of bounds access",
+        error.ModuloWith0 => "modulo with 0",
+        error.RangeIndexDecrease => "using a decreasing range for collection indexing",
+        error.StackOverflow => "stack overflow",
+        error.OutOfMemory => "no more memory available",
+    };
+    stderr.print("Runtime error: {s}\n", .{msg}) catch oom();
+
+    // Ignore global scope, thus -1
+    for (0..self.frame_stack.count - 1) |i| {
         const idx = self.frame_stack.count - i - 1;
-        const frame = self.frame_stack.frames[idx];
+        const frame = &self.frame_stack.frames[idx];
         const function = frame.function;
-        const instr = self.instructionNb();
+        // At this point, we point to next instruction so we take the previous one
+        const instr = frame.instructionNb() - 1;
 
-        var buf: [1024]u8 = undefined;
-        var stderr_writer = std.fs.File.stderr().writer(&buf);
-        const stderr = &stderr_writer.interface;
-        defer stderr.flush() catch oom();
-
-        stderr.print("[line {}] in ", .{function.chunk.offsets.items[instr]});
-
-        if (function.name) |name| {
-            stderr.print("{s}()\n", .{name});
-        } else stderr.print("script\n", .{});
+        stderr.print(
+            "    [line {}] in {s}\n",
+            .{ function.chunk.offsets.items[instr], function.name },
+        ) catch oom();
     }
 
     return kind;
-}
-
-fn instructionNb(self: *const Self) usize {
-    const frame = &self.frame_stack.frames[self.frame_stack.count - 1];
-    const addr1 = @intFromPtr(frame.ip);
-    const addr2 = @intFromPtr(frame.function.chunk.code.items.ptr);
-    return addr1 - addr2;
 }
 
 pub fn run(self: *Self, entry_point: *Obj.Function, modules: []CompiledModule) !void {
@@ -121,7 +129,7 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
 
         if (comptime options.print_instr) {
             var dis = Disassembler.init(&frame.function.chunk, frame.module, self.natives, .normal);
-            const instr_nb = self.instructionNb();
+            const instr_nb = frame.instructionNb();
             _ = dis.disInstruction(stdout, instr_nb);
         }
 
@@ -172,7 +180,7 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
                 const array = self.stack.pop().obj.as(Obj.Array);
                 const value = self.stack.pop();
 
-                const final = normalizeIndex(array.values.items.len, index);
+                const final = try self.normalizeIndex(array.values.items.len, index);
                 array.values.items[final] = value;
             },
             .bound_method => {
@@ -325,13 +333,13 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             .index_arr => {
                 const index = self.stack.pop().int;
                 const array = self.stack.pop().obj.as(Obj.Array);
-                const final = normalizeIndex(array.values.items.len, index);
+                const final = try self.normalizeIndex(array.values.items.len, index);
                 self.stack.push(array.values.items[final]);
             },
             .index_arr_cow => {
                 const index = self.stack.pop().int;
                 const array = self.stack.pop().obj.as(Obj.Array);
-                const final = normalizeIndex(array.values.items.len, index);
+                const final = try self.normalizeIndex(array.values.items.len, index);
 
                 var value = array.values.items[final];
                 value.obj = self.cow(value.obj);
@@ -340,19 +348,19 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             .index_range_arr => {
                 const index = self.stack.pop().range_int;
                 const array = self.stack.pop().obj.as(Obj.Array);
-                const start, const end = checkRangeIndex(array.values.items.len, index);
+                const start, const end = try self.checkRangeIndex(array.values.items.len, index);
                 self.stack.push(.makeObj(Obj.Array.create(self, array.values.items[start..end]).asObj()));
             },
             .index_str => {
                 const index = self.stack.pop().int;
                 const string = self.stack.pop().obj.as(Obj.String);
-                const final = normalizeIndex(string.chars.len, index);
+                const final = try self.normalizeIndex(string.chars.len, index);
                 self.stack.push(.makeObj(Obj.String.takeCopy(self, &.{string.chars[final]}).asObj()));
             },
             .index_range_str => {
                 const index = self.stack.pop().range_int;
                 const string = self.stack.pop().obj.as(Obj.String);
-                const start, const end = checkRangeIndex(string.chars.len, index);
+                const start, const end = try self.checkRangeIndex(string.chars.len, index);
                 self.stack.push(.makeObj(Obj.String.takeCopy(self, string.chars[start..end]).asObj()));
             },
             .in_array => {
@@ -464,13 +472,17 @@ fn execute(self: *Self, entry_point: *Obj.Function) !void {
             .mod_float => {
                 const rhs = self.stack.pop().float;
                 const lhs = self.stack.pop().float;
-                if (rhs == 0) @panic("Modulo wit 0");
+                if (rhs == 0) {
+                    return self.err(error.ModuloWith0);
+                }
                 self.stack.push(.makeFloat(@mod(lhs, rhs)));
             },
             .mod_int => {
                 const rhs = self.stack.pop().int;
                 const lhs = self.stack.pop().int;
-                if (rhs == 0) @panic("Modulo wit 0");
+                if (rhs == 0) {
+                    return self.err(error.ModuloWith0);
+                }
                 self.stack.push(.makeInt(@mod(lhs, rhs)));
             },
             .mul_float => {
@@ -636,25 +648,29 @@ fn strMul(self: *Self, str: *const Obj.String, factor: i64) void {
 }
 
 // // TODO: runtime error desactivable with release fast mode
-fn normalizeIndex(len: usize, index: i64) usize {
+fn normalizeIndex(self: *Self, len: usize, index: i64) Error!usize {
     if (index >= 0) {
         const i: usize = @intCast(index);
-        if (i > len) @panic("index out of bounds");
+        if (i > len) {
+            return self.err(error.OutOfBound);
+        }
         return i;
     } else {
         const abs = @abs(index);
-        if (abs > len) @panic("index out of bounds");
+        if (abs > len) {
+            return self.err(error.OutOfBound);
+        }
         return len - @as(usize, @intCast(abs));
     }
 }
 
 // // TODO: runtime error desactivable with release fast mode
-fn checkRangeIndex(len: usize, range: Value.RangeInt) struct { usize, usize } {
-    const s = normalizeIndex(len, range.start);
-    const e = normalizeIndex(len, range.end);
+fn checkRangeIndex(self: *Self, len: usize, range: Value.RangeInt) Error!struct { usize, usize } {
+    const s = try self.normalizeIndex(len, range.start);
+    const e = try self.normalizeIndex(len, range.end);
 
     if (s > e) {
-        @panic("invalid range: start > end");
+        return self.err(error.RangeIndexDecrease);
     }
 
     return .{ s, e };
@@ -714,6 +730,12 @@ pub const CallFrame = struct {
     slots: [*]Value,
     captures: []Value,
     blk_val: Value,
+
+    pub fn instructionNb(self: *const CallFrame) usize {
+        const addr1 = @intFromPtr(self.ip);
+        const addr2 = @intFromPtr(self.function.chunk.code.items.ptr);
+        return addr1 - addr2;
+    }
 
     pub fn readByte(self: *CallFrame) u8 {
         defer self.ip += 1;

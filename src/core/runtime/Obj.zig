@@ -168,7 +168,7 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
             if (comptime @import("builtin").mode == .Debug) {
                 try writer.print("<closure {s}>", .{closure.function.name});
             } else {
-                try writer.print("<fn {s}>", .{closure.function.name.chars});
+                try writer.print("<fn {s}>", .{closure.function.name});
             }
         },
         .@"enum" => try writer.print("<enum {s}>", .{self.as(Enum).name}),
