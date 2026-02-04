@@ -10,5 +10,8 @@ fn main() {
     b = float(8.4)
     print b
     print float("23.45")
+
+    print str(5)
+    print str(8.7)
 }
 

@@ -221,41 +221,53 @@ fn markArray(self: *Self, array: []const Value) Allocator.Error!void {
 pub fn alloc(ctx: *anyopaque, len: usize, alignment: Alignment, ret_addr: usize) ?[*]u8 {
     const self: *Self = @ptrCast(@alignCast(ctx));
 
-    self.bytes_allocated += len;
-    if (self.active and (self.bytes_allocated > self.next_gc or options.stress_gc)) {
-        self.collect() catch return null;
+    if (self.parent_allocator.rawAlloc(len, alignment, ret_addr)) |res| {
+        self.bytes_allocated += len;
+
+        if (self.active and (self.bytes_allocated > self.next_gc or options.stress_gc)) {
+            self.collect() catch return null;
+        }
+
+        return res;
     }
 
-    return self.parent_allocator.rawAlloc(len, alignment, ret_addr);
+    return null;
 }
 
 pub fn resize(ctx: *anyopaque, memory: []u8, alignment: Alignment, new_len: usize, ret_addr: usize) bool {
     const self: *Self = @ptrCast(@alignCast(ctx));
 
-    // TODO: can never shrink instead of expand?
-    self.bytes_allocated += new_len - memory.len;
+    if (self.parent_allocator.rawResize(memory, alignment, new_len, ret_addr)) {
+        self.bytes_allocated += new_len - memory.len;
 
-    if (self.active and (self.bytes_allocated > self.next_gc or options.stress_gc)) {
-        self.collect() catch return false;
+        if (self.active and (self.bytes_allocated > self.next_gc or options.stress_gc)) {
+            self.collect() catch return false;
+        }
+
+        return true;
     }
 
-    return self.parent_allocator.rawResize(memory, alignment, new_len, ret_addr);
+    return false;
 }
 
-// TODO: see if this is well implemented
 pub fn remap(ctx: *anyopaque, memory: []u8, alignment: Alignment, new_len: usize, ret_addr: usize) ?[*]u8 {
     const self: *Self = @ptrCast(@alignCast(ctx));
 
-    if (new_len >= memory.len)
-        self.bytes_allocated += new_len - memory.len
-    else
-        self.bytes_allocated -= memory.len - new_len;
+    if (self.parent_allocator.rawRemap(memory, alignment, new_len, ret_addr)) |res| {
+        if (new_len >= memory.len) {
+            self.bytes_allocated += new_len - memory.len;
+        } else {
+            self.bytes_allocated -= memory.len - new_len;
+        }
 
-    if (self.active and (self.bytes_allocated > self.next_gc or options.stress_gc)) {
-        self.collect() catch return null;
+        if (self.active and (self.bytes_allocated > self.next_gc or options.stress_gc)) {
+            self.collect() catch return null;
+        }
+
+        return res;
     }
 
-    return self.parent_allocator.rawRemap(memory, alignment, new_len, ret_addr);
+    return null;
 }
 
 pub fn free(ctx: *anyopaque, buf: []u8, alignment: Alignment, ret_addr: usize) void {

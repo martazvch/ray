@@ -31,3 +31,9 @@
             - args
             [Constant index 3]
                 [Float 5.6]
+    [Print]
+        [Native fn call]
+            [Builtin symbol: 2]
+            - args
+            [Constant index 4]
+                [Int 5]

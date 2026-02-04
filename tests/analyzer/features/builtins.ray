@@ -6,4 +6,6 @@ fn main() {
 
     let bind = int
     print bind(5.6)
+
+    print str(5)
 }

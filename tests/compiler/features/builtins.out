@@ -13,6 +13,10 @@ load_constant index 6, value 6.4
 call_sym_native index 1, arity 1, <native fn float>
 set_local index 1
 
+load_constant index 4, value 5
+call_sym_native index 2, arity 1, <native fn str>
+print
+
 ret_naked
 
 -- global scope --

@@ -3,5 +3,6 @@ fn main() {
     a = int(5)
     var b: float = float(6)
     b = float(6.4)
+    print str(5)
 }
 
