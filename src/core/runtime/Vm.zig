@@ -47,16 +47,7 @@ pub fn init(self: *Self, allocator: Allocator, state: *State) void {
     self.stack.init();
     self.frame_stack = .empty;
     self.objects = null;
-
     self.natives = state.native_reg.funcs.items;
-    // In REPL mode, we won't call the main function (there is not)
-    // so we increment ourself the frame stack (discaring the first one)
-    // but the count is coherent of what is expected below, for example
-    // for function call we exit if the frame stack count == 1. In REPL
-    // it would be always true
-    if (state.config.embedded) {
-        self.frame_stack.count += 1;
-    }
 }
 
 pub fn deinit(self: *Self) void {
@@ -145,7 +136,7 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
         }
 
         if (comptime options.print_instr) {
-            var dis = Disassembler.init(&frame.function.chunk, frame.module, self.natives, .normal);
+            var dis = Disassembler.init(&frame.function.chunk, frame.module, self.natives);
             const instr_nb = frame.instructionNb();
             _ = dis.disInstruction(stdout, instr_nb);
         }
@@ -298,8 +289,7 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
             .eq_null => self.stack.push(Value.makeBool(self.stack.pop() == .null)),
             .eq_str => self.stack.push(Value.makeBool(self.stack.pop().obj.as(Obj.String) == self.stack.pop().obj.as(Obj.String))),
             .exit_repl => {
-                // Here, there is no value to pop for now, no implicit null is
-                // put on top of the stack
+                // Just deletes the curretn call frame
                 self.frame_stack.count -= 1;
                 break;
             },
@@ -589,7 +579,6 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
             .struct_lit => {
                 const index = frame.readByte();
                 const arity = frame.readByte();
-                // const instance = Obj.Instance.create(self, frame.module.symbols[index].obj.as(Obj.Structure));
                 const instance = Obj.Instance.create(self, frame.module.symbols[index].obj.as(Obj.Structure));
                 structLit(instance, arity, &self.stack);
             },

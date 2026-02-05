@@ -222,8 +222,8 @@ pub fn Num(T: type) type {
 
         fn constantValue(ana: *const Analyzer, instr: usize) T {
             return switch (T) {
-                f64 => ana.irb.getConstant(instr).float,
-                i64 => ana.irb.getConstant(instr).int,
+                f64 => ana.getConstant(instr).float,
+                i64 => ana.getConstant(instr).int,
                 else => unreachable,
             };
         }
@@ -277,7 +277,7 @@ pub const Bool = struct {
         const arm_res = b: switch (value_arm.expr.*) {
             .bool => |e| {
                 const res = try ana.boolLit(e);
-                const constant = ana.irb.getConstant(res.instr).bool;
+                const constant = ana.getConstant(res.instr).bool;
 
                 if (constant) {
                     if (self.has_true) return ana.err(.match_duplicate_arm, span);
@@ -352,7 +352,7 @@ pub const String = struct {
         const arm_res = switch (value_arm.expr.*) {
             .string => |s| b: {
                 const res = try ana.string(s);
-                const constant = ana.irb.getConstant(res.instr).string;
+                const constant = ana.getConstant(res.instr).string;
 
                 if (self.covered.has(constant)) {
                     return ana.err(.match_duplicate_arm, span);

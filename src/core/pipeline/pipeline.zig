@@ -5,7 +5,6 @@ const options = @import("options");
 
 const State = @import("State.zig");
 const Compiler = @import("../compiler/compiler.zig").Compiler;
-const CompiledModule = @import("../compiler/compiler.zig").CompiledModule;
 const CompilationUnit = @import("../compiler/compiler.zig").CompilationUnit;
 const Analyzer = @import("../analyzer/Analyzer.zig");
 const AnalyzerMsg = @import("../analyzer/analyzer_msg.zig").AnalyzerMsg;
@@ -66,23 +65,10 @@ pub fn run(
     }
 
     state.updateModWithScope(allocator, mod_index);
-    state.modules.ensureCompileSizes(
-        allocator,
-        mod_index,
-        state.lex_scope.current.variables.count(),
-        state.lex_scope.symbol_count,
-        analyzer.irb.const_interner.constants.items.len,
-    );
+    state.modules.ensureCompileSizes(allocator, mod_index, state);
 
     // Compiler
-    var compiler = CompilationUnit.init(
-        allocator,
-        state,
-        mod_index,
-        analyzer.irb.const_interner.constants.items,
-        state.native_reg.funcs.items,
-        if (!state.config.print_bytecode) .none else if (options.test_mode) .@"test" else .normal,
-    );
+    var compiler = CompilationUnit.init(allocator, state, mod_index, state.config.print_bytecode);
 
     const entry_point = try compiler.compile(
         analyzer.irb.instructions.items(.data),
@@ -176,16 +162,21 @@ pub fn parse(allocator: Allocator, state: *State, file_name: []const u8, source:
     return ast;
 }
 
+/// Runs another pipeline to compile another module. they don't share lexical scope and constants
 pub fn runSubPipeline(allocator: Allocator, state: *State, file_name: []const u8, path: []const u8, source: [:0]const u8) void {
     const prev_scope = state.lex_scope;
     state.lex_scope = .empty;
     state.lex_scope.initGlobalScope(allocator, state);
+
+    const prev_constants = state.const_interner;
+    state.const_interner = .init(allocator);
 
     _ = run(allocator, state, true, file_name, path, source) catch {
         std.process.exit(0);
     };
 
     state.lex_scope = prev_scope;
+    state.const_interner = prev_constants;
 }
 
 fn printAst(allocator: Allocator, ast: *const Ast) !void {
@@ -207,7 +198,7 @@ fn printIr(allocator: Allocator, state: *const State, file_name: []const u8, ana
     var ir_renderer = IrRenderer.init(
         allocator,
         analyzer.irb.instructions.items(.data),
-        analyzer.irb.const_interner.constants.items,
+        state.const_interner.constants.items,
         &state.interner,
     );
     try stdout.writeAll(try ir_renderer.renderIr(file_name, analyzer.irb.roots.items));

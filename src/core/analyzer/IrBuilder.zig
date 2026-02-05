@@ -5,8 +5,7 @@ const MultiArrayList = std.MultiArrayList;
 
 const ir = @import("ir.zig");
 const Instruction = ir.Instruction;
-const ConstInterner = @import("ConstantInterner.zig");
-const Constant = ConstInterner.Constant;
+const ConstIdx = @import("ConstantInterner.zig").ConstIdx;
 const misc = @import("misc");
 const oom = misc.oom;
 
@@ -20,14 +19,12 @@ pub const Mode = union(enum) {
 allocator: Allocator,
 instructions: MultiArrayList(Instruction),
 roots: ArrayList(ir.Index),
-const_interner: ConstInterner,
 
 pub fn init(allocator: Allocator) Self {
     return .{
         .allocator = allocator,
         .instructions = .empty,
         .roots = .empty,
-        .const_interner = .init(allocator),
     };
 }
 
@@ -45,23 +42,12 @@ pub fn getInstr(self: *const Self, index: ir.Index) Instruction.Data {
 }
 
 /// Assumes that you known the instruction index points to a `constant` instruction
-pub fn getConstant(self: *const Self, instr: ir.Index) Constant {
-    const index = self.getInstr(instr).constant.index;
-
-    return self.const_interner.constants.items[index.toInt()];
+pub fn getConstantIdx(self: *const Self, instr: ir.Index) ConstIdx {
+    return self.getInstr(instr).constant.index;
 }
 
 pub fn addRootInstr(self: *Self, index: ir.Index) void {
     self.roots.append(self.allocator, index) catch oom();
-}
-
-pub fn addConstant(self: *Self, cte: Constant, offset: usize) usize {
-    const index = self.const_interner.add(self.allocator, cte);
-
-    return self.addInstr(
-        .{ .constant = .{ .index = index } },
-        offset,
-    );
 }
 
 pub fn wrapPreviousInstr(self: *Self, comptime instr: std.meta.FieldEnum(Instruction.Data)) usize {

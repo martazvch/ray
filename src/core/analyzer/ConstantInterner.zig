@@ -37,7 +37,7 @@ pub const ConstIdx = enum(u16) {
     }
 };
 
-pub const empty: Self = .{
+const empty: Self = .{
     .hashes = .empty,
     .constants = .empty,
 };

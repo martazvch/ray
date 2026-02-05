@@ -1,4 +1,5 @@
 const std = @import("std");
+const options = @import("options");
 const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 const Writer = std.Io.Writer;
@@ -20,15 +21,15 @@ wide: bool,
 prev_line: usize = 0,
 
 const Self = @This();
-pub const RenderMode = enum { none, normal, @"test" };
+pub const RenderMode = enum { normal, @"test" };
 
-pub fn init(chunk: *const Chunk, module: *const Module, natives: []const Value, render_mode: RenderMode) Self {
+pub fn init(chunk: *const Chunk, module: *const Module, natives: []const Value) Self {
     return .{
         .chunk = chunk,
         .globals = module.globals,
         .symbols = module.symbols,
         .constants = module.constants,
-        .render_mode = render_mode,
+        .render_mode = if (options.test_mode) .@"test" else .normal,
         .natives = natives,
         .wide = false,
     };

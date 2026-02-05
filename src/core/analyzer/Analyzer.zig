@@ -19,6 +19,7 @@ const Instr = ir.Instruction;
 const Span = @import("../parser/Lexer.zig").Span;
 const TokenTag = @import("../parser/Lexer.zig").Token.Tag;
 const ConstIdx = @import("ConstantInterner.zig").ConstIdx;
+const Constant = @import("ConstantInterner.zig").Constant;
 const Pipeline = @import("../pipeline/pipeline.zig");
 const State = @import("../pipeline/State.zig");
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
@@ -1277,7 +1278,7 @@ pub fn enumLit(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result {
     return .{
         .type = decl,
         .ti = .{ .comp_time = enum_ty.tags.get(tag_name).?.is(.void) },
-        .instr = self.irb.addConstant(
+        .instr = self.addConstant(
             // TODO: protect the cast
             .{ .enum_instance = .{
                 .sym = .{ .module_index = .toIndex(0), .symbol_index = @intCast(sym.sym.index) },
@@ -1452,7 +1453,7 @@ fn enumAccess(self: *Self, enum_info: InstrInfos, ty: Type.Enum, tag_tk: Ast.Tok
             .tag = .{
                 .type = self.ti.intern(.{ .@"enum" = ty }),
                 .ti = .{ .comp_time = ty.tags.get(tag_name).?.is(.void) },
-                .instr = self.irb.addConstant(
+                .instr = self.addConstant(
                     .{ .enum_instance = .{
                         .sym = self.irb.data(enum_info.instr).load_symbol,
                         .tag_index = index,
@@ -1926,7 +1927,7 @@ pub fn boolLit(self: *Self, expr: Ast.Bool) Result {
     return .{
         .type = self.ti.cache.bool,
         .ti = .{ .comp_time = true },
-        .instr = self.irb.addConstant(
+        .instr = self.addConstant(
             .{ .bool = self.ast.token_tags[expr] == .true },
             self.ast.getSpan(expr).start,
         ),
@@ -1943,7 +1944,7 @@ pub fn floatLit(self: *Self, expr: Ast.Float, negate: bool) Result {
     return .{
         .type = self.ti.cache.float,
         .ti = .{ .comp_time = true },
-        .instr = self.irb.addConstant(.{ .float = if (negate) -value else value }, self.ast.getSpan(expr).start),
+        .instr = self.addConstant(.{ .float = if (negate) -value else value }, self.ast.getSpan(expr).start),
     };
 }
 
@@ -1957,7 +1958,7 @@ pub fn intLit(self: *Self, expr: Ast.Int, negate: bool) Result {
     return .{
         .type = self.ti.cache.int,
         .ti = .{ .comp_time = true },
-        .instr = self.irb.addConstant(.{ .int = if (negate) -value else value }, self.ast.getSpan(expr).start),
+        .instr = self.addConstant(.{ .int = if (negate) -value else value }, self.ast.getSpan(expr).start),
     };
 }
 
@@ -1974,7 +1975,7 @@ pub fn nullLit(self: *Self, expr: Ast.Null) Result {
     return .{
         .type = self.ti.cache.null,
         .ti = .{ .comp_time = true },
-        .instr = self.irb.addConstant(.null, self.ast.getSpan(expr).start),
+        .instr = self.addConstant(.null, self.ast.getSpan(expr).start),
     };
 }
 
@@ -2012,7 +2013,9 @@ pub fn string(self: *Self, expr: Ast.String) Result {
     return .{
         .type = self.ti.cache.str,
         .ti = .{ .comp_time = true },
-        .instr = self.irb.addConstant(.{ .string = value }, span.start),
+        .instr = self.irb.addInstr(.{
+            .constant = .{ .index = self.state.addConstant(self.allocator, .{ .string = value }) },
+        }, span.start),
     };
 }
 
@@ -2872,4 +2875,15 @@ pub fn tryGetConstant(self: *Self, index: ir.Index) ?Instr.Data {
         },
         else => null,
     };
+}
+
+fn addConstant(self: *Self, constant: Constant, offset: usize) InstrIndex {
+    return self.irb.addInstr(
+        .{ .constant = .{ .index = self.state.addConstant(self.allocator, constant) } },
+        offset,
+    );
+}
+
+pub fn getConstant(self: *const Self, instr: InstrIndex) Constant {
+    return self.state.getConstant(self.irb.getConstantIdx(instr));
 }

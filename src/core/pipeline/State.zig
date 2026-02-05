@@ -9,6 +9,9 @@ const ModuleManager = @import("ModuleManager.zig");
 const NativeRegister = @import("NativesRegister.zig");
 const LexScope = @import("../analyzer/LexicalScope.zig");
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
+const ConstInterner = @import("../analyzer/ConstantInterner.zig");
+const ConstIdx = ConstInterner.ConstIdx;
+const Constant = ConstInterner.Constant;
 
 const misc = @import("misc");
 const Interner = misc.Interner;
@@ -17,6 +20,7 @@ const Sb = misc.StringBuilder;
 config: Config,
 interner: Interner,
 type_interner: TypeInterner,
+const_interner: ConstInterner,
 path_builder: Sb,
 lex_scope: LexScope,
 modules: ModuleManager,
@@ -33,6 +37,7 @@ pub const Config = struct {
     print_bytecode: bool = false,
     static_analyzis: bool = false,
     print_ir: bool = false,
+    save_dbg_infos: bool = false,
 };
 
 pub fn new(allocator: Allocator, config: Config) Self {
@@ -40,6 +45,7 @@ pub fn new(allocator: Allocator, config: Config) Self {
         .config = config,
         .interner = .init(allocator),
         .type_interner = .init(allocator),
+        .const_interner = .init(allocator),
         .path_builder = .empty,
         .lex_scope = .empty,
         .modules = .empty,
@@ -53,17 +59,13 @@ pub fn new(allocator: Allocator, config: Config) Self {
     ctx.registerNatives(allocator, @import("../builtins/builtins.zig"));
     ctx.registerNatives(allocator, @import("..//builtins/file.zig"));
 
+    ctx.lex_scope.save = config.save_dbg_infos;
     ctx.lex_scope.initGlobalScope(allocator, &ctx);
 
     // If embedded/Repl, all code is treated as local code to allow impur code
     if (config.embedded) {
         ctx.lex_scope.open(allocator, null, .{ .barrier = true });
     }
-
-    // TODO: implement this only for compile command
-    // if (config.compile) {
-    //     ctx.lex_scope.save = true;
-    // }
 
     return ctx;
 }
@@ -74,4 +76,12 @@ pub fn registerNatives(self: *Self, allocator: Allocator, Module: type) void {
 
 pub fn updateModWithScope(self: *Self, allocator: Allocator, index: ModIndex) void {
     self.modules.updateWithSymsInfo(allocator, index, self.lex_scope.current.symbols);
+}
+
+pub fn addConstant(self: *Self, allocator: Allocator, constant: Constant) ConstIdx {
+    return self.const_interner.add(allocator, constant);
+}
+
+pub fn getConstant(self: *const Self, index: ConstIdx) Constant {
+    return self.const_interner.constants.items[index.toInt()];
 }

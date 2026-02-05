@@ -33,9 +33,9 @@ pub const CompilationUnit = struct {
     instr_data: []const Instruction.Data,
     instr_lines: []const usize,
     constants: []const Constant,
-    render_mode: Disassembler.RenderMode,
     line: usize,
     compiled_constants: misc.Set(usize),
+    render: bool,
 
     // For disassembler
     native_funcs: []const Value,
@@ -44,14 +44,7 @@ pub const CompilationUnit = struct {
     const Error = error{ Err, TooManyConst } || std.posix.WriteError;
     const CompilerReport = GenReport(CompilerMsg);
 
-    pub fn init(
-        allocator: Allocator,
-        state: *State,
-        mod_index: ModIndex,
-        constants: []const Constant,
-        native_funcs: []const Value,
-        render_mode: Disassembler.RenderMode,
-    ) Self {
+    pub fn init(allocator: Allocator, state: *State, mod_index: ModIndex, render: bool) Self {
         return .{
             .allocator = allocator,
             .state = state,
@@ -60,11 +53,11 @@ pub const CompilationUnit = struct {
             .errs = .empty,
             .instr_data = undefined,
             .instr_lines = undefined,
-            .constants = constants,
-            .render_mode = render_mode,
+            .native_funcs = state.native_reg.funcs.items,
+            .constants = state.const_interner.constants.items,
             .line = 0,
             .compiled_constants = .empty,
-            .native_funcs = native_funcs,
+            .render = render,
         };
     }
 
@@ -78,7 +71,7 @@ pub const CompilationUnit = struct {
         self.instr_data = instr_data;
         self.instr_lines = instr_lines;
 
-        if (self.render_mode != .none) {
+        if (self.render) {
             var buf: [256]u8 = undefined;
             var stdout = std.fs.File.stdout().writer(&buf);
             const mod_name = self.state.interner.getKey(self.state.modules.getFromIndex(self.mod_index).name).?;
@@ -304,7 +297,7 @@ const Compiler = struct {
     }
 
     pub fn end(self: *Self) Error!*Obj.Function {
-        if (self.manager.render_mode != .none) {
+        if (self.manager.render) {
             var alloc_writer: std.Io.Writer.Allocating = .init(self.manager.allocator);
             defer alloc_writer.deinit();
 
@@ -312,7 +305,6 @@ const Compiler = struct {
                 &self.function.chunk,
                 self.manager.state.modules.getFromIndex(self.manager.mod_index),
                 self.manager.native_funcs,
-                self.manager.render_mode,
             );
             dis.disChunk(&alloc_writer.writer, self.function.name);
 
