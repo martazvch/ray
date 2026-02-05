@@ -42,8 +42,15 @@ pub fn run(
 
     const ast = try parse(allocator, state, file_name, source);
 
+    const mod_name = file_name[0 .. file_name.len - 4];
+    const mod_index = state.modules.open(
+        allocator,
+        state.interner.intern(path),
+        state.interner.intern(mod_name),
+    );
+
     var analyzer: Analyzer = .init(allocator, state);
-    const analyzed_module = analyzer.analyze(&ast, file_name, !is_sub);
+    analyzer.analyze(&ast, mod_name, !is_sub);
 
     // Analyzed Ast printer
     if (analyzer.warns.items.len > 0) {
@@ -58,29 +65,31 @@ pub fn run(
         if (options.test_mode and !is_sub) return error.ExitOnPrint;
     }
 
+    state.updateModWithScope(allocator, mod_index);
+    state.modules.ensureCompileSizes(
+        allocator,
+        mod_index,
+        state.lex_scope.current.variables.count(),
+        state.lex_scope.symbol_count,
+        analyzer.irb.const_interner.constants.items.len,
+    );
+
     // Compiler
     var compiler = CompilationUnit.init(
         allocator,
-        file_name,
-        &state.strings,
-        &state.interner,
-        if (!state.config.print_bytecode) .none else if (options.test_mode) .@"test" else .normal,
-        state.lex_scope.current.variables.count(),
-        state.lex_scope.symbol_count,
+        state,
+        mod_index,
         analyzer.irb.const_interner.constants.items,
         state.native_reg.funcs.items,
+        if (!state.config.print_bytecode) .none else if (options.test_mode) .@"test" else .normal,
     );
 
-    const entry_point, const compiled_module = try compiler.compile(
+    const entry_point = try compiler.compile(
         analyzer.irb.instructions.items(.data),
         analyzer.irb.roots.items,
         analyzer.irb.computeLineFromOffsets(source),
         analyzer.main,
-        state.module_interner.compiled.count(),
     );
-
-    const path_interned = state.interner.intern(path);
-    state.module_interner.add(path_interned, analyzed_module, compiled_module);
 
     return if (options.test_mode and state.config.print_bytecode and !is_sub)
         error.ExitOnPrint

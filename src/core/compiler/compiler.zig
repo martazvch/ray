@@ -7,6 +7,8 @@ const FieldEnum = std.meta.FieldEnum;
 const Disassembler = @import("Disassembler.zig");
 const ir = @import("../analyzer/ir.zig");
 const Instruction = ir.Instruction;
+const State = @import("../pipeline/State.zig");
+const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
 const Obj = @import("../runtime/Obj.zig");
 const Value = @import("../runtime/values.zig").Value;
 const Vm = @import("../runtime/Vm.zig");
@@ -22,41 +24,18 @@ const Interner = misc.Interner;
 const GenReport = misc.reporter.GenReport;
 const oom = misc.oom;
 
-pub const CompiledModule = struct {
-    // Used for debugging
-    name: []const u8,
-    globals: []Value,
-    symbols: []Value,
-    constants: []Value,
-
-    pub fn init(allocator: Allocator, name: []const u8, globals_count: usize, symbols_count: usize, constants_count: usize) CompiledModule {
-        return .{
-            .name = name,
-            .globals = allocator.alloc(Value, globals_count) catch oom(),
-            .symbols = allocator.alloc(Value, symbols_count) catch oom(),
-            .constants = allocator.alloc(Value, constants_count) catch oom(),
-        };
-    }
-
-    pub fn deinit(self: *CompiledModule, allocator: Allocator) void {
-        allocator.free(self.globals);
-        allocator.free(self.symbols);
-    }
-};
-
 pub const CompilationUnit = struct {
     allocator: Allocator,
-    interner: *const Interner,
+    state: *State,
+    mod_index: ModIndex,
     compiler: Compiler,
     errs: ArrayList(CompilerReport),
     instr_data: []const Instruction.Data,
     instr_lines: []const usize,
     constants: []const Constant,
     render_mode: Disassembler.RenderMode,
-    module: CompiledModule,
     line: usize,
     compiled_constants: misc.Set(usize),
-    interned_strings: *std.AutoHashMapUnmanaged(usize, *Obj.String),
 
     // For disassembler
     native_funcs: []const Value,
@@ -67,29 +46,25 @@ pub const CompilationUnit = struct {
 
     pub fn init(
         allocator: Allocator,
-        name: []const u8,
-        interned_strings: *std.AutoHashMapUnmanaged(usize, *Obj.String),
-        interner: *const Interner,
-        render_mode: Disassembler.RenderMode,
-        global_count: usize,
-        symbol_count: usize,
+        state: *State,
+        mod_index: ModIndex,
         constants: []const Constant,
         native_funcs: []const Value,
+        render_mode: Disassembler.RenderMode,
     ) Self {
         return .{
             .allocator = allocator,
-            .interner = interner,
+            .state = state,
+            .mod_index = mod_index,
             .compiler = undefined,
             .errs = .empty,
             .instr_data = undefined,
             .instr_lines = undefined,
             .constants = constants,
             .render_mode = render_mode,
-            .module = .init(allocator, name, global_count, symbol_count, constants.len),
             .line = 0,
             .compiled_constants = .empty,
             .native_funcs = native_funcs,
-            .interned_strings = interned_strings,
         };
     }
 
@@ -99,19 +74,20 @@ pub const CompilationUnit = struct {
         roots: []const ir.Index,
         instr_lines: []const usize,
         main_index: ?usize,
-        module_index: usize,
-    ) !struct { *Obj.Function, CompiledModule } {
+    ) !*Obj.Function {
         self.instr_data = instr_data;
         self.instr_lines = instr_lines;
 
         if (self.render_mode != .none) {
             var buf: [256]u8 = undefined;
             var stdout = std.fs.File.stdout().writer(&buf);
-            stdout.interface.print("//---- {s} ----\n\n", .{self.module.name}) catch oom();
+            const mod_name = self.state.interner.getKey(self.state.modules.getFromIndex(self.mod_index).name).?;
+            stdout.interface.print("//---- {s} ----\n\n", .{mod_name}) catch oom();
             stdout.interface.flush() catch oom();
         }
 
-        self.compiler = Compiler.init(self, "global scope", 0, module_index);
+        // TODO: protect cast
+        self.compiler = Compiler.init(self, "global scope", 0, @intCast(self.mod_index.toInt()));
 
         for (roots) |root| {
             try self.compiler.compileInstr(root);
@@ -125,7 +101,7 @@ pub const CompilationUnit = struct {
             self.compiler.writeOp(.exit_repl);
         }
 
-        return .{ try self.compiler.end(), self.module };
+        return try self.compiler.end();
     }
 };
 
@@ -133,7 +109,7 @@ const Compiler = struct {
     manager: *CompilationUnit,
     function: *Obj.Function,
     block_stack: BlockStack,
-    state: State = .{},
+    state: Context = .{},
 
     const Self = @This();
     const BlockStack = struct {
@@ -168,11 +144,11 @@ const Compiler = struct {
 
     const CompilerReport = GenReport(CompilerMsg);
     // TODO: could make a generic construct with only flags like this (share with other contexts)
-    const State = struct {
+    const Context = struct {
         cow: bool = false,
         in_cf: bool = false,
 
-        pub fn setAndGetPrev(self: *State, comptime f: FieldEnum(State), value: @FieldType(State, @tagName(f))) @TypeOf(value) {
+        pub fn setAndGetPrev(self: *Context, comptime f: FieldEnum(Context), value: @FieldType(Context, @tagName(f))) @TypeOf(value) {
             const prev = @field(self, @tagName(f));
             @field(self, @tagName(f)) = value;
 
@@ -243,11 +219,11 @@ const Compiler = struct {
     }
 
     fn addGlobal(self: *Self, index: usize, global: Value) void {
-        self.manager.module.globals[index] = global;
+        self.manager.state.modules.addGlobal(self.manager.mod_index, index, global);
     }
 
     fn addSymbol(self: *Self, index: usize, symbol: Value) void {
-        self.manager.module.symbols[index] = symbol;
+        self.manager.state.modules.addSymbol(self.manager.mod_index, index, symbol);
     }
 
     /// Emits the corresponding `get_global` or `get_local` with the correct index
@@ -334,7 +310,7 @@ const Compiler = struct {
 
             var dis = Disassembler.init(
                 &self.function.chunk,
-                &self.manager.module,
+                self.manager.state.modules.getFromIndex(self.manager.mod_index),
                 self.manager.native_funcs,
                 self.manager.render_mode,
             );
@@ -615,11 +591,12 @@ const Compiler = struct {
         try self.callSymbol(data, 1, callee.index, data.ext_mod);
     }
 
-    fn callSymbol(self: *Self, data: *const Instruction.Call, arity_offset: usize, sym_index: usize, sym_mod: ?usize) Error!void {
+    // TODO: protect casts
+    fn callSymbol(self: *Self, data: *const Instruction.Call, arity_offset: usize, sym_index: usize, sym_mod: ?ModIndex) Error!void {
         try self.compileArgs(data.args);
         if (sym_mod) |mod| {
             self.writeOpAndByte(.call_sym_ext, @intCast(sym_index));
-            self.writeByte(@intCast(mod));
+            self.writeByte(@intCast(mod.toInt()));
         } else if (data.native) {
             self.writeOpAndByte(.call_native, @intCast(sym_index));
         } else {
@@ -661,7 +638,7 @@ const Compiler = struct {
     }
 
     fn compileFn(self: *Self, data: *const Instruction.FnDecl) Error!void {
-        const fn_name = if (data.name) |idx| self.manager.interner.getKey(idx).? else "anonymus";
+        const fn_name = if (data.name) |idx| self.manager.state.interner.getKey(idx).? else "anonymus";
 
         const func = try self.compileFnBody(fn_name, data);
         self.addSymbol(data.sym_index, Value.makeObj(func.asObj()));
@@ -685,7 +662,7 @@ const Compiler = struct {
         for (decls) |decl| {
             const fn_data = self.manager.instr_data[decl].fn_decl;
             // Structures and enums' functions have a name
-            const fn_name = self.manager.interner.getKey(fn_data.name orelse unreachable).?;
+            const fn_name = self.manager.state.interner.getKey(fn_data.name orelse unreachable).?;
             const func = try self.compileFnBody(fn_name, &fn_data);
             self.addSymbol(fn_data.sym_index, Value.makeObj(func.asObj()));
         }
@@ -715,23 +692,24 @@ const Compiler = struct {
                 .float => |val| Value.makeFloat(val),
                 .enum_instance => |val| Value.makeObj(Obj.EnumInstance.createComptime(
                     self.manager.allocator,
-                    self.manager.module.symbols[val.sym.symbol_index].obj.as(Obj.Enum),
+                    self.manager.state.modules.getSymbol(self.manager.mod_index, val.sym.symbol_index).obj.as(Obj.Enum),
                     @intCast(val.tag_index),
                     Value.null_,
                 ).asObj()),
                 .null => Value.null_,
                 .string => |val| Value.makeObj(Obj.String.comptimeCopy(
                     self.manager.allocator,
-                    self.manager.interned_strings,
-                    self.manager.interner.getKey(val).?,
+                    &self.manager.state.strings,
+                    self.manager.state.interner.getKey(val).?,
                 ).asObj()),
             };
 
-            self.manager.module.constants[idx] = value;
+            self.manager.state.modules.addConstant(self.manager.mod_index, idx, value);
         }
     }
 
-    fn constant(self: *Self, index: ConstIdx, ext_mod: ?usize, load: bool) Error!void {
+    // TODO: protect casts
+    fn constant(self: *Self, index: ConstIdx, ext_mod: ?ModIndex, load: bool) Error!void {
         if (ext_mod == null) {
             try self.compileConstant(index);
         }
@@ -746,7 +724,7 @@ const Compiler = struct {
                 const idx = i.toInt();
                 if (ext_mod) |mod| {
                     self.writeOpAndByte(.load_ext_constant, @intCast(idx));
-                    self.writeByte(@intCast(mod));
+                    self.writeByte(@intCast(mod.toInt()));
                 } else {
                     try self.writeOpAndMaybeShort(.load_constant, idx);
                 }
@@ -773,7 +751,11 @@ const Compiler = struct {
     }
 
     fn enumDecl(self: *Self, data: *const Instruction.EnumDecl) Error!void {
-        const enum_val = Obj.Enum.create(self.manager.allocator, self.manager.interner.getKey(data.name).?, data.is_err);
+        const enum_val = Obj.Enum.create(
+            self.manager.allocator,
+            self.manager.state.interner.getKey(data.name).?,
+            data.is_err,
+        );
         self.addSymbol(data.sym_index, Value.makeObj(enum_val.asObj()));
         try self.containerFnDecls(data.functions);
     }
@@ -908,7 +890,7 @@ const Compiler = struct {
     // TODO: protect the casts
     fn loadSymbol(self: *Self, data: *const Instruction.LoadSymbol) Error!void {
         if (data.module_index) |mod| {
-            self.writeOpAndByte(.load_ext_sym, @intCast(mod));
+            self.writeOpAndByte(.load_ext_sym, @intCast(mod.toInt()));
             self.writeByte(data.symbol_index);
         } else {
             self.writeOpAndByte(.load_sym, data.symbol_index);
@@ -1012,7 +994,7 @@ const Compiler = struct {
     fn structDecl(self: *Self, data: *const Instruction.StructDecl) Error!void {
         var structure = Obj.Structure.create(
             self.manager.allocator,
-            self.manager.interner.getKey(data.name).?,
+            self.manager.state.interner.getKey(data.name).?,
             data.type_id,
             data.fields_count,
         );
@@ -1049,7 +1031,7 @@ const Compiler = struct {
         if (sym_data.module_index) |mod| {
             self.writeOpAndByte(.struct_lit_ext, sym_data.symbol_index);
             // TODO: protect cast
-            self.writeByte(@intCast(mod));
+            self.writeByte(@intCast(mod.toInt()));
         } else {
             self.writeOpAndByte(.struct_lit, sym_data.symbol_index);
         }

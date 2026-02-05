@@ -278,36 +278,36 @@ push_true
 load_constant index 58, value -360.9
 call_sym index 3, arity 5, <function method>
 
-load_ext_constant index 5, module 0
-call_sym_ext index 3, module 0, arity 1
+load_ext_constant index 5, module 1
+call_sym_ext index 3, module 1, arity 1
 print
 
 load_constant index 59, value imported static
-load_ext_constant index 3, module 0
+load_ext_constant index 3, module 1
 push_false
 push_false
-call_sym_ext index 1, module 0, arity 4
+call_sym_ext index 1, module 1, arity 4
 
 load_constant index 59, value imported static
 load_constant index 60, value 90
 push_true
 push_false
-call_sym_ext index 1, module 0, arity 4
+call_sym_ext index 1, module 1, arity 4
 
-struct_lit_ext index 0, module 0, arity 0
+struct_lit_ext index 0, module 1, arity 0
 get_local index 2
 load_constant index 61, value imported method
-load_ext_constant index 4, module 0
+load_ext_constant index 4, module 1
 push_true
 push_true
-call_sym_ext index 2, module 0, arity 5
+call_sym_ext index 2, module 1, arity 5
 
 get_local index 2
 load_constant index 61, value imported method
 load_constant index 62, value 180
 push_true
 push_false
-call_sym_ext index 2, module 0, arity 5
+call_sym_ext index 2, module 1, arity 5
 
 ret_naked
 

@@ -77,7 +77,11 @@ fn hash(data: Constant) u64 {
         .string => |*s| hasher.update(asBytes(s)),
         .null => {},
         .enum_instance => |e| {
-            hasher.update(asBytes(&e.sym.module_index));
+            if (e.sym.module_index) |idx| {
+                hasher.update(asBytes(&idx.toInt()));
+            } else {
+                hasher.update(asBytes(&@as(?usize, null)));
+            }
             hasher.update(asBytes(&e.sym.symbol_index));
             hasher.update(asBytes(&e.tag_index));
         },

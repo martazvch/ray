@@ -7,7 +7,7 @@ const Value = @import("../runtime/values.zig").Value;
 const oom = @import("misc").oom;
 const Chunk = @import("Chunk.zig");
 const OpCode = Chunk.OpCode;
-const Module = @import("compiler.zig").CompiledModule;
+const Module = @import("../pipeline/ModuleManager.zig").Module;
 
 chunk: *const Chunk,
 globals: []const Value,

@@ -224,7 +224,7 @@ fn call(self: *Self, data: *const Instruction.Call) void {
                 self.parseInstr(data.callee);
 
                 if (data.ext_mod) |mod| {
-                    self.indentAndPrintSlice("[Invoke symbol {} module {}]", .{ f.index, mod });
+                    self.indentAndPrintSlice("[Invoke symbol {} module {}]", .{ f.index, mod.toInt() });
                 } else if (data.native) {
                     self.indentAndPrintSlice("[Invoke native symbol {}]", .{f.index});
                 } else {
@@ -234,7 +234,7 @@ fn call(self: *Self, data: *const Instruction.Call) void {
         },
         .load_symbol => |sym| {
             if (data.ext_mod) |mod| {
-                self.indentAndPrintSlice("[Call symbol {} module {}]", .{ sym.symbol_index, mod });
+                self.indentAndPrintSlice("[Call symbol {} module {}]", .{ sym.symbol_index, mod.toInt() });
             } else {
                 self.indentAndPrintSlice("[Call symbol {}]", .{sym.symbol_index});
             }
@@ -267,7 +267,7 @@ fn argsList(self: *Self, kind: []const u8, args: []const Instruction.Arg) void {
         switch (arg) {
             .default => |def| {
                 if (def.mod) |mod| {
-                    self.indentAndPrintSlice("[Default {s} constant index {}, module {}]", .{ kind, def.const_index.toInt(), mod });
+                    self.indentAndPrintSlice("[Default {s} constant index {}, module {}]", .{ kind, def.const_index.toInt(), mod.toInt() });
                 } else {
                     self.indentAndPrintSlice("[Default {s} constant index {}]", .{ kind, def.const_index.toInt() });
                 }
@@ -404,7 +404,7 @@ fn intInstr(self: *Self, data: isize) void {
 
 fn loadSymbol(self: *Self, data: *const Instruction.LoadSymbol) void {
     if (data.module_index) |mod| {
-        self.indentAndPrintSlice("[Load symbol {} module {}]", .{ data.symbol_index, mod });
+        self.indentAndPrintSlice("[Load symbol {} module {}]", .{ data.symbol_index, mod.toInt() });
     } else {
         self.indentAndPrintSlice("[Load symbol {}]", .{data.symbol_index});
     }

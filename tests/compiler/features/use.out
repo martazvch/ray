@@ -33,18 +33,18 @@ exit_repl
 //---- test.ray ----
 
 -- main --
-call_sym_ext index 2, module 0, arity 0
+call_sym_ext index 2, module 1, arity 0
 
 load_constant index 3, value 1
 load_constant index 4, value 2
-call_sym_ext index 3, module 0, arity 2
+call_sym_ext index 3, module 1, arity 2
 
-load_extern_sym index 2, module 0
+load_extern_sym index 2, module 1
 
 get_local index 1
 call index 0
 
-load_extern_sym index 3, module 0
+load_extern_sym index 3, module 1
 
 get_local index 2
 load_constant index 5, value 6

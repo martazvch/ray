@@ -8,6 +8,7 @@ const Type = @import("types.zig").Type;
 const InstrIndex = @import("ir.zig").Index;
 const Span = @import("../parser/Lexer.zig").Span;
 const State = @import("../pipeline/State.zig");
+const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
 
 const misc = @import("misc");
 const InternerIdx = misc.Interner.Index;
@@ -26,14 +27,15 @@ pub const Variable = struct {
     captured: bool,
     constant: bool,
     comp_time: bool,
-    ext_mod: ?usize,
+    ext_mod: ?ModIndex,
 
     pub const Index = usize;
 };
 
 pub const Break = *const Type;
+// Name used for transpiling
 pub const Symbol = struct { name: InternerIdx, type: *const Type, index: usize };
-pub const ExternSymbol = struct { module_index: usize, symbol: Symbol };
+pub const ExternSymbol = struct { module_index: ModIndex, symbol: Symbol };
 
 pub const VariableMap = AutoArrayHashMapUnmanaged(InternerIdx, Variable);
 pub const SymbolArrMap = AutoArrayHashMapUnmanaged(InternerIdx, Symbol);
@@ -186,7 +188,7 @@ pub fn declareVar(
     initialized: bool,
     constant: bool,
     comp_time: bool,
-    ext_mode: ?usize,
+    ext_mode: ?ModIndex,
 ) error{TooManyLocals}!usize {
     const index = self.current.variables.count();
     if (index == 255 and !self.isGlobal()) return error.TooManyLocals;
@@ -274,7 +276,13 @@ pub fn getSymbolName(self: *const Self, sym_type: *const Type) ?InternerIdx {
     return null;
 }
 
-pub fn declareExternSymbol(self: *Self, allocator: Allocator, name: InternerIdx, module_index: usize, symbol: Symbol) void {
+pub fn declareExternSymbol(
+    self: *Self,
+    allocator: Allocator,
+    name: InternerIdx,
+    module_index: ModIndex,
+    symbol: Symbol,
+) void {
     self.current.extern_symbols.put(allocator, name, .{ .module_index = module_index, .symbol = symbol }) catch oom();
 }
 

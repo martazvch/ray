@@ -75,7 +75,7 @@ get_field index 0
 call index 0
 print
 
-load_extern_sym index 4, module 0
+load_extern_sym index 4, module 1
 get_local_cow index 1
 set_field index 0
 

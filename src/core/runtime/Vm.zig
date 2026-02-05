@@ -5,7 +5,7 @@ const Writer = std.Io.Writer;
 const options = @import("options");
 
 const OpCode = @import("../compiler/Chunk.zig").OpCode;
-const CompiledModule = @import("../compiler/compiler.zig").CompiledModule;
+const Module = @import("../pipeline/ModuleManager.zig").Module;
 const Disassembler = @import("../compiler/Disassembler.zig");
 const oom = @import("misc").oom;
 const Gc = @import("Gc.zig");
@@ -22,7 +22,7 @@ arena_comptime: std.heap.ArenaAllocator,
 gc_alloc: Allocator,
 strings: *std.AutoHashMapUnmanaged(usize, *Obj.String),
 objects: ?*Obj,
-modules: []CompiledModule,
+modules: []Module,
 natives: []Value,
 
 const Self = @This();
@@ -107,7 +107,7 @@ fn err(self: *Self, kind: Error) Error {
     return kind;
 }
 
-pub fn run(self: *Self, entry_point: *Obj.Function, modules: []CompiledModule) !void {
+pub fn run(self: *Self, entry_point: *Obj.Function, modules: []Module) !void {
     self.modules = modules;
     self.gc.active = true;
     try self.execute(entry_point);
@@ -725,7 +725,7 @@ const Stack = struct {
 
 pub const CallFrame = struct {
     function: *Obj.Function,
-    module: *CompiledModule,
+    module: *Module,
     ip: [*]u8,
     slots: [*]Value,
     captures: []Value,
@@ -760,7 +760,7 @@ pub const CallFrame = struct {
     }
 
     /// Sets the call to the provided function
-    pub fn call(self: *CallFrame, func: *Obj.Function, stack: *Stack, args_count: usize, modules: []CompiledModule) void {
+    pub fn call(self: *CallFrame, func: *Obj.Function, stack: *Stack, args_count: usize, modules: []Module) void {
         self.slots = stack.top - args_count;
         self.module = &modules[func.module_index];
         self.function = func;
@@ -768,7 +768,7 @@ pub const CallFrame = struct {
     }
 
     /// Calls a function bounded to a runtime value. Checks what kind of function it is before calling
-    pub fn runtimeCall(self: *CallFrame, callee: *Obj, stack: *Stack, args_count: usize, modules: []CompiledModule) void {
+    pub fn runtimeCall(self: *CallFrame, callee: *Obj, stack: *Stack, args_count: usize, modules: []Module) void {
         // As it's a runtime value containing the function, it's on top of stack. We got one slot behind to override it
         self.slots = stack.top - args_count - 1;
 

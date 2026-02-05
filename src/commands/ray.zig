@@ -32,5 +32,5 @@ pub fn run(allocator: Allocator, file_path: []const u8, config: State.Config) !v
     vm.init(allocator, &state);
     defer vm.deinit();
 
-    try vm.run(entry_point, state.module_interner.compiled.values());
+    try vm.run(entry_point, state.modules.modules.values());
 }

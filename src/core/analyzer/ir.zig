@@ -1,4 +1,5 @@
 const ConstIdx = @import("ConstantInterner.zig").ConstIdx;
+const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
 
 pub const Scope = enum { builtin, global, local };
 pub const Type = enum(u2) { float, int };
@@ -127,14 +128,14 @@ pub const Instruction = struct {
     pub const Call = struct {
         callee: Index,
         args: []const Arg,
-        ext_mod: ?usize,
+        ext_mod: ?ModIndex,
         native: bool,
     };
     pub const Arg = union(enum) {
         instr: Index,
         default: struct {
             const_index: ConstIdx,
-            mod: ?usize,
+            mod: ?ModIndex,
         },
     };
     pub const Continue = struct { depth: usize, pop_count: usize };
@@ -190,7 +191,7 @@ pub const Instruction = struct {
         pub const Kind = enum { array, range_int, range_float, string };
     };
     pub const LoadSymbol = struct {
-        module_index: ?usize,
+        module_index: ?ModIndex,
         symbol_index: u8,
     };
     pub const Match = struct {

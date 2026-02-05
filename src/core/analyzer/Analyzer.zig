@@ -21,6 +21,7 @@ const TokenTag = @import("../parser/Lexer.zig").Token.Tag;
 const ConstIdx = @import("ConstantInterner.zig").ConstIdx;
 const Pipeline = @import("../pipeline/pipeline.zig");
 const State = @import("../pipeline/State.zig");
+const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
 
 const type_mod = @import("types.zig");
 const Type = type_mod.Type;
@@ -37,11 +38,6 @@ const GenReport = misc.reporter.GenReport;
 const Sb = misc.StringBuilder;
 const Set = misc.Set;
 const oom = misc.oom;
-
-pub const AnalyzedModule = struct {
-    name: []const u8,
-    symbols: LexScope.SymbolArrMap,
-};
 
 pub const Context = struct {
     decl_type: ?*const Type,
@@ -93,7 +89,7 @@ const TypeInfos = struct {
     is_sym: bool = false,
     comp_time: bool = false,
     /// External module index where the symbol comes from
-    ext_mod: ?usize = null,
+    ext_mod: ?ModIndex = null,
 };
 pub const InstrInfos = struct {
     type: *const Type,
@@ -168,20 +164,12 @@ pub fn warn(self: *Self, kind: AnalyzerMsg, span: Span) void {
     self.warns.append(self.allocator, AnalyzerReport.warn(kind, span.start, span.end)) catch oom();
 }
 
-fn replacePrevErr(self: *Self, new_err: AnalyzerMsg, span: Span) Error {
-    const last = &self.errs.items[self.errs.items.len - 1];
-    last.* = AnalyzerReport.err(new_err, span.start, span.end);
-
-    return error.Err;
-}
-
-pub fn analyze(self: *Self, ast: *const Ast, module_name: []const u8, expect_main: bool) AnalyzedModule {
+pub fn analyze(self: *Self, ast: *const Ast, mod_name: []const u8, expect_main: bool) void {
     self.ast = ast;
     var ctx: Context = .empty;
 
-    const mod_no_ext = module_name[0 .. module_name.len - 3];
-    self.mod_name = self.interner.intern(mod_no_ext);
-    self.containers.append(self.allocator, mod_no_ext);
+    self.mod_name = self.interner.intern(mod_name);
+    self.containers.append(self.allocator, mod_name);
 
     for (ast.nodes) |*node| {
         const res = self.analyzeNode(node, .none, &ctx) catch continue;
@@ -191,11 +179,6 @@ pub fn analyze(self: *Self, ast: *const Ast, module_name: []const u8, expect_mai
     if (expect_main and self.main == null) {
         self.err(.no_main, .{ .start = 0, .end = 0 }) catch {};
     }
-
-    return .{
-        .name = module_name,
-        .symbols = self.scope.current.symbols,
-    };
 }
 
 pub fn analyzeNode(self: *Self, node: *const Node, expect: ExprResKind, ctx: *Context) Result {
@@ -658,17 +641,17 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
     // TODO: don't check only path but path + name?
     const interned = self.interner.intern(file.path);
 
-    if (!self.state.module_interner.analyzed.contains(interned)) {
+    if (!self.state.modules.has(interned)) {
         Pipeline.runSubPipeline(self.allocator, self.state, file.name, file.path, file.content);
     }
 
     if (node.items) |items| {
-        const mod = self.state.module_interner.analyzed.get(interned).?;
-        const mod_index = self.state.module_interner.analyzed.getIndex(interned).?;
+        const mod = self.state.modules.getFromName(interned).?;
+        const mod_index = self.state.modules.getIndex(interned).?;
 
         for (items) |item| {
             const item_name = self.interner.intern(self.ast.toSource(item.item));
-            const sym = mod.symbols.get(item_name) orelse return self.err(
+            const sym = mod.sym_infos.get(item_name) orelse return self.err(
                 .{ .missing_symbol_in_module = .{
                     .module = self.ast.toSource(node.names[node.names.len - 1]),
                     .symbol = self.ast.toSource(item.item),
@@ -1295,7 +1278,7 @@ pub fn enumLit(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result {
         .instr = self.irb.addConstant(
             // TODO: protect the cast
             .{ .enum_instance = .{
-                .sym = .{ .module_index = 0, .symbol_index = @intCast(sym.sym.index) },
+                .sym = .{ .module_index = .toIndex(0), .symbol_index = @intCast(sym.sym.index) },
                 .tag_index = @intCast(tag_index),
             } },
             span.start,
@@ -1518,12 +1501,12 @@ fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_idx: InternerIdx) 
     const text = self.ast.toSource(field_tk);
 
     const field_name = self.interner.intern(text);
-    const module = self.state.module_interner.getAnalyzed(module_idx).?;
-    const sym = module.symbols.get(field_name) orelse return self.err(
-        .{ .missing_symbol_in_module = .{ .module = module.name, .symbol = text } },
+    const module = self.state.modules.getFromName(module_idx).?;
+    const sym = module.sym_infos.get(field_name) orelse return self.err(
+        .{ .missing_symbol_in_module = .{ .module = self.interner.getKey(module.name).?, .symbol = text } },
         span,
     );
-    const index = self.state.module_interner.analyzed.getIndex(module_idx).?;
+    const index = self.state.modules.getIndex(module_idx).?;
 
     // TODO: protect the cast
     return .{
@@ -1577,7 +1560,7 @@ fn fnArgsList(
     self: *Self,
     args: []const Ast.FnCall.Arg,
     ty: *const Type.Function,
-    ext_mod: ?usize,
+    ext_mod: ?ModIndex,
     err_span: Span,
     ctx: *Context,
 ) Error![]const Instr.Arg {
@@ -1655,7 +1638,7 @@ const IdentRes = struct {
     kind: enum { variable, symbol },
     comp_time: bool = true,
     instr: InstrIndex,
-    module: ?usize = null,
+    module: ?ModIndex = null,
 };
 
 /// Tries to find a match from variables and symbols and returns its type while emitting an instruction
@@ -1754,7 +1737,7 @@ fn symbolIdentifier(self: *Self, name: InternerIdx, span: Span) ?struct { sym: *
 }
 
 /// Tries to find a symbol in scopes and returns it while emitting an instruction
-fn externSymbolIdentifier(self: *Self, name: InternerIdx, span: Span) ?struct { sym: *LexScope.Symbol, mod_index: usize, instr: InstrIndex } {
+fn externSymbolIdentifier(self: *Self, name: InternerIdx, span: Span) ?struct { sym: *LexScope.Symbol, mod_index: ModIndex, instr: InstrIndex } {
     const ext = self.scope.getExternSymbol(name) orelse return null;
 
     // TODO: protect cast
@@ -2572,11 +2555,11 @@ fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) Error
             );
 
             // If `identifier` returned no error and it's a module, safe unwrap
-            const module = self.state.module_interner.getAnalyzed(module_type.module).?;
+            const module = self.state.modules.getFromName(module_type.module).?;
 
             const symbol_token = fields[1];
             const symbol_name = self.interner.intern(self.ast.toSource(symbol_token));
-            const final = module.symbols.get(symbol_name) orelse return self.err(
+            const final = module.sym_infos.get(symbol_name) orelse return self.err(
                 .{ .missing_symbol_in_module = .{
                     .module = self.ast.toSource(module_token),
                     .symbol = self.ast.toSource(symbol_token),
@@ -2840,7 +2823,7 @@ fn declareVariable(
     initialized: bool,
     constant: bool,
     comp_time: bool,
-    ext_mod: ?usize,
+    ext_mod: ?ModIndex,
     span: Span,
 ) Error!usize {
     return self.scope.declareVar(

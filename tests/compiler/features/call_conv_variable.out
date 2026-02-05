@@ -41,7 +41,7 @@ get_field index 0
 ret
 
 -- importFuncFromMethod --
-load_extern_sym index 4, module 0
+load_extern_sym index 4, module 1
 ret
 
 -- copy --
@@ -73,7 +73,7 @@ get_local index 1
 call index 0
 print
 
-load_extern_sym index 4, module 0
+load_extern_sym index 4, module 1
 set_local index 1
 
 get_local index 1

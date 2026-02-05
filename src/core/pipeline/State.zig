@@ -5,9 +5,10 @@ const type_mod = @import("../analyzer/types.zig");
 const TypeInterner = type_mod.TypeInterner;
 const ObjFns = type_mod.ObjFns;
 const Obj = @import("../runtime/Obj.zig");
-const ModuleInterner = @import("ModuleInterner.zig");
+const ModuleManager = @import("ModuleManager.zig");
 const NativeRegister = @import("NativesRegister.zig");
 const LexScope = @import("../analyzer/LexicalScope.zig");
+const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
 
 const misc = @import("misc");
 const Interner = misc.Interner;
@@ -18,7 +19,7 @@ interner: Interner,
 type_interner: TypeInterner,
 path_builder: Sb,
 lex_scope: LexScope,
-module_interner: ModuleInterner,
+modules: ModuleManager,
 native_reg: NativeRegister,
 strings: std.AutoHashMapUnmanaged(usize, *Obj.String),
 array_fns: ObjFns,
@@ -41,7 +42,7 @@ pub fn new(allocator: Allocator, config: Config) Self {
         .type_interner = .init(allocator),
         .path_builder = .empty,
         .lex_scope = .empty,
-        .module_interner = .init(allocator),
+        .modules = .empty,
         .native_reg = .empty,
         .strings = .empty,
         .array_fns = Obj.Array.getFns(),
@@ -69,4 +70,8 @@ pub fn new(allocator: Allocator, config: Config) Self {
 
 pub fn registerNatives(self: *Self, allocator: Allocator, Module: type) void {
     self.native_reg.register(allocator, &self.interner, &self.type_interner, Module);
+}
+
+pub fn updateModWithScope(self: *Self, allocator: Allocator, index: ModIndex) void {
+    self.modules.updateWithSymsInfo(allocator, index, self.lex_scope.current.symbols);
 }
