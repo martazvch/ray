@@ -172,7 +172,9 @@ pub fn analyze(self: *Self, ast: *const Ast, mod_name: []const u8, expect_main: 
     self.containers.append(self.allocator, mod_name);
 
     for (ast.nodes) |*node| {
-        const res = self.analyzeNode(node, .none, &ctx) catch continue;
+        // If we don't expect a main, we're either embedded or in REPL, we can execute
+        // any code at global scope
+        const res = self.analyzeNode(node, if (expect_main) .none else .maybe, &ctx) catch continue;
         self.irb.addRootInstr(res.instr);
     }
 

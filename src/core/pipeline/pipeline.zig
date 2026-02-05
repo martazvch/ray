@@ -50,7 +50,7 @@ pub fn run(
     );
 
     var analyzer: Analyzer = .init(allocator, state);
-    analyzer.analyze(&ast, mod_name, !is_sub);
+    analyzer.analyze(&ast, mod_name, !is_sub and !state.config.embedded);
 
     // Analyzed Ast printer
     if (analyzer.warns.items.len > 0) {

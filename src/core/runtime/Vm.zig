@@ -110,16 +110,33 @@ fn err(self: *Self, kind: Error) Error {
 pub fn run(self: *Self, entry_point: *Obj.Function, modules: []Module) !void {
     self.modules = modules;
     self.gc.active = true;
-    try self.execute(entry_point);
+
+    var frame = try self.frame_stack.new();
+    frame.call(entry_point, &self.stack, 0, modules);
+
+    try self.execute(frame);
 }
 
-fn execute(self: *Self, entry_point: *Obj.Function) !void {
+pub fn runRepl(self: *Self, entry_point: *Obj.Function, modules: []Module) !void {
+    self.modules = modules;
+    self.gc.active = true;
+
+    var frame = try self.frame_stack.new();
+    // Reset stack pointer to start of stack
+    frame.slots = self.stack.values[0..].ptr;
+    frame.module = &modules[0];
+    frame.function = entry_point;
+    frame.ip = entry_point.chunk.code.items.ptr;
+
+    try self.execute(frame);
+}
+
+fn execute(self: *Self, first_frame: *CallFrame) !void {
     var buf: [1024]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&buf);
     const stdout = &stdout_writer.interface;
 
-    var frame = try self.frame_stack.new();
-    frame.call(entry_point, &self.stack, 0, self.modules);
+    var frame = first_frame;
 
     while (true) {
         if (comptime options.print_stack) {

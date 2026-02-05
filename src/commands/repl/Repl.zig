@@ -51,6 +51,18 @@ fn init(self: *Self, allocator: Allocator, config: State.Config) void {
     self.arena = .init(allocator);
     self.allocator = self.arena.allocator();
 
+    self.stdout = std.fs.File.stdout().writer(&stdout_buf);
+    self.stdout_writer = &self.stdout.interface;
+    self.logInfos();
+
+    self.prompts = .{};
+    self.cursor_pos = .zero;
+    self.indent_level = 0;
+
+    self.state = .new(self.allocator, config);
+    self.vm = undefined;
+    self.vm.init(allocator, &self.state);
+
     var terminal = terminal: {
         // Windows
         if (builtin.os.tag == .windows) {
@@ -70,19 +82,6 @@ fn init(self: *Self, allocator: Allocator, config: State.Config) void {
     terminal.enableRawMode() catch unreachable;
 
     self.terminal = terminal;
-
-    self.stdout = std.fs.File.stdout().writer(&stdout_buf);
-    self.stdout_writer = &self.stdout.interface;
-
-    self.prompts = .{};
-    self.cursor_pos = .zero;
-    self.indent_level = 0;
-
-    self.state = .new(self.allocator, config);
-    self.vm = undefined;
-    self.vm.init(allocator, &self.state);
-
-    self.logInfos();
 }
 
 fn deinit(self: *Self) void {
@@ -95,6 +94,8 @@ fn logInfos(self: *Self) void {
     defer self.stdout_writer.flush() catch oom();
     _ = try self.stdout_writer.write(
         \\        Ray language REPL
+        \\    Type quit or ctrl+c to exit
+        \\
         \\
         ,
     );
@@ -115,7 +116,7 @@ fn execute(self: *Self) !void {
             error.ExitOnPrint => continue,
             else => return e,
         };
-        try self.vm.run(entry_point, self.state.modules.modules.values());
+        try self.vm.runRepl(entry_point, self.state.modules.modules.values());
     }
 }
 

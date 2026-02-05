@@ -38,9 +38,6 @@ pub fn enableRawMode(ctx: *anyopaque) Terminal.Error!void {
     raw.iflag.INPCK = false;
     raw.iflag.ISTRIP = false;
 
-    // Disable output processing
-    raw.oflag.OPOST = false;
-
     // Set character size to 8 bits
     raw.cflag.CSIZE = .CS8;
 
