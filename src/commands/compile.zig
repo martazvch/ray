@@ -16,7 +16,7 @@ const Scope = @import("../core/analyzer/LexicalScope.zig").Scope;
 const Variable = @import("../core/analyzer/LexicalScope.zig").Variable;
 const Symbol = @import("../core/analyzer/LexicalScope.zig").Symbol;
 const Ast = @import("../core/parser/Ast.zig");
-const Pipeline = @import("../core/pipeline/Pipeline.zig");
+const Pipeline = @import("../core/pipeline/pipeline.zig");
 const State = @import("../core/pipeline/State.zig");
 
 allocator: Allocator,
@@ -128,9 +128,7 @@ pub fn runPipeline(self: *Self, args: clarg.ParsedArgs(Args)) !void {
     };
     defer self.allocator.free(file_content);
 
-    var pipeline: Pipeline = .init(arena_alloc, &state);
-
-    const scopes, const symbols, const irb = pipeline.runFrontend(file_path, file_content) catch |e| switch (e) {
+    const scopes, const symbols, const irb = Pipeline.runFrontend(arena_alloc, &state, false, file_path, file_content) catch |e| switch (e) {
         error.ExitOnPrint => return,
         else => return e,
     };

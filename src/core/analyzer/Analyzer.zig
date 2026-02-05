@@ -6,7 +6,6 @@ const AutoArrayHashMapUnmanaged = std.AutoArrayHashMapUnmanaged;
 const AutoHashMapUnmanaged = std.AutoHashMapUnmanaged;
 const FieldEnum = std.meta.FieldEnum;
 
-const Pipeline = @import("../pipeline/Pipeline.zig");
 const AnalyzerMsg = @import("analyzer_msg.zig").AnalyzerMsg;
 const Ast = @import("../parser/Ast.zig");
 const Node = Ast.Node;
@@ -20,6 +19,8 @@ const Instr = ir.Instruction;
 const Span = @import("../parser/Lexer.zig").Span;
 const TokenTag = @import("../parser/Lexer.zig").Token.Tag;
 const ConstIdx = @import("ConstantInterner.zig").ConstIdx;
+const Pipeline = @import("../pipeline/pipeline.zig");
+const State = @import("../pipeline/State.zig");
 
 const type_mod = @import("types.zig");
 const Type = type_mod.Type;
@@ -39,7 +40,6 @@ const oom = misc.oom;
 
 pub const AnalyzedModule = struct {
     name: []const u8,
-    globals: LexScope.VariableMap,
     symbols: LexScope.SymbolArrMap,
 };
 
@@ -116,51 +116,45 @@ const Result = Error!InstrInfos;
 pub const AnalyzerReport = GenReport(AnalyzerMsg);
 
 allocator: Allocator,
-pipeline: *Pipeline,
+state: *State,
 interner: *Interner,
 path: *Sb,
 containers: Sb,
+scope: *LexScope,
 
 errs: ArrayList(AnalyzerReport),
 warns: ArrayList(AnalyzerReport),
 ast: *const Ast,
-scope: LexScope,
 ti: *TypeInterner,
 irb: IrBuilder,
 main: ?usize,
 
 mod_name: InternerIdx,
-mod_index: usize,
 cached_names: struct { empty: usize, main: usize, std: usize, self: usize, Self: usize, init: usize },
 
-pub fn init(allocator: Allocator, pipeline: *Pipeline, save_dbg_infos: bool) Self {
-    var scope: LexScope = .empty;
-    scope.save = save_dbg_infos;
-    scope.initGlobalScope(allocator, pipeline.state);
-
+pub fn init(allocator: Allocator, state: *State) Self {
     return .{
         .allocator = allocator,
-        .pipeline = pipeline,
-        .interner = &pipeline.state.interner,
-        .path = &pipeline.state.path_builder,
+        .state = state,
+        .interner = &state.interner,
+        .path = &state.path_builder,
         .containers = .empty,
-        .ti = &pipeline.state.type_interner,
+        .scope = &state.lex_scope,
+        .ti = &state.type_interner,
         .ast = undefined,
         .errs = .empty,
         .warns = .empty,
-        .scope = scope,
         .irb = .init(allocator),
         .main = null,
 
         .mod_name = undefined,
-        .mod_index = pipeline.state.module_interner.analyzed.count(),
         .cached_names = .{
-            .empty = pipeline.state.interner.intern(""),
-            .main = pipeline.state.interner.intern("main"),
-            .std = pipeline.state.interner.intern("std"),
-            .self = pipeline.state.interner.intern("self"),
-            .Self = pipeline.state.interner.intern("Self"),
-            .init = pipeline.state.interner.intern("init"),
+            .empty = state.interner.intern(""),
+            .main = state.interner.intern("main"),
+            .std = state.interner.intern("std"),
+            .self = state.interner.intern("self"),
+            .Self = state.interner.intern("Self"),
+            .init = state.interner.intern("init"),
         },
     };
 }
@@ -198,11 +192,8 @@ pub fn analyze(self: *Self, ast: *const Ast, module_name: []const u8, expect_mai
         self.err(.no_main, .{ .start = 0, .end = 0 }) catch {};
     }
 
-    self.scope.closeGlobalScope();
-
     return .{
         .name = module_name,
-        .globals = self.scope.current.variables,
         .symbols = self.scope.current.symbols,
     };
 }
@@ -656,7 +647,7 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
     defer self.path.shrink(self.allocator, old_path_length);
 
     const result = Importer.fetchImportedFile(self.allocator, self.ast, node.names, self.path);
-    const file_infos = switch (result) {
+    const file = switch (result) {
         .ok => |f| f,
         .err => |e| {
             self.errs.append(self.allocator, e) catch oom();
@@ -665,19 +656,15 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
     };
 
     // TODO: don't check only path but path + name?
-    const interned = self.interner.intern(file_infos.path);
+    const interned = self.interner.intern(file.path);
 
-    if (!self.pipeline.state.module_interner.analyzed.contains(interned)) {
-        var pipeline = self.pipeline.createSubPipeline();
-        // TODO: proper error handling, for now just print errors and exit
-        _ = pipeline.run(file_infos.name, file_infos.path, file_infos.content) catch {
-            std.process.exit(0);
-        };
+    if (!self.state.module_interner.analyzed.contains(interned)) {
+        Pipeline.runSubPipeline(self.allocator, self.state, file.name, file.path, file.content);
     }
 
     if (node.items) |items| {
-        const mod = self.pipeline.state.module_interner.analyzed.get(interned).?;
-        const mod_index = self.pipeline.state.module_interner.analyzed.getIndex(interned).?;
+        const mod = self.state.module_interner.analyzed.get(interned).?;
+        const mod_index = self.state.module_interner.analyzed.getIndex(interned).?;
 
         for (items) |item| {
             const item_name = self.interner.intern(self.ast.toSource(item.item));
@@ -1394,8 +1381,8 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
 fn runtimeObjFnAccess(self: *Self, kind: Instr.ObjFn.Kind, instr: InstrIndex, fn_tk: Ast.TokenIndex, ty: *const Type) Result {
     const func_name = self.ast.toSource(fn_tk);
     const map, const generic = switch (kind) {
-        .array => .{ &self.pipeline.state.array_fns, ty.array.child },
-        .string => .{ &self.pipeline.state.string_fns, self.ti.getCached(.void) },
+        .array => .{ &self.state.array_fns, ty.array.child },
+        .string => .{ &self.state.string_fns, self.ti.getCached(.void) },
     };
     const func = map.get(func_name) orelse return self.err(
         .{ .undeclared_field_access = .{ .name = func_name } },
@@ -1531,12 +1518,12 @@ fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_idx: InternerIdx) 
     const text = self.ast.toSource(field_tk);
 
     const field_name = self.interner.intern(text);
-    const module = self.pipeline.state.module_interner.getAnalyzed(module_idx).?;
+    const module = self.state.module_interner.getAnalyzed(module_idx).?;
     const sym = module.symbols.get(field_name) orelse return self.err(
         .{ .missing_symbol_in_module = .{ .module = module.name, .symbol = text } },
         span,
     );
-    const index = self.pipeline.state.module_interner.analyzed.getIndex(module_idx).?;
+    const index = self.state.module_interner.analyzed.getIndex(module_idx).?;
 
     // TODO: protect the cast
     return .{
@@ -2585,7 +2572,7 @@ fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) Error
             );
 
             // If `identifier` returned no error and it's a module, safe unwrap
-            const module = self.pipeline.state.module_interner.getAnalyzed(module_type.module).?;
+            const module = self.state.module_interner.getAnalyzed(module_type.module).?;
 
             const symbol_token = fields[1];
             const symbol_name = self.interner.intern(self.ast.toSource(symbol_token));

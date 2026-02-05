@@ -5,7 +5,7 @@ const builtin = @import("builtin");
 
 const Terminal = @import("terminal/Terminal.zig");
 const WinTerm = @import("terminal/WinTerm.zig");
-const Pipeline = @import("../../core/pipeline/Pipeline.zig");
+const Pipeline = @import("../../core/pipeline/pipeline.zig");
 const Vm = @import("../../core/runtime/Vm.zig");
 const oom = @import("misc").oom;
 

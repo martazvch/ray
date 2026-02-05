@@ -1,7 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const Pipeline = @import("../core/pipeline/Pipeline.zig");
+const Pipeline = @import("../core/pipeline/pipeline.zig");
 const Vm = @import("../core/runtime/Vm.zig");
 const State = @import("../core/pipeline/State.zig");
 
@@ -20,9 +20,7 @@ pub fn run(allocator: Allocator, file_path: []const u8, config: State.Config) !v
         };
         defer allocator.free(file_content);
 
-        var pipeline: Pipeline = .init(arena_alloc, &state);
-
-        const entry_point = pipeline.run(file_path, ".", file_content) catch |e| switch (e) {
+        const entry_point = Pipeline.run(arena_alloc, &state, false, file_path, ".", file_content) catch |e| switch (e) {
             error.ExitOnPrint => return,
             else => return e,
         };
