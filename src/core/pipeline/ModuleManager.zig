@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 
 const SymbolArrMap = @import("../analyzer/LexicalScope.zig").SymbolArrMap;
 const Value = @import("../runtime/values.zig").Value;
+const State = @import("../pipeline/State.zig");
 
 const misc = @import("misc");
 const InternerIndex = misc.Interner.Index;
@@ -71,20 +72,13 @@ pub fn updateWithSymsInfo(self: *Self, allocator: Allocator, index: Index, symbo
     }
 }
 
-pub fn ensureCompileSizes(
-    self: *Self,
-    allocator: Allocator,
-    index: Index,
-    globals: usize,
-    symbols: usize,
-    constants: usize,
-) void {
+pub fn ensureCompileSizes(self: *Self, allocator: Allocator, index: Index, state: *const State) void {
     errdefer oom();
     const mod = self.getFromIndex(index);
 
-    mod.globals = try allocator.realloc(mod.globals, globals);
-    mod.symbols = try allocator.realloc(mod.symbols, symbols);
-    mod.constants = try allocator.realloc(mod.constants, constants);
+    mod.globals = try allocator.realloc(mod.globals, state.lex_scope.current.variables.count());
+    mod.symbols = try allocator.realloc(mod.symbols, state.lex_scope.symbol_count);
+    mod.constants = try allocator.realloc(mod.constants, state.const_interner.constants.items.len);
 }
 
 pub fn addGlobal(self: *Self, mod: Index, index: usize, value: Value) void {
