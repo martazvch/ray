@@ -5,13 +5,26 @@ const builtin = @import("builtin");
 
 const Terminal = @import("terminal/Terminal.zig");
 const WinTerm = @import("terminal/WinTerm.zig");
+const UnixTerm = @import("terminal/UnixTerm.zig");
 const Pipeline = @import("../../core/pipeline/pipeline.zig");
 const Vm = @import("../../core/runtime/Vm.zig");
+const State = @import("../../core/pipeline/State.zig");
 const oom = @import("misc").oom;
+
+arena: std.heap.ArenaAllocator,
+allocator: Allocator,
+terminal: Terminal,
+stdout: std.fs.File.Writer,
+stdout_writer: *std.io.Writer,
+prompts: Prompts,
+cursor_pos: Vec2,
+indent_level: usize,
+state: State,
+vm: Vm,
 
 const Self = @This();
 const Prompts = ArrayList([:0]const u8);
-const Error = error{ BadRead, BadWrite, TooManyIndents, Empty, EndOfFile } || std.fs.File.Writer.Error;
+const Error = error{ BadRead, BadWrite, TooManyIndents, Empty, EndOfFile } || std.io.Writer.Error;
 
 const MAX_IDENT = 64;
 const INDENT_SIZE = 4;
@@ -24,55 +37,70 @@ const Vec2 = struct {
     pub const zero: Vec2 = .{ .x = 0, .y = 0 };
 };
 
-terminal: Terminal,
-stdin: std.fs.File.Reader,
-stdout: std.fs.File.Writer,
-prompts: Prompts,
-cursor_pos: Vec2,
-indent_level: usize,
-allocator: Allocator,
-pipeline: Pipeline,
-vm: Vm,
+var stdout_buf: [1024]u8 = undefined;
 
-pub fn init(self: *Self, allocator: Allocator, config: Vm.Config) void {
+pub fn run(allocator: Allocator, config: State.Config) !void {
+    var repl: Self = undefined;
+    repl.init(allocator, config);
+    defer repl.deinit();
+
+    try repl.execute();
+}
+
+fn init(self: *Self, allocator: Allocator, config: State.Config) void {
+    self.arena = .init(allocator);
+    self.allocator = self.arena.allocator();
+
     var terminal = terminal: {
+        // Windows
         if (builtin.os.tag == .windows) {
-            const term = WinTerm.init() catch unreachable;
-
+            var term = self.allocator.create(WinTerm) catch oom();
+            term.* = WinTerm.init() catch unreachable;
             break :terminal term.terminal();
-        } else unreachable;
+        }
+        // Unix
+        else if (builtin.os.tag == .macos or builtin.os.tag == .linux) {
+            var term = self.allocator.create(UnixTerm) catch oom();
+            term.* = UnixTerm.init() catch unreachable;
+            break :terminal term.terminal();
+        }
+        // Unsupported
+        else @panic("unsupported OS for REPL");
     };
     terminal.enableRawMode() catch unreachable;
 
     self.terminal = terminal;
-    self.stdin = std.io.getStdIn().reader();
-    self.stdout = std.io.getStdOut().writer();
+
+    self.stdout = std.fs.File.stdout().writer(&stdout_buf);
+    self.stdout_writer = &self.stdout.interface;
+
     self.prompts = .{};
     self.cursor_pos = .zero;
     self.indent_level = 0;
-    self.allocator = allocator;
-    self.pipeline = undefined;
-    self.pipeline.init(&self.vm, config);
+
+    self.state = .new(self.allocator, config);
     self.vm = undefined;
-    self.vm.init(allocator, config);
+    self.vm.init(allocator, &self.state);
 
     self.logInfos();
 }
 
-pub fn deinit(self: *Self, allocator: Allocator) void {
+fn deinit(self: *Self) void {
     self.terminal.disableRawMode();
-
-    for (self.prompts.items) |prompt| {
-        allocator.free(prompt);
-    }
-    self.prompts.deinit(allocator);
+    self.arena.deinit();
 }
 
-pub fn logInfos(self: *Self) Error!void {
-    _ = self.stdout.write("\t\tRay language REPL\n  Type 'quit' or Ctrl+C to exit\n\n") catch return error.BadWrite;
+fn logInfos(self: *Self) void {
+    errdefer oom();
+    defer self.stdout_writer.flush() catch oom();
+    _ = try self.stdout_writer.write(
+        \\        Ray language REPL
+        \\
+        ,
+    );
 }
 
-pub fn run(self: *Self) !void {
+fn execute(self: *Self) !void {
     while (true) {
         const prompt = self.getPrompt(self.allocator) catch |e| switch (e) {
             error.Empty => continue,
@@ -83,15 +111,15 @@ pub fn run(self: *Self) !void {
             },
         };
 
-        const module = self.pipeline.run("stdin", prompt) catch |e| switch (e) {
-            error.ExitOnPrint => return,
+        const entry_point = Pipeline.run(self.allocator, &self.state, false, "stdin", ".", prompt) catch |e| switch (e) {
+            error.ExitOnPrint => continue,
             else => return e,
         };
-        try self.vm.run(module.compiled);
+        try self.vm.run(entry_point, self.state.modules.modules.values());
     }
 }
 
-pub fn getPrompt(self: *Self, allocator: Allocator) Error![:0]const u8 {
+fn getPrompt(self: *Self, allocator: Allocator) Error![:0]const u8 {
     var input: ArrayList(u8) = .{};
     errdefer input.deinit(allocator);
 
@@ -101,9 +129,11 @@ pub fn getPrompt(self: *Self, allocator: Allocator) Error![:0]const u8 {
     self.printPs1();
 
     while (true) {
+        defer self.stdout_writer.flush() catch oom();
+
         const key = self.terminal.getKey() catch |e| switch (e) {
             error.NonAsciiChar => {
-                self.stdout.writeAll("Error: accept only ascii characters\n") catch unreachable;
+                self.stdout_writer.writeAll("Error: accept only ascii characters\n") catch unreachable;
                 self.printPs1();
                 continue;
             },
@@ -148,16 +178,16 @@ pub fn getPrompt(self: *Self, allocator: Allocator) Error![:0]const u8 {
                 std.mem.copyForwards(u8, line[0..], line[1..]);
                 _ = input.pop();
                 self.moveCursor(.left, 1);
-                var len = self.stdout.write(input.items[line_offset + self.cursor_pos.x ..]) catch unreachable;
+                var len = self.stdout_writer.write(input.items[line_offset + self.cursor_pos.x ..]) catch unreachable;
                 // Erase the last character
-                len += self.stdout.write(" ") catch unreachable;
+                len += self.stdout_writer.write(" ") catch unreachable;
 
                 self.cursor_pos.x += len;
                 self.moveCursor(.left, len);
             },
             .delete => {},
             .tab => {
-                self.stdout.writeAll(SPACES[0..INDENT_SIZE]) catch unreachable;
+                self.stdout_writer.writeAll(SPACES[0..INDENT_SIZE]) catch unreachable;
                 input.appendSlice(allocator, SPACES[0..INDENT_SIZE]) catch oom();
                 self.cursor_pos.x += INDENT_SIZE;
             },
@@ -165,7 +195,7 @@ pub fn getPrompt(self: *Self, allocator: Allocator) Error![:0]const u8 {
                 const trimmed = std.mem.trimRight(u8, input.items[line_offset..], " ");
 
                 if (trimmed.len == 0) {
-                    try self.stdout.writeAll("\n");
+                    try self.stdout_writer.writeAll("\n");
 
                     if (self.indent_level > 0) {
                         input.appendSlice(allocator, "\n") catch oom();
@@ -174,7 +204,7 @@ pub fn getPrompt(self: *Self, allocator: Allocator) Error![:0]const u8 {
                     self.printPs1();
                     line_offset = input.items.len;
                     self.cursor_pos.x = self.indent(allocator, &input);
-                    self.stdout.writeAll(input.items[line_offset..]) catch unreachable;
+                    self.stdout_writer.writeAll(input.items[line_offset..]) catch unreachable;
                     continue;
                 }
 
@@ -206,10 +236,10 @@ pub fn getPrompt(self: *Self, allocator: Allocator) Error![:0]const u8 {
 
         if (self.cursor_pos.x != input.items.len - line_offset) {
             // Rewrite tail after cursor
-            try self.stdout.writeAll(input.items[line_offset + self.cursor_pos.x ..]);
+            try self.stdout_writer.writeAll(input.items[line_offset + self.cursor_pos.x ..]);
             // Move cursor back to original position
             const diff = input.items.len - line_offset - self.cursor_pos.x;
-            try self.stdout.print("\x1b[{}D", .{diff});
+            try self.stdout_writer.print("\x1b[{}D", .{diff});
         }
     }
 
@@ -217,12 +247,14 @@ pub fn getPrompt(self: *Self, allocator: Allocator) Error![:0]const u8 {
 }
 
 fn writeAndMoveCursor(self: *Self, char: u8) void {
-    self.stdout.writeByte(char) catch unreachable;
+    defer self.stdout_writer.flush() catch oom();
+    self.stdout_writer.writeByte(char) catch unreachable;
     self.cursor_pos.x += 1;
 }
 
 fn printPs1(self: *Self) void {
-    _ = self.stdout.write(if (self.indent_level == 0) "> " else "| ") catch unreachable;
+    defer self.stdout_writer.flush() catch oom();
+    _ = self.stdout_writer.write(if (self.indent_level == 0) "> " else "| ") catch unreachable;
 }
 
 fn indent(self: *Self, allocator: Allocator, line: *ArrayList(u8)) usize {
@@ -234,12 +266,14 @@ fn indent(self: *Self, allocator: Allocator, line: *ArrayList(u8)) usize {
 }
 
 fn moveCursor(self: *Self, dir: enum { left, right }, amount: usize) void {
+    defer self.stdout_writer.flush() catch oom();
+
     if (dir == .left) {
         self.cursor_pos.x -= amount;
-        self.stdout.print("\x1b[{}D", .{amount}) catch unreachable;
+        self.stdout_writer.print("\x1b[{}D", .{amount}) catch unreachable;
     } else {
         self.cursor_pos.x += amount;
-        self.stdout.print("\x1b[{}C", .{amount}) catch unreachable;
+        self.stdout_writer.print("\x1b[{}C", .{amount}) catch unreachable;
     }
 }
 
@@ -250,12 +284,15 @@ fn moveCursorEndOfLine(self: *Self, line_len: usize) void {
 }
 
 fn clearLineMoveStartOfLine(self: *Self) void {
-    self.stdout.writeAll("\x1b[2K\r") catch unreachable;
+    defer self.stdout_writer.flush() catch oom();
+    self.stdout_writer.writeAll("\x1b[2K\r") catch unreachable;
 }
 
 fn lineReturn(self: *Self, allocator: Allocator, line: *ArrayList(u8), write: bool) void {
+    defer self.stdout_writer.flush() catch oom();
+
     self.moveCursorEndOfLine(line.items.len);
-    self.stdout.writeAll("\n") catch unreachable;
+    self.stdout_writer.writeAll("\n") catch unreachable;
 
     if (write) {
         line.appendSlice(allocator, "\n") catch oom();
@@ -263,14 +300,16 @@ fn lineReturn(self: *Self, allocator: Allocator, line: *ArrayList(u8), write: bo
 }
 
 fn lineReturnContinue(self: *Self, allocator: Allocator, line: *ArrayList(u8)) usize {
+    defer self.stdout_writer.flush() catch oom();
+
     self.moveCursorEndOfLine(line.items.len);
     line.appendSlice(allocator, "\n") catch oom();
-    _ = self.stdout.writeAll("\n") catch unreachable;
+    _ = self.stdout_writer.writeAll("\n") catch unreachable;
     self.printPs1();
 
     const line_offset = line.items.len;
     const indent_len = self.indent(allocator, line);
-    _ = self.stdout.writeAll(line.items[line_offset..]) catch unreachable;
+    _ = self.stdout_writer.writeAll(line.items[line_offset..]) catch unreachable;
     self.cursor_pos.x = indent_len;
 
     return line_offset;
@@ -291,11 +330,13 @@ fn checkIndent(self: *Self, input: []const u8) Error!void {
 }
 
 fn restoreHistory(self: *Self, allocator: Allocator, index: usize, line: *ArrayList(u8), offset: usize) usize {
+    defer self.stdout_writer.flush() catch oom();
+
     self.resetLine(line, offset);
     const prev = self.prompts.items[index];
     const prev_no_return = prev[0 .. prev.len - 1];
     line.appendSlice(allocator, prev_no_return) catch oom();
-    self.stdout.writeAll(prev_no_return) catch unreachable;
+    self.stdout_writer.writeAll(prev_no_return) catch unreachable;
     const start_of_last_line = std.mem.lastIndexOf(u8, prev_no_return, "\n") orelse 0;
     self.cursor_pos.x = prev_no_return.len - start_of_last_line;
 
@@ -304,13 +345,15 @@ fn restoreHistory(self: *Self, allocator: Allocator, index: usize, line: *ArrayL
 
 /// Resets the line by erasing content from console and line buffer and prints Ps1 back
 fn resetLine(self: *Self, line: *ArrayList(u8), offset: usize) void {
+    defer self.stdout_writer.flush() catch oom();
+
     if (line.items.len != offset) {
         const line_count = std.mem.count(u8, line.items, "\n");
 
         self.clearLineMoveStartOfLine();
         for (0..line_count) |_| {
             // Move up
-            self.stdout.writeAll("\x1b[A") catch unreachable;
+            self.stdout_writer.writeAll("\x1b[A") catch unreachable;
             self.clearLineMoveStartOfLine();
         }
 

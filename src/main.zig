@@ -8,6 +8,7 @@ const Arg = clarg.Arg;
 const oom = @import("misc").oom;
 const State = @import("core/pipeline/State.zig");
 const ray = @import("commands/ray.zig");
+const Repl = @import("commands/repl/Repl.zig");
 const compile = @import("commands/compile.zig");
 
 const Args = struct {
@@ -67,10 +68,7 @@ pub fn main() !void {
     } else if (parsed.file) |f| {
         try ray.run(allocator, f, config);
     } else {
-        // var repl: Repl = undefined;
-        // defer repl.deinit(allocator);
-        // repl.init(allocator, config);
-        // try repl.run();
+        try Repl.run(allocator, config);
     }
 }
 

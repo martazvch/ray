@@ -61,33 +61,32 @@ const Self = @This();
 prev_cp: win.UINT,
 input_handle: HANDLE,
 original_mode: DWORD,
-stdout: std.fs.File.Writer,
 cursor_pos: usize,
 
 pub fn init() Terminal.Error!Self {
     // Set console output to UTF-8
     const prev_cp = win.kernel32.GetConsoleOutputCP();
     _ = win.kernel32.SetConsoleOutputCP(CP_UTF8);
-    const input_handle = win.kernel32.GetStdHandle(win.STD_INPUT_HANDLE) orelse {
-        return error.InitFail;
-    };
-
-    var original_mode: DWORD = 0;
-    if (win.kernel32.GetConsoleMode(input_handle, &original_mode) == 0) {
-        return error.InitFail;
-    }
 
     return .{
         .prev_cp = prev_cp,
-        .input_handle = input_handle,
-        .original_mode = original_mode,
-        .stdout = std.io.getStdOut().writer(),
+        .input_handle = undefined,
+        .original_mode = undefined,
         .cursor_pos = 0,
     };
 }
 
 pub fn enableRawMode(ctx: *anyopaque) Terminal.Error!void {
-    const self: *const Self = @ptrCast(@alignCast(ctx));
+    const self: *Self = @ptrCast(@alignCast(ctx));
+
+    self.input_handle = win.kernel32.GetStdHandle(win.STD_INPUT_HANDLE) orelse {
+        return error.InitFail;
+    };
+
+    if (win.kernel32.GetConsoleMode(self.input_handle, &self.original_mode) == 0) {
+        return error.InitFail;
+    }
+
     const raw_mode = self.original_mode & ~@as(DWORD, ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT);
     if (win.kernel32.SetConsoleMode(self.input_handle, raw_mode) == 0) {
         return error.RawModeFail;
@@ -127,9 +126,9 @@ pub fn getKey(ctx: *anyopaque) Terminal.Error!Terminal.Key {
         };
 
         const ctrl = key.dwControlKeyState & CTRL_PRESSED != 0;
-        const only_shift = key.dwControlKeyState & ~SHIFT_PRESSED == 0;
 
-        if (only_shift) continue;
+        // const only_shift = key.dwControlKeyState & ~SHIFT_PRESSED == 0;
+        // if (only_shift) continue;
 
         return switch (key.wVirtualKeyCode) {
             VK_UP => .{ .value = .up, .ctrl = ctrl },
