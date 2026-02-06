@@ -36,9 +36,9 @@ pub fn main() !void {
 }
 
 test {
-    try Tester.testMod(std.testing.allocator, @import("tests/simple.zig"));
-    try Tester.testMod(std.testing.allocator, @import("tests/declare_local.zig"));
-    try Tester.testMod(std.testing.allocator, @import("tests/declare_fn.zig"));
-    try Tester.testMod(std.testing.allocator, @import("tests/builtins.zig"));
-    try Tester.testMod(std.testing.allocator, @import("tests/register_natives.zig"));
+    try Tester.testMod(@import("tests/simple.zig"));
+    try Tester.testMod(@import("tests/declare_local.zig"));
+    try Tester.testMod(@import("tests/declare_fn.zig"));
+    try Tester.testMod(@import("tests/builtins.zig"));
+    try Tester.testMod(@import("tests/register_natives.zig"));
 }

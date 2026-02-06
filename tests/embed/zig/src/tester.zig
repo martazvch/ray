@@ -1,4 +1,5 @@
 const std = @import("std");
+const allocator = std.testing.allocator;
 const Allocator = std.mem.Allocator;
 const ray = @import("ray");
 
@@ -19,7 +20,7 @@ pub fn printFn(text: []const u8) void {
     output = text;
 }
 
-pub fn testMod(allocator: Allocator, Mod: type) Error!void {
+pub fn testMod(Mod: type) Error!void {
     var vm = ray.create(allocator);
     defer vm.deinit();
 
