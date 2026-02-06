@@ -141,6 +141,7 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
             var buf: [1024]u8 = undefined;
             var stdout_writer = std.fs.File.stdout().writer(&buf);
             const stdout = &stdout_writer.interface;
+            defer stdout.flush() catch oom();
 
             self.stack.print(stdout, frame) catch oom();
         }
@@ -149,6 +150,7 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
             var buf: [1024]u8 = undefined;
             var stdout_writer = std.fs.File.stdout().writer(&buf);
             const stdout = &stdout_writer.interface;
+            defer stdout.flush() catch oom();
 
             var dis = Disassembler.init(&frame.function.chunk, frame.module, self.natives);
             const instr_nb = frame.instructionNb();

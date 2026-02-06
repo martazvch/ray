@@ -36,7 +36,7 @@ pub const empty: Self = .{
     .scratch_structs = .empty,
 };
 
-pub fn register(self: *Self, allocator: Allocator, interner: *Interner, ti: *TypeInterner, Module: type) void {
+pub fn registerMod(self: *Self, allocator: Allocator, interner: *Interner, ti: *TypeInterner, Module: type) void {
     if (!@hasDecl(Module, "module")) {
         @compileError("Native Zig files must declare a module");
     }
@@ -94,7 +94,8 @@ fn registerStruct(self: *Self, allocator: Allocator, S: type, interner: *Interne
 }
 
 // We can use pointers here because we refer to comptime declarations in Module
-fn registerFn(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMeta, interner: *Interner, ti: *TypeInterner) struct { usize, *const Type } {
+// TODO: no check on already defined with same name?
+pub fn registerFn(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMeta, interner: *Interner, ti: *TypeInterner) struct { usize, *const Type } {
     const fn_type = self.fnZigToRay(allocator, func, interner, ti);
     self.funcs_meta.put(allocator, interner.intern(func.name), fn_type) catch oom();
     const value = Value.makeObj(Obj.NativeFunction.create(allocator, func.name, func.function).asObj());
@@ -115,9 +116,8 @@ fn fnZigToRay(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMeta, int
     inline for (func.info.params[offset..], 0..) |*p, i| {
         const param_ty = self.zigToRay(allocator, p.type.?, interner, ti);
 
-        const param_index = if (i == 0) i else i - 1;
         params.putAssumeCapacity(
-            interner.intern(func.params[param_index].name),
+            interner.intern(func.params[i].name),
             .{ .name = null, .type = param_ty, .default = null, .captured = false },
         );
     }
@@ -135,6 +135,7 @@ fn fnZigToRay(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMeta, int
 
 fn zigToRay(self: *Self, allocator: Allocator, ty: type, interner: *Interner, ti: *TypeInterner) *const Type {
     return switch (ty) {
+        bool => ti.getCached(.bool),
         i64 => ti.getCached(.int),
         f64 => ti.getCached(.float),
         void => ti.getCached(.void),

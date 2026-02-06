@@ -119,7 +119,7 @@ pub fn runPipeline(self: *Self, args: clarg.ParsedArgs(Args)) !void {
     const arena_alloc = arena.allocator();
     defer arena.deinit();
 
-    var state: State = .new(arena_alloc, .{});
+    var state: State = .new(arena_alloc, .{}, &.{});
 
     const file_content = std.fs.cwd().readFileAllocOptions(self.allocator, file_path, 100_000, null, .of(u8), 0) catch |err| {
         // TODO: Ray error

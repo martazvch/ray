@@ -23,10 +23,13 @@ pub fn testMod(allocator: Allocator, Mod: type) Error!void {
     var vm = ray.create(allocator);
     defer vm.deinit();
 
-    vm.init(.{
-        .embedded = true,
-        .printFn = printFn,
-    });
+    vm.init(
+        .{
+            .embedded = true,
+            .printFn = printFn,
+        },
+        if (@hasDecl(Mod, "natives")) @field(Mod, "natives") else &.{},
+    );
 
     inline for (@typeInfo(Mod).@"struct".decls) |decl| {
         const field = @field(Mod, decl.name);

@@ -59,7 +59,7 @@ fn init(self: *Self, allocator: Allocator, config: State.Config) void {
     self.cursor_pos = .zero;
     self.indent_level = 0;
 
-    self.state = .new(self.allocator, config);
+    self.state = .new(self.allocator, config, &.{});
     self.vm = undefined;
     self.vm.init(allocator, &self.state);
 

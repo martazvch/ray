@@ -2,9 +2,13 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const State = @import("core/pipeline/State.zig");
-const Config = State.Config;
+pub const Config = State.Config;
+
 const Pipeline = @import("core/pipeline/pipeline.zig");
-const Vm = @import("core/runtime/Vm.zig");
+pub const Vm = @import("core/runtime/Vm.zig");
+
+const ffi = @import("core/builtins/ffi.zig");
+pub const RayFn = ffi.ZigFnMeta;
 
 arena: std.heap.ArenaAllocator,
 allocator: Allocator,
@@ -23,9 +27,9 @@ pub fn create(allocator: Allocator) Self {
     };
 }
 
-pub fn init(self: *Self, config: Config) void {
+pub fn init(self: *Self, config: Config, comptime natives: []const RayFn) void {
     self.allocator = self.arena.allocator();
-    self.state = .new(self.allocator, config);
+    self.state = .new(self.allocator, config, natives);
     self.vm.init(self.allocator, &self.state);
 }
 

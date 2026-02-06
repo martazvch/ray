@@ -12,6 +12,7 @@ const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
 const ConstInterner = @import("../analyzer/ConstantInterner.zig");
 const ConstIdx = ConstInterner.ConstIdx;
 const Constant = ConstInterner.Constant;
+const ffi = @import("../builtins/ffi.zig");
 
 const misc = @import("misc");
 const Interner = misc.Interner;
@@ -65,7 +66,7 @@ fn defaultPrint(text: []const u8) void {
 //     try stderr.flush();
 // }
 
-pub fn new(allocator: Allocator, config: Config) Self {
+pub fn new(allocator: Allocator, config: Config, comptime natives: []const ffi.ZigFnMeta) Self {
     var ctx: Self = .{
         .config = config,
         .interner = .init(allocator),
@@ -81,22 +82,30 @@ pub fn new(allocator: Allocator, config: Config) Self {
     };
 
     ctx.type_interner.cacheFrequentTypes();
-    ctx.registerNatives(allocator, @import("../builtins/builtins.zig"));
-    ctx.registerNatives(allocator, @import("..//builtins/file.zig"));
+    ctx.registerMod(allocator, @import("../builtins/builtins.zig"));
+    ctx.registerMod(allocator, @import("..//builtins/file.zig"));
+
+    inline for (natives) |*native| {
+        _ = ctx.native_reg.registerFn(allocator, native, &ctx.interner, &ctx.type_interner);
+    }
 
     ctx.lex_scope.save = config.dbg_infos;
     ctx.lex_scope.initGlobalScope(allocator, &ctx);
 
     // If embedded/Repl, all code is treated as local code to allow impur code
-    if (config.embedded) {
+    if (ctx.config.embedded) {
         ctx.lex_scope.open(allocator, null, .{ .barrier = true });
     }
 
     return ctx;
 }
 
-pub fn registerNatives(self: *Self, allocator: Allocator, Module: type) void {
-    self.native_reg.register(allocator, &self.interner, &self.type_interner, Module);
+pub fn registerMod(self: *Self, allocator: Allocator, Module: type) void {
+    self.native_reg.registerMod(allocator, &self.interner, &self.type_interner, Module);
+}
+
+pub fn registerFn(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMeta) void {
+    _ = self.native_reg.registerFn(allocator, func, &self.interner, &self.type_interner);
 }
 
 pub fn updateModWithScope(self: *Self, allocator: Allocator, index: ModIndex) void {
