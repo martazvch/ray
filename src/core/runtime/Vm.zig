@@ -24,6 +24,7 @@ strings: *std.AutoHashMapUnmanaged(usize, *Obj.String),
 objects: ?*Obj,
 modules: []Module,
 natives: []Value,
+state: *State,
 
 const Self = @This();
 const Error = error{
@@ -47,7 +48,16 @@ pub fn init(self: *Self, allocator: Allocator, state: *State) void {
     self.stack.init();
     self.frame_stack = .empty;
     self.objects = null;
+    self.state = state;
     self.natives = state.native_reg.funcs.items;
+
+    // In REPL/embedded mode, we won't call the main function (there is not)
+    // so we increment ourself the frame stack (discaring the first one)
+    // because the first function we would exit would cause the VM to stop
+    // as there would not have any other frame
+    if (state.config.embedded) {
+        self.frame_stack.count += 1;
+    }
 }
 
 pub fn deinit(self: *Self) void {
@@ -123,19 +133,23 @@ pub fn runRepl(self: *Self, entry_point: *Obj.Function, modules: []Module) !void
 }
 
 fn execute(self: *Self, first_frame: *CallFrame) !void {
-    var buf: [1024]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&buf);
-    const stdout = &stdout_writer.interface;
-
     var frame = first_frame;
 
     while (true) {
         if (comptime options.print_stack) {
             // TODO: return an internal error?
+            var buf: [1024]u8 = undefined;
+            var stdout_writer = std.fs.File.stdout().writer(&buf);
+            const stdout = &stdout_writer.interface;
+
             self.stack.print(stdout, frame) catch oom();
         }
 
         if (comptime options.print_instr) {
+            var buf: [1024]u8 = undefined;
+            var stdout_writer = std.fs.File.stdout().writer(&buf);
+            const stdout = &stdout_writer.interface;
+
             var dis = Disassembler.init(&frame.function.chunk, frame.module, self.natives);
             const instr_nb = frame.instructionNb();
             _ = dis.disInstruction(stdout, instr_nb);
@@ -518,9 +532,10 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
                 self.stack.top -= count;
             },
             .print => {
-                self.stack.pop().print(stdout);
-                stdout.writeAll("\n") catch oom();
-                stdout.flush() catch oom();
+                var wa = std.io.Writer.Allocating.init(self.allocator);
+                var writer = &wa.writer;
+                self.stack.pop().print(writer);
+                self.state.config.printFn(writer.buffered());
             },
             .push_false => self.stack.push(Value.false_),
             .push_null => self.stack.push(Value.null_),

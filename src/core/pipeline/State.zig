@@ -37,8 +37,33 @@ pub const Config = struct {
     print_bytecode: bool = false,
     static_analyzis: bool = false,
     print_ir: bool = false,
-    save_dbg_infos: bool = false,
+    dbg_infos: bool = false,
+
+    printFn: *const fn ([]const u8) void = defaultPrint,
+    // errorFn: *const fn ([]const u8) void = defaultErr,
 };
+
+fn defaultPrint(text: []const u8) void {
+    errdefer @panic("failed to write to stdout");
+
+    var buf: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&buf);
+    const stdout = &stdout_writer.interface;
+
+    try stdout.print("{s}\n", .{text});
+    try stdout.flush();
+}
+
+// fn defaultErr(text: []const u8) void {
+//     errdefer @panic("failed to write to stderr");
+//
+//     var buf: [1024]u8 = undefined;
+//     var stderr_writer = std.fs.File.stderr().writer(&buf);
+//     const stderr = &stderr_writer.interface;
+//
+//     try stderr.print("{s}\n", .{text});
+//     try stderr.flush();
+// }
 
 pub fn new(allocator: Allocator, config: Config) Self {
     var ctx: Self = .{
@@ -59,7 +84,7 @@ pub fn new(allocator: Allocator, config: Config) Self {
     ctx.registerNatives(allocator, @import("../builtins/builtins.zig"));
     ctx.registerNatives(allocator, @import("..//builtins/file.zig"));
 
-    ctx.lex_scope.save = config.save_dbg_infos;
+    ctx.lex_scope.save = config.dbg_infos;
     ctx.lex_scope.initGlobalScope(allocator, &ctx);
 
     // If embedded/Repl, all code is treated as local code to allow impur code

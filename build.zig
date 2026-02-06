@@ -58,6 +58,20 @@ pub fn build(b: *std.Build) !void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
+    // -------
+    //  Embed
+    // -------
+    const embed_mod = b.addModule("embed", .{
+        .target = target,
+        .optimize = optimize,
+        .root_source_file = b.path("src/embed.zig"),
+        .imports = &.{
+            .{ .name = "misc", .module = misc_mod },
+            .{ .name = "options", .module = options.createModule() },
+        },
+    });
+    _ = embed_mod;
+
     // --------
     // For ZLS
     // --------
@@ -103,10 +117,18 @@ pub fn build(b: *std.Build) !void {
     run_tester.step.dependOn(&install_tester.step);
     run_tester.step.dependOn(b.getInstallStep());
 
+    if (b.args) |args| {
+        run_tester.addArgs(args);
+    } else {
+        run_tester.addArg("--stage=all");
+    }
+
     test_step.dependOn(&run_tester.step);
 
-    if (b.args) |args|
-        run_tester.addArgs(args)
-    else
-        run_tester.addArg("--stage=all");
+    // Embedded unit tests
+    var embed_tests = b.addSystemCommand(
+        &.{ "zig", "build", "test" },
+    );
+    embed_tests.setCwd(b.path(b.pathJoin(&.{ "tests", "embed", "zig" })));
+    test_step.dependOn(&embed_tests.step);
 }

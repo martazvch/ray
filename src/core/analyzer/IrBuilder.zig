@@ -96,7 +96,9 @@ pub fn computeLineFromOffsets(self: *Self, source: [:0]const u8) []const usize {
     var offset_index: usize = 0;
 
     for (source, 0..) |c, i| {
-        if (c == '\n') {
+        // If last char, we trigger it anyway, it allows to treat lines not terminated
+        // with a newline, like executing a single line code in embedded mode
+        if (c == '\n' or i == source.len - 1) {
             var prev: usize = 0;
 
             for (offsets[offset_index..]) |offset| {

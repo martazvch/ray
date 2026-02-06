@@ -1,0 +1,16 @@
+.{
+    .name = .ray_enbedded,
+    .version = "0.0.0",
+    .minimum_zig_version = "0.15.2",
+    .dependencies = .{
+        .ray = .{
+            .path = "../../..",
+        },
+    },
+    .fingerprint = 0x7bea46095e3b2275,
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
