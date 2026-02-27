@@ -31,6 +31,7 @@ pub const AnalyzerMsg = union(enum) {
     expect_statement,
     expect_value_found_type: struct { found: []const u8 },
     fail_no_err: struct { found: []const u8 },
+    fail_non_failable,
     fail_outside_fn,
     float_equal,
     fn_expect_value: struct { expect: []const u8 },
@@ -134,6 +135,7 @@ pub const AnalyzerMsg = union(enum) {
             .expect_statement => writer.writeAll("did not expect an expression in this context"),
             .expect_value_found_type => |e| writer.print("expect a value found type '{s}'", .{e.found}),
             .fail_no_err => |e| writer.print("'fail' is used to return errors from functions, found '{s}'", .{e.found}),
+            .fail_non_failable => writer.writeAll("can't fail from a non-failable function"),
             .fail_outside_fn => writer.writeAll("fail outside of a function"),
             .float_equal => writer.writeAll("floating-point values equality is unsafe"),
             .fn_expect_value => |e| writer.print("no value returned from function expecting '{s}'", .{e.expect}),
@@ -226,6 +228,7 @@ pub const AnalyzerMsg = union(enum) {
             .error_with_return => writer.writeAll("this is an error"),
             .expect_statement => writer.writeAll("this is an expression"),
             .expect_value_found_type => writer.writeAll("this is not a runtime value"),
+            .fail_non_failable => writer.writeAll("function doesn't return an error union"),
             .float_equal => writer.writeAll("both sides are 'floats'"),
             .fn_expect_value => writer.writeAll("last expression didn't return a value"),
             .for_iter_non_int_range => writer.writeAll("this range is made of floats"),
@@ -331,6 +334,10 @@ pub const AnalyzerMsg = union(enum) {
             ),
             .expect_value_found_type => writer.writeAll("types can't be used as a runtime value"),
             .fail_no_err => writer.writeAll("if you want to return a value, use 'return' instead"),
+            .fail_non_failable => writer.writeAll(
+                \\'fail' keyword can only be used inside a failable function that defines an error union as
+                \\return type
+            ),
             .fail_outside_fn => writer.writeAll("fail statements are only allow to exit a function's body with an error"),
             .float_equal => writer.writeAll(
                 \\floating-point values are approximations to infinitly precise real numbers. 

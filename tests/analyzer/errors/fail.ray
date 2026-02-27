@@ -1,0 +1,7 @@
+error FooErr { bar }
+
+fn foo() -> bool {
+    fail FooErr.bar
+}
+
+fn main() {}

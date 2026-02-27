@@ -3,6 +3,7 @@ const Writer = @import("std").Io.Writer;
 pub const ParserMsg = union(enum) {
     cant_chain_op,
     default_value_self,
+    empty_error_set,
     enum_lit_non_ident,
     err_type_not_ident,
     expect_brace_end_container: struct { kind: []const u8 },
@@ -74,6 +75,7 @@ pub const ParserMsg = union(enum) {
         try switch (self) {
             .cant_chain_op => writer.writeAll("can't chain this operator"),
             .default_value_self => writer.writeAll("can't assign a default value to 'self'"),
+            .empty_error_set => writer.writeAll("error set can't be empty"),
             .enum_lit_non_ident => writer.writeAll("expect an identifier for enum literal"),
             .err_type_not_ident => writer.writeAll("expect identifier when parsing error types"),
             .expect_arrow_before_fn_type => writer.writeAll("expect arrow '->' before function type"),
@@ -147,6 +149,7 @@ pub const ParserMsg = union(enum) {
     pub fn getHint(self: Self, writer: *Writer) !void {
         try switch (self) {
             .cant_chain_op => writer.writeAll("this one is not allowed"),
+            .empty_error_set => writer.writeAll("there is no fields"),
             .err_type_not_ident => writer.writeAll("this is not an identifier"),
             .expect_brace_end_container,
             .expect_brace_after_match_type,
@@ -217,6 +220,7 @@ pub const ParserMsg = union(enum) {
             .default_value_self => writer.writeAll(
                 "'self' is the only parameter than can't have a default value, as it's value is infered by the compiler",
             ),
+            .empty_error_set => writer.writeAll("error sets must define at least one field, otherwise they can't be used"),
             .enum_lit_non_ident => writer.writeAll("enum literal syntax is: '.enum_tag'"),
             .err_type_not_ident => writer.writeAll("when declaring an error union type, error type names should be an identifier"),
             .expect_arrow_before_fn_type => writer.writeAll("add an arrow '->' between function's arguments list and type"),

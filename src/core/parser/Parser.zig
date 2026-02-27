@@ -261,6 +261,10 @@ fn enumDecl(self: *Self, is_err: bool) Error!Node {
         if (!self.matchAndSkip(.comma)) break;
     }
 
+    if (is_err and tags.items.len == 0) {
+        return self.errAt(name orelse tk, .empty_error_set);
+    }
+
     const functions = try self.containerFnDecls("enum");
 
     return .{ .enum_decl = .{

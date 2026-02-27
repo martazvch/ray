@@ -1259,40 +1259,70 @@ fn closure(self: *Self, expr: *const Ast.FnDecl, ctx: *Context) Result {
 pub fn enumLit(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result {
     const span = self.ast.getSpan(tag);
     const decl = ctx.decl_type orelse return self.err(.enum_lit_no_type, span);
-
-    const enum_ty = decl.as(.@"enum") orelse return self.err(
-        .{ .enum_lit_non_enum = .{ .found = self.typeName(decl) } },
-        span,
-    );
     const tag_name = self.interner.intern(self.ast.toSource(tag));
 
-    const tag_index = enum_ty.tags.getIndex(tag_name) orelse return self.err(
+    const tag_res = try self.tagIndex(decl, tag_name, span) orelse return self.err(
         .{ .enum_unknown_decl = .{ .@"enum" = self.typeName(decl), .field = self.ast.toSource(tag) } },
         span,
     );
 
     // It must exist because type parsed before expression, so if not existing it would have error already
-    const name = self.scope.getSymbolName(decl).?;
+    const name = self.scope.getSymbolName(tag_res.enum_type).?;
     const sym = self.symbolIdentifier(name, span).?;
 
     return .{
-        .type = decl,
-        .ti = .{ .comp_time = enum_ty.tags.get(tag_name).?.is(.void) },
+        .type = tag_res.enum_type,
+        .ti = .{ .comp_time = tag_res.enum_type.@"enum".tags.get(tag_name).?.is(.void) },
         .instr = self.addConstant(
             // TODO: protect the cast
             .{ .enum_instance = .{
                 .sym = .{ .module_index = .toIndex(0), .symbol_index = @intCast(sym.sym.index) },
-                .tag_index = @intCast(tag_index),
+                .tag_index = @intCast(tag_res.index),
             } },
             span.start,
         ),
     };
 }
 
+const TagRes = struct {
+    index: usize,
+    enum_type: *const Type,
+};
+fn tagIndex(self: *Self, ty: *const Type, tag: InternerIdx, span: Span) Error!?TagRes {
+    switch (ty.*) {
+        .@"enum" => |t| return .{
+            .index = t.tags.getIndex(tag) orelse return null,
+            .enum_type = ty,
+        },
+        .@"union" => |*t| return findEnumLitInUnion(t, tag),
+        else => return self.err(
+            .{ .enum_lit_non_enum = .{ .found = self.typeName(ty) } },
+            span,
+        ),
+    }
+}
+
+fn findEnumLitInUnion(ty: *const Type.Union, tag: InternerIdx) ?TagRes {
+    for (ty.types) |t| {
+        const enum_ty = t.as(.@"enum") orelse continue;
+        return .{
+            .index = enum_ty.tags.getIndex(tag) orelse continue,
+            .enum_type = t,
+        };
+    }
+
+    return null;
+}
+
 fn fail(self: *Self, expr: Ast.Fail, ctx: *Context) Result {
     const span = self.ast.getSpan(expr);
     const fn_type = ctx.fn_type orelse return self.err(.fail_outside_fn, span);
     const ty = fn_type.function.return_type;
+
+    if (!ty.is(.error_union)) {
+        return self.err(.fail_non_failable, span);
+    }
+    ctx.decl_type = ty.error_union.err;
 
     var value_res = try self.analyzeExpr(expr.expr, .value, ctx);
 
