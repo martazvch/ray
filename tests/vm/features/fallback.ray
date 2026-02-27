@@ -1,0 +1,15 @@
+error ValueErr { tooSmall }
+
+fn failable(value: int) -> int!ValueErr {
+    if value < 10 {
+        fail .tooSmall
+    }
+
+    return value * 2
+}
+
+fn main() {
+    print failable(25) !! 85
+    print failable(5) !! 85
+}
+

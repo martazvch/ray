@@ -1,0 +1,13 @@
+[Enum declaration Foo]
+
+[Function declaration failable, returns]
+    [Return]
+        [Constant index 3]
+            [Int 5]
+
+[Function declaration main]
+    [Print]
+        [Binop type: bang_bang]
+            [Call symbol 1]
+            [Constant index 4]
+                [Int 85]

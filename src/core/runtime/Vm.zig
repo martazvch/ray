@@ -309,8 +309,20 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
                 self.frame_stack.count -= 1;
                 break;
             },
-            .ge_float => self.stack.push(Value.makeBool(self.stack.pop().float <= self.stack.pop().float)),
-            .ge_int => self.stack.push(Value.makeBool(self.stack.pop().int <= self.stack.pop().int)),
+            .fallback_err => {
+                const fallback = self.stack.pop();
+                const maybe_err = self.stack.peekRef(0);
+
+                switch (maybe_err.*) {
+                    .obj => |o| switch (o.kind) {
+                        .@"error" => maybe_err.* = fallback,
+                        else => {},
+                    },
+                    else => {},
+                }
+            },
+            .ge_float => self.stack.push(.makeBool(self.stack.pop().float <= self.stack.pop().float)),
+            .ge_int => self.stack.push(.makeBool(self.stack.pop().int <= self.stack.pop().int)),
             .get_capt_frame => {
                 // Get a capture in the current call frame, not on stack
                 const index = frame.readByte();

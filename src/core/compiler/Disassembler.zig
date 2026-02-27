@@ -102,6 +102,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .eq_null => self.simpleInstruction(writer, "eq_null", offset),
         .eq_str => self.simpleInstruction(writer, "eq_str", offset),
         .exit_repl => self.simpleInstruction(writer, "exit_repl", offset),
+        .fallback_err => self.simpleInstruction(writer, "fallback_err", offset),
         .ge_float => self.simpleInstruction(writer, "ge_float", offset),
         .ge_int => self.simpleInstruction(writer, "ge_int", offset),
         .get_capt_frame => self.indexInstruction(writer, "get_capt_frame", offset),

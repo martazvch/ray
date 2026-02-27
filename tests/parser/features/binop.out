@@ -166,5 +166,19 @@
             "string": "str"
         },
         "op": "in"
+    },
+    "binop": {
+        "lhs": {
+            "fn_call": {
+                "callee": {
+                    "identifier": "failable"
+                },
+                "args": []
+            }
+        },
+        "rhs": {
+            "int": "65"
+        },
+        "op": "!!"
     }
 }

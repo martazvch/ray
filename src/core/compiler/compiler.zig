@@ -454,6 +454,7 @@ const Compiler = struct {
                 .add_float => .add_float,
                 .add_int => .add_int,
                 .add_str => .str_cat,
+                .bang_bang => .fallback_err,
                 .div_float => .div_float,
                 .div_int => .div_int,
                 .eq_bool => .eq_bool,

@@ -1,0 +1,13 @@
+-- failable --
+load_constant index 3, value 5
+ret
+
+-- main --
+call_sym index 1, arity 0, <function failable>
+load_constant index 4, value 85
+fallback_err
+print
+ret_naked
+
+-- global scope --
+call_sym index 2, arity 0, <function main>

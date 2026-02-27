@@ -896,6 +896,8 @@ const Rule = struct { prec: i8, assoc: Assoc = .left };
 const rules = std.enums.directEnumArrayDefault(Token.Tag, Rule, .{ .prec = -1 }, 0, .{
     .question_mark = .{ .prec = 10 },
 
+    .bang_bang = .{ .prec = 15, .assoc = .none },
+
     .@"and" = .{ .prec = 20 },
     .@"or" = .{ .prec = 20 },
 
@@ -939,11 +941,9 @@ fn parsePrecedenceExpr(self: *Self, prec_min: i8) Error!*Expr {
             return self.errAtCurrent(.cant_chain_op);
         }
 
-        // Here, we can safely use it
-        var expr: *Expr = undefined;
-
         self.advance();
         const op = self.prev(.tag);
+        var expr: *Expr = undefined;
 
         switch (op) {
             // TODO: handle question mark on next line

@@ -1,0 +1,7 @@
+fn nonFailable() -> int {
+    return 5
+}
+
+fn main() {
+    print nonFailable() !! 85
+}

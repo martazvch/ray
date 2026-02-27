@@ -302,6 +302,7 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
                 .greater_equal => ">=",
                 .less => "<",
                 .less_equal => "<=",
+                .bang_bang => "!!",
                 .bang_equal => "!=",
                 .equal_equal => "==",
                 .@"and", .@"or" => |tag| @tagName(tag),

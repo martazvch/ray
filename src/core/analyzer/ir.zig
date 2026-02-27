@@ -77,6 +77,7 @@ pub const Instruction = struct {
             add_int,
             add_str,
             @"and",
+            bang_bang,
             div_float,
             div_int,
             eq_bool,

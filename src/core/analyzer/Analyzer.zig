@@ -1082,6 +1082,14 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
 
                 break :instr .{ if (expr.op == .@"and") .@"and" else .@"or", lhs.instr, rhs.instr, self.ti.getCached(.bool) };
             },
+            .bang_bang => {
+                if (!lhs.type.is(.error_union)) return self.err(
+                    .{ .fallback_err_on_non_err = .{ .found = self.typeName(lhs_type) } },
+                    lhs_span,
+                );
+
+                break :instr .{ .bang_bang, lhs.instr, rhs.instr, self.mergeTypes(&.{ lhs.type, rhs.type }) };
+            },
             else => unreachable,
         }
     };

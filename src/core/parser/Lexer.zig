@@ -73,6 +73,7 @@ pub const Token = struct {
         as,
         at,
         bang,
+        bang_bang,
         bang_equal,
         @"break",
         colon,
@@ -388,6 +389,10 @@ pub fn next(self: *Self) Token {
                     res.tag = .bang_equal;
                     self.index += 1;
                 },
+                '!' => {
+                    res.tag = .bang_bang;
+                    self.index += 1;
+                },
                 else => res.tag = .bang,
             }
         },
@@ -619,14 +624,14 @@ test "numbers" {
 test "tokens" {
     var lexer = Self.init(std.testing.allocator);
     defer lexer.deinit();
-    lexer.lex("(){}.:,=!< ><= >= !=+-*/ += -= *= /= [] | @ % %=");
+    lexer.lex("(){}.:,=!< ><= >= !=+-*/ += -= *= /= [] | @ % %= !!");
 
     const res = [_]Token.Tag{
         .left_paren,    .right_paren, .left_brace, .right_brace,  .dot,          .colon,
         .comma,         .equal,       .bang,       .less,         .greater,      .less_equal,
         .greater_equal, .bang_equal,  .plus,       .minus,        .star,         .slash,
         .plus_equal,    .minus_equal, .star_equal, .slash_equal,  .left_bracket, .right_bracket,
-        .pipe,          .at,          .modulo,     .modulo_equal,
+        .pipe,          .at,          .modulo,     .modulo_equal, .bang_bang,
     };
 
     for (0..res.len) |i| {

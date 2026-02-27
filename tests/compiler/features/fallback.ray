@@ -1,0 +1,10 @@
+error Foo { bar }
+
+fn failable() -> int!Foo {
+    return 5
+}
+
+fn main() {
+    print failable() !! 85
+}
+
