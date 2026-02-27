@@ -123,6 +123,7 @@ pub const Token = struct {
         plus_equal,
         print,
         question_mark,
+        question_mark_question_mark,
         @"return",
         right_brace,
         right_bracket,
@@ -163,6 +164,7 @@ const State = enum {
     int,
     invalid,
     less,
+    question_mark,
     slash,
     start,
     string,
@@ -312,10 +314,7 @@ pub fn next(self: *Self) Token {
                 '!' => continue :state .bang,
                 '=' => continue :state .equal,
                 '.' => continue :state .dot,
-                '?' => {
-                    res.tag = .question_mark;
-                    self.index += 1;
-                },
+                '?' => continue :state .question_mark,
                 '"' => {
                     res.tag = .string;
                     continue :state .string;
@@ -394,6 +393,17 @@ pub fn next(self: *Self) Token {
                     self.index += 1;
                 },
                 else => res.tag = .bang,
+            }
+        },
+        .question_mark => {
+            self.index += 1;
+
+            switch (self.source[self.index]) {
+                '?' => {
+                    res.tag = .question_mark_question_mark;
+                    self.index += 1;
+                },
+                else => res.tag = .question_mark,
             }
         },
         .comment => {
@@ -624,14 +634,15 @@ test "numbers" {
 test "tokens" {
     var lexer = Self.init(std.testing.allocator);
     defer lexer.deinit();
-    lexer.lex("(){}.:,=!< ><= >= !=+-*/ += -= *= /= [] | @ % %= !!");
+    lexer.lex("(){}.:,=!< ><= >= !=+-*/ += -= *= /= [] | @ % %= !! ? ??");
 
     const res = [_]Token.Tag{
-        .left_paren,    .right_paren, .left_brace, .right_brace,  .dot,          .colon,
-        .comma,         .equal,       .bang,       .less,         .greater,      .less_equal,
-        .greater_equal, .bang_equal,  .plus,       .minus,        .star,         .slash,
-        .plus_equal,    .minus_equal, .star_equal, .slash_equal,  .left_bracket, .right_bracket,
-        .pipe,          .at,          .modulo,     .modulo_equal, .bang_bang,
+        .left_paren,                  .right_paren, .left_brace, .right_brace,  .dot,          .colon,
+        .comma,                       .equal,       .bang,       .less,         .greater,      .less_equal,
+        .greater_equal,               .bang_equal,  .plus,       .minus,        .star,         .slash,
+        .plus_equal,                  .minus_equal, .star_equal, .slash_equal,  .left_bracket, .right_bracket,
+        .pipe,                        .at,          .modulo,     .modulo_equal, .bang_bang,    .question_mark,
+        .question_mark_question_mark,
     };
 
     for (0..res.len) |i| {

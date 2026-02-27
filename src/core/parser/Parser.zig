@@ -897,6 +897,7 @@ const rules = std.enums.directEnumArrayDefault(Token.Tag, Rule, .{ .prec = -1 },
     .question_mark = .{ .prec = 10 },
 
     .bang_bang = .{ .prec = 15, .assoc = .none },
+    .question_mark_question_mark = .{ .prec = 15, .assoc = .none },
 
     .@"and" = .{ .prec = 20 },
     .@"or" = .{ .prec = 20 },

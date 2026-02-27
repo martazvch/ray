@@ -4,7 +4,12 @@ fn failable() -> int!Foo {
     return 5
 }
 
+fn optional() -> ?int {
+    return 5
+}
+
 fn main() {
     print failable() !! 85
+    print optional() ?? 85
 }
 

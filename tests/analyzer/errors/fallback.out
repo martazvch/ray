@@ -1,1 +1,2 @@
 fallback_err_on_non_err, int
+fallback_opt_on_non_opt, int

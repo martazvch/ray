@@ -309,6 +309,7 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
                 .plus => "+",
                 .modulo => "%",
                 .minus => "-",
+                .question_mark_question_mark => "??",
                 .star => "*",
                 .slash => "/",
                 else => unreachable,

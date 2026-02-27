@@ -2,12 +2,22 @@
 load_constant index 3, value 5
 ret
 
+-- optional --
+load_constant index 3, value 5
+ret
+
 -- main --
 call_sym index 1, arity 0, <function failable>
 load_constant index 4, value 85
 fallback_err
 print
+
+call_sym index 2, arity 0, <function optional>
+load_constant index 4, value 85
+fallback_opt
+print
+
 ret_naked
 
 -- global scope --
-call_sym index 2, arity 0, <function main>
+call_sym index 3, arity 0, <function main>

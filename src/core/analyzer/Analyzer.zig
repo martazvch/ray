@@ -1090,6 +1090,14 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
 
                 break :instr .{ .bang_bang, lhs.instr, rhs.instr, self.mergeTypes(&.{ lhs.type, rhs.type }) };
             },
+            .question_mark_question_mark => {
+                if (!lhs.type.is(.optional)) return self.err(
+                    .{ .fallback_opt_on_non_opt = .{ .found = self.typeName(lhs_type) } },
+                    lhs_span,
+                );
+
+                break :instr .{ .question_mark_question_mark, lhs.instr, rhs.instr, self.mergeTypes(&.{ lhs.type, rhs.type }) };
+            },
             else => unreachable,
         }
     };

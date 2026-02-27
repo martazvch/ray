@@ -478,6 +478,7 @@ const Compiler = struct {
                 .ne_float => .ne_float,
                 .ne_int => .ne_int,
                 .ne_str => .ne_str,
+                .question_mark_question_mark => .fallback_opt,
                 .sub_float => .sub_float,
                 .sub_int => .sub_int,
                 else => unreachable,

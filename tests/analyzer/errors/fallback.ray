@@ -4,4 +4,5 @@ fn nonFailable() -> int {
 
 fn main() {
     print nonFailable() !! 85
+    print nonFailable() ?? 85
 }

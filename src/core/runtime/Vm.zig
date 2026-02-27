@@ -321,6 +321,13 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
                     else => {},
                 }
             },
+            .fallback_opt => {
+                const fallback = self.stack.pop();
+                const maybe_opt = self.stack.peekRef(0);
+                if (maybe_opt.* == .null) {
+                    maybe_opt.* = fallback;
+                }
+            },
             .ge_float => self.stack.push(.makeBool(self.stack.pop().float <= self.stack.pop().float)),
             .ge_int => self.stack.push(.makeBool(self.stack.pop().int <= self.stack.pop().int)),
             .get_capt_frame => {

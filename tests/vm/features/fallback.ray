@@ -8,8 +8,19 @@ fn failable(value: int) -> int!ValueErr {
     return value * 2
 }
 
+fn optional(value: int) -> ?int {
+    if value < 10 {
+        return null
+    }
+
+    return value * 2
+}
+
 fn main() {
     print failable(25) !! 85
     print failable(5) !! 85
+
+    print optional(25) ?? 42
+    print optional(5) ?? 42
 }
 

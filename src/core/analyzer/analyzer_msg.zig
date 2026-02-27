@@ -31,6 +31,7 @@ pub const AnalyzerMsg = union(enum) {
     expect_statement,
     expect_value_found_type: struct { found: []const u8 },
     fallback_err_on_non_err: struct { found: []const u8 },
+    fallback_opt_on_non_opt: struct { found: []const u8 },
     fail_no_err: struct { found: []const u8 },
     fail_non_failable,
     fail_outside_fn,
@@ -136,6 +137,7 @@ pub const AnalyzerMsg = union(enum) {
             .expect_statement => writer.writeAll("did not expect an expression in this context"),
             .expect_value_found_type => |e| writer.print("expect a value found type '{s}'", .{e.found}),
             .fallback_err_on_non_err => |e| writer.print("expect an error union, found '{s}", .{e.found}),
+            .fallback_opt_on_non_opt => |e| writer.print("expect an optional type, found '{s}", .{e.found}),
             .fail_no_err => |e| writer.print("'fail' is used to return errors from functions, found '{s}'", .{e.found}),
             .fail_non_failable => writer.writeAll("can't fail from a non-failable function"),
             .fail_outside_fn => writer.writeAll("fail outside of a function"),
@@ -231,6 +233,7 @@ pub const AnalyzerMsg = union(enum) {
             .expect_statement => writer.writeAll("this is an expression"),
             .expect_value_found_type => writer.writeAll("this is not a runtime value"),
             .fallback_err_on_non_err => writer.writeAll("this is not an error union"),
+            .fallback_opt_on_non_opt => writer.writeAll("this is not an optional type"),
             .fail_non_failable => writer.writeAll("function doesn't return an error union"),
             .float_equal => writer.writeAll("both sides are 'floats'"),
             .fn_expect_value => writer.writeAll("last expression didn't return a value"),
@@ -338,6 +341,10 @@ pub const AnalyzerMsg = union(enum) {
             .expect_value_found_type => writer.writeAll("types can't be used as a runtime value"),
             .fallback_err_on_non_err => writer.writeAll(
                 \\fallback operator '!!' is meant to provide a value in case of an error union value is an error
+                \\It can't be used with any other type
+            ),
+            .fallback_opt_on_non_opt => writer.writeAll(
+                \\fallback operator '??' is meant to provide a value in case of an optional type being null
                 \\It can't be used with any other type
             ),
             .fail_no_err => writer.writeAll("if you want to return a value, use 'return' instead"),

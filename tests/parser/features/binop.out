@@ -180,5 +180,19 @@
             "int": "65"
         },
         "op": "!!"
+    },
+    "binop": {
+        "lhs": {
+            "fn_call": {
+                "callee": {
+                    "identifier": "nullable"
+                },
+                "args": []
+            }
+        },
+        "rhs": {
+            "int": "65"
+        },
+        "op": "??"
     }
 }

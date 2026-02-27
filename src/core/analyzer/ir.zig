@@ -106,6 +106,7 @@ pub const Instruction = struct {
             ne_str,
             ne_tag,
             @"or",
+            question_mark_question_mark,
             sub_float,
             sub_int,
         };
