@@ -49,7 +49,6 @@ const Kind = enum {
             Closure => .closure,
             Enum => .@"enum",
             EnumInstance => .enum_instance,
-            Error => .@"error",
             Function => .function,
             Instance => .instance,
             Iterator => .iterator,
@@ -110,8 +109,7 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
         .box => self.as(Box).deinit(vm),
         .closure => self.as(Closure).deinit(vm),
         .@"enum" => self.as(Enum).deinit(vm),
-        .enum_instance => self.as(EnumInstance).deinit(vm),
-        .@"error" => self.as(Error).deinit(vm),
+        .enum_instance, .@"error" => self.as(EnumInstance).deinit(vm),
         .function => {
             const function = self.as(Function);
             function.deinit(vm);
@@ -172,13 +170,13 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
             }
         },
         .@"enum" => try writer.print("<enum {s}>", .{self.as(Enum).name}),
-        .enum_instance => {
+        .enum_instance, .@"error" => {
             const instance = self.as(EnumInstance);
-            try writer.print("<enum {s}, tag {}>", .{ instance.parent.name, instance.tag_id });
-        },
-        .@"error" => {
-            const instance = self.as(Error);
-            try writer.print("<error {s}, tag {}>", .{ instance.parent.name, instance.tag_id });
+            try writer.print("<{s} {s}.{s}>", .{
+                if (instance.parent.is_err) "error" else "enum",
+                instance.parent.name,
+                instance.parent.tags[instance.tag_id],
+            });
         },
         .function => {
             const function = self.as(Function);
@@ -200,7 +198,6 @@ pub fn log(self: *Obj) void {
         .closure => std.debug.print("<closure {s}>", .{self.as(Closure).function.name}),
         .@"enum" => std.debug.print("<enum {s}>", .{self.as(Enum).name}),
         .enum_instance => std.debug.print("<enum instance {s}>", .{self.as(EnumInstance).parent.name}),
-        .@"error" => std.debug.print("<error instance {s}>", .{self.as(Error).parent.name}),
         .function => std.debug.print("<fn {s}>", .{self.as(Function).name}),
         .instance => std.debug.print("<instance of {s}>", .{self.as(Instance).parent.name}),
         .iterator => std.debug.print("<iterator>", .{}),
@@ -643,15 +640,16 @@ pub const Enum = struct {
     obj: Obj,
     name: []const u8,
     is_err: bool,
-    // tags: []const []const u8,
+    tags: []const []const u8,
 
     const Self = @This();
 
-    pub fn create(allocator: Allocator, name: []const u8, is_err: bool) *Self {
+    pub fn create(allocator: Allocator, name: []const u8, tags: []const []const u8, is_err: bool) *Self {
         const obj = Obj.allocateComptime(allocator, Self, undefined);
         obj.name = allocator.dupe(u8, name) catch oom();
         obj.is_err = is_err;
-        // obj.tags = tags;
+        obj.tags = tags;
+        obj.obj.kind = if (is_err) .@"error" else .enum_instance;
 
         return obj;
     }
@@ -685,38 +683,7 @@ pub const EnumInstance = struct {
         obj.parent = parent;
         obj.tag_id = tag_id;
         obj.payload = payload;
-
         obj.obj.kind = if (parent.is_err) .@"error" else .enum_instance;
-
-        return obj;
-    }
-
-    pub fn asObj(self: *Self) *Obj {
-        return &self.obj;
-    }
-
-    pub fn deinit(self: *Self, vm: *Vm) void {
-        vm.gc_alloc.destroy(self);
-    }
-};
-
-pub const Error = struct {
-    obj: Obj,
-    parent: *const Enum,
-    tag_id: u8,
-    payload: Value,
-
-    const Self = @This();
-
-    pub fn create(allocator: Allocator, parent: *const Enum, tag_id: u8, payload: Value) *Self {
-        const obj = Obj.allocateComptime(allocator, Self, undefined);
-        obj.parent = parent;
-        obj.tag_id = tag_id;
-        obj.payload = payload;
-
-        if (parent.is_err) {
-            obj.kind = .@"error";
-        }
 
         return obj;
     }

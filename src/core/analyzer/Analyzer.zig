@@ -312,12 +312,13 @@ fn enumDeclaration(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtRe
     try self.openContainer(name_tk);
     defer self.closeContainer();
 
-    try self.enumTags(node.tags, ty, ctx);
+    const tags = try self.enumTags(node.tags, ty, ctx);
     const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
 
     return self.irb.addInstr(
         .{ .enum_decl = .{
             .name = name,
+            .tags = tags,
             .sym_index = sym.index,
             .functions = funcs,
             .is_err = node.is_err,
@@ -326,8 +327,9 @@ fn enumDeclaration(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtRe
     );
 }
 
-fn enumTags(self: *Self, tags: []const Ast.EnumDecl.Tag, ty: *Type.Enum, ctx: *Context) Error!void {
+fn enumTags(self: *Self, tags: []const Ast.EnumDecl.Tag, ty: *Type.Enum, ctx: *Context) Error![]const []const u8 {
     ty.tags.ensureTotalCapacity(self.allocator, @intCast(tags.len)) catch oom();
+    var names = ArrayList([]const u8).initCapacity(self.allocator, @intCast(tags.len)) catch oom();
 
     for (tags) |tag| {
         const tag_res = try self.enumTag(tag, ctx);
@@ -341,7 +343,10 @@ fn enumTags(self: *Self, tags: []const Ast.EnumDecl.Tag, ty: *Type.Enum, ctx: *C
         } else {
             gop.value_ptr.* = tag_res.ty;
         }
+        names.appendAssumeCapacity(self.allocator.dupe(u8, self.ast.toSource(tag.name)) catch oom());
     }
+
+    return names.toOwnedSlice(self.allocator) catch oom();
 }
 
 fn enumTag(self: *Self, tag: Ast.EnumDecl.Tag, ctx: *const Context) Error!struct { name: InternerIdx, ty: *const Type } {
@@ -874,7 +879,7 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
         .string => |e| self.string(e),
         .struct_literal => |*e| self.structLiteral(e, ctx),
         .ternary => |*e| self.ternary(e, ctx),
-        .trap => |e| self.trap(e, ctx),
+        .trap => |e| self.trap(e, if (expect.expects()) .value else .none, ctx),
         .unary => |*e| self.unary(e, ctx),
     };
 
@@ -895,7 +900,7 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
         .maybe => {},
         .symbol => if (!res.ti.is_sym) return error.NotSymbol,
         // Either used by blocks or asked by top level statement but blocks consume `.none`
-        .none => return self.err(.expect_statement, self.ast.getSpan(expr)),
+        .none => if (!res.type.is(.void)) return self.err(.expect_statement, self.ast.getSpan(expr)),
     }
 
     if (self.scope.isGlobal() and !res.ti.comp_time) {
@@ -2089,6 +2094,10 @@ fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Resul
             var matcher = matchers.String.init();
             break :ana .{ .string, matcher.matcher() };
         },
+        .@"union" => |t| {
+            std.log.debug("Found: {any}", .{t.types});
+            @panic("Match on union is not implemented yet");
+        },
         else => |t| {
             std.log.debug("Found: {any}", .{t});
             @panic("Match on that type is not implemented yet");
@@ -2363,7 +2372,7 @@ fn ternary(self: *Self, expr: *const Ast.Ternary, ctx: *Context) Result {
     };
 }
 
-fn trap(self: *Self, expr: Ast.Trap, ctx: *Context) Result {
+fn trap(self: *Self, expr: Ast.Trap, expect: ExprResKind, ctx: *Context) Result {
     const lhs = try self.analyzeExpr(expr.lhs, .value, ctx);
     const err_type = lhs.type.as(.error_union) orelse return self.err(
         .{ .trap_on_non_error = .{ .found = self.typeName(lhs.type) } },
@@ -2371,26 +2380,33 @@ fn trap(self: *Self, expr: Ast.Trap, ctx: *Context) Result {
     );
 
     const rhs = switch (expr.rhs) {
-        .match => |m| try self.trapMatch(m, err_type, ctx),
-        .binding => |b| try self.trapIdent(b, err_type, ctx),
+        .match => |m| try self.trapMatch(m, err_type, expect, ctx),
+        .binding => |b| try self.trapIdent(b, err_type, expect, ctx),
     };
 
     return .{
         .type = rhs.type,
-        .instr = self.irb.addInstr(.{ .trap = .{ .lhs = lhs.instr, .rhs = rhs.instr } }, self.ast.getSpan(expr).start),
+        .instr = self.irb.addInstr(
+            .{ .trap = .{
+                .lhs = lhs.instr,
+                .rhs = rhs.instr,
+                .is_match = expr.rhs == .match,
+            } },
+            self.ast.getSpan(expr).start,
+        ),
     };
 }
 
-fn trapIdent(self: *Self, binding: Ast.Trap.Binding, err_type: Type.ErrorUnion, ctx: *Context) Result {
+fn trapIdent(self: *Self, binding: Ast.Trap.Binding, err_type: Type.ErrorUnion, expect: ExprResKind, ctx: *Context) Result {
     if (binding.token) |token| {
         const err_name = try self.internIfNotInCurrentScope(token);
         const binding_span = self.ast.getSpan(token);
         _ = try self.forwardDeclareVariable(err_name, err_type.err, false, binding_span);
     }
-    return self.analyzeExpr(binding.body, .value, ctx);
+    return self.analyzeExpr(binding.body, expect, ctx);
 }
 
-fn trapMatch(self: *Self, expr: *Expr, err_type: Type.ErrorUnion, ctx: *Context) Result {
+fn trapMatch(self: *Self, expr: *Expr, err_type: Type.ErrorUnion, expect: ExprResKind, ctx: *Context) Result {
     const match_expr = expr.match.expr;
 
     if (match_expr.* != .identifier) {
@@ -2405,7 +2421,7 @@ fn trapMatch(self: *Self, expr: *Expr, err_type: Type.ErrorUnion, ctx: *Context)
     defer _ = self.scope.close();
 
     _ = try self.declareVariable(err_name, err_type.err, false, true, true, false, null, binding_span);
-    return self.analyzeExpr(expr, .value, ctx);
+    return self.analyzeExpr(expr, expect, ctx);
 }
 
 fn unary(self: *Self, expr: *const Ast.Unary, ctx: *Context) Result {
@@ -2440,119 +2456,6 @@ fn unary(self: *Self, expr: *const Ast.Unary, ctx: *Context) Result {
     };
 }
 
-fn when(self: *Self, expr: *const Ast.When, expect: ExprResKind, ctx: *Context) Result {
-    const value = try self.analyzeExpr(expr.expr, .value, ctx);
-
-    const value_type = value.type.as(.@"union") orelse return self.err(
-        .{ .when_with_non_union = .{ .found = self.typeName(value.type) } },
-        self.ast.getSpan(expr.expr),
-    );
-    var proto = value_type.proto(self.allocator);
-
-    const types, const arms = try self.whenArms(expr.arms, expr.alias, value.type, &proto, expect, ctx);
-    try self.whenValidation(&proto, self.ast.getSpan(expr.kw));
-
-    return .{
-        .type = self.mergeTypes(types),
-        .instr = self.irb.addInstr(
-            .{ .when = .{ .expr = value.instr, .arms = arms, .is_expr = expect.expects() } },
-            self.ast.getSpan(expr).start,
-        ),
-    };
-}
-
-const WhenArmsRes = struct { []const *const Type, []const Instr.When.Arm };
-
-fn whenArms(
-    self: *Self,
-    arm_exprs: []const Ast.When.Arm,
-    glob_alias: ?Ast.TokenIndex,
-    ty: *const Type,
-    proto: *Type.Union.Proto,
-    expect: ExprResKind,
-    ctx: *Context,
-) Error!WhenArmsRes {
-    var had_err = false;
-    var types: Set(*const Type) = .empty;
-    var arms = ArrayList(Instr.When.Arm).initCapacity(self.allocator, arm_exprs.len) catch oom();
-
-    for (arm_exprs) |*arm| {
-        const arm_span = self.ast.getSpan(arm.type);
-        const arm_ty = try self.checkAndGetType(arm.type, ctx);
-
-        const resolved_ty = self.findTypeInProto(proto, ty, arm_ty, arm_span) catch continue;
-
-        // Implicit scope for aliases
-        self.scope.open(self.allocator, null, false, expect == .value);
-        defer _ = self.scope.close();
-
-        alias: {
-            const alias = glob_alias orelse break :alias;
-            const binding = try self.internIfNotInCurrentScope(alias);
-            _ = try self.declareVariable(binding, resolved_ty, false, true, true, false, null, self.ast.getSpan(alias));
-        }
-
-        const body = self.analyzeNode(&arm.body, expect, ctx) catch {
-            had_err = true;
-            continue;
-        };
-
-        types.add(self.allocator, body.type) catch oom();
-        arms.appendAssumeCapacity(.{ .type_id = self.ti.typeId(resolved_ty), .body = body.instr });
-    }
-
-    return if (had_err) error.Err else .{ types.toOwned(), arms.toOwnedSlice(self.allocator) catch oom() };
-}
-
-fn findTypeInProto(self: *Self, proto: *Type.Union.Proto, union_ty: *const Type, ty: *const Type, span: Span) Error!*const Type {
-    const gop = proto.getEntry(ty) orelse gop: {
-        // We might not be able to find the entry if we're comparing anonymus function with a declared one
-        if (ty.is(.function)) {
-            var it = proto.iterator();
-            while (it.next()) |entry| {
-                if (entry.value_ptr.*) continue;
-
-                const fn_ty = entry.key_ptr.*;
-                if (fn_ty.* == .function) {
-                    _ = self.checkFunctionEq(fn_ty, ty) catch continue;
-                    break :gop entry;
-                }
-            }
-        }
-
-        return self.err(
-            .{ .when_arm_not_in_union = .{ .found = self.typeName(ty), .expect = self.typeName(union_ty) } },
-            span,
-        );
-    };
-
-    if (gop.value_ptr.*) {
-        return self.err(.when_arm_duplicate, span);
-    }
-    gop.value_ptr.* = true;
-
-    return gop.key_ptr.*;
-}
-
-fn whenValidation(self: *Self, proto: *const Type.Union.Proto, span: Span) Error!void {
-    var missing: ArrayList(u8) = .empty;
-
-    var it = proto.iterator();
-    while (it.next()) |entry| {
-        if (!entry.value_ptr.*) {
-            if (missing.items.len > 0) {
-                missing.appendSlice(self.allocator, ", ") catch oom();
-            }
-            missing.appendSlice(self.allocator, self.typeName(entry.key_ptr.*)) catch oom();
-        }
-    }
-
-    if (missing.items.len > 0) return self.err(
-        .{ .match_non_exhaustive = .{ .kind = "when", .missing = missing.toOwnedSlice(self.allocator) catch oom() } },
-        span,
-    );
-}
-
 /// Checks if identifier name is already declared, otherwise interns it and returns the key
 fn internIfNotInCurrentScope(self: *Self, token: usize) Error!usize {
     const name = self.interner.intern(self.ast.toSource(token));
@@ -2577,19 +2480,31 @@ fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) Error
                 return self.err(.void_array, self.ast.getSpan(arr_type.child));
             }
 
-            return self.ti.intern(.{ .array = .{ .child = child } });
+            return self.ti.intern(.{ .array = .{
+                .child = child,
+            } });
         },
         .error_union => |err_union| {
             const ok = try self.checkAndGetType(err_union.ok, ctx);
 
-            var errs = ArrayList(*const Type).initCapacity(self.allocator, err_union.errs.len) catch oom();
-            for (err_union.errs) |e| {
-                errs.appendAssumeCapacity(try self.checkAndGetType(&.{ .scalar = e }, ctx));
-            }
+            const err_type = err: {
+                var errs = ArrayList(*const Type).initCapacity(self.allocator, err_union.errs.len) catch oom();
+                for (err_union.errs) |e| {
+                    errs.appendAssumeCapacity(try self.checkAndGetType(&.{ .scalar = e }, ctx));
+                }
+
+                if (err_union.errs.len > 1) {
+                    break :err self.ti.intern(.{ .@"union" = .{
+                        .types = errs.toOwnedSlice(self.allocator) catch oom(),
+                    } });
+                } else {
+                    break :err errs.items[0];
+                }
+            };
 
             return self.ti.intern(.{ .error_union = .{
                 .ok = ok,
-                .err = self.ti.intern(.{ .@"union" = .{ .types = errs.toOwnedSlice(self.allocator) catch oom() } }),
+                .err = err_type,
             } });
         },
         .fields => |fields| {

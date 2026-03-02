@@ -1,5 +1,5 @@
-<enum Foo, tag 0>
-<enum Bar, tag 1>
+<enum Foo.a>
+<enum Bar.b>
 true
 true
 false

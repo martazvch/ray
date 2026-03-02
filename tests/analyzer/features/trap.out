@@ -1,0 +1,71 @@
+[Enum declaration ValueErr]
+[Function declaration failable, returns]
+    [If]
+    - condition:
+        [Binop type: lt_int]
+            [Variable index: 0, scope: local]
+            [Constant index 3]
+                [Int 10]
+    - then:
+        [Block pop count: 0, is_expr: false]
+            [Pop]
+                [Return]
+                    [Constant index 0]
+                        [Bool true]
+    [Fail]
+        [Constant index 4]
+            [Enum create]
+                - enum
+                [Load symbol 0 module 0]
+                - tag
+                0
+[Function declaration main]
+    [Print]
+        [Trap]
+        - lhs
+            [Call symbol 1]
+                - args
+                [Constant index 5]
+                    [Int 15]
+        - rhs
+            [Block pop count: 1, is_expr: true]
+                [Print]
+                    [Variable index: 0, scope: local]
+                [Break depth: 0, pop: 1]
+                    [Constant index 6]
+                        [Int 88]
+    [Print]
+        [Trap]
+        - lhs
+            [Call symbol 1]
+                - args
+                [Constant index 5]
+                    [Int 15]
+        - rhs
+            [Block pop count: 1, is_expr: false]
+                [Return]
+    [Print]
+        [Trap]
+        - lhs
+            [Call symbol 1]
+                - args
+                [Constant index 5]
+                    [Int 15]
+        - rhs
+            [Match enum]
+            - expression:
+                [Variable index: 0, scope: local]
+            - arms:
+                - expr:
+                    [Constant index 4]
+                        [Enum create]
+                            - enum
+                            [Load symbol 0 module 0]
+                            - tag
+                            0
+                - body:
+                    [Constant index 7]
+                        [Int 1]
+                - wildcard:
+                    [Constant index 8]
+                        [Int 4]

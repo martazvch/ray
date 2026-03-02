@@ -150,6 +150,7 @@ pub const Instruction = struct {
     };
     pub const EnumDecl = struct {
         name: usize,
+        tags: []const []const u8,
         sym_index: SymbolIndex,
         functions: []const Index,
         is_err: bool,
@@ -238,6 +239,7 @@ pub const Instruction = struct {
     pub const Trap = struct {
         lhs: Index,
         rhs: Index,
+        is_match: bool,
     };
     pub const Unary = struct {
         op: Op,

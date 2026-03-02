@@ -748,6 +748,7 @@ const Compiler = struct {
         const enum_val = Obj.Enum.create(
             self.manager.allocator,
             self.manager.state.interner.getKey(data.name).?,
+            data.tags,
             data.is_err,
         );
         self.addSymbol(data.sym_index, Value.makeObj(enum_val.asObj()));
@@ -1038,6 +1039,13 @@ const Compiler = struct {
         const ok_jump = self.emitJump(.jump_no_err);
         try self.compileInstr(data.rhs);
         try self.patchJump(ok_jump);
+
+        // If we use match directly on return value, it sits on top of stack, so we have to remove
+        // it manually while leaving the result of the match on top of stack
+        if (data.is_match) {
+            // If the match didn't return any value, just pop from top, otherwise swap match res
+            self.writeOp(if (self.at(data.rhs).match.is_expr) .swap_pop else .pop);
+        }
     }
 
     fn unary(self: *Self, data: *const Instruction.Unary) Error!void {

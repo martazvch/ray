@@ -1,0 +1,33 @@
+error ValueErr {
+    tooSmall,
+    tooBig,
+}
+
+fn failable(value: int) -> bool!ValueErr {
+    if value < 10 {
+        fail .tooSmall
+    } else if value > 30 {
+        fail .tooBig
+    }
+
+    return true
+}
+
+fn main() {
+    print failable(5) trap e {
+        print e
+        break 88
+    }
+    print failable(3) trap match e {
+        .tooSmall => 1
+        _ => 4
+    }
+    print failable(33) trap match e {
+        .tooSmall => 1
+        _ => 4
+    }
+    print failable(33) trap e {
+        return
+    }
+}
+

@@ -1,6 +1,6 @@
-<enum Marker, tag 0>
+<enum Marker.cross>
 x
-<enum Marker, tag 1>
+<enum Marker.circle>
 o
 o
 x
