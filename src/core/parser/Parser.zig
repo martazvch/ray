@@ -1345,17 +1345,15 @@ fn matchTypeArm(self: *Self) Error!Ast.Match.TypeArm {
 
     const body: Ast.Match.TypeArm.BodyKind = if (self.match(.arrow_big))
         .{ .value = try self.statement() }
-    else if (self.match(.colon))
+    else if (self.match(.left_brace))
         try self.matchTypeSubMatch()
     else
-        return self.errAtCurrent(.expect_arrow_colon_before_arm_body);
+        return self.errAtCurrent(.expect_arrow_or_brace_before_arm_body);
 
     return .{ .type = ty, .body = body };
 }
 
 fn matchTypeSubMatch(self: *Self) Error!Ast.Match.TypeArm.BodyKind {
-    self.skipNewLines();
-    try self.expectOrErrAtPrev(.left_brace, .expect_brace_before_match_type_arm);
     self.skipNewLines();
 
     const arms = try self.matchValue();
