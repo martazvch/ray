@@ -6,10 +6,10 @@ expect_expr, }
 
 expect_new_line_pm_arm
 
-expect_brace_before_match_type_arm
+expect_arrow_or_brace_before_arm_body
 expect_expr, }
 
-expect_arrow_colon_before_arm_body
+expect_arrow_or_brace_before_arm_body
 expect_expr, }
 
 match_wildcard_not_last

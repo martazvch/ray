@@ -12,12 +12,11 @@ pub const ParserMsg = union(enum) {
     expect_brace_after_while_cond,
     expect_arrow_before_arm_body,
     expect_arrow_before_fn_type,
-    expect_arrow_colon_before_arm_body,
+    expect_arrow_or_brace_before_arm_body,
     expect_brace_before_enum_body,
     expect_brace_before_fn_body,
     expect_brace_before_for_body,
     expect_brace_before_match_body,
-    expect_brace_before_match_type_arm,
     expect_brace_before_struct_body,
     expect_block_or_do: struct { what: []const u8 },
     expect_closing_pipe,
@@ -80,7 +79,7 @@ pub const ParserMsg = union(enum) {
             .err_type_not_ident => writer.writeAll("expect identifier when parsing error types"),
             .expect_arrow_before_fn_type => writer.writeAll("expect arrow '->' before function type"),
             .expect_arrow_before_arm_body => writer.writeAll("expect arrow '=>' before pattern matching arm's body"),
-            .expect_arrow_colon_before_arm_body => writer.writeAll("expect arrow '=>' or ':' before pattern matching arm's body"),
+            .expect_arrow_or_brace_before_arm_body => writer.writeAll("expect arrow '=>' or '{' before pattern matching arm's body"),
             .expect_block_or_do => |e| writer.print("expect a block or 'do' after '{s}' condition", .{e.what}),
             .expect_brace_end_container => |e| writer.print("expect closing brace after {s}'s body", .{e.kind}),
             .expect_brace_after_match_type => writer.writeAll("expect closing brace after arm's body"),
@@ -91,7 +90,6 @@ pub const ParserMsg = union(enum) {
             .expect_brace_before_for_body => writer.writeAll("expect opening brace before for's body"),
             .expect_brace_before_struct_body => writer.writeAll("expect opening brace before structure's body"),
             .expect_brace_before_match_body => writer.writeAll("expect opening brace before pattern matching body"),
-            .expect_brace_before_match_type_arm => writer.writeAll("expect opening brace before pattern matching arm"),
             .expect_closing_pipe => writer.writeAll("expect closing '|' after closure's parameters list"),
             .expect_colon_before_type => writer.writeAll("invalid variable type declaration"),
             .expect_comma_array_values => writer.writeAll("expect a ',' between array values"),
@@ -157,12 +155,11 @@ pub const ParserMsg = union(enum) {
             .expect_brace_after_while_cond,
             .expect_arrow_before_fn_type,
             .expect_arrow_before_arm_body,
-            .expect_arrow_colon_before_arm_body,
+            .expect_arrow_or_brace_before_arm_body,
             .expect_brace_before_enum_body,
             .expect_brace_before_fn_body,
             .expect_brace_before_for_body,
             .expect_brace_before_match_body,
-            .expect_brace_before_match_type_arm,
             .expect_brace_before_struct_body,
             .expect_block_or_do,
             .expect_closing_pipe,
@@ -227,11 +224,11 @@ pub const ParserMsg = union(enum) {
             .expect_arrow_before_arm_body => writer.writeAll(
                 "Syntax is: <pattern> => <body> with optional binding like <pattern> :: binding => <body>",
             ),
-            .expect_arrow_colon_before_arm_body, .expect_brace_after_match_type, .expect_brace_before_match_type_arm => writer.writeAll(
+            .expect_arrow_or_brace_before_arm_body, .expect_brace_after_match_type => writer.writeAll(
                 \\Pattern matching on types with 'is' requires one of the two syntaxes:
-                \\  Arm as a statement:         <type> => <body> with optional binding like <pattern> :: binding => <body>
-                \\  Arm as a sub pattern match: <type>: {
-                \\                                  <pattern> => <body>,
+                \\  Arm as a statement:         <type> => <expr> with optional binding like <pattern> :: binding => <body>
+                \\  Arm as a sub pattern match: <type> {
+                \\                                  <pattern> => <expr>,
                 \\                              }
             ),
             .expect_brace_before_enum_body,

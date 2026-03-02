@@ -1087,11 +1087,11 @@ let arr = [1, 4.5, false] // type is infered as: [int|float|bool]
 
 ### Usage
 
-To use a value with an inline union type, you pattern match on the active branch by its type:
+To use a value with an inline union type, you pattern match on its type by specifying `is`. You can either provide a direct expression like regular pattern matching:
 
 ```rust
 fn resize(self, amount: int|Point) {
-    match amount {
+    match amount is {
         int => {
             self.pos.x += amount
             self.pos.y += amount
@@ -1101,14 +1101,49 @@ fn resize(self, amount: int|Point) {
 }
 ```
 
-You can any types — built-in types, structs, enums, or even function types:
+You can any types, structs, enums, or even function types:
 
 ```rust
 fn register(entity: Entity|fn() -> Entity) {
-    self.entities.push(match entity {
+    self.entities.push(match entity is {
         Entity => entity
         fn() -> Entity => entity()
     })
+}
+```
+
+There is also a powerful syntax that allow you to open a *type scope* and direct pattern match on the type itself, specially usefull when matching `enums` in `inline union` for example:
+
+```rust
+enum Shape2D = {
+    square: int,
+    triangle: (int, int),
+}
+enum Shape3D = {
+    cube: int,
+    cylinder: (int, int),
+}
+let shape: Shape2D|Shape3D = .square(5)
+
+match shape is {
+    Shape2D {
+        .square => ...,
+    }
+    Shape3D {
+        .cube => ...,
+    }
+}
+```
+
+It's a shorthand to avoid writting:
+```rust
+match shape is {
+    Shape2D :: s => match s {
+        .square => ...,
+    }
+    Shape3D :: s => match {
+        .cube => ...,
+    }
 }
 ```
 
@@ -1169,7 +1204,7 @@ struct Vec {
 }
 
 fn action(v: Vec, movements: [str:Vec]) {
-    let amount: Movement = .vec(movements["default"]) ?? .int(0) // here, amount is of type: Vec|int
+    let amount: Movement = .vec(movements["default"]) ?? .int(0)
     v.translate(amount)
 }
 ```
@@ -1346,7 +1381,7 @@ This expands to:
 It is ideal for tightly scoped or inline error definitions:
 
 ```zig
-fn parseConfig(path: str) Config!error{ invalidPath: str, accessDenied: int} { ... }
+fn parseConfig(path: str) Config!error{ invalidPath: str, accessDenied: int } { ... }
 ```
 
 > [!NOTE]
@@ -1397,13 +1432,13 @@ Pattern matching appears in:
 
 ### Pattern in match
 
-A `match` expression tests a value against a list of patterns. An `else` clause can be used to represent all other patterns:
+A `match` expression tests a value against a list of patterns. An `_` clause can be used to represent all other patterns:
 
 ```rust
 match value {
     Pattern1 => expr1
     Pattern2 => expr2
-    else => fallback
+    _ => fallback
 }
 ```
 
@@ -1418,7 +1453,7 @@ match number {
     0 => print("zero")
     1 => print("one")
     42 => print("meaning of life")
-    else => print("something else")
+    _ => print("something else")
 }
 ```
 
@@ -1437,7 +1472,7 @@ struct User {
 match user {
     .{ id: !null, name: "Tom" } => print("Tom has an ID")
     .{ name: "Alice", .. } => print("Alice, ID irrelevant")
-    else => print("Other user")
+    _ => print("Other user")
 }
 ```
 
@@ -1456,7 +1491,7 @@ let pair = (10, (20, 30))
 
 match pair {
     (10, (20, x)) => print(x)   // prints 30
-    else => {}
+    _ => {}
 }
 ```
 
@@ -1491,17 +1526,7 @@ It's sometimes useful to be able to refer to the matched value. You can do so by
 match getValue() @v {
     // Small values not used
     0..9 => {}
-    else => processId(v)
-}
-```
-
-Or with inline unions:
-
-```rust
-let obj: Vec|Point = getValue()
-match obj @v {
-    Vec => print("x: {v.x}, y: {v.y}")
-    Point => ...
+    _ => processId(v)
 }
 ```
 
@@ -1513,7 +1538,7 @@ Patterns can have guard conditions:
 match user {
     .{ id: !null } if v > 10 => print("Large ID")
     .{ id: !null } => print("Small ID")
-    else => print("No ID")
+    _ => print("No ID")
 }
 ```
 

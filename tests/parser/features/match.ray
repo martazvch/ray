@@ -15,12 +15,12 @@ match value is {
 }
 
 match value is {
-    int: {
+    int {
         0 => 1
         6 => varName
         _ => "oui"
     }
-    float: {
+    float {
         1.2 => 4
         _ => 5.6
     }

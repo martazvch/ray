@@ -11,7 +11,7 @@ match value {
 }
 
 match value is {
-    int: print "oui"
+    int print "oui"
 }
 
 match value is {
@@ -30,5 +30,5 @@ match value {
 }
 
 match value is {
-    int: {
+    int {
         0 => 0
