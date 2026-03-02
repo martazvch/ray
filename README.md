@@ -6,6 +6,59 @@ It runs on its own stack-based VM with a mark-and-sweep GC, and is implemented e
 
 ![Pipeline Tests](https://github.com/martazvch/ray/actions/workflows/main.yml/badge.svg)
 
+```rust
+enum Shape2D {
+    square: int,
+    triangle: (int, int),
+
+    fn fmt(self) -> str {
+        return match self {
+            .square => "[]"
+            .triangle => "/\\"
+        }
+    }
+}
+enum Shape3D {
+    cube: int,
+    cylinder: (int, int),
+    ...
+}
+
+error ShapeErr {
+    unknown,
+    wrongDim: int,
+}
+
+fn getShape(dim = 2, kind: str) -> ?(Shape2D|Shape3D)!ShapeErr {
+    return match dim {
+        2 => Shape2D.fromStr(kind)
+        3 => Shape3D.fromStr(kind)
+        _ @d => fail .wrongDim(d)
+    }
+}
+
+fn main() {
+    let shape = getShape() trap err {
+        print "got error: {err}"
+        return
+    }
+
+    if let s = shape {
+        match s is {
+            Shape2D {
+                .square(side) => ...
+                ...
+            }
+            Shape3D {
+                ...
+            }
+        }
+    }
+}
+
+
+```
+
 ## Why Ray
 
 I built Ray because I wanted something that combines my favorite language features — strong typing, explicit error handling, no surprises — but interpreted, so you can embed it and script with it.
