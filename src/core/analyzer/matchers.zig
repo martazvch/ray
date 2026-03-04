@@ -23,7 +23,9 @@ pub const Enum = struct {
     const Self = @This();
 
     pub fn init(proto: Type.Enum.Proto) Self {
-        return .{ .proto = proto };
+        return .{
+            .proto = proto,
+        };
     }
 
     fn arm(self_opaque: *anyopaque, ana: *Analyzer, value_arm: *const Ast.Match.ValueArm, expect: ExprResKind, ctx: *Context) Matcher.ArmRes {
@@ -117,7 +119,9 @@ pub fn Num(T: type) type {
         const RangeType = RangeSetType.InnerRange;
 
         pub fn init() Self {
-            return .{ .covered = .empty };
+            return .{
+                .covered = .empty,
+            };
         }
 
         pub fn deinit(self: *Self, allocator: Allocator) void {
@@ -257,14 +261,18 @@ pub fn Num(T: type) type {
 }
 
 pub const Bool = struct {
-    has_true: bool = false,
-    has_false: bool = false,
-    has_wildcard: bool = false,
+    has_true: bool,
+    has_false: bool,
+    has_wildcard: bool,
 
     const Self = @This();
 
     pub fn init() Self {
-        return .{};
+        return .{
+            .has_true = false,
+            .has_false = false,
+            .has_wildcard = false,
+        };
     }
 
     pub fn deinit(_: *Self, _: Allocator) void {}
@@ -337,7 +345,9 @@ pub const String = struct {
     const Self = @This();
 
     pub fn init() Self {
-        return .{ .covered = .empty };
+        return .{
+            .covered = .empty,
+        };
     }
 
     pub fn deinit(self: *Self, allocator: Allocator) void {

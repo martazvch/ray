@@ -14,6 +14,10 @@ pub fn Set(comptime T: type) type {
             self.set.deinit(allocator);
         }
 
+        pub fn ensureUnused(self: *Self, allocator: Allocator, size: usize) Allocator.Error!void {
+            try self.set.ensureUnusedCapacity(allocator, size);
+        }
+
         pub fn fromSlice(allocator: Allocator, slice: []const T) Allocator.Error!Self {
             var set: ArrayMap(T, void) = .empty;
             try set.ensureTotalCapacity(allocator, slice.len);
@@ -28,6 +32,12 @@ pub fn Set(comptime T: type) type {
 
         pub fn add(self: *Self, allocator: Allocator, item: T) Allocator.Error!void {
             const gop = try self.set.getOrPut(allocator, item);
+            if (gop.found_existing) return;
+            gop.key_ptr.* = item;
+        }
+
+        pub fn addAssume(self: *Self, item: T) void {
+            const gop = self.set.getOrPutAssumeCapacity(item);
             if (gop.found_existing) return;
             gop.key_ptr.* = item;
         }

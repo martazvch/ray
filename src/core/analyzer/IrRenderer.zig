@@ -90,6 +90,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .load_symbol => |*data| self.loadSymbol(data),
         .load_builtin => |index| self.indentAndPrintSlice("[Builtin symbol: {}]", .{index}),
         .match => |*data| self.match(data),
+        .match_type => |data| self.matchType(data),
         .multiple_var_decl => |*data| self.multipleVarDecl(data),
         // Accessed only via `call`
         .obj_func => unreachable,
@@ -104,7 +105,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .unary => |*data| self.unary(data),
         .unbox => |index| self.indexInstr("Unbox", index),
         .var_decl => |*data| self.varDecl(data),
-        .when => |*data| self.when(data),
+        // .when => |*data| self.when(data),
         .@"while" => |data| self.whileInstr(data),
 
         .noop => {},
@@ -436,6 +437,21 @@ fn match(self: *Self, data: *const Instruction.Match) void {
     }
 }
 
+fn matchType(self: *Self, data: Instruction.MatchType) void {
+    self.indentAndAppendSlice("[When]");
+    self.indentAndAppendSlice("- expression:");
+    self.indent_level += 1;
+    self.parseInstr(data.expr);
+    self.indent_level -= 1;
+    self.indentAndAppendSlice("- arms:");
+    for (data.arms) |arm| {
+        self.indentAndPrintSlice("[Types id: {}]", .{arm.type_id});
+        self.indent_level += 1;
+        self.parseInstr(arm.body);
+        self.indent_level -= 1;
+    }
+}
+
 fn multipleVarDecl(self: *Self, data: *const Instruction.MultiVarDecl) void {
     for (data.decls) |decl| {
         self.parseInstr(decl);
@@ -519,21 +535,6 @@ fn varDecl(self: *Self, data: *const Instruction.VarDecl) void {
     self.indent_level += 1;
     defer self.indent_level -= 1;
     if (data.value) |index| self.parseInstr(index) else self.indentAndAppendSlice("[Null]");
-}
-
-fn when(self: *Self, data: *const Instruction.When) void {
-    self.indentAndAppendSlice("[When]");
-    self.indentAndAppendSlice("- expression:");
-    self.indent_level += 1;
-    self.parseInstr(data.expr);
-    self.indent_level -= 1;
-    self.indentAndAppendSlice("- arms:");
-    for (data.arms) |arm| {
-        self.indentAndPrintSlice("[Types id: {}]", .{arm.type_id});
-        self.indent_level += 1;
-        self.parseInstr(arm.body);
-        self.indent_level -= 1;
-    }
 }
 
 fn whileInstr(self: *Self, data: Instruction.While) void {

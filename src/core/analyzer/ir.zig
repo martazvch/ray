@@ -39,6 +39,7 @@ pub const Instruction = struct {
         load_symbol: LoadSymbol,
         load_builtin: usize,
         match: Match,
+        match_type: MatchType,
         multiple_var_decl: MultiVarDecl,
         obj_func: ObjFn,
         pat_nullable: Index,
@@ -52,7 +53,6 @@ pub const Instruction = struct {
         unary: Unary,
         unbox: Index,
         var_decl: VarDecl,
-        when: When,
         @"while": While,
 
         noop, // Used only by 'use' statements as they don't produce any instructions
@@ -207,6 +207,15 @@ pub const Instruction = struct {
         pub const Arm = struct { expr: Index, body: Index };
         pub const Kind = enum { bool, float, int, @"enum", string };
     };
+    pub const MatchType = struct {
+        expr: Index,
+        arms: []const Arm,
+
+        pub const Arm = struct {
+            type_id: TypeId,
+            body: Index,
+        };
+    };
     pub const MultiVarDecl = struct { decls: []const Index };
     pub const ObjFn = struct {
         obj: Index,
@@ -256,13 +265,6 @@ pub const Instruction = struct {
     pub const Variable = struct {
         index: u64,
         scope: Scope,
-    };
-    pub const When = struct {
-        expr: Index,
-        arms: []const Arm,
-        is_expr: bool,
-
-        pub const Arm = struct { type_id: TypeId, body: Index };
     };
     pub const While = struct { cond: Index, body: Index };
 };

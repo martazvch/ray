@@ -2073,6 +2073,13 @@ pub fn string(self: *Self, expr: Ast.String) Result {
 fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Result {
     const value = try self.analyzeExpr(expr.expr, .value, ctx);
 
+    return switch (expr.body) {
+        .value => |v| self.matchValue(v, value, expr.kw, expect, ctx),
+        .type => |t| self.matchType(t, value, expr.kw, expect, ctx),
+    };
+}
+
+fn matchValue(self: *Self, expr: Ast.Match.ValueMatch, value: InstrInfos, kw: Ast.TokenIndex, expect: ExprResKind, ctx: *Context) Result {
     const kind: Instr.Match.Kind, var matcher = ana: switch (value.type.*) {
         .bool => {
             var matcher = matchers.Bool.init();
@@ -2094,20 +2101,17 @@ fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Resul
             var matcher = matchers.String.init();
             break :ana .{ .string, matcher.matcher() };
         },
-        .@"union" => |t| {
-            std.log.debug("Found: {any}", .{t.types});
-            @panic("Match on union is not implemented yet");
+        .@"union" => {
+            // TODO: Error
+            @panic("Must use match is for unions");
         },
         else => |t| {
+            // TODO: Error
             std.log.debug("Found: {any}", .{t});
             @panic("Match on that type is not implemented yet");
         },
     };
-
-    const res = switch (expr.body) {
-        .value => |arms| try self.matchValueArms(&matcher, value.type, arms, expr.kw, expect, ctx),
-        .type => @panic("TODO"),
-    };
+    const res = try self.matchValueArms(&matcher, value.type, expr, kw, expect, ctx);
 
     return .{
         .type = self.mergeTypes(res.types),
@@ -2119,14 +2123,14 @@ fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Resul
                 .is_expr = expect.expects(),
                 .kind = kind,
             } },
-            self.ast.getSpan(expr).start,
+            self.ast.getSpan(kw).start,
         ),
     };
 }
 
 fn matchValueArms(
     self: *Self,
-    analyzer: *Matcher,
+    matcher: *Matcher,
     ty: *const Type,
     expr: Ast.Match.ValueMatch,
     kw: Ast.TokenIndex,
@@ -2141,7 +2145,7 @@ fn matchValueArms(
     defer ctx.decl_type = prev_decl_type;
 
     for (expr.arms) |*arm| {
-        const arm_res, const body_res = try analyzer.arm(self, arm, expect, ctx);
+        const arm_res, const body_res = try matcher.arm(self, arm, expect, ctx);
 
         if (arm_res.type != ty) return self.err(
             .{ .type_mismatch = .{ .expect = self.typeName(ty), .found = self.typeName(arm_res.type) } },
@@ -2153,17 +2157,57 @@ fn matchValueArms(
     }
 
     const wildcard = if (expr.wildcard) |*w| w: {
-        const res = try analyzer.wildcard(self, w, expect, ctx);
+        const res = try matcher.wildcard(self, w, expect, ctx);
         types.add(self.allocator, res.type) catch oom();
         break :w res.instr;
     } else null;
 
-    try analyzer.validate(self, self.ast.getSpan(kw));
+    try matcher.validate(self, self.ast.getSpan(kw));
 
     return .{
         .types = types.toOwned(),
         .arms = arms_instr.toOwnedSlice(self.allocator) catch oom(),
         .wildcard = wildcard,
+    };
+}
+
+fn matchType(self: *Self, expr: Ast.Match.TypeMatch, value: InstrInfos, kw: Ast.TokenIndex, expect: ExprResKind, ctx: *Context) Result {
+    const union_ty: Type.Union = value.type.as(.@"union") orelse @panic("Must be an union for match is");
+    var proto = union_ty.proto(self.allocator);
+
+    var arms = ArrayList(Instr.MatchType.Arm).initCapacity(self.allocator, expr.arms.len) catch oom();
+
+    for (expr.arms) |arm| {
+        const arm_type = try self.checkAndGetType(arm.type, ctx);
+
+        const gop = proto.getOrPut(self.allocator, arm_type) catch oom();
+        if (!gop.found_existing) {
+            @panic("Union doesn't have type");
+        }
+        if (gop.value_ptr.*) {
+            @panic("Type already checked");
+        }
+        gop.value_ptr.* = true;
+
+        const arm_res = switch (arm.body) {
+            .value => |*v| try self.analyzeNode(v, expect, ctx),
+            .patmat => |v| try self.matchValue(v, value, kw, expect, ctx),
+        };
+        arms.appendAssumeCapacity(.{
+            .type_id = self.ti.typeId(arm_type),
+            .body = arm_res.instr,
+        });
+    }
+
+    return .{
+        .type = value.type,
+        .instr = self.irb.addInstr(
+            .{ .match_type = .{
+                .expr = value.instr,
+                .arms = arms.toOwnedSlice(self.allocator) catch oom(),
+            } },
+            self.ast.getSpan(kw).start,
+        ),
     };
 }
 

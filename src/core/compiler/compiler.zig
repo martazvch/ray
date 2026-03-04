@@ -362,6 +362,7 @@ const Compiler = struct {
             .load_builtin => |index| self.writeOpAndByte(.load_builtin, @intCast(index)),
             .load_symbol => |*data| self.loadSymbol(data),
             .match => |*data| self.match(data),
+            .match_type => |data| self.matchType(data),
             .multiple_var_decl => |*data| self.multipleVarDecl(data),
 
             // Used in `call`, not meant to be accessed directly
@@ -382,7 +383,6 @@ const Compiler = struct {
             .unary => |*data| self.unary(data),
             .unbox => |index| self.wrappedInstr(.unbox, index),
             .var_decl => |*data| self.varDecl(data),
-            .when => |*data| self.when(data),
             .@"while" => |data| self.whileInstr(data),
 
             .noop => {},
@@ -965,6 +965,11 @@ const Compiler = struct {
         } else {
             self.writeOp(.pop);
         }
+    }
+
+    fn matchType(self: *Self, data: Instruction.MatchType) Error!void {
+        _ = self; // autofix
+        _ = data; // autofix
     }
 
     fn multipleVarDecl(self: *Self, data: *const Instruction.MultiVarDecl) Error!void {

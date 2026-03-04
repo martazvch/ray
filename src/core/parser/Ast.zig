@@ -451,7 +451,10 @@ pub fn getSpan(self: *const @This(), anynode: anytype) Span {
         },
         Pattern => switch (node) {
             .value => |e| if (e.alias) |alias|
-                .{ .start = self.getSpan(e.expr).start, .end = self.token_spans[alias].end }
+                .{
+                    .start = self.getSpan(e.expr).start,
+                    .end = self.token_spans[alias].end,
+                }
             else
                 self.getSpan(e.expr),
             .nullable => |e| .{
@@ -476,6 +479,8 @@ pub fn getSpan(self: *const @This(), anynode: anytype) Span {
             .start = self.token_spans[node.op].start,
             .end = self.getSpan(node.expr).end,
         },
-        else => @compileError("Trying to get span on a non Node object and not usize"),
+        else => @compileError(
+            "Trying to get span on a non Node object and not usize: " ++ @typeName(NodeType),
+        ),
     };
 }
