@@ -5,7 +5,7 @@ fn main() {
         "volue" => 1
         "valuee" => 2
         "value" => 3
-        _ => "oooo"
+        else => "oooo"
     }
 }
 

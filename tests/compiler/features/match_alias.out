@@ -1,0 +1,25 @@
+-- getValue --
+load_constant index 3, value 5
+ret
+
+-- main --
+call_sym index 0, arity 0, <function getValue>
+dup
+
+load_constant index 3, value 5
+eq_int
+jump_false 7 -> 17
+pop
+get_local index 0
+print
+jump 14 -> 21
+pop
+
+load_constant index 4, value non
+print
+pop
+
+ret_naked
+
+-- global scope --
+call_sym index 1, arity 0, <function main>

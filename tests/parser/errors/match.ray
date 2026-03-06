@@ -19,14 +19,14 @@ match value is {
 }
 
 match value {
-    _ => 1
+    else => 1
     0 => "other"
 }
 
 match value {
     0 => "other"
-    _ => 1
-    _ => 1
+    else => 1
+    else => 1
 }
 
 match value is {

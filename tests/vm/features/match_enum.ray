@@ -38,12 +38,12 @@ fn main() {
 
     let a = match marker {
         .circle => "circle"
-        _ => "any other"
+        else => "any other"
     }
     print a
 
      print match marker {
-        _ => "all cases"
+        else => "all cases"
     }
 }
 

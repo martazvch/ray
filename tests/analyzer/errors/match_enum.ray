@@ -49,7 +49,7 @@ fn main() {
         .circle => {}
         .cross => {}
         .none => {}
-        _ => {}
+        else => {}
     }
 }
 

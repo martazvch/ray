@@ -492,6 +492,11 @@ fn renderAnonBlock(self: *Self, block: *const Ast.Block, name: ?[]const u8, comm
 fn match(self: *Self, expr: Ast.Match, comma: bool) !void {
     try self.openKey("match", .block);
     try self.renderSingleExpr("expression", expr.expr, .block, true);
+    try self.pushKeyValue(
+        "alias",
+        if (expr.alias) |alias| self.ast.toSource(alias) else "",
+        true,
+    );
 
     try self.openKey("arms", .list);
     switch (expr.body) {
@@ -515,18 +520,12 @@ fn matchValue(self: *Self, expr: Ast.Match.ValueMatch) !void {
 fn matchValueArm(self: *Self, arm: Ast.Match.ValueArm, comma: bool) !void {
     try self.openAnonKey(.block);
     try self.renderSingleExpr("expr", arm.expr, .block, true);
-    if (arm.alias) |alias| {
-        try self.pushKeyValue("alias", self.ast.toSource(alias), true);
-    }
     try self.renderSingleNode("body", &arm.body, .block, false);
     try self.closeKey(.block, comma);
 }
 
 fn matchWildcard(self: *Self, arm: Ast.Match.Wildcard, comma: bool) !void {
     try self.openKey("wildcard", .block);
-    if (arm.alias) |alias| {
-        try self.pushKeyValue("alias", self.ast.toSource(alias), true);
-    }
     try self.renderSingleNode("body", &arm.body, .block, false);
     try self.closeKey(.block, comma);
 }

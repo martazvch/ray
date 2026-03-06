@@ -237,6 +237,11 @@ pub fn getVariable(self: *const Self, name: InternerIdx) ?struct { *Variable, us
     return null;
 }
 
+/// Gets a variable at index in current scope. Assumes it exists
+pub fn getVarInCurrentScopeAt(self: *const Self, index: usize) *Variable {
+    return &self.current.variables.values()[index];
+}
+
 /// Forward declares a symbol without incrementing global symbol count
 pub fn forwardDeclareSymbol(self: *Self, allocator: Allocator, name: InternerIdx) *Symbol {
     self.current.symbols.put(allocator, name, .{ .name = name, .type = undefined, .index = self.symbol_count }) catch oom();

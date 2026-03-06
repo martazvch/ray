@@ -3,7 +3,7 @@ fn testString(s: str) {
         "To" => "yup"
         "Martin" => "lom"
         "Tom" => "atLeast"
-        _ => "z"
+        else => "z"
     }
 }
 
@@ -17,7 +17,7 @@ fn main() {
         "To" => "yup"
         "Martin" => "Tom"
         "Tom" => "atLeast"
-        _ => "z"
+        else => "z"
     }
 }
 

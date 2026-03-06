@@ -34,7 +34,7 @@ fn main() {
 
     match marker {
         .circle => {}
-        _ => {}
+        else => {}
     }
 }
 

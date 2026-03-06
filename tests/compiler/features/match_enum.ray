@@ -35,7 +35,7 @@ fn main() {
     match marker {
         .circle => print "circle"
         .cross => print "cross"
-        _ => "invalid"
+        else => "invalid"
     }
 }
 

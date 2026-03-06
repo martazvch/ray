@@ -210,6 +210,7 @@ pub const Instruction = struct {
     pub const MatchType = struct {
         expr: Index,
         arms: []const Arm,
+        is_expr: bool,
 
         pub const Arm = struct {
             type_id: TypeId,

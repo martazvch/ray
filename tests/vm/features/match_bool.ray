@@ -14,13 +14,13 @@ fn main() {
     value = false
     match value {
         true => print true
-        _ => print false
+        else => print false
     }
 
     value = true
     match value {
         true => print true
-        _ => print false
+        else => print false
     }
 }
 

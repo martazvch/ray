@@ -462,7 +462,7 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
 
     // If it's a closure, it lives on the stack at runtime
     if (captures.len > 0) {
-        _ = try self.declareVariable(name, interned_type, false, true, true, false, null, span);
+        _ = try self.declareVariable(name, interned_type, .{}, span);
     }
 
     if (name == self.cached_names.main and self.scope.isGlobal()) {
@@ -495,7 +495,7 @@ fn loadFunctionCaptures(self: *Self, captures_meta: *const Ast.FnDecl.Meta.Captu
         const name = capt.key_ptr.*;
         const capt_infos = capt.value_ptr.*;
         const variable, _ = self.scope.getVariable(name) orelse unreachable;
-        _ = try self.declareVariable(name, variable.type, true, true, false, false, null, .zero);
+        _ = try self.declareVariable(name, variable.type, .{ .captured = true, .constant = false }, .zero);
         captures.appendAssumeCapacity(.{ .index = capt_infos.index, .local = capt_infos.is_local });
     }
 
@@ -523,7 +523,7 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
             const self_type = ctx.self_type orelse return self.err(.self_outside_decl, span);
 
             is_method = true;
-            _ = try self.declareVariable(param_name, self_type, p.meta.captured, true, true, false, null, .zero);
+            _ = try self.declareVariable(param_name, self_type, .{ .captured = p.meta.captured }, .zero);
             decls.putAssumeCapacity(param_name, .{
                 .name = param_name,
                 .type = self_type,
@@ -550,7 +550,7 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
 
         if (param_type.is(.void)) return self.err(.void_param, span);
 
-        _ = try self.declareVariable(param_name, param_type, p.meta.captured, true, true, false, null, span);
+        _ = try self.declareVariable(param_name, param_type, .{ .captured = p.meta.captured }, span);
         decls.putAssumeCapacity(param_name, .{
             .name = param_name,
             .type = param_type,
@@ -727,11 +727,13 @@ fn varDeclaration(self: *Self, node: *const Ast.VarDecl, ctx: *Context) StmtResu
     const decl_index = try self.declareVariable(
         name,
         checked_type,
-        node.meta.captured,
-        value_res != null,
-        node.is_const,
-        if (value_res) |v| v.ti.comp_time else false,
-        if (value_res) |v| v.ti.ext_mod else null,
+        .{
+            .captured = node.meta.captured,
+            .initialized = value_res != null,
+            .constant = node.is_const,
+            .comp_time = if (value_res) |v| v.ti.comp_time else false,
+            .ext_mod = if (value_res) |v| v.ti.ext_mod else null,
+        },
         span,
     );
 
@@ -2072,10 +2074,24 @@ pub fn string(self: *Self, expr: Ast.String) Result {
 
 fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Result {
     const value = try self.analyzeExpr(expr.expr, .value, ctx);
+    var alias: ?usize = null;
+
+    if (expr.alias) |tk| {
+        self.scope.open(self.allocator, null, .{});
+        alias = try self.declareVariable(
+            self.interner.intern(self.ast.toSource(tk)),
+            value.type,
+            .{},
+            self.ast.getSpan(tk),
+        );
+    }
+    defer {
+        if (expr.alias != null) _ = self.scope.close();
+    }
 
     return switch (expr.body) {
         .value => |v| self.matchValue(v, value, expr.kw, expect, ctx),
-        .type => |t| self.matchType(t, value, expr.kw, expect, ctx),
+        .type => |t| self.matchType(t, value, expr.kw, alias, expect, ctx),
     };
 }
 
@@ -2171,7 +2187,15 @@ fn matchValueArms(
     };
 }
 
-fn matchType(self: *Self, expr: Ast.Match.TypeMatch, value: InstrInfos, kw: Ast.TokenIndex, expect: ExprResKind, ctx: *Context) Result {
+fn matchType(
+    self: *Self,
+    expr: Ast.Match.TypeMatch,
+    value: InstrInfos,
+    kw: Ast.TokenIndex,
+    alias: ?usize,
+    expect: ExprResKind,
+    ctx: *Context,
+) Result {
     const union_ty: Type.Union = value.type.as(.@"union") orelse @panic("Must be an union for match is");
     var proto = union_ty.proto(self.allocator);
 
@@ -2189,6 +2213,11 @@ fn matchType(self: *Self, expr: Ast.Match.TypeMatch, value: InstrInfos, kw: Ast.
         }
         gop.value_ptr.* = true;
 
+        if (alias) |al| {
+            const variable = self.scope.getVarInCurrentScopeAt(al);
+            variable.type = arm_type;
+        }
+
         const arm_res = switch (arm.body) {
             .value => |*v| try self.analyzeNode(v, expect, ctx),
             .patmat => |v| try self.matchValue(v, value, kw, expect, ctx),
@@ -2205,6 +2234,7 @@ fn matchType(self: *Self, expr: Ast.Match.TypeMatch, value: InstrInfos, kw: Ast.
             .{ .match_type = .{
                 .expr = value.instr,
                 .arms = arms.toOwnedSlice(self.allocator) catch oom(),
+                .is_expr = expect.expects(),
             } },
             self.ast.getSpan(kw).start,
         ),
@@ -2464,7 +2494,7 @@ fn trapMatch(self: *Self, expr: *Expr, err_type: Type.ErrorUnion, expect: ExprRe
     self.scope.open(self.allocator, null, .{ .exp_val = true });
     defer _ = self.scope.close();
 
-    _ = try self.declareVariable(err_name, err_type.err, false, true, true, false, null, binding_span);
+    _ = try self.declareVariable(err_name, err_type.err, .{}, binding_span);
     return self.analyzeExpr(expr, expect, ctx);
 }
 
@@ -2825,26 +2855,23 @@ pub fn typeName(self: *const Self, ty: *const Type) []const u8 {
     return ty.toString(self.allocator, self.interner, self.mod_name);
 }
 
-fn declareVariable(
-    self: *Self,
-    name: InternerIdx,
-    ty: *const Type,
-    captured: bool,
-    initialized: bool,
-    constant: bool,
-    comp_time: bool,
-    ext_mod: ?ModIndex,
-    span: Span,
-) Error!usize {
+const VarConf = struct {
+    captured: bool = false,
+    initialized: bool = true,
+    constant: bool = true,
+    comp_time: bool = false,
+    ext_mod: ?ModIndex = null,
+};
+fn declareVariable(self: *Self, name: InternerIdx, ty: *const Type, conf: VarConf, span: Span) Error!usize {
     return self.scope.declareVar(
         self.allocator,
         name,
         ty,
-        captured,
-        initialized,
-        constant,
-        comp_time,
-        ext_mod,
+        conf.captured,
+        conf.initialized,
+        conf.constant,
+        conf.comp_time,
+        conf.ext_mod,
     ) catch self.err(.too_many_locals, span);
 }
 

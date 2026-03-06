@@ -1,0 +1,11 @@
+fn getValue() -> int {
+    return 5
+}
+
+fn main() {
+    match getValue() @v {
+        5 => print v
+        else => print "non"
+    }
+}
+

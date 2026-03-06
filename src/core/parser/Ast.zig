@@ -256,6 +256,7 @@ pub const Match = struct {
     kw: TokenIndex,
     expr: *Expr,
     body: Kind,
+    alias: ?TokenIndex,
 
     pub const Kind = union(enum) {
         value: ValueMatch,
@@ -269,7 +270,6 @@ pub const Match = struct {
 
     pub const ValueArm = struct {
         expr: *Expr,
-        alias: ?TokenIndex,
         body: Node,
     };
 
@@ -290,7 +290,6 @@ pub const Match = struct {
 
     pub const Wildcard = struct {
         token: TokenIndex,
-        alias: ?TokenIndex,
         body: Node,
     };
 };

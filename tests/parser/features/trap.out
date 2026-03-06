@@ -55,6 +55,7 @@
                 "expression": {
                     "identifier": "binding"
                 },
+                "alias": "",
                 "arms": [
                     {
                         "expr": {

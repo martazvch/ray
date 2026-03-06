@@ -1256,7 +1256,7 @@ fn matchExpr(self: *Self) Error!*Expr {
         defer self.ctx.in_cond = save_cond;
         break :value try self.parsePrecedenceExpr(0);
     };
-
+    const alias = try self.getAlias(.at);
     const match_type = self.match(.is);
 
     self.skipNewLines();
@@ -1273,6 +1273,7 @@ fn matchExpr(self: *Self) Error!*Expr {
         .kw = kw,
         .expr = value,
         .body = body,
+        .alias = alias,
     } };
 
     return expr;
@@ -1281,29 +1282,28 @@ fn matchExpr(self: *Self) Error!*Expr {
 fn matchValue(self: *Self) Error!Ast.Match.Kind {
     const arms, const wildcard = try self.matchArm(Ast.Match.ValueArm, matchValueArm);
 
-    return .{ .value = .{ .arms = arms, .wildcard = wildcard } };
+    return .{ .value = .{
+        .arms = arms,
+        .wildcard = wildcard,
+    } };
 }
 
 fn matchValueArm(self: *Self) Error!Ast.Match.ValueArm {
     const expr = try self.parsePrecedenceExpr(0);
-    const alias = try self.getAlias(.at);
     try self.expect(.arrow_big, .expect_arrow_before_arm_body);
 
     return .{
         .expr = expr,
-        .alias = alias,
         .body = try self.statement(),
     };
 }
 
 fn matchWildcard(self: *Self) Error!Ast.Match.Wildcard {
     const token = self.token_idx - 1;
-    const alias = try self.getAlias(.at);
     try self.expect(.arrow_big, .expect_arrow_before_arm_body);
 
     return .{
         .token = token,
-        .alias = alias,
         .body = try self.statement(),
     };
 }
@@ -1314,7 +1314,7 @@ fn matchArm(self: *Self, Arm: type, parseArmFn: *const fn (*Self) Error!Arm) Err
 
     while (!self.check(.eof) and !self.check(.right_brace)) {
         arm: {
-            if (self.match(.underscore)) {
+            if (self.match(.@"else")) {
                 if (wildcard != null) {
                     return self.errAtCurrent(.match_duplicate_wildcard);
                 }

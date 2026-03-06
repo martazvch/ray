@@ -417,6 +417,119 @@ map["sunday"] = 12
 assert(map["monday"].len() == 3)
 ```
 
+## Control flow
+
+Ray provides a small, expressive set of control-flow constructs. Every block is an expression and must return a coherent value unless the flow exits (`return`, `break`, or error propagation).
+
+When using `break` **without** a label, it exits the inner most [block](#Blocks), `return` always exits current function.
+
+### Blocks
+
+Blocks can be used in any expressions and are declared with `{}`. When openning a block, it creates a new lexical scope and when exiting it all local variables/declarations are gone.
+
+A block can be:
+- An expression if exited with `break <value>`
+- Labeled with `:name`
+
+```zig
+let value = {
+    // Local scope
+    var tmp = 5
+    tmp += 8
+    break tmp
+}
+```
+
+Naming blocks allow to nest them:
+
+```zig
+let value = v: {
+    var tmp = 5
+    tmp += {
+        let count = getCounter()
+        // Targets outter block
+        if count == 10 do break :v count
+        break count
+    }
+}
+```
+
+You can name any expression's block, for example:
+
+```zig
+let value = if true v: { break :v 5 } else 8
+```
+
+### If expressions
+
+#### Syntax
+If used as an expression, all branches must return a value. If `then` branch's body is a single statement, it can be written with any braces `{}` as long as it's after `do` keyword:
+
+```zig
+// do
+if true do print("ok")
+
+let x = if condition do 10 else 20
+```
+
+#### Chaining
+
+You can chain `if`/`else`:
+
+```zig
+let r = if a > 0 do
+    "positive"
+else if a == 0 do
+    "zero"
+else
+    "negative"
+```
+
+#### If-let / if-var
+
+Ray supports *pattern-matching inside conditions* through two related constructs:
+- `if let` — binds only immutable values
+- `if var` — binds a mutable variable when destructuring
+
+Both are shorthand for a `match` expression with a single arm and an implicit `else {}`.
+
+You may destructure any value directly inside the `if let` condition. This is useful for inspecting structures, enums, unions, and nested patterns without writing a full `match`.
+
+```rust
+struct User { id: ?int, name: str }
+
+fn verify(user: User) -> bool {
+    if let .{ id: !null, name: "Tom" } = user {
+        return true
+    }
+
+    ...
+}
+```
+
+It allow powerful and short way to test for patterns instead of the full `match` syntax. The code above could also be written:
+
+```rust
+fn verify(user: User) -> bool {
+    match user {
+        .{ id: !null, name: "Tom" } => return true
+        else => {}
+    }
+
+    ...
+}
+```
+
+When the right-hand side is a nullable type (`?T`), the `if let` expression automatically tests for `null`.
+
+```rust
+let id: ?int = 8
+
+if let i = id {
+    // Here `i` is of type int
+}
+```
+
 ### Functions
 
 Functions in Ray are lightweight building blocks. They support default arguments, closures, anonymous form, error propagation, null chaining, and structured error handling via trap.
@@ -877,9 +990,65 @@ Method Lookup Order
 
 Ray uses the type of the value to infer which method applies, ensuring static dispatch:
 
-#### Pattern matching
 
-Fields can be destructured directly:
+## Inline unions
+
+Ray supports **inline unions** as a lightweight way to express that a value may be *one of several types*.
+Inline unions let you write:
+
+```rust
+int | float | bool
+```
+
+instead of defining a named enum-like type.
+
+Inline unions behave like a sum type where each branch is identified by its type.
+They are ideal for situations where you need simple, type-driven dispatch or flexible input types without boilerplate.
+See [pattern matchin](#Pattern%20matching) for usage.
+
+### Syntax
+
+An inline union is written using `|`:
+
+```rust
+let v: int|float|bool = 42
+```
+
+As always, the type will automatically be infered:
+
+```rust
+let arr = [1, 4.5, false] // type is infered as: [int|float|bool]
+```
+
+> [!NOTE]
+> Inline unions aren't order dependent.
+> There is absolutly no difference between `int|float` and `float|int`
+> Ray internally treats them as sets of types, not as ordered sequences.
+
+### Pattern matching
+
+One of the most useful construct is Ray is `match` that allow to test variable against patterns instead of values.
+Allow `match` have to be **exhaustive**, preventing from forgetting to update an expression when modifying a type somewheree in your codebase, but you can always match any other values that you're not intersted in with `else` arm that will match the remaining cases, making the `match` exhaustive.
+
+#### With scalar type
+
+You can pattern match on any type with a regular `match` for example:
+
+```rust
+// int
+match value {
+    0 => print "zero"
+    1 => print "non-zero"
+    else => print "any other"
+}
+// str
+match value {
+    "Tom" => greetTom()
+    ...
+}
+```
+
+When pattern mathcing structures, fields can be destructured directly:
 
 ```rust
 match p {
@@ -906,14 +1075,211 @@ match p {
 }
 ```
 
-Use `when` for additional constraints:
+Use `if` for additional constraints:
 
 ```rust
 match p {
-    Point { x, y } when x == y => print("Diagonal")
+    Point { x, y } if x == y => print("Diagonal")
     Point { x, y } => print("({x}, {y})")
 }
 ```
+
+You can also alias the value matched on with `@<name>` to be able to refer to it. For example, if you match on a function's return value, you might want to use it:
+
+```rust
+fn getValue() -> int {
+    return 5
+}
+
+match getValue() @v {
+    1..5 => print v
+    else => print "not intersted"
+}
+```
+
+#### With a type union
+
+To use a value with an inline union type, you pattern match on its type by specifying `is`. You can either provide a direct expression like regular pattern matching with `=>`:
+
+```rust
+fn resize(self, amount: int|Point) {
+    match amount is {
+        int => {
+            self.pos.x += amount
+            self.pos.y += amount
+        }
+        Point => self.pos += amount
+    }
+}
+```
+
+You can any types, structs, enums, or even function types:
+
+```rust
+fn register(entity: Entity|fn() -> Entity) {
+    self.entities.push(match entity is {
+        Entity => entity
+        fn() -> Entity => entity()
+    })
+}
+```
+
+There is also a powerful syntax that allow you to open a *type scope* and direct pattern match on the type itself, specially usefull when matching `enums` in `inline union` for example:
+
+```rust
+enum Shape2D = {
+    square: int,
+    triangle: (int, int),
+}
+enum Shape3D = {
+    cube: int,
+    cylinder: (int, int),
+}
+let shape: Shape2D|Shape3D = .square(5)
+
+match shape is {
+    Shape2D {
+        .square => ...,
+    }
+    Shape3D {
+        .cube => ...,
+    }
+}
+```
+
+It's a shorthand to avoid writting:
+```rust
+match shape @s is {
+    Shape2D => match s {
+        .square => ...,
+    }
+    Shape3D => match s {
+        .cube => ...,
+    }
+}
+```
+
+#### Automatic aliasing
+
+Note that you don't need explicit aliasing for simple identifier. The two following pieces of code are equivalent:
+
+```rust
+// As `value` is an identifier, matched type is infered inside each arm
+match value is {
+    int => value + 1
+    str => int(value) + 1
+}
+
+// Equivalent to
+match value @v is {
+    int => v + 1
+    str => int(v) + 1
+}
+```
+
+For any other expression, you need to explicitly alias the value if you want to use it:
+
+```rust
+// Field
+match foo.bar.buz @v is {
+    ...
+}
+
+// Returned value
+match getValue() @v is {
+    ...
+}
+```
+
+### Use case
+
+Inline unions shine when you want to work with sum types in a quick way. There aren't meant to replace `enums` in places where you need a complex type with methods or traits.
+For example:
+
+```rust
+enum Size {
+    pixels: int,
+    relative: float,
+    auto: bool,
+}
+
+fn applySize(size: Size) {
+    match size {
+        .pixels(v) => setPixels(v)
+        .relative(v) => setRelative(v)
+        .auto(flag) => if flag do setAuto()
+    }
+}
+```
+
+Can be rewritten:
+
+```rust
+fn applySize(size: int|float|bool) {
+    match size {
+        int => setPixels(size)
+        float => setRelative(size)
+        bool => if size do setAuto()
+    }
+}
+```
+
+This removes unnecessary boilerplate while keeping the behavior clear and explicit.
+
+A more complete example:
+
+```rust
+struct Vec {
+    x, y: float
+
+    enum Movement {
+        int: int,
+        float: float,
+        vec: Vec,
+    }
+
+    fn translate(self, delta: Movement) -> Self {
+        return match delta {
+            .int(v) => .{ x: self.x + float(v), y: self.y + float(v) }
+            .float(v) => .{ x: self.x + v, y: self.y + v }
+            .Vec(v) => .{ x: self.x + v.x, y: self.y + v.y } 
+        }
+    }
+}
+
+fn action(v: Vec, movements: [str:Vec]) {
+    let amount: Movement = .vec(movements["default"]) ?? .int(0)
+    v.translate(amount)
+}
+```
+
+Can be written:
+
+```rust
+struct Vec {
+    x, y: float
+
+    fn translate(self, delta: int|float|Self) -> Self {
+        return match delta {
+            int => .{ x: self.x + float(delta), y: self.y + float(delta) }
+            float => .{ x: self.x + delta, y: self.y + delta }
+            Self => .{ x: self.x + delta.x, y: self.y + delta.y } 
+        }
+    }
+}
+
+fn action(v: Vec, movements: [str:Vec]) {
+    let amount = movements["default"] ?? 0 // here, amount is of type: Vec|int
+    v.translate(amount)
+}
+```
+
+What this shows:
+- Inline unions remove the need to wrap values (.int(v), .float(v), .vec(v)).
+- Matching becomes more natural: int, float, or Self.
+- The code is shorter, without losing clarity.
+- The type of amount is inferred automatically as Vec|int.
+- Inline unions shine in small sum-type situations where enums would only add ceremony.
 
 ### Enumerations
 
@@ -1052,303 +1418,6 @@ enum Shape {
 }
 ```
 
-## Inline unions
-
-Ray supports **inline unions** as a lightweight way to express that a value may be *one of several types*.
-Inline unions let you write:
-
-```rust
-int | float | bool
-```
-
-instead of defining a named enum-like type.
-
-Inline unions behave like a sum type where each branch is identified by its type.
-They are ideal for situations where you need simple, type-driven dispatch or flexible input types without boilerplate.
-
-### Syntax
-
-An inline union is written using `|`:
-
-```rust
-let v: int|float|bool = 42
-```
-
-As always, the type will automatically be infered:
-
-```rust
-let arr = [1, 4.5, false] // type is infered as: [int|float|bool]
-```
-
-> [!NOTE]
-> Inline unions aren't order dependent.
-> There is absolutly no difference between `int|float` and `float|int`
-> Ray internally treats them as sets of types, not as ordered sequences.
-
-### Usage
-
-To use a value with an inline union type, you pattern match on its type by specifying `is`. You can either provide a direct expression like regular pattern matching:
-
-```rust
-fn resize(self, amount: int|Point) {
-    match amount is {
-        int => {
-            self.pos.x += amount
-            self.pos.y += amount
-        }
-        Point => self.pos += amount
-    }
-}
-```
-
-You can any types, structs, enums, or even function types:
-
-```rust
-fn register(entity: Entity|fn() -> Entity) {
-    self.entities.push(match entity is {
-        Entity => entity
-        fn() -> Entity => entity()
-    })
-}
-```
-
-There is also a powerful syntax that allow you to open a *type scope* and direct pattern match on the type itself, specially usefull when matching `enums` in `inline union` for example:
-
-```rust
-enum Shape2D = {
-    square: int,
-    triangle: (int, int),
-}
-enum Shape3D = {
-    cube: int,
-    cylinder: (int, int),
-}
-let shape: Shape2D|Shape3D = .square(5)
-
-match shape is {
-    Shape2D {
-        .square => ...,
-    }
-    Shape3D {
-        .cube => ...,
-    }
-}
-```
-
-It's a shorthand to avoid writting:
-```rust
-match shape is {
-    Shape2D :: s => match s {
-        .square => ...,
-    }
-    Shape3D :: s => match {
-        .cube => ...,
-    }
-}
-```
-
-### Use case
-
-Inline unions shine when you want to work with sum types in a quick way. There aren't meant to replace `enums` in places where you need a complex type with methods or traits.
-For example:
-
-```rust
-enum Size {
-    pixels: int,
-    relative: float,
-    auto: bool,
-}
-
-fn applySize(size: Size) {
-    match size {
-        .pixels(v) => setPixels(v)
-        .relative(v) => setRelative(v)
-        .auto(flag) => if flag do setAuto()
-    }
-}
-```
-
-Can be rewritten:
-
-```rust
-fn applySize(size: int|float|bool) {
-    match size {
-        int => setPixels(size)
-        float => setRelative(size)
-        bool => if size do setAuto()
-    }
-}
-```
-
-This removes unnecessary boilerplate while keeping the behavior clear and explicit.
-
-A more complete example:
-
-```rust
-struct Vec {
-    x, y: float
-
-    enum Movement {
-        int: int,
-        float: float,
-        vec: Vec,
-    }
-
-    fn translate(self, delta: Movement) -> Self {
-        return match delta {
-            .int(v) => .{ x: self.x + float(v), y: self.y + float(v) }
-            .float(v) => .{ x: self.x + v, y: self.y + v }
-            .Vec(v) => .{ x: self.x + v.x, y: self.y + v.y } 
-        }
-    }
-}
-
-fn action(v: Vec, movements: [str:Vec]) {
-    let amount: Movement = .vec(movements["default"]) ?? .int(0)
-    v.translate(amount)
-}
-```
-
-Can be written:
-
-```rust
-struct Vec {
-    x, y: float
-
-    fn translate(self, delta: int|float|Self) -> Self {
-        return match delta {
-            int => .{ x: self.x + float(delta), y: self.y + float(delta) }
-            float => .{ x: self.x + delta, y: self.y + delta }
-            Self => .{ x: self.x + delta.x, y: self.y + delta.y } 
-        }
-    }
-}
-
-fn action(v: Vec, movements: [str:Vec]) {
-    let amount = movements["default"] ?? 0 // here, amount is of type: Vec|int
-    v.translate(amount)
-}
-```
-
-What this shows:
-- Inline unions remove the need to wrap values (.int(v), .float(v), .vec(v)).
-- Matching becomes more natural: int, float, or Self.
-- The code is shorter, without losing clarity.
-- The type of amount is inferred automatically as Vec|int.
-- Inline unions shine in small sum-type situations where enums would only add ceremony.
-
-## Control flow
-
-Ray provides a small, expressive set of control-flow constructs. Every block is an expression and must return a coherent value unless the flow exits (`return`, `break`, or error propagation).
-
-When using `break` **without** a label, it exits the inner most [block](#Blocks), `return` always exits current function.
-
-### Blocks
-
-Blocks can be used in any expressions and are declared with `{}`. When openning a block, it creates a new lexical scope and when exiting it all local variables/declarations are gone.
-
-A block can be:
-- An expression if exited with `break <value>`
-- Labeled with `:name`
-
-```zig
-let value = {
-    // Local scope
-    var tmp = 5
-    tmp += 8
-    break tmp
-}
-```
-
-Naming blocks allow to nest them:
-
-```zig
-let value = v: {
-    var tmp = 5
-    tmp += {
-        let count = getCounter()
-        // Targets outter block
-        if count == 10 do break :v count
-        break count
-    }
-}
-```
-
-You can name any expression's block, for example:
-
-```zig
-let value = if true v: { break :v 5 } else 8
-```
-
-### If expressions
-
-#### Syntax
-If used as an expression, all branches must return a value. If `then` branch's body is a single statement, it can be written with any braces `{}` as long as it's after `do` keyword:
-
-```zig
-// do
-if true do print("ok")
-
-let x = if condition do 10 else 20
-```
-
-#### Chaining
-
-You can chain `if`/`else`:
-
-```zig
-let r = if a > 0 do
-    "positive"
-else if a == 0 do
-    "zero"
-else
-    "negative"
-```
-
-#### If-let / if-var
-
-Ray supports *pattern-matching inside conditions* through two related constructs:
-- `if let` — binds only immutable values
-- `if var` — binds a mutable variable when destructuring
-
-Both are shorthand for a `match` expression with a single arm and an implicit `else {}`.
-
-You may destructure any value directly inside the `if let` condition. This is useful for inspecting structures, enums, unions, and nested patterns without writing a full `match`.
-
-```rust
-struct User { id: ?int, name: str }
-
-fn verify(user: User) -> bool {
-    if let .{ id: !null, name: "Tom" } = user {
-        return true
-    }
-
-    ...
-}
-```
-
-It allow powerful and short way to test for patterns instead of the full `match` syntax. The code above could also be written:
-
-```rust
-fn verify(user: User) -> bool {
-    match user {
-        .{ id: !null, name: "Tom" } => return true
-        else => {}
-    }
-
-    ...
-}
-```
-
-When the right-hand side is a nullable type (`?T`), the `if let` expression automatically tests for `null`.
-
-```rust
-let id: ?int = 8
-
-if let i = id {
-    // Here `i` is of type int
-}
-```
 
 ## Errors
 

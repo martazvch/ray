@@ -1,8 +1,12 @@
 match value {
     .fileNotFound => "oui"
     .otherError => "non"
-    _ => "dont know bro"
-}    
+    else => "dont know bro"
+}
+
+match getValue() @v {
+    1 => {}
+}
 
 match value is {
     int => 5
@@ -11,18 +15,22 @@ match value is {
         let b = 2
         break a = b
     }
-    _ => 10
+    else => 10
 }
 
 match value is {
     int {
         0 => 1
         6 => varName
-        _ => "oui"
+        else => "oui"
     }
     float {
         1.2 => 4
-        _ => 5.6
+        else => 5.6
     }
-    _ => "youpi"
+    else => "youpi"
+}
+
+match getValue() @v is {
+    int => {}
 }

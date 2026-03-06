@@ -3,6 +3,6 @@ fn getBool() -> bool { return false }
 fn main() {
     match true {
         getBool() => print true
-        _ => print false
+        else => print false
     }
 }

@@ -20,6 +20,6 @@ fn main() {
     }
     print failable(15) trap match e {
         .tooSmall => 1
-        _ => 4
+        else => 4
     }
 }

@@ -3,6 +3,7 @@
         "expression": {
             "identifier": "value"
         },
+        "alias": "",
         "arms": [
             {
                 "expr": {
@@ -29,8 +30,30 @@
     },
     "match": {
         "expression": {
+            "fn_call": {
+                "callee": {
+                    "identifier": "getValue"
+                },
+                "args": []
+            }
+        },
+        "alias": "v",
+        "arms": [
+            {
+                "expr": {
+                    "int": "1"
+                },
+                "body": {
+                    "block": {}
+                }
+            }
+        ]
+    },
+    "match": {
+        "expression": {
             "identifier": "value"
         },
+        "alias": "",
         "arms": [
             {
                 "type": "int",
@@ -84,6 +107,7 @@
         "expression": {
             "identifier": "value"
         },
+        "alias": "",
         "arms": [
             {
                 "type": "int",
@@ -132,6 +156,25 @@
             "wildcard": {
                 "body": {
                     "string": "youpi"
+                }
+            }
+        ]
+    },
+    "match": {
+        "expression": {
+            "fn_call": {
+                "callee": {
+                    "identifier": "getValue"
+                },
+                "args": []
+            }
+        },
+        "alias": "v",
+        "arms": [
+            {
+                "type": "int",
+                "body": {
+                    "block": {}
                 }
             }
         ]

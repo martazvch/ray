@@ -967,9 +967,60 @@ const Compiler = struct {
         }
     }
 
+    // TODO: do as Parser, provide a `armFn` and make a common `matchArm` for both value and type match
     fn matchType(self: *Self, data: Instruction.MatchType) Error!void {
-        _ = self; // autofix
-        _ = data; // autofix
+        try self.compileInstr(data.expr);
+
+        var exit_jumps = ArrayList(usize).initCapacity(self.manager.allocator, data.arms.len) catch oom();
+
+        for (data.arms) |arm| {
+            self.writeOp(.dup);
+
+            if (arm.type_id <= 4) {
+                self.writeOp(switch (arm.type_id) {
+                    0 => .is_float,
+                    1 => .is_int,
+                    2 => .is_bool,
+                    3 => .is_str,
+                    else => unreachable,
+                });
+            } else if (arm.type_id < std.math.maxInt(u8)) {
+                self.writeOpAndByte(.is_type, @intCast(arm.type_id));
+            } else {
+                // TODO: implement at least with a u16
+                @panic("Type id to high, not implemented yet");
+            }
+
+            const arm_jump = self.emitJump(.jump_false);
+            // Pops the condition
+            self.writeOp(.pop);
+            // Arm body
+            try self.compileInstr(arm.body);
+
+            // Exits the when after arm body
+            exit_jumps.appendAssumeCapacity(self.emitJump(.jump));
+
+            // Skips to next arm
+            try self.patchJump(arm_jump);
+            // Pops the condition in case of false
+            self.writeOp(.pop);
+        }
+
+        // if (data.wildcard) |wc| {
+        //     try self.compileInstr(wc);
+        // }
+
+        for (exit_jumps.items) |jump| {
+            try self.patchJump(jump);
+        }
+
+        // If we return a value, we pop the value matched on and leave the result on stack
+        // equivalent to swapping the two first values then popping
+        if (data.is_expr) {
+            self.writeOp(.swap_pop);
+        } else {
+            self.writeOp(.pop);
+        }
     }
 
     fn multipleVarDecl(self: *Self, data: *const Instruction.MultiVarDecl) Error!void {
@@ -1081,56 +1132,6 @@ const Compiler = struct {
         }
 
         self.defineVariable(data.variable);
-    }
-
-    fn when(self: *Self, data: *const Instruction.When) Error!void {
-        try self.compileInstr(data.expr);
-
-        var exit_jumps = ArrayList(usize).initCapacity(self.manager.allocator, data.arms.len) catch oom();
-
-        for (data.arms) |arm| {
-            if (arm.type_id <= 4) {
-                self.writeOp(switch (arm.type_id) {
-                    0 => .is_float,
-                    1 => .is_int,
-                    2 => .is_bool,
-                    3 => .is_str,
-                    else => unreachable,
-                });
-            } else if (arm.type_id < std.math.maxInt(u8)) {
-                self.writeOpAndByte(.is_type, @intCast(arm.type_id));
-            } else {
-                // TODO: implement at least with a u16
-                @panic("Type id to high, not implemented yet");
-            }
-
-            const arm_jump = self.emitJump(.jump_false);
-            // Pops the condition
-            self.writeOp(.pop);
-
-            // Arm body
-            try self.compileInstr(arm.body);
-
-            // Exits the when after arm body
-            exit_jumps.appendAssumeCapacity(self.emitJump(.jump));
-
-            // Skips to next arm
-            try self.patchJump(arm_jump);
-            // Pops the condition in case of false
-            self.writeOp(.pop);
-        }
-
-        for (exit_jumps.items) |jump| {
-            try self.patchJump(jump);
-        }
-
-        // If we return a value, we pop the value matched on and leave the result on stack
-        // equivalent to swapping the two first values then popping
-        if (data.is_expr) {
-            self.writeOp(.swap_pop);
-        } else {
-            self.writeOp(.pop);
-        }
     }
 
     fn whileInstr(self: *Self, data: Instruction.While) Error!void {
