@@ -433,16 +433,16 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
                 const value = self.stack.pop().obj.as(Obj.String);
                 self.stack.push(.makeBool(std.mem.containsAtLeast(u8, string.chars, 1, value.chars)));
             },
-            .is_bool => self.stack.push(.makeBool(self.stack.peek(0) == .bool)),
-            .is_float => self.stack.push(.makeBool(self.stack.peek(0) == .float)),
-            .is_int => self.stack.push(.makeBool(self.stack.peek(0) == .int)),
+            .is_bool => self.stack.push(.makeBool(self.stack.pop() == .bool)),
+            .is_float => self.stack.push(.makeBool(self.stack.pop() == .float)),
+            .is_int => self.stack.push(.makeBool(self.stack.pop() == .int)),
             .is_str => {
-                const top = self.stack.peekRef(0);
+                const top = self.stack.pop();
                 self.stack.push(.makeBool(if (top.asObj()) |o| o.kind == .string else false));
             },
             .is_type => {
                 const type_id = frame.readByte();
-                self.stack.push(.makeBool(self.stack.peek(0).obj.type_id == type_id));
+                self.stack.push(.makeBool(self.stack.pop().obj.type_id == type_id));
             },
             .iter_new_arr => self.stack.peekRef(0).* = .makeObj(Obj.ArrIterator.create(self, self.stack.peek(0))),
             .iter_new_range => self.stack.peekRef(0).* = .makeObj(Obj.RangeIterator.create(self, self.stack.peek(0).range_int)),

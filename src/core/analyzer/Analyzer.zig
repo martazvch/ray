@@ -902,7 +902,9 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
         .maybe => {},
         .symbol => if (!res.ti.is_sym) return error.NotSymbol,
         // Either used by blocks or asked by top level statement but blocks consume `.none`
-        .none => if (!res.type.is(.void)) return self.err(.expect_statement, self.ast.getSpan(expr)),
+        .none => if (!res.type.is(.void)) {
+            return self.err(.expect_statement, self.ast.getSpan(expr));
+        },
     }
 
     if (self.scope.isGlobal() and !res.ti.comp_time) {
@@ -2199,7 +2201,9 @@ fn matchType(
     const union_ty: Type.Union = value.type.as(.@"union") orelse @panic("Must be an union for match is");
     var proto = union_ty.proto(self.allocator);
 
-    var arms = ArrayList(Instr.MatchType.Arm).initCapacity(self.allocator, expr.arms.len) catch oom();
+    var types: Set(*const Type) = .empty;
+    const len = expr.arms.len + @intFromBool(expr.wildcard != null);
+    var arms = ArrayList(Instr.MatchType.Arm).initCapacity(self.allocator, len) catch oom();
 
     for (expr.arms) |arm| {
         const arm_type = try self.checkAndGetType(arm.type, ctx);
@@ -2226,10 +2230,11 @@ fn matchType(
             .type_id = self.ti.typeId(arm_type),
             .body = arm_res.instr,
         });
+        types.add(self.allocator, arm_res.type) catch oom();
     }
 
     return .{
-        .type = value.type,
+        .type = self.mergeTypes(types.keys()),
         .instr = self.irb.addInstr(
             .{ .match_type = .{
                 .expr = value.instr,
@@ -2649,7 +2654,19 @@ fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) Error
 
             types.ensureTotalCapacity(self.allocator, u.len) catch oom();
             for (u) |child| {
-                types.appendAssumeCapacity(try self.checkAndGetType(child, ctx));
+                const child_type = try self.checkAndGetType(child, ctx);
+
+                // Flattens unions
+                switch (child_type.*) {
+                    .@"union" => |child_union| {
+                        types.ensureUnusedCapacity(self.allocator, child_union.types.len) catch oom();
+
+                        for (child_union.types) |child_ty| {
+                            types.appendAssumeCapacity(child_ty);
+                        }
+                    },
+                    else => types.appendAssumeCapacity(child_type),
+                }
             }
 
             return self.ti.intern(.{ .@"union" = .{ .types = types.toOwnedSlice(self.allocator) catch oom() } });

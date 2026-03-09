@@ -977,6 +977,7 @@ const Compiler = struct {
             self.writeOp(.dup);
 
             if (arm.type_id <= 4) {
+                // TODO: fragile mechanism...
                 self.writeOp(switch (arm.type_id) {
                     0 => .is_float,
                     1 => .is_int,
@@ -1006,6 +1007,7 @@ const Compiler = struct {
             self.writeOp(.pop);
         }
 
+        // TODO: wildcard
         // if (data.wildcard) |wc| {
         //     try self.compileInstr(wc);
         // }
