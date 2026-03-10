@@ -293,9 +293,9 @@ pub const AnalyzerMsg = union(enum) {
     pub fn getHelp(self: Self, writer: *Writer) !void {
         try switch (self) {
             .already_declared,
-            .already_declared_field,
             .already_declared_param,
-            => writer.writeAll("refer to variable's definition to get array's dimension"),
+            .already_declared_field,
+            => writer.writeAll("you can use another name, use symbol like _ or open a local scope with '{}'"),
             .assign_to_struct_fn => writer.writeAll("it is not allowed to modify structures' functions at runtime"),
             .assign_to_constant => writer.writeAll(
                 "variables declared with 'const' and function parameters are constant, their value can't be changed",
