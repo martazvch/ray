@@ -383,8 +383,13 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
 
     const res = try self.analyzeExpr(node.expr, .value, ctx);
 
-    // Virtual scope to declare the iterator
-    _ = try self.forwardDeclareVariable(undefined, undefined, false, undefined);
+    // Placeholder variable that holds the iterator
+    _ = try self.forwardDeclareVariable(
+        self.interner.intern("@iter"),
+        undefined,
+        false,
+        undefined,
+    );
 
     const kind: Instr.For.Kind, const elem_type = switch (res.type.*) {
         .array => |t| .{ .array, t.child },
