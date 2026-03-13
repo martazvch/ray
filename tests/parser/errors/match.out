@@ -16,4 +16,6 @@ match_wildcard_not_last
 
 match_duplicate_wildcard
 
+expect_type_name
+
 expect_brace_after_match_type

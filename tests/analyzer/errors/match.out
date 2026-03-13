@@ -1,0 +1,6 @@
+type_mismatch, int, float
+match_all_arms_dont_return
+match_regular_on_union, int|float
+type_not_in_union, int|float, bool
+match_non_literal
+void_value

@@ -438,7 +438,7 @@ fn match(self: *Self, data: *const Instruction.Match) void {
 }
 
 fn matchType(self: *Self, data: Instruction.MatchType) void {
-    self.indentAndAppendSlice("[When]");
+    self.indentAndAppendSlice("[Match is]");
     self.indentAndAppendSlice("- expression:");
     self.indent_level += 1;
     self.parseInstr(data.expr);
@@ -449,6 +449,11 @@ fn matchType(self: *Self, data: Instruction.MatchType) void {
         self.indent_level += 1;
         self.parseInstr(arm.body);
         self.indent_level -= 1;
+    }
+    if (data.wildcard) |wc| {
+        self.indentAndAppendSlice("- wildcard:");
+        self.indent_level += 1;
+        self.parseInstr(wc);
     }
 }
 

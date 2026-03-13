@@ -12,7 +12,7 @@ const Ast = @import("../parser/Ast.zig");
 const Span = @import("../parser/Lexer.zig").Span;
 
 pub const MatchArms = struct {
-    types: []const *const Type,
+    ty: *const Type,
     arms: []const Instr.Match.Arm,
     wildcard: ?InstrIndex,
 };
@@ -25,7 +25,7 @@ pub const ArmRes = Error!struct { InstrInfos, InstrInfos };
 
 const VTable = struct {
     armFn: *const fn (*anyopaque, *Analyzer, *const Ast.Match.ValueArm, ExprResKind, *Context) ArmRes,
-    wildcardFn: *const fn (*anyopaque, *Analyzer, *const Ast.Match.Wildcard, ExprResKind, *Context) Error!InstrInfos,
+    wildcardFn: *const fn (*anyopaque, *Analyzer, Ast.Match.Wildcard, ExprResKind, *Context) Error!InstrInfos,
     validateFn: *const fn (*anyopaque, *Analyzer, Span) Error!void,
 };
 
@@ -33,7 +33,7 @@ pub fn arm(self: *Self, ana: *Analyzer, arm_expr: *const Ast.Match.ValueArm, exp
     return self.vtable.armFn(self.ptr, ana, arm_expr, expect, ctx);
 }
 
-pub fn wildcard(self: *Self, ana: *Analyzer, arm_expr: *const Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {
+pub fn wildcard(self: *Self, ana: *Analyzer, arm_expr: Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {
     return self.vtable.wildcardFn(self.ptr, ana, arm_expr, expect, ctx);
 }
 

@@ -1,0 +1,47 @@
+fn main() {
+    var a: int|float = 8.3
+    match a is {
+        int => 1
+        bool => 2
+    }
+
+    match a is {
+        int => 1
+        float => 2
+        int => 2
+    }
+
+    let nonUnion = true
+    match nonUnion is {
+        
+    }
+
+    let b = match a is {
+        int => 5
+        float => print "float"
+    }
+
+    let c: bool = match a is {
+        int => 5
+        float => true
+    }
+
+    let d: bool|str = match a is {
+        int => 5
+        float => true
+    }
+
+    match a is {
+        int => print "int"
+        float => print "float"
+        else => print "else"
+    }
+
+    // Valide match to check if variable's type isn't changed
+    match a is {
+        int => print "int"
+        float => print "float"
+    }
+    // Should still be an union
+    print a + 1
+}

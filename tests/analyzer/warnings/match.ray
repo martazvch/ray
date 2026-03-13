@@ -1,0 +1,7 @@
+fn main() {
+    let bind = 5
+    match bind @b {
+        else => print "useless"
+    }
+}
+

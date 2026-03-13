@@ -2,12 +2,14 @@ const std = @import("std");
 const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 const Analyzer = @import("Analyzer.zig");
+const Variable = @import("LexicalScope.zig").Variable;
 const Matcher = @import("Matcher.zig");
 const ExprResKind = Analyzer.ExprResKind;
 const Error = Analyzer.Error;
 const Context = Analyzer.Context;
 const InstrInfos = Analyzer.InstrInfos;
 const Type = @import("types.zig").Type;
+const TypeId = @import("types.zig").TypeId;
 const Ast = @import("../parser/Ast.zig");
 const Span = @import("../parser/Lexer.zig").Span;
 const misc = @import("misc");
@@ -51,7 +53,7 @@ pub const Enum = struct {
         return .{ arm_res, body };
     }
 
-    fn wildcard(self_opaque: *anyopaque, ana: *Analyzer, wc: *const Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {
+    fn wildcard(self_opaque: *anyopaque, ana: *Analyzer, wc: Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {
         var self: *Self = @ptrCast(@alignCast(self_opaque));
 
         check: {
@@ -195,7 +197,11 @@ pub fn Num(T: type) type {
                     else => |*e| {
                         const res = try ana.analyzeExpr(e, expect, ctx);
 
-                        if (res.ti.comp_time) {
+                        // analyzeExpr checks for result's kind expectation but if we ask for a value
+                        // and the return symbol is a function, it by-pass the .value tag, so we have to make
+                        // sure ourselves here that it isn't a symbol, otherwise `int` for example (which is a builtin)
+                        // is a valid value as a `match` arm
+                        if (res.ti.comp_time and !res.ti.is_sym) {
                             break :b .{ res, null };
                         }
                     },
@@ -232,7 +238,7 @@ pub fn Num(T: type) type {
             };
         }
 
-        fn wildcard(self_opaque: *anyopaque, ana: *Analyzer, wc: *const Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {
+        fn wildcard(self_opaque: *anyopaque, ana: *Analyzer, wc: Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {
             var self: *Self = @ptrCast(@alignCast(self_opaque));
             self.has_wildcard = true;
 
@@ -305,7 +311,7 @@ pub const Bool = struct {
         return .{ arm_res, body };
     }
 
-    fn wildcard(self_opaque: *anyopaque, ana: *Analyzer, wc: *const Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {
+    fn wildcard(self_opaque: *anyopaque, ana: *Analyzer, wc: Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {
         var self: *Self = @ptrCast(@alignCast(self_opaque));
 
         if (self.has_true and self.has_false) {
@@ -379,7 +385,7 @@ pub const String = struct {
         return .{ arm_res, body };
     }
 
-    fn wildcard(self_opaque: *anyopaque, ana: *Analyzer, wc: *const Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {
+    fn wildcard(self_opaque: *anyopaque, ana: *Analyzer, wc: Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {
         var self: *Self = @ptrCast(@alignCast(self_opaque));
         self.has_wildcard = true;
 
@@ -403,5 +409,120 @@ pub const String = struct {
                 .validateFn = validate,
             },
         };
+    }
+};
+
+pub const Union = struct {
+    proto: Type.Union.Proto,
+    alias: ?usize,
+    value: InstrInfos,
+    value_var: ?*Variable,
+    value_span: Span,
+    value_base_type: *const Type,
+    match_kw: Ast.TokenIndex,
+    has_wildcard: bool,
+
+    const Self = @This();
+
+    pub fn init(ana: *Analyzer, ty: Type.Union, alias: ?usize, value: InstrInfos, value_span: Span, kw: Ast.TokenIndex) Self {
+        const value_instr = ana.irb.getInstr(value.instr);
+        const is_ident = value_instr == .identifier;
+
+        return .{
+            .proto = ty.proto(ana.allocator),
+            .alias = alias,
+            .value = value,
+            .value_var = if (is_ident) ana.scope.getVarInCurrentScopeAt(value_instr.identifier.index) else null,
+            .value_span = value_span,
+            .value_base_type = value.type,
+            .match_kw = kw,
+            .has_wildcard = false,
+        };
+    }
+
+    const ArmTypeRes = Analyzer.Error!struct { TypeId, InstrInfos };
+
+    pub fn arm(self: *Self, ana: *Analyzer, type_arm: Ast.Match.TypeArm, expect: ExprResKind, ctx: *Context) ArmTypeRes {
+        const arm_type = try ana.checkAndGetType(type_arm.type, ctx);
+
+        const gop = self.proto.getOrPut(ana.allocator, arm_type) catch oom();
+        if (!gop.found_existing) return ana.err(
+            .{ .type_not_in_union = .{
+                .expect = ana.typeName(self.value_base_type),
+                .found = ana.typeName(arm_type),
+            } },
+            ana.ast.getSpan(type_arm),
+        );
+
+        if (gop.value_ptr.*) {
+            return ana.err(.match_duplicate_arm, ana.ast.getSpan(type_arm));
+        }
+        gop.value_ptr.* = true;
+
+        // Defines alias' type inside this arm
+        if (self.alias) |al| {
+            const alias_variable = ana.scope.getVarInCurrentScopeAt(al);
+            alias_variable.type = arm_type;
+        }
+
+        // Same if matched on value is an identifier
+        if (self.value_var) |v| {
+            v.type = arm_type;
+        }
+
+        const body_res = switch (type_arm.body) {
+            .value => |*v| try ana.analyzeNode(v, expect, ctx),
+            .patmat => |v| pat: {
+                var local_value = self.value;
+                local_value.type = arm_type;
+                break :pat try ana.matchValue(v, local_value, self.value_span, self.match_kw, expect, ctx);
+            },
+        };
+
+        return .{ ana.ti.typeId(arm_type), body_res };
+    }
+
+    pub fn wildcard(self: *Self, ana: *Analyzer, wc: Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {
+        check: {
+            var it = self.proto.iterator();
+            while (it.next()) |entry| {
+                if (!entry.value_ptr.*) {
+                    break :check;
+                }
+            }
+
+            return ana.err(.match_wildcard_exhaustive, ana.ast.getSpan(wc));
+        }
+
+        self.has_wildcard = true;
+
+        return ana.analyzeNode(&wc.body, expect, ctx);
+    }
+
+    pub fn validate(self: *Self, ana: *Analyzer, span: Span) Error!void {
+        if (self.has_wildcard) return;
+
+        var missing: ArrayList(u8) = .empty;
+
+        var it = self.proto.iterator();
+        while (it.next()) |entry| {
+            if (!entry.value_ptr.*) {
+                if (missing.items.len > 0) {
+                    missing.appendSlice(ana.allocator, ", ") catch oom();
+                }
+                missing.appendSlice(ana.allocator, ana.typeName(entry.key_ptr.*)) catch oom();
+            }
+        }
+
+        if (missing.items.len > 0) return ana.err(
+            .{ .match_non_exhaustive = .{ .missing = missing.toOwnedSlice(ana.allocator) catch oom() } },
+            span,
+        );
+    }
+
+    pub fn terminate(self: *Self) void {
+        if (self.value_var) |v| {
+            v.type = self.value_base_type;
+        }
     }
 };

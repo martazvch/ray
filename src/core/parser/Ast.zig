@@ -444,6 +444,7 @@ pub fn getSpan(self: *const @This(), anynode: anytype) Span {
             .end = self.getSpan(node.expr).end,
         },
         Match.ValueArm => self.getSpan(node.expr),
+        Match.TypeArm => self.getSpan(node.type),
         Match.Wildcard => .{
             .start = self.getSpan(node.token).start,
             .end = self.getSpan(node.body).end,

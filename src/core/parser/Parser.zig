@@ -1064,6 +1064,10 @@ fn block(self: *Self) Error!struct { *Expr, bool } {
             .fn_decl => has_callable = true,
             .var_decl => |v| if (v.value) |val| {
                 if (val.* == .closure) has_callable = true;
+            }
+            // If no value was provided, we expect a new line
+            else if (!self.check(.right_brace)) {
+                try self.expect(.new_line, .expect_new_line);
             },
             else => {},
         }

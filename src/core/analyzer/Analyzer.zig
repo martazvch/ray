@@ -243,7 +243,8 @@ fn assignment(self: *Self, node: *const Ast.Assignment, ctx: *Context) StmtResul
 
     const assigne = maybe_assigne orelse return self.err(.invalid_assign_target, span);
 
-    ctx.decl_type = assigne.type;
+    const prev_decl = ctx.setAndGetPrevious(.decl_type, assigne.type);
+    defer ctx.decl_type = prev_decl;
 
     var value_res = try self.analyzeExpr(node.value, .value, ctx);
 
@@ -939,7 +940,7 @@ fn array(self: *Self, expr: *const Ast.Array, ctx: *Context) Result {
     }
 
     return .{
-        .type = self.ti.intern(.{ .array = .{ .child = self.mergeTypes(types.toOwned()) } }),
+        .type = self.ti.intern(.{ .array = .{ .child = self.mergeTypes(types.keys()) } }),
         .ti = .{ .comp_time = pure },
         .instr = self.irb.addInstr(
             .{ .array = .{ .values = values.toOwnedSlice(self.allocator) catch oom() } },
@@ -994,8 +995,7 @@ fn block(self: *Self, expr: *const Ast.Block, pop_offset: usize, opts: LexScope.
         }
 
         // Else we merge all possibilities
-        var types = Set(*const Type).fromSlice(self.allocator, breaks) catch oom();
-        break :ty self.mergeTypes(types.toOwned());
+        break :ty self.mergeTypes(breaks);
     };
 
     // TODO: protect cast
@@ -1028,7 +1028,8 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
     const lhs = try self.analyzeExpr(expr.lhs, .value, ctx);
 
     // For enum literals
-    ctx.decl_type = if (!lhs.type.is(.void)) lhs.type else null;
+    const prev_decl = ctx.setAndGetPrevious(.decl_type, if (!lhs.type.is(.void)) lhs.type else null);
+    defer ctx.decl_type = prev_decl;
 
     const rhs = try self.analyzeExpr(expr.rhs, .value, ctx);
 
@@ -1642,6 +1643,9 @@ fn fnArgsList(
         }
     }
 
+    const prev_decl = ctx.setAndGetPrevious(.decl_type, null);
+    defer ctx.decl_type = prev_decl;
+
     for (args, 0..) |arg, i| {
         var param_info: *const Type.Function.Parameter = undefined;
         const span = self.ast.getSpan(arg.value);
@@ -2026,7 +2030,12 @@ pub fn identifier(self: *Self, expr: Ast.Identifier, ctx: *Context) Result {
     const res = try self.resolveIdentifier(expr, true, ctx);
     return .{
         .type = res.type,
-        .ti = .{ .heap = res.type.isHeap(), .is_sym = res.kind == .symbol, .comp_time = res.comp_time, .ext_mod = res.module },
+        .ti = .{
+            .heap = res.type.isHeap(),
+            .is_sym = res.kind == .symbol,
+            .comp_time = res.comp_time,
+            .ext_mod = res.module,
+        },
         .instr = res.instr,
     };
 }
@@ -2081,9 +2090,16 @@ pub fn string(self: *Self, expr: Ast.String) Result {
 
 fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Result {
     const value = try self.analyzeExpr(expr.expr, .value, ctx);
+    const value_span = self.ast.getSpan(expr.expr);
     var alias: ?usize = null;
 
     if (expr.alias) |tk| {
+        const value_instr = self.irb.getInstr(value.instr);
+        if (value_instr == .identifier) self.warn(
+            .match_useless_alias,
+            self.ast.getSpan(tk),
+        );
+
         self.scope.open(self.allocator, null, .{});
         alias = try self.declareVariable(
             self.interner.intern(self.ast.toSource(tk)),
@@ -2097,12 +2113,26 @@ fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Resul
     }
 
     return switch (expr.body) {
-        .value => |v| self.matchValue(v, value, expr.kw, expect, ctx),
-        .type => |t| self.matchType(t, value, expr.kw, alias, expect, ctx),
+        .value => |v| self.matchValue(v, value, value_span, expr.kw, expect, ctx),
+        .type => |t| {
+            if (!value.type.is(.@"union")) return self.err(
+                .{ .match_is_non_union = .{ .found = self.typeName(value.type) } },
+                value_span,
+            );
+            return self.matchType(t, value, value_span, expr.kw, alias, expect, ctx);
+        },
     };
 }
 
-fn matchValue(self: *Self, expr: Ast.Match.ValueMatch, value: InstrInfos, kw: Ast.TokenIndex, expect: ExprResKind, ctx: *Context) Result {
+pub fn matchValue(
+    self: *Self,
+    expr: Ast.Match.ValueMatch,
+    value: InstrInfos,
+    value_span: Span,
+    kw: Ast.TokenIndex,
+    expect: ExprResKind,
+    ctx: *Context,
+) Result {
     const kind: Instr.Match.Kind, var matcher = ana: switch (value.type.*) {
         .bool => {
             var matcher = matchers.Bool.init();
@@ -2124,10 +2154,10 @@ fn matchValue(self: *Self, expr: Ast.Match.ValueMatch, value: InstrInfos, kw: As
             var matcher = matchers.String.init();
             break :ana .{ .string, matcher.matcher() };
         },
-        .@"union" => {
-            // TODO: Error
-            @panic("Must use match is for unions");
-        },
+        .@"union" => return self.err(
+            .{ .match_regular_on_union = .{ .found = self.typeName(value.type) } },
+            value_span,
+        ),
         else => |t| {
             // TODO: Error
             std.log.debug("Found: {any}", .{t});
@@ -2137,7 +2167,7 @@ fn matchValue(self: *Self, expr: Ast.Match.ValueMatch, value: InstrInfos, kw: As
     const res = try self.matchValueArms(&matcher, value.type, expr, kw, expect, ctx);
 
     return .{
-        .type = self.mergeTypes(res.types),
+        .type = res.ty,
         .instr = self.irb.addInstr(
             .{ .match = .{
                 .expr = value.instr,
@@ -2161,34 +2191,38 @@ fn matchValueArms(
     ctx: *Context,
 ) Error!Matcher.MatchArms {
     var types: Set(*const Type) = .empty;
+    defer types.deinit(self.allocator);
+
     const len = expr.arms.len + @intFromBool(expr.wildcard != null);
     var arms_instr = ArrayList(Instr.Match.Arm).initCapacity(self.allocator, len) catch oom();
 
-    const prev_decl_type = ctx.setAndGetPrevious(.decl_type, ty);
-    defer ctx.decl_type = prev_decl_type;
+    var arms_return = ArrayList(bool).initCapacity(self.allocator, len) catch oom();
+    defer arms_return.deinit(self.allocator);
+
+    const assigne_ty = ctx.setAndGetPrevious(.decl_type, ty);
+    defer ctx.decl_type = assigne_ty;
 
     for (expr.arms) |*arm| {
         const arm_res, const body_res = try matcher.arm(self, arm, expect, ctx);
 
-        if (arm_res.type != ty) return self.err(
-            .{ .type_mismatch = .{ .expect = self.typeName(ty), .found = self.typeName(arm_res.type) } },
-            self.ast.getSpan(arm.expr),
-        );
+        _ = try self.performTypeCoercion(ty, arm_res.type, false, self.ast.getSpan(arm.expr));
+        if (assigne_ty) |decl_ty| {
+            _ = try self.performTypeCoercion(decl_ty, body_res.type, false, self.ast.getSpan(arm.body));
+        }
 
         types.add(self.allocator, body_res.type) catch oom();
+        arms_return.appendAssumeCapacity(!body_res.type.is(.void));
         arms_instr.appendAssumeCapacity(.{ .expr = arm_res.instr, .body = body_res.instr });
     }
 
-    const wildcard = if (expr.wildcard) |*w| w: {
-        const res = try matcher.wildcard(self, w, expect, ctx);
-        types.add(self.allocator, res.type) catch oom();
-        break :w res.instr;
-    } else null;
+    const wildcard = try self.matchWildcard(matcher, expr.wildcard, &types, &arms_return, expect, ctx);
+    const return_ty = self.mergeTypes(types.keys());
 
     try matcher.validate(self, self.ast.getSpan(kw));
+    try self.validateArmReturns(arms_return.items, expect, self.ast.getSpan(kw));
 
     return .{
-        .types = types.toOwned(),
+        .ty = return_ty,
         .arms = arms_instr.toOwnedSlice(self.allocator) catch oom(),
         .wildcard = wildcard,
     };
@@ -2198,45 +2232,42 @@ fn matchType(
     self: *Self,
     expr: Ast.Match.TypeMatch,
     value: InstrInfos,
+    value_span: Span,
     kw: Ast.TokenIndex,
     alias: ?usize,
     expect: ExprResKind,
     ctx: *Context,
 ) Result {
-    const union_ty: Type.Union = value.type.as(.@"union") orelse @panic("Must be an union for match is");
-    var proto = union_ty.proto(self.allocator);
+    // Checked in callee
+    const union_ty: Type.Union = value.type.as(.@"union").?;
+    var matcher: matchers.Union = .init(self, union_ty, alias, value, value_span, kw);
+    defer matcher.terminate();
 
     var types: Set(*const Type) = .empty;
     const len = expr.arms.len + @intFromBool(expr.wildcard != null);
     var arms = ArrayList(Instr.MatchType.Arm).initCapacity(self.allocator, len) catch oom();
 
+    var arms_return = ArrayList(bool).initCapacity(self.allocator, len) catch oom();
+    defer arms_return.deinit(self.allocator);
+
     for (expr.arms) |arm| {
-        const arm_type = try self.checkAndGetType(arm.type, ctx);
-
-        const gop = proto.getOrPut(self.allocator, arm_type) catch oom();
-        if (!gop.found_existing) {
-            @panic("Union doesn't have type");
-        }
-        if (gop.value_ptr.*) {
-            @panic("Type already checked");
-        }
-        gop.value_ptr.* = true;
-
-        if (alias) |al| {
-            const variable = self.scope.getVarInCurrentScopeAt(al);
-            variable.type = arm_type;
+        const arm_type, const body_res = try matcher.arm(self, arm, expect, ctx);
+        if (ctx.decl_type) |t| {
+            _ = try self.performTypeCoercion(t, body_res.type, false, self.ast.getSpan(arm));
         }
 
-        const arm_res = switch (arm.body) {
-            .value => |*v| try self.analyzeNode(v, expect, ctx),
-            .patmat => |v| try self.matchValue(v, value, kw, expect, ctx),
-        };
         arms.appendAssumeCapacity(.{
-            .type_id = self.ti.typeId(arm_type),
-            .body = arm_res.instr,
+            .type_id = arm_type,
+            .body = body_res.instr,
         });
-        types.add(self.allocator, arm_res.type) catch oom();
+        types.add(self.allocator, body_res.type) catch oom();
+        arms_return.appendAssumeCapacity(!body_res.type.is(.void));
     }
+
+    const wildcard = try self.matchWildcard(&matcher, expr.wildcard, &types, &arms_return, expect, ctx);
+    try self.validateArmReturns(arms_return.items, expect, self.ast.getSpan(kw));
+
+    try matcher.validate(self, self.ast.getSpan(kw));
 
     return .{
         .type = self.mergeTypes(types.keys()),
@@ -2244,11 +2275,58 @@ fn matchType(
             .{ .match_type = .{
                 .expr = value.instr,
                 .arms = arms.toOwnedSlice(self.allocator) catch oom(),
+                .wildcard = wildcard,
                 .is_expr = expect.expects(),
             } },
             self.ast.getSpan(kw).start,
         ),
     };
+}
+
+fn matchWildcard(
+    self: *Self,
+    matcher: anytype,
+    wildcard: ?Ast.Match.Wildcard,
+    types: *Set(*const Type),
+    returns: *ArrayList(bool),
+    expect: ExprResKind,
+    ctx: *Context,
+) Error!?InstrIndex {
+    if (@typeInfo(@TypeOf(matcher)) != .pointer) {
+        @compileError("matcher must be a pointer");
+    }
+    if (!@hasDecl(@TypeOf(matcher.*), "wildcard")) {
+        @compileError("matcher must have 'wildcard' function");
+    }
+
+    const wild_expr = wildcard orelse return null;
+
+    if (returns.items.len == 0) self.warn(
+        .match_useless,
+        self.ast.getSpan(wild_expr),
+    );
+
+    const res = try matcher.wildcard(self, wild_expr, expect, ctx);
+    types.add(self.allocator, res.type) catch oom();
+    returns.appendAssumeCapacity(!res.type.is(.void));
+    return res.instr;
+}
+
+fn validateArmReturns(self: *Self, returns: []const bool, expect: ExprResKind, span: Span) Error!void {
+    if (!expect.expects()) return;
+
+    var prev_ret = false;
+
+    for (returns, 0..) |ret, i| {
+        if (i == 0) {
+            prev_ret = ret;
+            continue;
+        }
+
+        if (prev_ret != ret) {
+            return self.err(.match_all_arms_dont_return, span);
+        }
+    }
 }
 
 const Pattern = struct {
@@ -2553,7 +2631,7 @@ fn internIfNotInCurrentScope(self: *Self, token: usize) Error!usize {
 }
 
 /// Checks that the node is a declared type and return it's value. If node is `.empty`, returns `void`
-fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) Error!*const Type {
+pub fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) Error!*const Type {
     const t = ty orelse return self.ti.getCached(.void);
 
     return switch (t.*) {

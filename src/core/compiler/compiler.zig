@@ -1007,10 +1007,9 @@ const Compiler = struct {
             self.writeOp(.pop);
         }
 
-        // TODO: wildcard
-        // if (data.wildcard) |wc| {
-        //     try self.compileInstr(wc);
-        // }
+        if (data.wildcard) |wc| {
+            try self.compileInstr(wc);
+        }
 
         for (exit_jumps.items) |jump| {
             try self.patchJump(jump);
