@@ -4,6 +4,7 @@ const Writer = std.Io.Writer;
 
 const options = @import("options");
 
+const TypeId = @import("../analyzer/types.zig").TypeId;
 const OpCode = @import("../compiler/Chunk.zig").OpCode;
 const Module = @import("../pipeline/ModuleManager.zig").Module;
 const Disassembler = @import("../compiler/Disassembler.zig");
@@ -25,6 +26,9 @@ objects: ?*Obj,
 modules: []Module,
 natives: []Value,
 state: *State,
+
+// Used ti-ype ids at runtime
+arr_str_type_id: TypeId,
 
 const Self = @This();
 const Error = error{
@@ -50,6 +54,10 @@ pub fn init(self: *Self, allocator: Allocator, state: *State) void {
     self.objects = null;
     self.state = state;
     self.natives = state.native_reg.funcs.items;
+
+    self.arr_str_type_id = state.type_interner.typeId(
+        state.type_interner.intern(.{ .array = .{ .child = state.type_interner.getCached(.str) } }),
+    );
 
     // In REPL/embedded mode, we won't call the main function (there is not)
     // so we increment ourself the frame stack (discaring the first one)
@@ -177,7 +185,8 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
             },
             .array_new => {
                 const len = frame.readMaybeShort(wide);
-                const array = Obj.Array.create(self, (self.stack.top - len)[0..len]);
+                const type_id = frame.readShort();
+                const array = Obj.Array.create(self, type_id, (self.stack.top - len)[0..len]);
                 self.stack.top -= len;
                 self.stack.push(Value.makeObj(array.asObj()));
             },
@@ -391,7 +400,7 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
                 const index = self.stack.pop().range_int;
                 const array = self.stack.pop().obj.as(Obj.Array);
                 const start, const end = try self.checkRangeIndex(array.values.items.len, index);
-                self.stack.push(.makeObj(Obj.Array.create(self, array.values.items[start..end]).asObj()));
+                self.stack.push(.makeObj(Obj.Array.create(self, array.obj.type_id, array.values.items[start..end]).asObj()));
             },
             .index_str => {
                 const index = self.stack.pop().int;
@@ -442,7 +451,13 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
             },
             .is_type => {
                 const type_id = frame.readByte();
-                self.stack.push(.makeBool(self.stack.pop().obj.type_id == type_id));
+                const value = self.stack.pop();
+
+                if (value == .obj) {
+                    self.stack.push(.makeBool(value.obj.type_id == type_id));
+                } else {
+                    self.stack.push(.false_);
+                }
             },
             .iter_new_arr => self.stack.peekRef(0).* = .makeObj(Obj.ArrIterator.create(self, self.stack.peek(0))),
             .iter_new_range => self.stack.peekRef(0).* = .makeObj(Obj.RangeIterator.create(self, self.stack.peek(0).range_int)),
@@ -797,7 +812,7 @@ pub const CallFrame = struct {
         return (@as(u16, part1) << 8) | part2;
     }
 
-    pub fn readMaybeShort(self: *CallFrame, wide: bool) usize {
+    pub fn readMaybeShort(self: *CallFrame, wide: bool) u16 {
         return if (wide) self.readShort() else self.readByte();
     }
 

@@ -3,7 +3,7 @@
 -- main --
 load_constant index 3, value 1
 load_constant index 4, value 2
-array_new index 2
+array_new length 2, type_id 16
 get_local index 0
 load_constant index 5, value 5
 call_array_fn index 0, arity 1

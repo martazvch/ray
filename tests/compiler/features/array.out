@@ -6,16 +6,16 @@ ret
 load_constant index 4, value 1
 load_constant index 3, value 2
 load_constant index 5, value 3
-array_new index 3
+array_new length 3, type_id 16
 
 load_constant index 4, value 1
 load_constant index 3, value 2
-array_new index 2
+array_new length 2, type_id 16
 
 load_constant index 6, value 6
 load_constant index 7, value 7
 call_sym index 1, arity 0, <function getIdx>
-array_new index 3
+array_new length 3, type_id 16
 struct_lit index 0, arity 1, <structure Foo>
 
 get_local index 0
@@ -50,11 +50,11 @@ load_constant index 4, value 1
 
 load_constant index 4, value 1
 load_constant index 3, value 2
-array_new index 2
+array_new length 2, type_id 16
 load_constant index 5, value 3
 load_constant index 11, value 4
-array_new index 2
-array_new index 2
+array_new length 2, type_id 16
+array_new length 2, type_id 19
 
 load_constant index 12, value 98
 get_local_cow index 5

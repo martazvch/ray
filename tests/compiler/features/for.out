@@ -2,66 +2,66 @@
 load_constant index 3, value 1
 load_constant index 4, value 2
 load_constant index 5, value 3
-array_new index 3
+array_new length 3, type_id 16
 
 iter_new_arr
 iter_next
-jump_null 10 -> 20
+jump_null 12 -> 22
 get_local index 1
 print
 pop
-loop 17 -> 9
+loop 19 -> 11
 pop2
 
 load_constant index 6, value 5
 load_constant index 7, value 6
 load_constant index 8, value 7
 load_constant index 9, value 8
-array_new index 4
+array_new length 4, type_id 16
 
 get_local index 0
 iter_new_arr
 iter_next
-jump_null 35 -> 45
+jump_null 39 -> 49
 get_local index 2
 print
 pop
-loop 42 -> 34
+loop 46 -> 38
 pop2
 
 load_constant index 10, value Tom
 get_local index 1
 iter_new_str
 iter_next
-jump_null 52 -> 62
+jump_null 56 -> 66
 get_local index 3
 print
 pop
-loop 59 -> 51
+loop 63 -> 55
 pop2
 
 load_constant index 11, value Martin
 iter_new_str
 iter_next
-jump_null 67 -> 77
+jump_null 71 -> 81
 get_local index 3
 print
 pop
-loop 74 -> 66
+loop 78 -> 70
 pop2
 
 push_true
 push_false
-array_new index 2
+array_new length 2, type_id 17
 iter_new_arr
 iter_next_index
-jump_null 84 -> 97
+jump_null 90 -> 103
 get_local index 3
 print
 get_local index 4
 print
 pop2
-loop 94 -> 83
+loop 100 -> 89
 pop3
 
 load_constant index 6, value 5
@@ -69,11 +69,11 @@ load_constant index 12, value 0
 range_new_int
 iter_new_range
 iter_next
-jump_null 105 -> 115
+jump_null 111 -> 121
 get_local index 3
 print
 pop
-loop 112 -> 104
+loop 118 -> 110
 pop2
 
 load_constant index 6, value 5
@@ -81,11 +81,11 @@ load_constant index 13, value -1
 range_new_int
 iter_new_range
 iter_next
-jump_null 123 -> 133
+jump_null 129 -> 139
 get_local index 3
 print
 pop
-loop 130 -> 122
+loop 136 -> 128
 pop2
 
 load_constant index 15, value -5
@@ -93,11 +93,11 @@ load_constant index 14, value -8
 range_new_int
 iter_new_range
 iter_next
-jump_null 141 -> 151
+jump_null 147 -> 157
 get_local index 3
 print
 pop
-loop 148 -> 140
+loop 154 -> 146
 pop2
 
 ret_naked

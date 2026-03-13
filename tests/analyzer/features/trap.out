@@ -1,4 +1,5 @@
 [Enum declaration ValueErr]
+
 [Function declaration failable, returns]
     [If]
     - condition:
@@ -12,44 +13,52 @@
                 [Return]
                     [Constant index 0]
                         [Bool true]
+    - else:
+        [If]
+        - condition:
+            [Binop type: gt_int]
+                [Variable index: 0, scope: local]
+                [Constant index 4]
+                    [Int 20]
+        - then:
+            [Block pop count: 0, is_expr: false]
+                [Pop]
+                    [Fail]
+                        [Constant index 5]
+                            [Enum create]
+                                - enum
+                                [Load symbol 0 module 0]
+                                - tag
+                                1
     [Fail]
-        [Constant index 4]
+        [Constant index 6]
             [Enum create]
                 - enum
                 [Load symbol 0 module 0]
                 - tag
                 0
+
 [Function declaration main]
     [Print]
         [Trap]
         - lhs
             [Call symbol 1]
                 - args
-                [Constant index 5]
+                [Constant index 7]
                     [Int 15]
         - rhs
             [Block pop count: 1, is_expr: true]
                 [Print]
                     [Variable index: 0, scope: local]
                 [Break depth: 0, pop: 1]
-                    [Constant index 6]
+                    [Constant index 8]
                         [Int 88]
     [Print]
         [Trap]
         - lhs
             [Call symbol 1]
                 - args
-                [Constant index 5]
-                    [Int 15]
-        - rhs
-            [Block pop count: 1, is_expr: false]
-                [Return]
-    [Print]
-        [Trap]
-        - lhs
-            [Call symbol 1]
-                - args
-                [Constant index 5]
+                [Constant index 7]
                     [Int 15]
         - rhs
             [Match enum]
@@ -57,15 +66,51 @@
                 [Variable index: 0, scope: local]
             - arms:
                 - expr:
-                    [Constant index 4]
+                    [Constant index 6]
                         [Enum create]
                             - enum
                             [Load symbol 0 module 0]
                             - tag
                             0
                 - body:
-                    [Constant index 7]
+                    [Constant index 9]
                         [Int 1]
                 - wildcard:
-                    [Constant index 8]
+                    [Constant index 10]
                         [Int 4]
+        [Trap]
+        - lhs
+            [Call symbol 1]
+                - args
+                [Constant index 11]
+                    [Int 25]
+        - rhs
+            [Match enum]
+            - expression:
+                [Variable index: 0, scope: local]
+            - arms:
+                - expr:
+                    [Constant index 6]
+                        [Enum create]
+                            - enum
+                            [Load symbol 0 module 0]
+                            - tag
+                            0
+                - body:
+                    [Print]
+                        [Constant index 9]
+                            [Int 1]
+                - wildcard:
+                    [Print]
+                        [Constant index 10]
+                            [Int 4]
+            [Print]
+                [Trap]
+                - lhs
+                    [Call symbol 1]
+                        - args
+                        [Constant index 7]
+                            [Int 15]
+                - rhs
+                    [Block pop count: 1, is_expr: false]
+                        [Return]

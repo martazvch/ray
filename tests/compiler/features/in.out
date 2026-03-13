@@ -21,7 +21,7 @@ print
 load_constant index 11, value 45
 load_constant index 12, value 43
 load_constant index 11, value 45
-array_new index 2
+array_new length 2, type_id 18
 in_array
 print
 

@@ -6,7 +6,10 @@ error ValueErr {
 fn failable(val: int) -> bool!ValueErr {
     if val < 10 {
         return true
+    } else if val > 20 {
+        fail .tooBig
     }
+
     fail .tooSmall
 }
 
@@ -15,16 +18,16 @@ fn main() {
         print e
         break 88
     }
-    print failable(15) trap e {
-        return
-    }
     print failable(15) trap match e {
         .tooSmall => 1
         else => 4
     }
-    failable(15) trap match e {
+    failable(25) trap match e {
         .tooSmall => print 1
         else => print 4
+    }
+    print failable(15) trap e {
+        return
     }
 }
 

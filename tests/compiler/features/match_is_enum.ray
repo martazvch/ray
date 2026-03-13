@@ -1,0 +1,19 @@
+enum Foo {
+    a,
+    b,
+    c,
+}
+
+fn main() {
+    let f: Foo|int = Foo.a
+
+    match f is {
+        Foo {
+            .a => print "a"
+            .b => print "b"
+            .c => print "c"
+        }
+        int => print "int"
+    }
+}
+

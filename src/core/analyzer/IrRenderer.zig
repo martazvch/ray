@@ -105,7 +105,6 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .unary => |*data| self.unary(data),
         .unbox => |index| self.indexInstr("Unbox", index),
         .var_decl => |*data| self.varDecl(data),
-        // .when => |*data| self.when(data),
         .@"while" => |data| self.whileInstr(data),
 
         .noop => {},

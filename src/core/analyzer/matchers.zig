@@ -440,7 +440,7 @@ pub const Union = struct {
         };
     }
 
-    const ArmTypeRes = Analyzer.Error!struct { TypeId, InstrInfos };
+    const ArmTypeRes = Analyzer.Error!struct { *const Type, InstrInfos };
 
     pub fn arm(self: *Self, ana: *Analyzer, type_arm: Ast.Match.TypeArm, expect: ExprResKind, ctx: *Context) ArmTypeRes {
         const arm_type = try ana.checkAndGetType(type_arm.type, ctx);
@@ -479,7 +479,7 @@ pub const Union = struct {
             },
         };
 
-        return .{ ana.ti.typeId(arm_type), body_res };
+        return .{ arm_type, body_res };
     }
 
     pub fn wildcard(self: *Self, ana: *Analyzer, wc: Ast.Match.Wildcard, expect: ExprResKind, ctx: *Context) Error!InstrInfos {

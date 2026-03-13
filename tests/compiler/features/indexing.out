@@ -2,7 +2,7 @@
 load_constant index 3, value 1
 load_constant index 4, value 2
 load_constant index 5, value 3
-array_new index 3
+array_new length 3, type_id 16
 get_local index 0
 load_constant index 3, value 1
 index_arr
@@ -20,12 +20,12 @@ print
 load_constant index 3, value 1
 load_constant index 4, value 2
 load_constant index 5, value 3
-array_new index 3
+array_new length 3, type_id 16
 load_constant index 8, value 4
 load_constant index 9, value 5
 load_constant index 10, value 6
-array_new index 3
-array_new index 2
+array_new length 3, type_id 16
+array_new length 2, type_id 18
 get_local index 1
 load_constant index 3, value 1
 index_arr

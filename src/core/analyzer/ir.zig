@@ -114,6 +114,7 @@ pub const Instruction = struct {
 
     pub const Array = struct {
         values: []const Index,
+        type_id: TypeId,
     };
     pub const Assignment = struct {
         assigne: Index,
@@ -152,6 +153,7 @@ pub const Instruction = struct {
         name: usize,
         tags: []const []const u8,
         sym_index: SymbolIndex,
+        type_id: TypeId,
         functions: []const Index,
         is_err: bool,
     };
@@ -216,6 +218,9 @@ pub const Instruction = struct {
         pub const Arm = struct {
             type_id: TypeId,
             body: Index,
+            kind: Kind,
+
+            pub const Kind = enum { int, float, bool, str, obj };
         };
     };
     pub const MultiVarDecl = struct { decls: []const Index };

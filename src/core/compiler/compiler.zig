@@ -399,6 +399,7 @@ const Compiler = struct {
             try self.compileInstr(value);
         }
         try self.writeOpAndMaybeShort(.array_new, data.values.len);
+        self.writeShort(data.type_id);
     }
 
     fn arrayAssign(self: *Self, data: Instruction.Indexing) Error!void {
@@ -748,6 +749,7 @@ const Compiler = struct {
         const enum_val = Obj.Enum.create(
             self.manager.allocator,
             self.manager.state.interner.getKey(data.name).?,
+            data.type_id,
             data.tags,
             data.is_err,
         );
@@ -976,20 +978,12 @@ const Compiler = struct {
         for (data.arms) |arm| {
             self.writeOp(.dup);
 
-            if (arm.type_id <= 4) {
-                // TODO: fragile mechanism...
-                self.writeOp(switch (arm.type_id) {
-                    0 => .is_float,
-                    1 => .is_int,
-                    2 => .is_bool,
-                    3 => .is_str,
-                    else => unreachable,
-                });
-            } else if (arm.type_id < std.math.maxInt(u8)) {
-                self.writeOpAndByte(.is_type, @intCast(arm.type_id));
-            } else {
-                // TODO: implement at least with a u16
-                @panic("Type id to high, not implemented yet");
+            switch (arm.kind) {
+                .int => self.writeOp(.is_int),
+                .float => self.writeOp(.is_float),
+                .bool => self.writeOp(.is_bool),
+                .str => self.writeOp(.is_str),
+                .obj => try self.writeOpAndMaybeShort(.is_type, arm.type_id),
             }
 
             const arm_jump = self.emitJump(.jump_false);

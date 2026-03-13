@@ -80,7 +80,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
     return switch (op) {
         .add_float => self.simpleInstruction(writer, "add_float", offset),
         .add_int => self.simpleInstruction(writer, "add_int", offset),
-        .array_new => self.indexInstruction(writer, "array_new", offset),
+        .array_new => self.arrayNew(writer, offset),
         .array_set => self.simpleInstruction(writer, "array_set", offset),
         .bound_method => self.indexInstruction(writer, "bound_method", offset),
         .box => self.simpleInstruction(writer, "box", offset),
@@ -197,12 +197,16 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
 
 fn getIndex(self: *const Self, offset: usize) struct { value: usize, bytes: usize } {
     if (self.wide) {
-        var index = @as(u16, self.chunk.code.items[offset + 1]) << 8;
-        index |= self.chunk.code.items[offset + 2];
-        return .{ .value = index, .bytes = 2 };
+        return .{ .value = self.readShort(offset), .bytes = 2 };
     } else {
         return .{ .value = self.chunk.code.items[offset + 1], .bytes = 1 };
     }
+}
+
+fn readShort(self: *const Self, offset: usize) u16 {
+    var index = @as(u16, self.chunk.code.items[offset + 1]) << 8;
+    index |= self.chunk.code.items[offset + 2];
+    return index;
 }
 
 fn simpleInstruction(self: *Self, writer: *Writer, name: []const u8, offset: usize) Writer.Error!usize {
@@ -238,6 +242,19 @@ fn indexExternInstruction(self: *Self, writer: *Writer, name: []const u8, offset
     }
 
     return offset + 3;
+}
+
+fn arrayNew(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
+    const len = self.getIndex(offset);
+    const type_id = self.readShort(offset + len.bytes);
+
+    if (self.render_mode == .@"test") {
+        try writer.print("array_new length {}, type_id {}\n", .{ len.value, type_id });
+    } else {
+        try writer.print("array_new length {:>4}, type_id {:>4}\n", .{ len.value, type_id });
+    }
+
+    return offset + 1 + len.bytes + 2;
 }
 
 fn getGlobal(self: *Self, writer: *Writer, cow: bool, offset: usize) Writer.Error!usize {
@@ -288,8 +305,7 @@ fn extConstantInstruction(self: *Self, writer: *Writer, name: []const u8, offset
 }
 
 fn jumpInstruction(self: *Self, writer: *Writer, name: []const u8, sign: isize, offset: usize) Writer.Error!usize {
-    var jump: u16 = @as(u16, self.chunk.code.items[offset + 1]) << 8;
-    jump |= self.chunk.code.items[offset + 2];
+    const jump = self.readShort(offset);
     const target = @as(isize, jump) * sign + @as(isize, @intCast(offset)) + 3;
 
     if (self.render_mode == .@"test") {

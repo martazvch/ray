@@ -256,8 +256,8 @@ pub const Array = struct {
 
     const Self = @This();
 
-    pub fn create(vm: *Vm, values: []Value) *Self {
-        const obj = Obj.allocate(vm, Self, undefined);
+    pub fn create(vm: *Vm, type_id: TypeId, values: []Value) *Self {
+        const obj = Obj.allocate(vm, Self, type_id);
         obj.values = .empty;
 
         if (options.log_gc) std.debug.print("<array>\n", .{});
@@ -294,7 +294,7 @@ pub const Array = struct {
             if (value.asObj()) |obj| vm.gc.tmp_roots.appendAssumeCapacity(obj);
         }
 
-        return Self.create(vm, values.toOwnedSlice(vm.allocator) catch oom());
+        return Self.create(vm, self.obj.type_id, values.toOwnedSlice(vm.allocator) catch oom());
     }
 
     pub fn deinit(self: *Self, vm: *Vm) void {
@@ -450,7 +450,7 @@ pub const String = struct {
         }
         defer vm.gc.popTmpBuf();
 
-        return .makeObj(Array.create(vm, chunks.items).asObj());
+        return .makeObj(Array.create(vm, vm.arr_str_type_id, chunks.items).asObj());
     }
 };
 
@@ -644,8 +644,8 @@ pub const Enum = struct {
 
     const Self = @This();
 
-    pub fn create(allocator: Allocator, name: []const u8, tags: []const []const u8, is_err: bool) *Self {
-        const obj = Obj.allocateComptime(allocator, Self, undefined);
+    pub fn create(allocator: Allocator, name: []const u8, type_id: TypeId, tags: []const []const u8, is_err: bool) *Self {
+        const obj = Obj.allocateComptime(allocator, Self, type_id);
         obj.name = allocator.dupe(u8, name) catch oom();
         obj.is_err = is_err;
         obj.tags = tags;
@@ -658,13 +658,7 @@ pub const Enum = struct {
         return &self.obj;
     }
 
-    // Functions aren't freed because they are on the main linked list of objects in the VM
-    // The memory of the array is owned though
     pub fn deinit(self: *Self, vm: *Vm) void {
-        // for (self.tags) |tag| {
-        //     vm.allocator.free(tag);
-        // }
-        // vm.allocator.free(self.tags);
         vm.gc_alloc.destroy(self);
     }
 };
@@ -684,6 +678,7 @@ pub const EnumInstance = struct {
         obj.tag_id = tag_id;
         obj.payload = payload;
         obj.obj.kind = if (parent.is_err) .@"error" else .enum_instance;
+        obj.obj.type_id = parent.obj.type_id;
 
         return obj;
     }

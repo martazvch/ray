@@ -262,6 +262,6 @@ load_constant index 257, value 255
 wide
 load_constant index 258, value 256
 wide
-array_new index 256
+array_new length 256, type_id 15
 def_global index 0
 call_sym index 0, arity 0, <function main>

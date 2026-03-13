@@ -21,7 +21,7 @@ get_local index 1
 incr_ref
 get_local index 1
 incr_ref
-array_new index 1
+array_new length 1, type_id 19
 struct_lit index 3, arity 2, <structure Structure>
 
 get_local index 2
@@ -65,10 +65,10 @@ call_sym index 2, arity 1, <function clone>
 get_field index 0
 
 store_blk_val
-jump 96 -> 99
+jump 98 -> 101
 load_blk_val
 store_blk_val
-jump 101 -> 104
+jump 103 -> 106
 load_blk_val
 
 set_local index 5
@@ -79,19 +79,19 @@ call_sym index 2, arity 1, <function clone>
 get_field index 0
 
 store_blk_val
-jump 117 -> 120
+jump 119 -> 122
 load_blk_val
 store_blk_val
-jump 122 -> 125
+jump 124 -> 127
 load_blk_val
 
 set_local index 5
 
 push_true
-jump_false 129 -> 137
+jump_false 131 -> 139
 pop
 ret_naked
-jump 134 -> 145
+jump 136 -> 147
 pop
 get_local index 1
 call_sym index 2, arity 1, <function clone>
@@ -99,12 +99,12 @@ get_field index 0
 set_local index 5
 
 push_true
-jump_false 148 -> 162
+jump_false 150 -> 164
 pop
 get_local index 1
 call_sym index 2, arity 1, <function clone>
 get_field index 0
-jump 159 -> 164
+jump 161 -> 166
 pop
 ret_naked
 set_local index 5

@@ -1,0 +1,34 @@
+enum Foo {
+    a,
+    b,
+    c,
+}
+
+fn matchAny(f: Foo|int|[float]|[str]) {
+    match f is {
+        Foo {
+            .a => print "a"
+            .b => print "b"
+            .c => print "c"
+        }
+        int => print "int"
+        [float] => print "array float"
+        [str] => print "array str"
+    }
+}
+
+fn main() {
+    var f: Foo|int|[str]|[float] = Foo.a
+    matchAny(f)
+    f = .b
+    matchAny(f)
+    f = .c
+    matchAny(f)
+    f = 5
+    matchAny(f)
+
+    f = [1.2, 3.4]
+    matchAny(f)
+    f = ["aabb", "ccdd"]
+    matchAny(f)
+}

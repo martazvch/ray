@@ -211,7 +211,7 @@ pub fn analyzeNode(self: *Self, node: *const Node, expect: ExprResKind, ctx: *Co
 fn assignment(self: *Self, node: *const Ast.Assignment, ctx: *Context) StmtResult {
     const span = self.ast.getSpan(node.assigne);
 
-    const maybe_assigne: ?InstrInfos = switch (node.assigne.*) {
+    const assigne: InstrInfos = switch (node.assigne.*) {
         .identifier => |e| b: {
             var assigne = try self.expectVariableIdentifier(e);
             if (assigne.variable.constant) return self.err(.{ .assign_to_constant = .{ .name = self.ast.toSource(e) } }, span);
@@ -241,13 +241,10 @@ fn assignment(self: *Self, node: *const Ast.Assignment, ctx: *Context) StmtResul
         else => return self.err(.invalid_assign_target, span),
     };
 
-    const assigne = maybe_assigne orelse return self.err(.invalid_assign_target, span);
-
     const prev_decl = ctx.setAndGetPrevious(.decl_type, assigne.type);
     defer ctx.decl_type = prev_decl;
 
     var value_res = try self.analyzeExpr(node.value, .value, ctx);
-
     _ = try self.performTypeCoercion(assigne.type, value_res.type, false, self.ast.getSpan(node.value));
 
     self.checkWrap(&value_res.instr, value_res.ti.heap);
@@ -321,6 +318,7 @@ fn enumDeclaration(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtRe
             .name = name,
             .tags = tags,
             .sym_index = sym.index,
+            .type_id = self.ti.typeId(interned),
             .functions = funcs,
             .is_err = node.is_err,
         } },
@@ -938,12 +936,16 @@ fn array(self: *Self, expr: *const Ast.Array, ctx: *Context) Result {
         pure = pure and val_res.ti.comp_time;
         values.appendAssumeCapacity(val_instr);
     }
+    const ty = self.ti.intern(.{ .array = .{ .child = self.mergeTypes(types.keys()) } });
 
     return .{
-        .type = self.ti.intern(.{ .array = .{ .child = self.mergeTypes(types.keys()) } }),
+        .type = ty,
         .ti = .{ .comp_time = pure },
         .instr = self.irb.addInstr(
-            .{ .array = .{ .values = values.toOwnedSlice(self.allocator) catch oom() } },
+            .{ .array = .{
+                .values = values.toOwnedSlice(self.allocator) catch oom(),
+                .type_id = self.ti.typeId(ty),
+            } },
             self.ast.getSpan(expr).start,
         ),
     };
@@ -2257,8 +2259,15 @@ fn matchType(
         }
 
         arms.appendAssumeCapacity(.{
-            .type_id = arm_type,
+            .type_id = self.ti.typeId(arm_type),
             .body = body_res.instr,
+            .kind = switch (arm_type.*) {
+                .int => .int,
+                .float => .float,
+                .bool => .bool,
+                .str => .str,
+                else => .obj,
+            },
         });
         types.add(self.allocator, body_res.type) catch oom();
         arms_return.appendAssumeCapacity(!body_res.type.is(.void));
@@ -2799,18 +2808,18 @@ fn performTypeCoercion(self: *Self, decl: *const Type, value: *const Type, decl_
     }
 
     check: {
-        if (value.is(.array)) {
-            return self.checkArrayType(decl, value, span) catch |e| switch (e) {
-                error.mismatch => break :check,
-                else => |narrowed| return narrowed,
-            };
-        } else if (decl.is(.@"union")) {
+        if (decl.is(.@"union")) {
             return checkUnionType(decl, value) catch |e| return switch (e) {
                 error.Mismatch => break :check,
                 error.NotInUnion => self.err(
                     .{ .type_not_in_union = .{ .expect = self.typeName(decl), .found = self.typeName(value) } },
                     span,
                 ),
+            };
+        } else if (value.is(.array)) {
+            return self.checkArrayType(decl, value, span) catch |e| switch (e) {
+                error.mismatch => break :check,
+                else => |narrowed| return narrowed,
             };
         } else if (value.is(.function)) {
             return self.checkFunctionEq(decl, value) catch break :check;
