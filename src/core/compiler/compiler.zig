@@ -1093,9 +1093,10 @@ const Compiler = struct {
 
         // If we use match directly on return value, it sits on top of stack, so we have to remove
         // it manually while leaving the result of the match on top of stack
-        if (data.is_match) {
-            // If the match didn't return any value, just pop from top, otherwise swap match res
-            self.writeOp(if (self.at(data.rhs).match.is_expr) .swap_pop else .pop);
+        switch (data.kind) {
+            .match => self.writeOp(if (self.at(data.rhs).match.is_expr) .swap_pop else .pop),
+            .match_is => self.writeOp(if (self.at(data.rhs).match_type.is_expr) .swap_pop else .pop),
+            else => {},
         }
     }
 

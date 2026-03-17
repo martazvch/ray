@@ -512,7 +512,7 @@ fn structLiteral(self: *Self, data: *const Instruction.StructLiteral) void {
 }
 
 fn trap(self: *Self, data: Instruction.Trap) void {
-    self.indentAndAppendSlice("[Trap]");
+    self.indentAndPrintSlice("[Trap {t}]", .{data.kind});
     self.indentAndAppendSlice("- lhs");
     self.indent_level += 1;
     self.parseInstr(data.lhs);

@@ -40,7 +40,7 @@
 
 [Function declaration main]
     [Print]
-        [Trap]
+        [Trap expr]
         - lhs
             [Call symbol 1]
                 - args
@@ -54,7 +54,7 @@
                     [Constant index 8]
                         [Int 88]
     [Print]
-        [Trap]
+        [Trap match]
         - lhs
             [Call symbol 1]
                 - args
@@ -78,7 +78,7 @@
                 - wildcard:
                     [Constant index 10]
                         [Int 4]
-        [Trap]
+        [Trap match]
         - lhs
             [Call symbol 1]
                 - args
@@ -105,7 +105,7 @@
                         [Constant index 10]
                             [Int 4]
             [Print]
-                [Trap]
+                [Trap expr]
                 - lhs
                     [Call symbol 1]
                         - args

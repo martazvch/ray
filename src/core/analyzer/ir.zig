@@ -255,7 +255,9 @@ pub const Instruction = struct {
     pub const Trap = struct {
         lhs: Index,
         rhs: Index,
-        is_match: bool,
+        kind: Kind,
+
+        pub const Kind = enum { expr, match, match_is };
     };
     pub const Unary = struct {
         op: Op,

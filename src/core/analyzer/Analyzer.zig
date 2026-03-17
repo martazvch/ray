@@ -46,6 +46,7 @@ pub const Context = struct {
     self_type: ?*const Type,
     in_call: bool,
     in_for: bool,
+    in_trap: bool,
 
     pub const empty: Context = .{
         .decl_type = null,
@@ -53,6 +54,7 @@ pub const Context = struct {
         .self_type = null,
         .in_call = false,
         .in_for = false,
+        .in_trap = false,
     };
 
     const ContextSnapshot = struct {
@@ -2116,13 +2118,7 @@ fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Resul
 
     return switch (expr.body) {
         .value => |v| self.matchValue(v, value, value_span, expr.kw, expect, ctx),
-        .type => |t| {
-            if (!value.type.is(.@"union")) return self.err(
-                .{ .match_is_non_union = .{ .found = self.typeName(value.type) } },
-                value_span,
-            );
-            return self.matchType(t, value, value_span, expr.kw, alias, expect, ctx);
-        },
+        .type => |t| return self.matchType(t, value, value_span, expr.kw, alias, expect, ctx),
     };
 }
 
@@ -2240,9 +2236,13 @@ fn matchType(
     expect: ExprResKind,
     ctx: *Context,
 ) Result {
-    // Checked in callee
+    if (!value.type.is(.@"union")) return self.err(
+        .{ .match_is_non_union = .{ .found = self.typeName(value.type) } },
+        value_span,
+    );
+
     const union_ty: Type.Union = value.type.as(.@"union").?;
-    var matcher: matchers.Union = .init(self, union_ty, alias, value, value_span, kw);
+    var matcher: matchers.Union = .init(self, union_ty, alias, ctx.in_trap, value, value_span, kw);
     defer matcher.terminate();
 
     var types: Set(*const Type) = .empty;
@@ -2550,9 +2550,12 @@ fn trap(self: *Self, expr: Ast.Trap, expect: ExprResKind, ctx: *Context) Result 
         self.ast.getSpan(expr.lhs),
     );
 
-    const rhs = switch (expr.rhs) {
-        .match => |m| try self.trapMatch(m, err_type, expect, ctx),
-        .binding => |b| try self.trapIdent(b, err_type, expect, ctx),
+    const prev_in_trap = ctx.setAndGetPrevious(.in_trap, true);
+    defer ctx.in_trap = prev_in_trap;
+
+    const rhs, const is_match = switch (expr.rhs) {
+        .match => |m| .{ try self.trapMatch(m, err_type, expect, ctx), true },
+        .binding => |b| .{ try self.trapIdent(b, err_type, expect, ctx), false },
     };
 
     return .{
@@ -2561,7 +2564,12 @@ fn trap(self: *Self, expr: Ast.Trap, expect: ExprResKind, ctx: *Context) Result 
             .{ .trap = .{
                 .lhs = lhs.instr,
                 .rhs = rhs.instr,
-                .is_match = expr.rhs == .match,
+                .kind = if (!is_match)
+                    .expr
+                else if (expr.rhs.match.match.body == .value)
+                    .match
+                else
+                    .match_is,
             } },
             self.ast.getSpan(expr).start,
         ),

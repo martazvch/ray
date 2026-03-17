@@ -415,6 +415,7 @@ pub const String = struct {
 pub const Union = struct {
     proto: Type.Union.Proto,
     alias: ?usize,
+    in_trap: bool,
     value: InstrInfos,
     value_var: ?*Variable,
     value_span: Span,
@@ -424,15 +425,29 @@ pub const Union = struct {
 
     const Self = @This();
 
-    pub fn init(ana: *Analyzer, ty: Type.Union, alias: ?usize, value: InstrInfos, value_span: Span, kw: Ast.TokenIndex) Self {
+    pub fn init(
+        ana: *Analyzer,
+        ty: Type.Union,
+        alias: ?usize,
+        in_trap: bool,
+        value: InstrInfos,
+        value_span: Span,
+        kw: Ast.TokenIndex,
+    ) Self {
         const value_instr = ana.irb.getInstr(value.instr);
         const is_ident = value_instr == .identifier;
 
         return .{
             .proto = ty.proto(ana.allocator),
             .alias = alias,
+            .in_trap = in_trap,
             .value = value,
-            .value_var = if (is_ident) ana.scope.getVarInCurrentScopeAt(value_instr.identifier.index) else null,
+            // If we are in `trap` expression, the identifier doesn't refer to a variable,
+            // it's the binding name for the error
+            .value_var = if (is_ident and !in_trap)
+                ana.scope.getVarInCurrentScopeAt(value_instr.identifier.index)
+            else
+                null,
             .value_span = value_span,
             .value_base_type = value.type,
             .match_kw = kw,
@@ -460,10 +475,10 @@ pub const Union = struct {
         gop.value_ptr.* = true;
 
         // Defines alias' type inside this arm
-        if (self.alias) |al| {
+        if (!self.in_trap) if (self.alias) |al| {
             const alias_variable = ana.scope.getVarInCurrentScopeAt(al);
             alias_variable.type = arm_type;
-        }
+        };
 
         // Same if matched on value is an identifier
         if (self.value_var) |v| {
