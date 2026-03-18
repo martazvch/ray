@@ -197,6 +197,7 @@ pub fn analyzeNode(self: *Self, node: *const Node, expect: ExprResKind, ctx: *Co
         .multi_var_decl => |*n| try self.multiVarDecl(n, ctx),
         .print => |n| try self.print(n, ctx),
         .struct_decl => |*n| try self.structDecl(n, ctx),
+        .trait_decl => unreachable,
         .use => |*n| b: {
             try self.use(n);
             // TODO: replace with a error.Noop to skip it?
@@ -463,7 +464,7 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
     ctx.decl_type = fn_type.return_type;
     defer ctx.decl_type = null;
 
-    const body_instrs, const returns = try self.fnBody(node.body.nodes, &fn_type, span, ctx);
+    const body_instrs, const returns = try self.fnBody(node.body, &fn_type, span, ctx);
     _ = self.scope.close();
 
     // If it's a closure, it lives on the stack at runtime
@@ -569,16 +570,19 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
 }
 
 /// Analyses function's body returning all of the instructions and a flag indicating if the function returns
-fn fnBody(self: *Self, body: []Node, fn_type: *const Type.Function, name_span: Span, ctx: *Context) Error!struct { []const InstrIndex, bool } {
+fn fnBody(self: *Self, fn_body: ?Ast.Block, fn_type: *const Type.Function, name_span: Span, ctx: *Context) Error!struct { []const InstrIndex, bool } {
+    const body = fn_body orelse return .{ &.{}, false };
+    const nodes = body.nodes;
+
     const err_count = self.errs.items.len;
     var final_type: *const Type = self.ti.getCached(.void);
     var returns = false;
-    const len = body.len;
+    const len = nodes.len;
 
     var instrs: ArrayList(InstrIndex) = .empty;
-    instrs.ensureTotalCapacity(self.allocator, body.len) catch oom();
+    instrs.ensureTotalCapacity(self.allocator, nodes.len) catch oom();
 
-    for (body, 0..) |*n, i| {
+    for (nodes, 0..) |*n, i| {
         const last = i == len - 1;
 
         // We try to analyze the whole body
@@ -603,7 +607,7 @@ fn fnBody(self: *Self, body: []Node, fn_type: *const Type.Function, name_span: S
 
     // If you had an error, we don't even check this
     if (err_count == self.errs.items.len and !returns and !fn_type.return_type.is(.void)) {
-        const span = if (body.len == 0) name_span else self.ast.getSpan(body[body.len - 1]);
+        const span = if (nodes.len == 0) name_span else self.ast.getSpan(nodes[nodes.len - 1]);
         return self.err(.{ .fn_expect_value = .{ .expect = self.typeName(fn_type.return_type) } }, span);
     }
 
@@ -1271,7 +1275,7 @@ fn closure(self: *Self, expr: *const Ast.FnDecl, ctx: *Context) Result {
     const offset = span.start;
 
     ctx.fn_type = interned_type;
-    const body_instrs, const returns = try self.fnBody(expr.body.nodes, &closure_type, span, ctx);
+    const body_instrs, const returns = try self.fnBody(expr.body, &closure_type, span, ctx);
 
     // TODO: protect the cast
     return .{

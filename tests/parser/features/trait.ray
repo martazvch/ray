@@ -1,0 +1,7 @@
+trait Foo {
+    fn eq(self, other: int) -> float
+    fn hash(self, other: int) {
+        print self
+        print other
+    }
+}

@@ -114,6 +114,21 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
 
             try self.closeKey(.block, comma);
         },
+        .trait_decl => |n| {
+            try self.openKey(@tagName(node.*), .block);
+            try self.pushKeyValue("name", self.ast.toSource(n.name), true);
+            if (n.functions.len == 0) {
+                try self.emptyKey("functions", .list, false);
+            } else {
+                try self.openKey("functions", .list);
+                for (n.functions, 0..) |*f, i| {
+                    const last = i != n.functions.len - 1;
+                    try self.renderFnDecl(self.ast.toSource(f.name), f, last);
+                }
+                try self.closeKey(.list, false);
+            }
+            try self.closeKey(.block, comma);
+        },
         .use => |n| {
             try self.openKey("use", .block);
 
@@ -204,7 +219,11 @@ fn renderFnDecl(self: *Self, name: []const u8, decl: *const Ast.FnDecl, comma: b
     }
 
     try self.pushKeyValue("return_type", if (decl.return_type) |ret| try self.renderType(ret) else "void", true);
-    try self.renderAnonBlock(&decl.body, "body", false);
+    if (decl.body) |*b| {
+        try self.renderAnonBlock(b, "body", false);
+    } else {
+        try self.emptyKey("body", .list, false);
+    }
     try self.closeKey(.block, comma);
 }
 

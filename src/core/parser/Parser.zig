@@ -30,12 +30,14 @@ const Context = struct {
     panic_mode: bool,
     in_cond: bool,
     in_group: bool,
+    in_trait: bool,
     label: ?TokenIndex,
 
     pub const empty: Context = .{
         .panic_mode = false,
         .in_cond = false,
         .in_group = false,
+        .in_trait = false,
         .label = null,
     };
 
@@ -294,25 +296,6 @@ fn enumTag(self: *Self) Error!Ast.EnumDecl.Tag {
 }
 
 fn fnDecl(self: *Self) Error!Node {
-    const fn_def = try self.fnDefinition();
-    const body, const has_callable = try self.block();
-
-    return .{ .fn_decl = .{
-        .name = fn_def.name,
-        .params = fn_def.params,
-        .body = body.block,
-        .return_type = fn_def.return_ty,
-        .has_callable = has_callable,
-        .is_closure = false,
-    } };
-}
-
-const FnDef = struct {
-    name: TokenIndex,
-    params: []Ast.VarDecl,
-    return_ty: ?*Ast.Type,
-};
-fn fnDefinition(self: *Self) Error!FnDef {
     try self.expect(.identifier, .expectName("function"));
     const name = self.token_idx - 1;
 
@@ -323,13 +306,27 @@ fn fnDefinition(self: *Self) Error!FnDef {
 
     const return_type = try self.fnReturnType();
     self.skipNewLines();
-    try self.expect(.left_brace, .expectBraceBefore("function"));
 
-    return .{
+    const body: ?Ast.Block, const has_callable = body: {
+        if (!self.match(.left_brace)) {
+            if (self.ctx.in_trait) {
+                break :body .{ null, false };
+            } else {
+                return self.errAtPrev(.expectBraceBefore("function"));
+            }
+        }
+        const block_expr, const has_callable = try self.block();
+        break :body .{ block_expr.block, has_callable };
+    };
+
+    return .{ .fn_decl = .{
         .name = name,
         .params = params,
-        .return_ty = return_type,
-    };
+        .body = body,
+        .return_type = return_type,
+        .has_callable = has_callable,
+        .is_closure = false,
+    } };
 }
 
 fn fnParams(self: *Self, is_closure: bool) Error![]Ast.VarDecl {
@@ -478,7 +475,7 @@ fn containerFnDecls(self: *Self, kind: []const u8) Error![]Ast.FnDecl {
     var functions: ArrayList(Ast.FnDecl) = .empty;
 
     while (!self.check(.right_brace) and !self.check(.eof)) {
-        try self.expect(.@"fn", .{ .expect_fn_in_container = .{ .kind = kind } });
+        try self.expect(.@"fn", .{ .expect_fn_end_container = .{ .kind = kind } });
         functions.append(self.allocator, (try self.fnDecl()).fn_decl) catch oom();
         self.skipNewLines();
     }
@@ -491,11 +488,18 @@ fn containerFnDecls(self: *Self, kind: []const u8) Error![]Ast.FnDecl {
 fn traitDecl(self: *Self) !Node {
     try self.expect(.identifier, .expectName("trait"));
     const name = self.token_idx - 1;
-    _ = name; // autofix
     self.skipNewLines();
     try self.expectOrErrAtPrev(.left_brace, .expectBraceBefore("trait"));
     self.skipNewLines();
-    unreachable;
+
+    self.ctx.in_trait = true;
+    defer self.ctx.in_trait = false;
+    const functions = try self.containerFnDecls("trait");
+
+    return .{ .trait_decl = .{
+        .name = name,
+        .functions = functions,
+    } };
 }
 
 fn varDecl(self: *Self) Error!Node {

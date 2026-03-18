@@ -1,0 +1,48 @@
+{
+    "trait_decl": {
+        "name": "Foo",
+        "functions": [
+            "fn_decl": {
+                "name": "eq",
+                "params": [
+                    {
+                        "name": "self",
+                        "type": "Self",
+                        "value": {}
+                    },
+                    {
+                        "name": "other",
+                        "type": "int",
+                        "value": {}
+                    }
+                ],
+                "return_type": "float",
+                "body": []
+            },
+            "fn_decl": {
+                "name": "hash",
+                "params": [
+                    {
+                        "name": "self",
+                        "type": "Self",
+                        "value": {}
+                    },
+                    {
+                        "name": "other",
+                        "type": "int",
+                        "value": {}
+                    }
+                ],
+                "return_type": "void",
+                "body": [
+                    "print": {
+                        "self": "{}"
+                    },
+                    "print": {
+                        "identifier": "other"
+                    }
+                ]
+            }
+        ]
+    }
+}

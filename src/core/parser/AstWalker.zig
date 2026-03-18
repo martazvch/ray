@@ -141,8 +141,10 @@ fn functionCaptures(self: *Self, node: *Ast.FnDecl, ctx: *CaptureCtx) void {
         const interned = self.interner.intern(self.ast.toSource(p.name));
         ctx.declareLocal(self.allocator, interned, p);
     }
-    for (node.body.nodes) |*n| {
-        self.captureFromNode(n, ctx);
+    if (node.body) |b| {
+        for (b.nodes) |*n| {
+            self.captureFromNode(n, ctx);
+        }
     }
 
     const scope = ctx.close();
@@ -177,6 +179,11 @@ fn captureFromNode(self: *Self, node: *Ast.Node, ctx: *CaptureCtx) void {
         },
         .print => |expr| self.captureFromExpr(expr, ctx),
         .struct_decl => {},
+        .trait_decl => |expr| {
+            for (expr.functions) |*f| {
+                self.functionCaptures(f, ctx);
+            }
+        },
         .use => {},
         .var_decl => |*n| {
             if (n.value) |val| {

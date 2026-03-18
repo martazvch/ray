@@ -22,6 +22,7 @@ pub const Node = union(enum) {
     multi_var_decl: MultiVarDecl,
     print: *Expr,
     struct_decl: StructDecl,
+    trait_decl: TraitDecl,
     use: Use,
     var_decl: VarDecl,
     @"while": While,
@@ -54,7 +55,7 @@ pub const EnumDecl = struct {
 pub const FnDecl = struct {
     name: TokenIndex,
     params: []VarDecl,
-    body: Block,
+    body: ?Block,
     return_type: ?*Type,
     has_callable: bool,
     is_closure: bool,
@@ -107,6 +108,11 @@ pub const Type = union(enum) {
 pub const StructDecl = struct {
     name: TokenIndex,
     fields: []VarDecl,
+    functions: []FnDecl,
+};
+
+pub const TraitDecl = struct {
+    name: TokenIndex,
     functions: []FnDecl,
 };
 
@@ -374,7 +380,7 @@ pub fn getSpan(self: *const @This(), anynode: anytype) Span {
             .start = self.token_spans[node.for_tk].start,
             .end = self.getSpan(node.body).end,
         },
-        FnDecl, StructDecl, VarDecl => self.token_spans[node.name],
+        FnDecl, StructDecl, TraitDecl, VarDecl => self.token_spans[node.name],
         MultiVarDecl => .{
             .start = self.getSpan(node.decls[0]).start,
             .end = self.getSpan(node.decls[node.decls.len - 1]).end,
