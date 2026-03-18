@@ -1,7 +1,7 @@
 expect_arrow_before_arm_body
 expect_expr, }
 
-expect_brace_before_match_body
+expect_brace_before, match
 expect_expr, }
 
 expect_new_line_pm_arm
@@ -16,6 +16,6 @@ match_wildcard_not_last
 
 match_duplicate_wildcard
 
-expect_type_name
+expect_name, type
 
-expect_brace_after_match_type
+expect_brace_after, arm's body

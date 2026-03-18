@@ -1,11 +1,11 @@
-expect_struct_name
+expect_name, structure
 missing_comma_after_field
 expect_fn_in_container, structure
 expect_field_type_or_default
-expect_field_name
+expect_name, field
 // Because how synchronize works in parser
 expect_expr, }
-expect_brace_before_struct_body
+expect_brace_before, structure
 expect_fn_in_container, structure
 // Because how synchronize works in parser
 expect_expr, }

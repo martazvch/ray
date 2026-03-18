@@ -284,8 +284,6 @@ const Compiler = struct {
         const chunk = &self.function.chunk;
         // +2 for the two 8bits jump value (cf emit jump)
         const jump_offset = offset - loop_start + 2;
-        std.log.debug("Offset: {}, loop_start: {}", .{ offset, loop_start });
-        std.log.debug("Jump offset: {}", .{jump_offset});
 
         // TODO: Error handling
         if (jump_offset > std.math.maxInt(u16)) {

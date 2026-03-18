@@ -242,6 +242,8 @@ fn declaration(self: *Self) Error!Node {
         self.fnDecl()
     else if (self.match(.@"struct"))
         self.structDecl()
+    else if (self.match(.trait))
+        self.traitDecl()
     else if (self.match(.use))
         self.use()
     else
@@ -251,7 +253,7 @@ fn declaration(self: *Self) Error!Node {
 fn enumDecl(self: *Self, is_err: bool) Error!Node {
     const tk = self.token_idx - 1;
     const name = if (self.matchAndSkip(.identifier)) self.token_idx - 1 else null;
-    try self.expect(.left_brace, .expect_brace_before_enum_body);
+    try self.expect(.left_brace, .expectBraceBefore("enum"));
     self.skipNewLines();
 
     var tags: ArrayList(Ast.EnumDecl.Tag) = .empty;
@@ -292,7 +294,26 @@ fn enumTag(self: *Self) Error!Ast.EnumDecl.Tag {
 }
 
 fn fnDecl(self: *Self) Error!Node {
-    try self.expect(.identifier, .expect_fn_name);
+    const fn_def = try self.fnDefinition();
+    const body, const has_callable = try self.block();
+
+    return .{ .fn_decl = .{
+        .name = fn_def.name,
+        .params = fn_def.params,
+        .body = body.block,
+        .return_type = fn_def.return_ty,
+        .has_callable = has_callable,
+        .is_closure = false,
+    } };
+}
+
+const FnDef = struct {
+    name: TokenIndex,
+    params: []Ast.VarDecl,
+    return_ty: ?*Ast.Type,
+};
+fn fnDefinition(self: *Self) Error!FnDef {
+    try self.expect(.identifier, .expectName("function"));
     const name = self.token_idx - 1;
 
     try self.expect(.left_paren, .expect_paren_after_fn_name);
@@ -302,18 +323,13 @@ fn fnDecl(self: *Self) Error!Node {
 
     const return_type = try self.fnReturnType();
     self.skipNewLines();
-    try self.expect(.left_brace, .expect_brace_before_fn_body);
+    try self.expect(.left_brace, .expectBraceBefore("function"));
 
-    const body, const has_callable = try self.block();
-
-    return .{ .fn_decl = .{
+    return .{
         .name = name,
         .params = params,
-        .body = body.block,
-        .return_type = return_type,
-        .has_callable = has_callable,
-        .is_closure = false,
-    } };
+        .return_ty = return_type,
+    };
 }
 
 fn fnParams(self: *Self, is_closure: bool) Error![]Ast.VarDecl {
@@ -364,7 +380,7 @@ fn fnParams(self: *Self, is_closure: bool) Error![]Ast.VarDecl {
         }
 
         if (param_names.items.len == 0) {
-            try self.expect(.identifier, .{ .expect_name = .{ .kind = "parameter" } });
+            try self.expect(.identifier, .expectName("parameter"));
         }
 
         const typ = if (self.match(.colon)) try self.parseType() else null;
@@ -404,10 +420,10 @@ fn fnReturnType(self: *Self) Error!?*Ast.Type {
 }
 
 fn structDecl(self: *Self) !Node {
-    try self.expect(.identifier, .expect_struct_name);
+    try self.expect(.identifier, .expectName("structure"));
     const name = self.token_idx - 1;
     self.skipNewLines();
-    try self.expectOrErrAtPrev(.left_brace, .expect_brace_before_struct_body);
+    try self.expectOrErrAtPrev(.left_brace, .expectBraceBefore("structure"));
     self.skipNewLines();
 
     var fields: ArrayList(Ast.VarDecl) = .empty;
@@ -419,7 +435,7 @@ fn structDecl(self: *Self) !Node {
         defer field_names.clearRetainingCapacity();
 
         if (!self.check(.identifier))
-            return self.errAtCurrent(.expect_field_name);
+            return self.errAtCurrent(.expectName("field"));
 
         // Support sharing type across fields
         while (self.match(.identifier)) {
@@ -472,10 +488,20 @@ fn containerFnDecls(self: *Self, kind: []const u8) Error![]Ast.FnDecl {
     return functions.toOwnedSlice(self.allocator) catch oom();
 }
 
+fn traitDecl(self: *Self) !Node {
+    try self.expect(.identifier, .expectName("trait"));
+    const name = self.token_idx - 1;
+    _ = name; // autofix
+    self.skipNewLines();
+    try self.expectOrErrAtPrev(.left_brace, .expectBraceBefore("trait"));
+    self.skipNewLines();
+    unreachable;
+}
+
 fn varDecl(self: *Self) Error!Node {
     const is_const = self.prev(.tag) == .let;
     const name = self.token_idx;
-    try self.expect(.identifier, .{ .expect_name = .{ .kind = "variable" } });
+    try self.expect(.identifier, .expectName("variable"));
 
     if (self.check(.comma)) {
         return self.multiVarDecl(name, is_const);
@@ -506,7 +532,7 @@ fn multiVarDecl(self: *Self, first_name: usize, is_const: bool) Error!Node {
     var variables: ArrayList(usize) = .empty;
 
     while (self.match(.comma)) {
-        try self.expect(.identifier, .{ .expect_name = .{ .kind = "variable" } });
+        try self.expect(.identifier, .expectName("variable"));
         variables.append(self.allocator, self.token_idx - 1) catch oom();
     }
 
@@ -624,7 +650,7 @@ fn parseType(self: *Self) Error!*Ast.Type {
     }
     // Unknown
     else {
-        return self.errAtCurrent(.expect_type_name);
+        return self.errAtCurrent(.expectName("type"));
     }
 
     // Inline union
@@ -676,7 +702,7 @@ fn use(self: *Self) Error!Node {
     }
 
     if (!self.check(.identifier)) {
-        return self.errAtCurrent(.{ .expect_name = .{ .kind = "module" } });
+        return self.errAtCurrent(.expectName("module"));
     }
 
     while (self.match(.identifier) and !self.check(.eof)) {
@@ -814,7 +840,7 @@ fn forLoop(self: *Self) Error!Node {
     defer self.ctx.in_cond = save_cond;
     const expr = try self.parsePrecedenceExpr(0);
 
-    try self.expect(.left_brace, .expect_brace_before_for_body);
+    try self.expect(.left_brace, .expectBraceBefore("for"));
     const body = try self.blockExpr(label);
 
     return .{ .for_loop = .{
@@ -843,7 +869,7 @@ fn whileStmt(self: *Self) Error!Node {
     const body = if (self.isAtBlock())
         try self.blockExpr(label)
     else
-        return self.errAtCurrent(.expect_brace_after_while_cond);
+        return self.errAtCurrent(.expectBraceAfter("while's condition"));
 
     return .{ .@"while" = .{
         .pattern = cond,
@@ -1135,7 +1161,7 @@ fn closure(self: *Self) Error!*Expr {
 
     const return_type = try self.fnReturnType();
     self.skipNewLines();
-    try self.expect(.left_brace, .expect_brace_before_fn_body);
+    try self.expect(.left_brace, .expectBraceBefore("function"));
 
     const body, _ = try self.block();
 
@@ -1264,7 +1290,7 @@ fn matchExpr(self: *Self) Error!*Expr {
     const match_type = self.match(.is);
 
     self.skipNewLines();
-    try self.expectOrErrAtPrev(.left_brace, .expect_brace_before_match_body);
+    try self.expectOrErrAtPrev(.left_brace, .expectBraceBefore("match"));
     const opening_brace = self.token_idx - 1;
     self.skipNewLines();
 
@@ -1361,7 +1387,7 @@ fn matchTypeSubMatch(self: *Self) Error!Ast.Match.TypeArm.BodyKind {
     self.skipNewLines();
 
     const arms = try self.matchValue();
-    try self.expect(.right_brace, .expect_brace_after_match_type);
+    try self.expect(.right_brace, .expectBraceAfter("arm's body"));
 
     return .{ .patmat = arms.value };
 }
@@ -1533,7 +1559,7 @@ fn structLiteral(self: *Self, expr: *Expr) Error!*Expr {
         if (!self.match(.comma)) break;
         self.skipNewLines();
     }
-    try self.expect(.right_brace, .expect_brace_after_struct_lit);
+    try self.expect(.right_brace, .expectBraceAfter("structure's name"));
 
     struct_lit.* = .{ .struct_literal = .{
         .structure = expr,

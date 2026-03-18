@@ -1,3 +1,3 @@
-expect_brace_after_while_cond
-expect_brace_after_while_cond
+expect_brace_after, while's condition
+expect_brace_after, while's condition
 expect_expr, while
