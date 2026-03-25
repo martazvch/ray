@@ -26,7 +26,7 @@ ret
 
 -- main --
 load_constant index 7, value 15
-call_sym index 2, arity 1, <function failable>
+call index 0, arity 1, failable
 jump_no_err 5 -> 69
 get_local index 0
 dup
@@ -68,7 +68,7 @@ swap_pop
 print
 
 load_constant index 7, value 15
-call_sym index 2, arity 1, <function failable>
+call index 0, arity 1, failable
 jump_no_err 76 -> 91
 get_local index 0
 print
@@ -82,4 +82,4 @@ print
 
 ret_naked
 -- global scope --
-call_sym index 3, arity 0, <function main>
+call index 1, arity 0, main

@@ -80,8 +80,8 @@
                     - tag
                     1
     [Variable declaration index: 2, scope: local]
-        [Call symbol 2]
+        [Call symbol 0]
     [Print]
-        [Field access 3]
+        [Field access 1]
             [Variable index: 2, scope: local]
-        [Invoke symbol 3]
+        [Invoke symbol 1]

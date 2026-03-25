@@ -7,7 +7,7 @@ load_constant index 3, value 8
 push_true
 load_constant index 4, value yup
 load_constant index 4, value yup
-struct_lit index 0, arity 6, <structure Vec2>
+struct_lit index 0, arity 6, Vec2
 
 load_constant index 8, value 3
 load_constant index 10, value 99
@@ -15,10 +15,10 @@ load_constant index 7, value 7
 push_false
 load_constant index 4, value yup
 load_constant index 9, value Tom
-struct_lit index 0, arity 6, <structure Vec2>
+struct_lit index 0, arity 6, Vec2
 set_local index 0
 
 ret_naked
 
 -- global scope --
-call_sym index 1, arity 0, <function main>
+call index 0, arity 0, main

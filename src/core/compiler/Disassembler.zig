@@ -5,17 +5,16 @@ const Allocator = std.mem.Allocator;
 const Writer = std.Io.Writer;
 
 const Value = @import("../runtime/values.zig").Value;
+const Obj = @import("../runtime/Obj.zig");
 const oom = @import("misc").oom;
 const Chunk = @import("Chunk.zig");
 const OpCode = Chunk.OpCode;
 const Module = @import("../pipeline/ModuleManager.zig").Module;
 
 chunk: *const Chunk,
-globals: []const Value,
-symbols: []const Value,
-constants: []const Value,
-natives: []const Value,
+natives: []const *Obj.NativeFunction,
 render_mode: RenderMode,
+module: *const Module,
 wide: bool,
 
 prev_line: usize = 0,
@@ -23,14 +22,12 @@ prev_line: usize = 0,
 const Self = @This();
 pub const RenderMode = enum { normal, @"test" };
 
-pub fn init(chunk: *const Chunk, module: *const Module, natives: []const Value) Self {
+pub fn init(chunk: *const Chunk, module: *const Module, natives: []const *Obj.NativeFunction) Self {
     return .{
         .chunk = chunk,
-        .globals = module.globals,
-        .symbols = module.symbols,
-        .constants = module.constants,
         .render_mode = if (options.test_mode) .@"test" else .normal,
         .natives = natives,
+        .module = module,
         .wide = false,
     };
 }
@@ -84,18 +81,18 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .array_set => self.simpleInstruction(writer, "array_set", offset),
         .bound_method => self.indexInstruction(writer, "bound_method", offset),
         .box => self.simpleInstruction(writer, "box", offset),
-        .call => self.indexInstruction(writer, "call", offset),
-        .call_array_fn => self.callObjFn(writer, .array, offset),
-        .call_str_fn => self.callObjFn(writer, .string, offset),
-        .call_sym => self.callSym(writer, offset),
-        .call_sym_ext => self.callExtSym(writer, offset),
-        .call_native => self.callNativeSym(writer, offset),
+        .call_any => self.indexInstruction(writer, "call", offset),
+        .call_array, .call_string => self.callObjFn(writer, op, offset),
+        .call => self.call(writer, offset),
+        .call_ext => self.callExt(writer, offset),
+        .call_native => self.callNative(writer, offset),
         .closure => self.indexInstruction(writer, "closure", offset),
         .def_global => self.indexInstruction(writer, "def_global", offset),
         .div_float => self.simpleInstruction(writer, "div_float", offset),
         .div_int => self.simpleInstruction(writer, "div_int", offset),
         .dup => self.simpleInstruction(writer, "dup", offset),
-        .enum_create => self.indexInstruction(writer, "enum_create", offset),
+        .enum_lit => self.enumLiteral(writer, offset),
+        .enum_lit_ext => self.enumLiteralExt(writer, offset),
         .eq_bool => self.simpleInstruction(writer, "eq_bool", offset),
         .eq_float => self.simpleInstruction(writer, "eq_float", offset),
         .eq_int => self.simpleInstruction(writer, "eq_int", offset),
@@ -149,9 +146,9 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .load_blk_val => self.simpleInstruction(writer, "load_blk_val", offset),
         .load_constant => self.constantInstruction(writer, "load_constant", offset),
         .load_ext_constant => self.extConstantInstruction(writer, "load_ext_constant", offset),
-        .load_ext_sym => self.indexExternInstruction(writer, "load_extern_sym", offset),
-        .load_builtin => self.indexInstruction(writer, "load_builtin", offset),
-        .load_sym => self.loadSymbol(writer, offset),
+        .load_fn => self.loadSymbol(writer, offset),
+        .load_fn_ext => self.indexExternInstruction(writer, "load_fn_ext", offset),
+        .load_fn_builtin => self.indexInstruction(writer, "load_fn_builtin", offset),
         .loop => self.jumpInstruction(writer, "loop", -1, offset),
         .mod_float => self.simpleInstruction(writer, "mod_float", offset),
         .mod_int => self.simpleInstruction(writer, "mod_int", offset),
@@ -232,8 +229,8 @@ fn indexInstruction(self: *Self, writer: *Writer, name: []const u8, offset: usiz
 }
 
 fn indexExternInstruction(self: *Self, writer: *Writer, name: []const u8, offset: usize) Writer.Error!usize {
-    const index = self.chunk.code.items[offset + 1];
-    const module = self.chunk.code.items[offset + 2];
+    const module = self.chunk.code.items[offset + 1];
+    const index = self.chunk.code.items[offset + 2];
 
     if (self.render_mode == .@"test") {
         try writer.print("{s} index {}, module {}\n", .{ name, module, index });
@@ -267,7 +264,7 @@ fn getGlobal(self: *Self, writer: *Writer, cow: bool, offset: usize) Writer.Erro
         try writer.print("{s:<20} index {:>4}", .{ text, index });
     }
 
-    if (self.globals[index].asObj()) |obj| {
+    if (self.module.globals[index].asObj()) |obj| {
         try writer.writeAll(", ");
         try obj.print(writer);
     }
@@ -278,7 +275,7 @@ fn getGlobal(self: *Self, writer: *Writer, cow: bool, offset: usize) Writer.Erro
 
 fn constantInstruction(self: *Self, writer: *Writer, name: []const u8, offset: usize) Writer.Error!usize {
     const index = self.getIndex(offset);
-    const value = self.constants[index.value];
+    const value = self.module.constants[index.value];
 
     if (self.render_mode == .@"test") {
         try writer.print("{s} index {}, value ", .{ name, index.value });
@@ -318,18 +315,14 @@ fn jumpInstruction(self: *Self, writer: *Writer, name: []const u8, sign: isize, 
 }
 
 fn loadSymbol(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
-    const text = "load_sym";
+    const text = "load_fn";
     const idx = self.chunk.code.items[offset + 1];
-    const sym = self.symbols[idx].obj;
-
-    var buf: [512]u8 = undefined;
-    var bw = std.Io.Writer.fixed(&buf);
-    sym.print(&bw) catch oom();
+    const func = self.module.functions[idx];
 
     if (self.render_mode == .@"test") {
-        try writer.print("{s} index {}, {s}\n", .{ text, idx, bw.buffered() });
+        try writer.print("{s} index {}, {s}\n", .{ text, idx, func.name });
     } else {
-        try writer.print("{s:<20} index {:>4}, {s}\n", .{ text, idx, bw.buffered() });
+        try writer.print("{s:<20} index {:>4}, {s}\n", .{ text, idx, func.name });
     }
 
     return offset + 2;
@@ -347,26 +340,23 @@ fn getMember(self: *Self, writer: *Writer, name: []const u8, offset: usize) Writ
     return offset + 2;
 }
 
-fn callSym(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
-    const text = "call_sym";
+fn call(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
+    const text = "call";
     const index = self.chunk.code.items[offset + 1];
     const arity = self.chunk.code.items[offset + 2];
+    const func = self.module.functions[index];
 
     if (self.render_mode == .@"test") {
-        try writer.print("{s} index {}, arity {}, ", .{ text, index, arity });
+        try writer.print("{s} index {}, arity {}, {s}\n", .{ text, index, arity, func.name });
     } else {
-        try writer.print("{s:<20} index {:>4}, arity {:>4}, ", .{ text, index, arity });
+        try writer.print("{s:<20} index {:>4}, arity {:>4}, {s}\n", .{ text, index, arity, func.name });
     }
-
-    const symbol = self.symbols[index];
-    symbol.print(writer);
-    try writer.print("\n", .{});
 
     return offset + 3;
 }
 
-fn callExtSym(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
-    const text = "call_sym_ext";
+fn callExt(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
+    const text = "call_ext";
     const index = self.chunk.code.items[offset + 1];
     const module = self.chunk.code.items[offset + 2];
     const arity = self.chunk.code.items[offset + 3];
@@ -380,52 +370,75 @@ fn callExtSym(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
     return offset + 4;
 }
 
-fn callNativeSym(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
-    const text = "call_sym_native";
+fn callNative(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
+    const text = "call_native";
     const index = self.chunk.code.items[offset + 1];
     const arity = self.chunk.code.items[offset + 2];
+    const native = self.natives[index];
 
     if (self.render_mode == .@"test") {
-        try writer.print("{s} index {}, arity {}, ", .{ text, index, arity });
+        try writer.print("{s} index {}, arity {}, {s}\n", .{ text, index, arity, native.name });
     } else {
-        try writer.print("{s:<20} index {:>4}, arity {:>4}, ", .{ text, index, arity });
+        try writer.print("{s:<20} index {:>4}, arity {:>4}, {s}\n", .{ text, index, arity, native.name });
     }
-
-    const symbol = self.natives[index];
-    symbol.print(writer);
-    try writer.print("\n", .{});
 
     return offset + 3;
 }
 
-fn callObjFn(self: *Self, writer: *Writer, comptime kind: enum { array, string }, offset: usize) Writer.Error!usize {
-    const text = "call_" ++ @tagName(kind) ++ "_fn";
+fn callObjFn(self: *Self, writer: *Writer, op: OpCode, offset: usize) Writer.Error!usize {
     const index = self.chunk.code.items[offset + 1];
     const arity = self.chunk.code.items[offset + 2];
 
     if (self.render_mode == .@"test") {
-        try writer.print("{s} index {}, arity {}\n", .{ text, index, arity });
+        try writer.print("{t} index {}, arity {}\n", .{ op, index, arity });
     } else {
-        try writer.print("{s:<20} index {:>4}, arity {:>4}\n", .{ text, index, arity });
+        try writer.print("{t:<20} index {:>4}, arity {:>4}\n", .{ op, index, arity });
     }
 
     return offset + 3;
+}
+
+fn enumLiteral(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
+    const text = "enum_lit";
+    const index = self.chunk.code.items[offset + 1];
+    const tag = self.chunk.code.items[offset + 2];
+    const sym = self.module.enums[index];
+
+    if (self.render_mode == .@"test") {
+        try writer.print("{s} index {}, tag {}, {s}\n", .{ text, index, tag, sym.name });
+    } else {
+        try writer.print("{s:<20} index {:>4}, tag {:>4}, {s}\n", .{ text, index, tag, sym.name });
+    }
+
+    return offset + 3;
+}
+
+fn enumLiteralExt(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
+    const text = "enum_lit_ext";
+    const index = self.chunk.code.items[offset + 1];
+    const module = self.chunk.code.items[offset + 2];
+    const tag = self.chunk.code.items[offset + 3];
+
+    if (self.render_mode == .@"test") {
+        try writer.print("{s} index {}, module {}, tag {}\n", .{ text, index, module, tag });
+    } else {
+        try writer.print("{s:<20} index {:>4}, module {:>4}, tag {:>4}\n", .{ text, index, module, tag });
+    }
+
+    return offset + 4;
 }
 
 fn structLiteral(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
     const text = "struct_lit";
     const index = self.chunk.code.items[offset + 1];
     const arity = self.chunk.code.items[offset + 2];
+    const sym = self.module.structures[index];
 
     if (self.render_mode == .@"test") {
-        try writer.print("{s} index {}, arity {}, ", .{ text, index, arity });
+        try writer.print("{s} index {}, arity {}, {s}\n", .{ text, index, arity, sym.name });
     } else {
-        try writer.print("{s:<20} index {:>4}, arity {:>4}, ", .{ text, index, arity });
+        try writer.print("{s:<20} index {:>4}, arity {:>4}, {s}\n", .{ text, index, arity, sym.name });
     }
-
-    const symbol = self.symbols[index];
-    symbol.print(writer);
-    try writer.print("\n", .{});
 
     return offset + 3;
 }

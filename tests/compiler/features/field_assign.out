@@ -1,6 +1,6 @@
 -- main --
 load_constant index 3, value Tom
-struct_lit index 0, arity 1, <structure Person>
+struct_lit index 0, arity 1, Person
 
 load_constant index 4, value Martin
 get_local_cow index 0
@@ -8,4 +8,4 @@ set_field index 0
 ret_naked
 
 -- global scope --
-call_sym index 1, arity 0, <function main>
+call index 0, arity 0, main

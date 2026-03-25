@@ -28,7 +28,7 @@
                     [Int 6]
                 [Constant index 7]
                     [Int 7]
-                [Call symbol 1]
+                [Call symbol 0]
     [Print]
         [Indexing array]
             - index
@@ -47,21 +47,21 @@
         [Int 99]
     [Indexing assignment, array]
         - index
-        [Call symbol 1]
+        [Call symbol 0]
         - expr
         [Variable index: 0, scope: local]
     [Constant index 10]
         [Int -9]
     [Indexing assignment, array]
         - index
-        [Call symbol 1]
+        [Call symbol 0]
         - expr
         [Field access 0]
             [Variable index: 2, scope: local]
     [Print]
         [Indexing array]
             - index
-            [Call symbol 1]
+            [Call symbol 0]
             - expr
             [Field access 0]
                 [Variable index: 2, scope: local]

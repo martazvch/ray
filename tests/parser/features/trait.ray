@@ -5,3 +5,31 @@ trait Foo {
         print other
     }
 }
+
+struct Foo {
+    x, y: int
+
+    impl Bar {}
+    impl Baz {
+        fn eq(self, other: str) -> bool {
+            return true
+        }
+        fn hash() {}
+    }
+
+    fn ownFn(self, a: float) {}
+}
+
+enum Foo {
+    x, y,
+
+    impl Bar {}
+    impl Baz {
+        fn eq(self, other: str) -> bool {
+            return true
+        }
+        fn hash() {}
+    }
+
+    fn ownFn(self, a: float) {}
+}

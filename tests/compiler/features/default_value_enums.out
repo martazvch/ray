@@ -30,20 +30,20 @@ ret
 
 -- markerStuff --
 get_local index 0
-call_sym index 2, arity 1, <function toString>
+call index 1, arity 1, toString
 print
 ret_naked
 
 -- markerStuff2 --
 get_local index 0
-call_sym index 2, arity 1, <function toString>
+call index 1, arity 1, toString
 print
 ret_naked
 
 -- main --
 load_constant index 3, value <enum Marker.cross>
 load_constant index 5, value <enum Marker.circle>
-struct_lit index 3, arity 2, <structure Cell>
+struct_lit index 0, arity 2, Cell
 
 get_local index 0
 get_field index 0
@@ -51,7 +51,7 @@ print
 
 get_local index 0
 get_field index 0
-call_sym index 2, arity 1, <function toString>
+call index 1, arity 1, toString
 print
 
 get_local index 0
@@ -60,16 +60,16 @@ print
 
 get_local index 0
 get_field index 1
-call_sym index 2, arity 1, <function toString>
+call index 1, arity 1, toString
 print
 
 load_constant index 5, value <enum Marker.circle>
-call_sym index 4, arity 1, <function markerStuff>
+call index 2, arity 1, markerStuff
 
 load_constant index 3, value <enum Marker.cross>
-call_sym index 5, arity 1, <function markerStuff2>
+call index 3, arity 1, markerStuff2
 
 ret_naked
 
 -- global scope --
-call_sym index 6, arity 0, <function main>
+call index 4, arity 0, main

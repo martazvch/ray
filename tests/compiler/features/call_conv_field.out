@@ -16,7 +16,7 @@ ret_naked
 -- getVecFromPos --
 get_local index 0
 get_local index 1
-struct_lit index 0, arity 2, <structure Vec2>
+struct_lit index 0, arity 2, Vec2
 ret
 
 -- getInt --
@@ -46,17 +46,17 @@ ret
 
 -- main --
 load_constant index 3, value 0
-struct_lit index 1, arity 1, <structure Bar>
+struct_lit index 1, arity 1, Bar
 
-load_sym index 4, <function copy>
-struct_lit index 0, arity 1, <structure Foo>
+load_fn index 2, copy
+struct_lit index 0, arity 1, Foo
 
 get_local index 1
 get_field index 0
 call index 0
 print
 
-load_sym index 2, <function static>
+load_fn index 0, static
 get_local_cow index 1
 set_field index 0
 
@@ -66,7 +66,7 @@ call index 0
 print
 
 get_local index 0
-bound_method index 3
+bound_method index 1
 get_local_cow index 1
 set_field index 0
 
@@ -75,7 +75,7 @@ get_field index 0
 call index 0
 print
 
-load_extern_sym index 4, module 1
+load_fn_ext index 3, module 1
 get_local_cow index 1
 set_field index 0
 
@@ -87,4 +87,4 @@ print
 ret_naked
 
 -- global scope --
-call_sym index 5, arity 0, <function main>
+call index 3, arity 0, main

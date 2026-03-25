@@ -16,7 +16,7 @@ pub const Constant = union(enum) {
     int: i64,
     float: f64,
     bool: bool,
-    enum_instance: Instruction.EnumCreate,
+    enum_instance: Instruction.EnumLit,
     null,
     string: misc.Interner.Index,
 };

@@ -227,7 +227,21 @@ fn synchronize(self: *Self) void {
 
     while (!self.check(.eof)) {
         switch (self.token_tags[self.token_idx]) {
-            .@"enum", .@"fn", .@"for", .@"if", .left_brace, .let, .match, .print, .@"return", .@"struct", .use, .@"var", .@"while" => return,
+            .@"enum",
+            .@"fn",
+            .@"for",
+            .@"if",
+            .left_brace,
+            .let,
+            .match,
+            .print,
+            .@"return",
+            .@"struct",
+            .trait,
+            .use,
+            .@"var",
+            .@"while",
+            => return,
             else => self.advance(),
         }
     }
@@ -259,7 +273,7 @@ fn enumDecl(self: *Self, is_err: bool) Error!Node {
     self.skipNewLines();
 
     var tags: ArrayList(Ast.EnumDecl.Tag) = .empty;
-    while (!self.check(.@"fn") and !self.check(.right_brace) and !self.check(.eof)) {
+    while (!self.check(.@"fn") and !self.check(.impl) and !self.check(.right_brace) and !self.check(.eof)) {
         const tag = try self.enumTag();
         tags.append(self.allocator, tag) catch oom();
         if (!self.matchAndSkip(.comma)) break;
@@ -269,7 +283,7 @@ fn enumDecl(self: *Self, is_err: bool) Error!Node {
         return self.errAt(name orelse tk, .empty_error_set);
     }
 
-    const functions = try self.containerFnDecls("enum");
+    const functions, const traits = try self.containerFnDecls("enum");
 
     return .{ .enum_decl = .{
         .tk = tk,
@@ -277,6 +291,7 @@ fn enumDecl(self: *Self, is_err: bool) Error!Node {
         .is_err = is_err,
         .tags = tags.toOwnedSlice(self.allocator) catch oom(),
         .functions = functions,
+        .traits = traits,
     } };
 }
 
@@ -431,8 +446,9 @@ fn structDecl(self: *Self) !Node {
     while (!self.check(.@"fn") and !self.check(.right_brace) and !self.check(.eof)) {
         defer field_names.clearRetainingCapacity();
 
-        if (!self.check(.identifier))
+        if (!self.check(.identifier)) {
             return self.errAtCurrent(.expectName("field"));
+        }
 
         // Support sharing type across fields
         while (self.match(.identifier)) {
@@ -462,27 +478,38 @@ fn structDecl(self: *Self) !Node {
         return self.errAtPrev(.missing_comma_after_field);
     }
 
-    const functions = try self.containerFnDecls("structure");
+    const functions, const traits = try self.containerFnDecls("structure");
 
     return .{ .struct_decl = .{
         .name = name,
         .fields = fields.toOwnedSlice(self.allocator) catch oom(),
         .functions = functions,
+        .traits = traits,
     } };
 }
 
-fn containerFnDecls(self: *Self, kind: []const u8) Error![]Ast.FnDecl {
+fn containerFnDecls(self: *Self, kind: []const u8) Error!struct { []Ast.FnDecl, []Ast.TraitDecl } {
     var functions: ArrayList(Ast.FnDecl) = .empty;
+    var traits: ArrayList(Ast.TraitDecl) = .empty;
 
     while (!self.check(.right_brace) and !self.check(.eof)) {
-        try self.expect(.@"fn", .{ .expect_fn_end_container = .{ .kind = kind } });
-        functions.append(self.allocator, (try self.fnDecl()).fn_decl) catch oom();
+        if (self.match(.@"fn")) {
+            functions.append(self.allocator, (try self.fnDecl()).fn_decl) catch oom();
+        } else if (self.match(.impl)) {
+            traits.append(self.allocator, (try self.traitDecl()).trait_decl) catch oom();
+        } else {
+            return self.errAtCurrent(.{ .expect_fn_end_container = .{ .kind = kind } });
+        }
+
         self.skipNewLines();
     }
 
     try self.expectOrErrAtPrev(.right_brace, .{ .expect_brace_end_container = .{ .kind = kind } });
 
-    return functions.toOwnedSlice(self.allocator) catch oom();
+    return .{
+        functions.toOwnedSlice(self.allocator) catch oom(),
+        traits.toOwnedSlice(self.allocator) catch oom(),
+    };
 }
 
 fn traitDecl(self: *Self) !Node {
@@ -494,7 +521,11 @@ fn traitDecl(self: *Self) !Node {
 
     self.ctx.in_trait = true;
     defer self.ctx.in_trait = false;
-    const functions = try self.containerFnDecls("trait");
+    const functions, const traits = try self.containerFnDecls("trait");
+
+    if (traits.len > 0) {
+        return self.errAt(traits[0].name, .trait_impl_trait);
+    }
 
     return .{ .trait_decl = .{
         .name = name,

@@ -69,7 +69,8 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
                 try self.closeKey(.list, false);
             }
 
-            try self.renderFnDecls(n.functions);
+            try self.renderFnDecls(n.functions, true);
+            try self.renderTraitImpls(n.traits);
             try self.closeKey(.block, comma);
         },
         .for_loop => |n| {
@@ -110,7 +111,8 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
                 try self.closeKey(.list, true);
             }
 
-            try self.renderFnDecls(n.functions);
+            try self.renderFnDecls(n.functions, true);
+            try self.renderTraitImpls(n.traits);
 
             try self.closeKey(.block, comma);
         },
@@ -172,16 +174,16 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
     }
 }
 
-fn renderFnDecls(self: *Self, decls: []const Ast.FnDecl) !void {
+fn renderFnDecls(self: *Self, decls: []const Ast.FnDecl, comma: bool) !void {
     if (decls.len == 0) {
-        try self.emptyKey("functions", .list, false);
+        try self.emptyKey("functions", .list, comma);
     } else {
         try self.openKey("functions", .list);
         for (decls, 0..) |*f, i| {
             const last = i != decls.len - 1;
             try self.renderFnDecl(self.ast.toSource(f.name), f, last);
         }
-        try self.closeKey(.list, false);
+        try self.closeKey(.list, comma);
     }
 }
 
@@ -225,6 +227,30 @@ fn renderFnDecl(self: *Self, name: []const u8, decl: *const Ast.FnDecl, comma: b
         try self.emptyKey("body", .list, false);
     }
     try self.closeKey(.block, comma);
+}
+
+fn renderTraitImpls(self: *Self, decls: []const Ast.TraitDecl) !void {
+    if (decls.len == 0) {
+        try self.emptyKey("traits", .list, false);
+    } else {
+        try self.openKey("traits", .list);
+        for (decls, 0..) |trait, i| {
+            const last = i != decls.len - 1;
+            try self.openKey(self.ast.toSource(trait.name), .block);
+            defer self.closeKey(.block, last) catch {};
+
+            if (trait.functions.len == 0) {
+                try self.emptyKey("functions", .list, false);
+                continue;
+            }
+
+            for (trait.functions, 0..) |*f, j| {
+                const last_fn = j != trait.functions.len - 1;
+                try self.renderFnDecl(self.ast.toSource(f.name), f, last_fn);
+            }
+        }
+        try self.closeKey(.list, false);
+    }
 }
 
 fn renderNameTypeValue(self: *Self, decl: *const Ast.VarDecl, comma: bool) !void {

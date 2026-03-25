@@ -17,7 +17,7 @@
         [Return]
             [Structure literal]
                 - structure
-                [Load symbol 2]
+                [Load symbol 1]
                 - args
                 [Array]
                     [Constant index 0]
@@ -31,7 +31,7 @@
             [Return]
                 [Structure literal]
                     - structure
-                    [Load symbol 5]
+                    [Load symbol 2]
                     - args
                     [Constant index 1]
                         [Bool false]

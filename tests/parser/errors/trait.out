@@ -1,0 +1,5 @@
+expect_name, trait
+expect_brace_before, trait
+expect_fn_end_container, trait
+expect_expr, }
+trait_impl_trait

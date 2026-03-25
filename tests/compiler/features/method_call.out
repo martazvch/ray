@@ -20,18 +20,18 @@ ret
 -- main --
 load_constant index 3, value 5
 load_constant index 4, value Tom
-struct_lit index 0, arity 2, <structure Human>
+struct_lit index 0, arity 2, Human
 
 push_null
 get_local index 0
-call_sym index 1, arity 1, <function speak>
+call index 0, arity 1, speak
 
 get_local index 0
 load_constant index 5, value 10
-call_sym index 2, arity 2, <function getOld>
+call index 1, arity 2, getOld
 
 pop
 ret_naked
 
 -- global scope --
-call_sym index 3, arity 0, <function main>
+call index 2, arity 0, main

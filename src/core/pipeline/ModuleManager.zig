@@ -3,7 +3,9 @@ const Allocator = std.mem.Allocator;
 
 const SymbolArrMap = @import("../analyzer/LexicalScope.zig").SymbolArrMap;
 const Value = @import("../runtime/values.zig").Value;
+const Obj = @import("../runtime/Obj.zig");
 const State = @import("../pipeline/State.zig");
+const TypeId = @import("../analyzer/types.zig").TypeId;
 
 const misc = @import("misc");
 const InternerIndex = misc.Interner.Index;
@@ -15,19 +17,38 @@ pub const Module = struct {
     path: InternerIndex,
     name: InternerIndex,
     /// Type infos gathered by the analyzer
+    // TODO: used for what?
     sym_infos: SymbolArrMap,
     /// Compiled values/symbols used at runtime
     globals: []Value,
-    symbols: []Value,
     constants: []Value,
+
+    enums: []Enum,
+    functions: []*Obj.Function,
+    structures: []Structure,
+
+    pub const Enum = struct {
+        name: []const u8,
+        tags: []const []const u8,
+        type_id: TypeId,
+        is_err: bool,
+    };
+
+    pub const Structure = struct {
+        name: []const u8,
+        type_id: TypeId,
+        field_count: usize,
+    };
 
     pub const empty: Module = .{
         .path = undefined,
         .name = undefined,
         .sym_infos = .empty,
         .globals = &.{},
-        .symbols = &.{},
         .constants = &.{},
+        .enums = &.{},
+        .functions = &.{},
+        .structures = &.{},
     };
 };
 
@@ -76,25 +97,42 @@ pub fn ensureCompileSizes(self: *Self, allocator: Allocator, index: Index, state
     errdefer oom();
     const mod = self.getFromIndex(index);
 
+    // We use realloc because of REPL mode that keeps defining symbols in current module
     mod.globals = try allocator.realloc(mod.globals, state.lex_scope.current.variables.count());
-    mod.symbols = try allocator.realloc(mod.symbols, state.lex_scope.symbol_count);
     mod.constants = try allocator.realloc(mod.constants, state.const_interner.constants.items.len);
+    mod.enums = try allocator.realloc(mod.enums, state.lex_scope.enum_count);
+    mod.functions = try allocator.realloc(mod.functions, state.lex_scope.func_count);
+    mod.structures = try allocator.realloc(mod.structures, state.lex_scope.struct_count);
 }
 
 pub fn addGlobal(self: *Self, mod: Index, index: usize, value: Value) void {
     self.getFromIndex(mod).globals[index] = value;
 }
 
-pub fn addSymbol(self: *Self, mod: Index, index: usize, value: Value) void {
-    self.getFromIndex(mod).symbols[index] = value;
+pub fn addSymbol(self: *Self, mod_index: Index, sym_index: usize, value: anytype) void {
+    const module = self.getFromIndex(mod_index);
+    const array = switch (@TypeOf(value)) {
+        Module.Enum => module.enums,
+        *Obj.Function => module.functions,
+        Module.Structure => module.structures,
+        else => @compileError("Can only add symbols defined in compiled module, found " ++ @typeName(@TypeOf(value))),
+    };
+    array[sym_index] = value;
+}
+
+pub fn getSymbol(self: *const Self, mod_index: Index, sym_index: usize, comptime kind: enum { @"enum", structure }) *const switch (kind) {
+    .@"enum" => Module.Enum,
+    .structure => Module.Structure,
+} {
+    const mod = self.getFromIndex(mod_index);
+    return switch (kind) {
+        .@"enum" => &mod.enums[sym_index],
+        .structure => &mod.structures[sym_index],
+    };
 }
 
 pub fn addConstant(self: *Self, mod: Index, index: usize, value: Value) void {
     self.getFromIndex(mod).constants[index] = value;
-}
-
-pub fn getSymbol(self: *const Self, mod: Index, sym_index: usize) Value {
-    return self.getFromIndex(mod).symbols[sym_index];
 }
 
 pub fn getFromIndex(self: *const Self, index: Index) *Module {

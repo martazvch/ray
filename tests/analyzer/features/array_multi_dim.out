@@ -47,7 +47,7 @@
                         [Int 6]
                     [Constant index 11]
                         [Int 7]
-                    [Call symbol 1]
+                    [Call symbol 0]
                 [Array]
                     [Constant index 12]
                         [Int 8]
@@ -86,7 +86,7 @@
         [Int 99]
     [Indexing assignment, array]
         - index
-        [Call symbol 1]
+        [Call symbol 0]
         - expr
         [Indexing array]
             - index
@@ -100,7 +100,7 @@
     [Indexing assignment, array]
         [Cow]
         - index
-        [Call symbol 1]
+        [Call symbol 0]
         - expr
         [Field access 0]
             [Variable index: 2, scope: local]
@@ -113,14 +113,14 @@
         - expr
         [Indexing array]
             - index
-            [Call symbol 1]
+            [Call symbol 0]
             - expr
             [Field access 0]
                 [Variable index: 2, scope: local]
     [Print]
         [Indexing array]
             - index
-            [Call symbol 1]
+            [Call symbol 0]
             - expr
             [Field access 0]
                 [Variable index: 2, scope: local]
@@ -132,7 +132,7 @@
             - expr
             [Indexing array]
                 - index
-                [Call symbol 1]
+                [Call symbol 0]
                 - expr
                 [Field access 0]
                     [Variable index: 2, scope: local]

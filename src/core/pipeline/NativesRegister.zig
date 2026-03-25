@@ -16,7 +16,7 @@ const Interner = misc.Interner;
 const oom = misc.oom;
 
 /// Native functions used at runtime
-funcs: ArrayList(Value),
+funcs: ArrayList(*Obj.NativeFunction),
 /// Native functions translated to Ray's type system for compilation
 funcs_meta: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
 /// Native structures used at runtime
@@ -98,9 +98,9 @@ fn registerStruct(self: *Self, allocator: Allocator, S: type, interner: *Interne
 pub fn registerFn(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMeta, interner: *Interner, ti: *TypeInterner) struct { usize, *const Type } {
     const fn_type = self.fnZigToRay(allocator, func, interner, ti);
     self.funcs_meta.put(allocator, interner.intern(func.name), fn_type) catch oom();
-    const value = Value.makeObj(Obj.NativeFunction.create(allocator, func.name, func.function).asObj());
+    const native = Obj.NativeFunction.create(allocator, func.name, func.function);
 
-    self.funcs.append(allocator, value) catch oom();
+    self.funcs.append(allocator, native) catch oom();
 
     return .{ self.funcs.items.len - 1, fn_type };
 }

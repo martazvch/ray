@@ -18,15 +18,15 @@ ret
 -- main --
 load_constant index 3, value 5
 load_constant index 4, value Tom
-struct_lit index 0, arity 2, <structure Human>
+struct_lit index 0, arity 2, Human
+
+push_null
+get_local index 0
+bound_method index 0
 
 push_null
 get_local index 0
 bound_method index 1
-
-push_null
-get_local index 0
-bound_method index 2
 
 get_local index 2
 call index 0
@@ -37,4 +37,4 @@ pop
 ret_naked
 
 -- global scope --
-call_sym index 3, arity 0, <function main>
+call index 2, arity 0, main

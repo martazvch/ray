@@ -13,17 +13,17 @@
             [Return]
                 [Structure literal]
                     - structure
-                    [Load symbol 4]
+                    [Load symbol 2]
                     - args
                     [Variable index: 0, scope: local]
                     [Variable index: 1, scope: local]
     [Variable declaration index: 0, scope: local]
-        [Call symbol 1]
+        [Call symbol 0]
             - args
             [Constant index 3]
                 [Int 5]
     [Variable declaration index: 1, scope: local]
-        [Load symbol 1]
+        [Load symbol 0]
     [Fn call]
         [Variable index: 1, scope: local]
         - args
@@ -31,14 +31,14 @@
             [Int 65]
     [Assignment index: 0, scope: local, cow]
     [Variable declaration index: 2, scope: local]
-        [Call symbol 5]
+        [Call symbol 2]
             - args
             [Constant index 5]
                 [Int 12]
             [Constant index 6]
                 [Int 99]
     [Variable declaration index: 3, scope: local]
-        [Load symbol 5]
+        [Load symbol 2]
     [Fn call]
         [Variable index: 3, scope: local]
         - args

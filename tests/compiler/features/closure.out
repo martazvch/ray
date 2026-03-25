@@ -13,11 +13,11 @@ ret_naked
 load_constant index 3, value init
 box
 
-load_sym index 1, <function set>
+load_fn index 1, set
 get_capt_local index 0
 closure index 1
 
-load_sym index 2, <function get>
+load_fn index 2, get
 get_capt_local index 0
 closure index 1
 
@@ -30,7 +30,7 @@ set_global index 1
 ret_naked
 
 -- main --
-call_sym index 0, arity 0, <function set_vars>
+call index 0, arity 0, set_vars
 
 get_global index 0
 call index 0
@@ -47,4 +47,4 @@ def_global index 0
 push_null
 def_global index 1
 
-call_sym index 3, arity 0, <function main>
+call index 3, arity 0, main

@@ -30,6 +30,7 @@ pub const Type = union(enum) {
     module: InternerIdx,
     optional: *const Type,
     structure: Structure,
+    trait: Trait,
     @"union": Union,
 
     pub const Array = struct {
@@ -74,7 +75,7 @@ pub const Type = union(enum) {
     pub const Loc = struct { name: InternerIdx, container: InternerIdx };
 
     pub const Enum = struct {
-        loc: ?Loc,
+        loc: Loc,
         tags: Tags,
         is_err: bool,
         functions: ArrayMap(InternerIdx, LexScope.Symbol),
@@ -155,7 +156,7 @@ pub const Type = union(enum) {
     };
 
     pub const Structure = struct {
-        loc: ?Loc,
+        loc: Loc,
         fields: FieldsMap,
         functions: ArrayMap(InternerIdx, LexScope.Symbol),
 
@@ -177,6 +178,11 @@ pub const Type = union(enum) {
 
             return res;
         }
+    };
+
+    pub const Trait = struct {
+        loc: Loc,
+        functions: ArrayMap(InternerIdx, LexScope.Symbol),
     };
 
     pub const Union = struct {
@@ -263,14 +269,8 @@ pub const Type = union(enum) {
             .array => |ty| ty.child.hash(allocator, hasher),
             .@"enum" => |*ty| {
                 hasher.update(asBytes(&ty.is_err));
-                if (ty.loc) |loc| {
-                    hasher.update(asBytes(&loc.name));
-                    hasher.update(asBytes(&loc.container));
-                } else {
-                    for (ty.tags.values()) |tag| {
-                        tag.hash(allocator, hasher);
-                    }
-                }
+                hasher.update(asBytes(&ty.loc.name));
+                hasher.update(asBytes(&ty.loc.container));
             },
             .error_union => |ty| {
                 ty.ok.hash(allocator, hasher);
@@ -291,14 +291,12 @@ pub const Type = union(enum) {
             .optional => |child| child.hash(allocator, hasher),
             .range => |r| r.hash(allocator, hasher),
             .structure => |ty| {
-                if (ty.loc) |loc| {
-                    hasher.update(asBytes(&loc.name));
-                    hasher.update(asBytes(&loc.container));
-                } else {
-                    for (ty.fields.values()) |f| {
-                        f.type.hash(allocator, hasher);
-                    }
-                }
+                hasher.update(asBytes(&ty.loc.name));
+                hasher.update(asBytes(&ty.loc.container));
+            },
+            .trait => |ty| {
+                hasher.update(asBytes(&ty.loc.name));
+                hasher.update(asBytes(&ty.loc.container));
             },
             .@"union" => |u| {
                 var set = Set(*const Type).fromSlice(allocator, u.types) catch oom();
@@ -328,25 +326,11 @@ pub const Type = union(enum) {
                 writer.writeAll("]") catch oom();
             },
             .@"enum" => |*ty| {
-                if (ty.loc) |loc| {
-                    // If symbol is defnined in current mod/file, don't repeat the module
-                    if (loc.container == mod_name) {
-                        writer.print("{s}", .{interner.getKey(loc.name).?}) catch oom();
-                    } else {
-                        writer.print("{s}.{s}", .{ interner.getKey(loc.container).?, interner.getKey(loc.name).? }) catch oom();
-                    }
+                // If symbol is defnined in current mod/file, don't repeat the module
+                if (ty.loc.container == mod_name) {
+                    writer.print("{s}", .{interner.getKey(ty.loc.name).?}) catch oom();
                 } else {
-                    writer.writeAll(@tagName(self.*)) catch oom();
-                    writer.writeAll(" {") catch oom();
-
-                    for (ty.tags.keys(), ty.tags.values(), 0..) |k, v, i| {
-                        writer.print("{s}: {s}{s}", .{
-                            interner.getKey(k).?,
-                            v.toString(allocator, interner, mod_name),
-                            if (i < ty.tags.count() - 1) ", " else "",
-                        }) catch oom();
-                    }
-                    writer.writeAll("}") catch oom();
+                    writer.print("{s}.{s}", .{ interner.getKey(ty.loc.container).?, interner.getKey(ty.loc.name).? }) catch oom();
                 }
             },
             .error_union => |ty| {
@@ -372,24 +356,19 @@ pub const Type = union(enum) {
                 writer.print("?{s}", .{opt.toString(allocator, interner, mod_name)}) catch oom();
             },
             .structure => |ty| {
-                if (ty.loc) |loc| {
-                    // If symbol is defnined in current mod/file, don't repeat the module
-                    if (loc.container == mod_name) {
-                        writer.print("{s}", .{interner.getKey(loc.name).?}) catch oom();
-                    } else {
-                        writer.print("{s}.{s}", .{ interner.getKey(loc.container).?, interner.getKey(loc.name).? }) catch oom();
-                    }
+                // If symbol is defnined in current mod/file, don't repeat the module
+                if (ty.loc.container == mod_name) {
+                    writer.print("{s}", .{interner.getKey(ty.loc.name).?}) catch oom();
                 } else {
-                    writer.writeAll("struct {") catch oom();
-
-                    for (ty.fields.keys(), ty.fields.values(), 0..) |k, v, i| {
-                        writer.print("{s}: {s}{s}", .{
-                            interner.getKey(k).?,
-                            v.type.toString(allocator, interner, mod_name),
-                            if (i < ty.fields.count() - 1) ", " else "",
-                        }) catch oom();
-                    }
-                    writer.writeAll("}") catch oom();
+                    writer.print("{s}.{s}", .{ interner.getKey(ty.loc.container).?, interner.getKey(ty.loc.name).? }) catch oom();
+                }
+            },
+            .trait => |ty| {
+                // If symbol is defnined in current mod/file, don't repeat the module
+                if (ty.loc.container == mod_name) {
+                    writer.print("trait {s}", .{interner.getKey(ty.loc.name).?}) catch oom();
+                } else {
+                    writer.print("trait {s}.{s}", .{ interner.getKey(ty.loc.container).?, interner.getKey(ty.loc.name).? }) catch oom();
                 }
             },
             .@"union" => |u| {
@@ -494,7 +473,7 @@ pub const TypeInterner = struct {
         return @intCast(self.ids.getIndex(ty).?);
     }
 
-    pub fn newStruct(self: *TypeInterner, loc: ?Type.Loc) *Type {
+    pub fn newStruct(self: *TypeInterner, loc: Type.Loc) *Type {
         return self.intern(.{ .structure = .{
             .loc = loc,
             .fields = .empty,
@@ -502,7 +481,7 @@ pub const TypeInterner = struct {
         } });
     }
 
-    pub fn newEnum(self: *TypeInterner, loc: ?Type.Loc, is_err: bool) *Type {
+    pub fn newEnum(self: *TypeInterner, loc: Type.Loc, is_err: bool) *Type {
         return self.intern(.{ .@"enum" = .{
             .loc = loc,
             .tags = .empty,

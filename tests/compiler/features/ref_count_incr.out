@@ -1,25 +1,25 @@
 -- clone --
 load_constant index 3, value 1
 load_constant index 4, value 2
-struct_lit index 0, arity 2, <structure Point>
-struct_lit index 1, arity 1, <structure Poly>
+struct_lit index 0, arity 2, Point
+struct_lit index 1, arity 1, Poly
 ret
 
 -- main --
 load_constant index 4, value 2
 load_constant index 5, value 6
-struct_lit index 0, arity 2, <structure Point>
+struct_lit index 0, arity 2, Point
 
 get_local index 0
 incr_ref
-struct_lit index 1, arity 1, <structure Poly>
+struct_lit index 1, arity 1, Poly
 
 get_local index 1
 incr_ref
 get_local index 1
 incr_ref
 array_new length 1, type_id 19
-struct_lit index 3, arity 2, <structure Structure>
+struct_lit index 2, arity 2, Structure
 
 get_local index 0
 incr_ref
@@ -113,4 +113,4 @@ set_local index 5
 ret_naked
 
 -- global scope --
-call_sym index 4, arity 0, <function main>
+call index 1, arity 0, main

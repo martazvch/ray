@@ -24,7 +24,7 @@ gc_alloc: Allocator,
 strings: *std.AutoHashMapUnmanaged(usize, *Obj.String),
 objects: ?*Obj,
 modules: []Module,
-natives: []Value,
+natives: []*Obj.NativeFunction,
 state: *State,
 
 // Used ti-ype ids at runtime
@@ -190,7 +190,7 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
                 self.stack.top -= len;
                 self.stack.push(Value.makeObj(array.asObj()));
             },
-            .call_array_fn => {
+            .call_array => {
                 const index = frame.readByte();
                 const arity = frame.readByte();
                 const array = self.stack.peekRef(arity).obj.as(Obj.Array);
@@ -199,7 +199,7 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
                 self.stack.top -= arity + 1;
                 if (result) |res| self.stack.push(res);
             },
-            .call_str_fn => {
+            .call_string => {
                 const index = frame.readByte();
                 const arity = frame.readByte();
                 const string = self.stack.peekRef(arity).obj.as(Obj.String);
@@ -221,7 +221,7 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
 
                 const closure = Obj.Closure.create(
                     self,
-                    frame.module.symbols[sym_index].obj.as(Obj.Function),
+                    frame.module.functions[sym_index],
                     (self.stack.top - 1)[0..1],
                 );
                 // Discard the function
@@ -233,7 +233,7 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
                 const boxed = Value.makeObj(Obj.Box.create(self, to_box).asObj());
                 self.stack.push(boxed);
             },
-            .call => {
+            .call_any => {
                 const args_count = frame.readByte();
                 const callee = self.stack.peekRef(args_count).obj;
 
@@ -252,23 +252,23 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
                     },
                 }
             },
-            .call_sym => {
+            .call => {
                 const index = frame.readByte();
                 const arity = frame.readByte();
                 frame = try self.frame_stack.newKeepMod();
-                frame.call(frame.module.symbols[index].obj.as(Obj.Function), &self.stack, arity, self.modules);
+                frame.call(frame.module.functions[index], &self.stack, arity, self.modules);
             },
-            .call_sym_ext => {
+            .call_ext => {
                 const index = frame.readByte();
                 const module = frame.readByte();
                 const arity = frame.readByte();
                 frame = try self.frame_stack.newKeepMod();
-                frame.call(self.modules[module].symbols[index].obj.as(Obj.Function), &self.stack, arity, self.modules);
+                frame.call(self.modules[module].functions[index], &self.stack, arity, self.modules);
             },
             .call_native => {
                 const index = frame.readByte();
                 const args_count = frame.readByte();
-                const native = self.natives[index].obj.as(Obj.NativeFunction).function;
+                const native = self.natives[index].function;
                 const result = native(self, (self.stack.top - args_count)[0..args_count]);
 
                 self.stack.top -= args_count;
@@ -299,14 +299,16 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
                 self.stack.push(Value.makeInt(@divTrunc(lhs, rhs)));
             },
             .dup => self.stack.push(self.stack.peek(0)),
-            .enum_create => {
-                // TODO: Should not be comptime!
-                self.stack.peekRef(0).* = .makeObj(Obj.EnumInstance.createComptime(
-                    self.allocator,
-                    self.stack.peek(0).obj.as(Obj.Enum),
-                    frame.readByte(),
-                    .null,
-                ).asObj());
+            .enum_lit => {
+                const index = frame.readByte();
+                const tag = frame.readByte();
+                self.stack.push(.makeObj(Obj.EnumInstance.create(self, &frame.module.enums[index], tag, .null).asObj()));
+            },
+            .enum_lit_ext => {
+                const index = frame.readByte();
+                const module = frame.readByte();
+                const tag = frame.readByte();
+                self.stack.push(.makeObj(Obj.EnumInstance.create(self, &self.modules[module].enums[index], tag, .null).asObj()));
             },
             .eq_bool => self.stack.push(Value.makeBool(self.stack.pop().bool == self.stack.pop().bool)),
             .eq_float => self.stack.push(Value.makeBool(self.stack.pop().float == self.stack.pop().float)),
@@ -314,7 +316,7 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
             .eq_null => self.stack.push(Value.makeBool(self.stack.pop() == .null)),
             .eq_str => self.stack.push(Value.makeBool(self.stack.pop().obj.as(Obj.String) == self.stack.pop().obj.as(Obj.String))),
             .exit_repl => {
-                // Just deletes the curretn call frame
+                // Just deletes the current call frame
                 self.frame_stack.count -= 1;
                 break;
             },
@@ -506,20 +508,19 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
                 const mod_index = frame.readByte();
                 self.stack.push(self.modules[mod_index].constants[const_index]);
             },
-            .load_ext_sym => {
-                const module_index = frame.readByte();
+            .load_fn_builtin => {
+                const symbol_idx = frame.readByte();
+                self.stack.push(.makeObj(self.natives[symbol_idx].asObj()));
+            },
+            .load_fn => {
+                const symbol_idx = frame.readByte();
+                self.stack.push(.makeObj(frame.module.functions[symbol_idx].asObj()));
+            },
+            .load_fn_ext => {
                 const symbol_index = frame.readByte();
+                const module_index = frame.readByte();
                 const module = self.modules[module_index];
-                const symbol = module.symbols[symbol_index];
-                self.stack.push(symbol);
-            },
-            .load_builtin => {
-                const symbol_idx = frame.readByte();
-                self.stack.push(self.natives[symbol_idx]);
-            },
-            .load_sym => {
-                const symbol_idx = frame.readByte();
-                self.stack.push(frame.module.symbols[symbol_idx]);
+                self.stack.push(.makeObj(module.functions[symbol_index].asObj()));
             },
             .loop => {
                 const jump = frame.readShort();
@@ -630,14 +631,14 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
             .struct_lit => {
                 const index = frame.readByte();
                 const arity = frame.readByte();
-                const instance = Obj.Instance.create(self, frame.module.symbols[index].obj.as(Obj.Structure));
+                const instance = Obj.Instance.create(self, &frame.module.structures[index]);
                 structLit(instance, arity, &self.stack);
             },
             .struct_lit_ext => {
                 const index = frame.readByte();
                 const module = frame.readByte();
                 const arity = frame.readByte();
-                const instance = Obj.Instance.create(self, self.modules[module].symbols[index].obj.as(Obj.Structure));
+                const instance = Obj.Instance.create(self, &self.modules[module].structures[index]);
                 structLit(instance, arity, &self.stack);
             },
             .sub_float => {

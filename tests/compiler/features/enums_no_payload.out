@@ -63,12 +63,12 @@ get_tag
 ne_int
 pop
 
-call_sym index 2, arity 0, <function init>
+call index 0, arity 0, init
 get_local index 2
-call_sym index 3, arity 1, <function toStr>
+call index 1, arity 1, toStr
 print
 
 ret_naked
 
 -- global scope --
-call_sym index 4, arity 0, <function main>
+call index 2, arity 0, main

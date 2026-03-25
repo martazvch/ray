@@ -33,6 +33,7 @@
                 "value": {}
             }
         ],
-        "functions": []
+        "functions": [],
+        "traits": []
     }
 }

@@ -43,7 +43,7 @@
     [Print]
         [Trap match_is]
         - lhs
-            [Call symbol 2]
+            [Call symbol 0]
                 - args
                 [Constant index 7]
                     [Int 15]
@@ -84,7 +84,7 @@
     [Print]
         [Trap expr]
         - lhs
-            [Call symbol 2]
+            [Call symbol 0]
                 - args
                 [Constant index 7]
                     [Int 15]

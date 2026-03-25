@@ -13,7 +13,7 @@ const ObjFnTypeInfo = type_mod.ObjFnTypeInfo;
 const ObjFns = type_mod.ObjFns;
 
 const Chunk = @import("../compiler/Chunk.zig");
-const CompiledModule = @import("../compiler/compiler.zig").CompiledModule;
+const Module = @import("../pipeline/ModuleManager.zig").Module;
 const ffi = @import("../builtins/ffi.zig");
 const oom = @import("misc").oom;
 const Value = @import("values.zig").Value;
@@ -31,7 +31,6 @@ const Kind = enum {
     array,
     box,
     closure,
-    @"enum",
     enum_instance,
     @"error",
     function,
@@ -40,14 +39,12 @@ const Kind = enum {
     native_fn,
     native_obj,
     string,
-    structure,
 
     pub fn fromType(T: type) Kind {
         return switch (T) {
             Array => .array,
             Box => .box,
             Closure => .closure,
-            Enum => .@"enum",
             EnumInstance => .enum_instance,
             Function => .function,
             Instance => .instance,
@@ -55,7 +52,6 @@ const Kind = enum {
             NativeFunction => .native_fn,
             NativeObj => .native_obj,
             String => .string,
-            Structure => .structure,
             else => @compileError(@typeName(T) ++ " isn't a runtime object type"),
         };
     }
@@ -99,7 +95,7 @@ pub fn deepCopy(self: *Obj, vm: *Vm) *Obj {
         .enum_instance, .@"error" => @panic("TODO"),
         .instance => self.as(Instance).deepCopy(vm).asObj(),
         // Immutable, shallow copy ok
-        .box, .closure, .@"enum", .function, .iterator, .native_fn, .native_obj, .string, .structure => self,
+        .box, .closure, .function, .iterator, .native_fn, .native_obj, .string => self,
     };
 }
 
@@ -108,7 +104,6 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
         .array => self.as(Array).deinit(vm),
         .box => self.as(Box).deinit(vm),
         .closure => self.as(Closure).deinit(vm),
-        .@"enum" => self.as(Enum).deinit(vm),
         .enum_instance, .@"error" => self.as(EnumInstance).deinit(vm),
         .function => {
             const function = self.as(Function);
@@ -131,10 +126,6 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
             object.deinit(vm);
         },
         .string => self.as(String).deinit(vm.gc_alloc),
-        .structure => {
-            const structure = self.as(Structure);
-            structure.deinit(vm.gc_alloc);
-        },
     }
 }
 
@@ -169,7 +160,6 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
                 try writer.print("<fn {s}>", .{closure.function.name});
             }
         },
-        .@"enum" => try writer.print("<enum {s}>", .{self.as(Enum).name}),
         .enum_instance, .@"error" => {
             const instance = self.as(EnumInstance);
             try writer.print("<{s} {s}.{s}>", .{
@@ -187,7 +177,6 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
         .native_fn => try writer.print("<native fn {s}>", .{self.as(NativeFunction).name}),
         .native_obj => try writer.print("<native object {s}>", .{self.as(NativeObj).name}),
         .string => try writer.print("{s}", .{self.as(String).chars}),
-        .structure => try writer.print("<structure {s}>", .{self.as(Structure).name}),
     }
 }
 
@@ -196,7 +185,6 @@ pub fn log(self: *Obj) void {
         .array => std.debug.print("<array>", .{}),
         .box => std.debug.print("box", .{}),
         .closure => std.debug.print("<closure {s}>", .{self.as(Closure).function.name}),
-        .@"enum" => std.debug.print("<enum {s}>", .{self.as(Enum).name}),
         .enum_instance => std.debug.print("<enum instance {s}>", .{self.as(EnumInstance).parent.name}),
         .function => std.debug.print("<fn {s}>", .{self.as(Function).name}),
         .instance => std.debug.print("<instance of {s}>", .{self.as(Instance).parent.name}),
@@ -204,7 +192,6 @@ pub fn log(self: *Obj) void {
         .native_fn => std.debug.print("<native function {s}>", .{self.as(NativeFunction).name}),
         .native_obj => unreachable,
         .string => std.debug.print("{s}", .{self.as(String).chars}),
-        .structure => std.debug.print("<structure {s}>", .{self.as(Structure).name}),
     }
 }
 
@@ -563,40 +550,14 @@ pub const NativeFunction = struct {
     }
 };
 
-pub const Structure = struct {
-    obj: Obj,
-    name: []const u8,
-    field_count: usize,
-
-    const Self = @This();
-
-    pub fn create(allocator: Allocator, name: []const u8, type_id: TypeId, field_count: usize) *Self {
-        const obj = Obj.allocateComptime(allocator, Self, type_id);
-        obj.name = allocator.dupe(u8, name) catch oom();
-        obj.field_count = field_count;
-
-        return obj;
-    }
-
-    pub fn asObj(self: *Self) *Obj {
-        return &self.obj;
-    }
-
-    // Functions aren't freed because they are on the main linked list of objects in the VM
-    // The memory of the array is owned though
-    pub fn deinit(self: *Self, allocator: Allocator) void {
-        allocator.destroy(self);
-    }
-};
-
 pub const Instance = struct {
     obj: Obj,
-    parent: *Structure,
+    parent: *const Module.Structure,
     fields: []Value,
 
     const Self = @This();
 
-    pub fn create(vm: *Vm, parent: *Structure) *Self {
+    pub fn create(vm: *Vm, parent: *const Module.Structure) *Self {
         // Fields first for GC because other wise allocating fields after creation
         // of the instance may trigger GC in between
         const alloc_fields = vm.gc_alloc.alloc(Value, parent.field_count) catch oom();
@@ -604,7 +565,7 @@ pub const Instance = struct {
 
         obj.parent = parent;
         obj.fields = alloc_fields;
-        obj.asObj().type_id = parent.asObj().type_id;
+        obj.asObj().type_id = parent.type_id;
 
         if (options.log_gc) obj.asObj().log();
 
@@ -636,49 +597,34 @@ pub const Instance = struct {
     }
 };
 
-pub const Enum = struct {
-    obj: Obj,
-    name: []const u8,
-    is_err: bool,
-    tags: []const []const u8,
-
-    const Self = @This();
-
-    pub fn create(allocator: Allocator, name: []const u8, type_id: TypeId, tags: []const []const u8, is_err: bool) *Self {
-        const obj = Obj.allocateComptime(allocator, Self, type_id);
-        obj.name = allocator.dupe(u8, name) catch oom();
-        obj.is_err = is_err;
-        obj.tags = tags;
-        obj.obj.kind = if (is_err) .@"error" else .enum_instance;
-
-        return obj;
-    }
-
-    pub fn asObj(self: *Self) *Obj {
-        return &self.obj;
-    }
-
-    pub fn deinit(self: *Self, vm: *Vm) void {
-        vm.gc_alloc.destroy(self);
-    }
-};
-
 pub const EnumInstance = struct {
     obj: Obj,
-    parent: *const Enum,
+    parent: *const Module.Enum,
     tag_id: u8,
     payload: Value,
 
     const Self = @This();
 
     /// Creates a compile time constant that is a naked enum field
-    pub fn createComptime(allocator: Allocator, parent: *const Enum, tag_id: u8, payload: Value) *Self {
-        const obj = Obj.allocateComptime(allocator, Self, undefined);
+    pub fn create(vm: *Vm, parent: *const Module.Enum, tag_id: u8, payload: Value) *Self {
+        const obj = Obj.allocate(vm, Self, parent.type_id);
         obj.parent = parent;
         obj.tag_id = tag_id;
         obj.payload = payload;
         obj.obj.kind = if (parent.is_err) .@"error" else .enum_instance;
-        obj.obj.type_id = parent.obj.type_id;
+        obj.obj.type_id = parent.type_id;
+
+        return obj;
+    }
+
+    /// Creates a compile time constant that is a naked enum field
+    pub fn createComptime(allocator: Allocator, parent: *const Module.Enum, tag_id: u8, payload: Value) *Self {
+        const obj = Obj.allocateComptime(allocator, Self, parent.type_id);
+        obj.parent = parent;
+        obj.tag_id = tag_id;
+        obj.payload = payload;
+        obj.obj.kind = if (parent.is_err) .@"error" else .enum_instance;
+        obj.obj.type_id = parent.type_id;
 
         return obj;
     }

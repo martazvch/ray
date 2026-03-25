@@ -14,9 +14,9 @@ array_new length 2, type_id 16
 
 load_constant index 6, value 6
 load_constant index 7, value 7
-call_sym index 1, arity 0, <function getIdx>
+call index 0, arity 0, getIdx
 array_new length 3, type_id 16
-struct_lit index 0, arity 1, <structure Foo>
+struct_lit index 0, arity 1, Foo
 
 get_local index 0
 load_constant index 4, value 1
@@ -30,18 +30,18 @@ print
 
 load_constant index 9, value 99
 get_local_cow index 0
-call_sym index 1, arity 0, <function getIdx>
+call index 0, arity 0, getIdx
 array_set
 
 load_constant index 10, value -9
 get_local_cow index 2
 get_field_cow index 0
-call_sym index 1, arity 0, <function getIdx>
+call index 0, arity 0, getIdx
 array_set
 
 get_local index 2
 get_field index 0
-call_sym index 1, arity 0, <function getIdx>
+call index 0, arity 0, getIdx
 index_arr
 print
 
@@ -66,4 +66,4 @@ array_set
 ret_naked
 
 -- global scope --
-call_sym index 2, arity 0, <function main>
+call index 1, arity 0, main

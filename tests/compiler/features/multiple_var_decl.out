@@ -23,9 +23,9 @@ load_constant index 10, value 56
 load_constant index 11, value 2
 sub_int
 mul_int
-call_sym index 0, arity 0, <function add>
+call index 0, arity 0, add
 
 ret_naked
 
 -- global scope --
-call_sym index 1, arity 0, <function main>
+call index 1, arity 0, main

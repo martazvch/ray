@@ -45,7 +45,9 @@ scopes: ArrayList(Scope),
 current: *Scope,
 builtins: AutoHashMapUnmanaged(InternerIdx, *const Type),
 natives: AutoHashMapUnmanaged(InternerIdx, Symbol),
-symbol_count: usize,
+enum_count: usize,
+func_count: usize,
+struct_count: usize,
 
 // Dbg
 save: bool,
@@ -59,7 +61,9 @@ pub const empty: Self = .{
     .current = undefined,
     .builtins = .empty,
     .natives = .empty,
-    .symbol_count = 0,
+    .enum_count = 0,
+    .func_count = 0,
+    .struct_count = 0,
 
     .save = false,
     .saved = .empty,
@@ -243,9 +247,26 @@ pub fn getVarInCurrentScopeAt(self: *const Self, index: usize) *Variable {
 }
 
 /// Forward declares a symbol without incrementing global symbol count
-pub fn forwardDeclareSymbol(self: *Self, allocator: Allocator, name: InternerIdx) *Symbol {
-    self.current.symbols.put(allocator, name, .{ .name = name, .type = undefined, .index = self.symbol_count }) catch oom();
-    self.symbol_count += 1;
+pub fn forwardDeclareSymbol(
+    self: *Self,
+    allocator: Allocator,
+    name: InternerIdx,
+    kind: enum { function, @"enum", structure, trait },
+) *Symbol {
+    const index = switch (kind) {
+        .@"enum" => &self.enum_count,
+        .function => &self.func_count,
+        .structure => &self.struct_count,
+        else => unreachable,
+    };
+
+    self.current.symbols.put(allocator, name, .{
+        .name = name,
+        .type = undefined,
+        .index = index.*,
+    }) catch oom();
+
+    index.* += 1;
 
     const sym = self.current.symbols.getPtr(name).?;
 

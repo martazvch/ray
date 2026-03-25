@@ -68,7 +68,7 @@
     [Constant index 1]
         [Bool false]
 [Function declaration main]
-    [Call symbol 4]
+    [Call symbol 3]
         - args
         [Constant index 7]
             [String abcd]
@@ -77,7 +77,7 @@
         [Default param constant index 6]
         [Default param constant index 1]
         [Default param constant index 1]
-    [Call symbol 4]
+    [Call symbol 3]
         - args
         [Constant index 7]
             [String abcd]
@@ -94,20 +94,20 @@
             - args
             [Default field constant index 3]
     [Print]
-        [Call symbol 1]
+        [Call symbol 0]
             - args
             [Default param constant index 4]
     [Print]
-        [Call symbol 3]
+        [Call symbol 2]
             - args
             [Default param constant index 4]
     [Print]
-        [Field access 2]
+        [Field access 1]
             [Variable index: 0, scope: local]
-        [Invoke symbol 2]
+        [Invoke symbol 1]
             - args
             [Default param constant index 4]
     [Print]
-        [Call symbol 5 module 1]
+        [Call symbol 4 module 1]
             - args
             [Default param constant index 5, module 1]

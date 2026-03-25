@@ -9,6 +9,7 @@ const ir = @import("../analyzer/ir.zig");
 const Instruction = ir.Instruction;
 const State = @import("../pipeline/State.zig");
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
+const Module = @import("../pipeline/ModuleManager.zig").Module;
 const Obj = @import("../runtime/Obj.zig");
 const Value = @import("../runtime/values.zig").Value;
 const Vm = @import("../runtime/Vm.zig");
@@ -38,7 +39,7 @@ pub const CompilationUnit = struct {
     render: bool,
 
     // For disassembler
-    native_funcs: []const Value,
+    native_funcs: []const *Obj.NativeFunction,
 
     const Self = @This();
     const Error = error{ Err, TooManyConst } || std.posix.WriteError;
@@ -88,7 +89,7 @@ pub const CompilationUnit = struct {
 
         if (main_index) |idx| {
             // TODO: protect
-            self.compiler.writeOpAndByte(.call_sym, @intCast(idx));
+            self.compiler.writeOpAndByte(.call, @intCast(idx));
             self.compiler.writeByte(0);
         } else {
             self.compiler.writeOp(.exit_repl);
@@ -209,14 +210,6 @@ const Compiler = struct {
         } else {
             self.writeOpAndByte(op, @intCast(value));
         }
-    }
-
-    fn addGlobal(self: *Self, index: usize, global: Value) void {
-        self.manager.state.modules.addGlobal(self.manager.mod_index, index, global);
-    }
-
-    fn addSymbol(self: *Self, index: usize, symbol: Value) void {
-        self.manager.state.modules.addSymbol(self.manager.mod_index, index, symbol);
     }
 
     /// Emits the corresponding `get_global` or `get_local` with the correct index
@@ -345,7 +338,7 @@ const Compiler = struct {
             .@"continue" => |data| self.continueInstr(data),
             .discard => |index| self.wrappedInstr(.pop, index),
 
-            .enum_create => |*data| self.enumCreate(data),
+            .enum_create => |*data| self.enumLit(data),
             .enum_decl => |*data| self.enumDecl(data),
             .fail => |data| self.returnInstr(data),
             .field => |*data| self.field(data),
@@ -357,8 +350,8 @@ const Compiler = struct {
             .incr_rc => |index| self.wrappedInstr(.incr_ref, index),
             .indexing => |data| self.indexing(data),
             // TODO: protect the cast
-            .load_builtin => |index| self.writeOpAndByte(.load_builtin, @intCast(index)),
-            .load_symbol => |*data| self.loadSymbol(data),
+            .load_builtin => |index| self.writeOpAndByte(.load_fn_builtin, @intCast(index)),
+            .load_symbol => |data| self.symbolAccess(.load_fn, data),
             .match => |*data| self.match(data),
             .match_type => |data| self.matchType(data),
             .multiple_var_decl => |*data| self.multipleVarDecl(data),
@@ -377,6 +370,7 @@ const Compiler = struct {
             .@"return" => |data| self.returnInstr(data),
             .struct_decl => |*data| self.structDecl(data),
             .struct_literal => |*data| self.structLiteral(data),
+            .trait_decl => |data| self.traitDecl(data),
             .trap => |data| self.trap(data),
             .unary => |*data| self.unary(data),
             .unbox => |index| self.wrappedInstr(.unbox, index),
@@ -576,7 +570,7 @@ const Compiler = struct {
         try self.compileInstr(data.callee);
         try self.compileArgs(data.args);
         // TODO: protect cast
-        self.writeOpAndByte(.call, @intCast(data.args.len));
+        self.writeOpAndByte(.call_any, @intCast(data.args.len));
     }
 
     fn invoke(self: *Self, data: *const Instruction.Call, callee: Instruction.Field) Error!void {
@@ -588,12 +582,12 @@ const Compiler = struct {
     fn callSymbol(self: *Self, data: *const Instruction.Call, arity_offset: usize, sym_index: usize, sym_mod: ?ModIndex) Error!void {
         try self.compileArgs(data.args);
         if (sym_mod) |mod| {
-            self.writeOpAndByte(.call_sym_ext, @intCast(sym_index));
+            self.writeOpAndByte(.call_ext, @intCast(sym_index));
             self.writeByte(@intCast(mod.toInt()));
         } else if (data.native) {
             self.writeOpAndByte(.call_native, @intCast(sym_index));
         } else {
-            self.writeOpAndByte(.call_sym, @intCast(sym_index));
+            self.writeOpAndByte(.call, @intCast(sym_index));
         }
         self.writeByte(@intCast(data.args.len + arity_offset));
     }
@@ -601,7 +595,7 @@ const Compiler = struct {
     fn callObjFn(self: *Self, data: Instruction.ObjFn, args: []const Instruction.Arg) Error!void {
         try self.compileInstr(data.obj);
         try self.compileArgs(args);
-        self.writeOpAndByte(if (data.kind == .array) .call_array_fn else .call_str_fn, @intCast(data.fn_index));
+        self.writeOpAndByte(if (data.kind == .array) .call_array else .call_string, @intCast(data.fn_index));
         self.writeByte(@intCast(args.len));
     }
 
@@ -634,7 +628,7 @@ const Compiler = struct {
         const fn_name = if (data.name) |idx| self.manager.state.interner.getKey(idx).? else "anonymus";
 
         const func = try self.compileFnBody(fn_name, data);
-        self.addSymbol(data.sym_index, Value.makeObj(func.asObj()));
+        self.manager.state.modules.addSymbol(self.manager.mod_index, data.sym_index, func);
 
         if (data.captures.len > 0) {
             try self.compileClosure(data, data.sym_index);
@@ -642,7 +636,7 @@ const Compiler = struct {
     }
 
     fn compileClosure(self: *Self, data: *const Instruction.FnDecl, sym_index: usize) Error!void {
-        self.writeOpAndByte(.load_sym, @intCast(sym_index));
+        self.writeOpAndByte(.load_fn, @intCast(sym_index));
 
         for (data.captures) |*capt| {
             try self.capture(capt);
@@ -657,7 +651,7 @@ const Compiler = struct {
             // Structures and enums' functions have a name
             const fn_name = self.manager.state.interner.getKey(fn_data.name orelse unreachable).?;
             const func = try self.compileFnBody(fn_name, &fn_data);
-            self.addSymbol(fn_data.sym_index, Value.makeObj(func.asObj()));
+            self.manager.state.modules.addSymbol(self.manager.mod_index, fn_data.sym_index, func);
         }
     }
 
@@ -685,9 +679,9 @@ const Compiler = struct {
                 .float => |val| Value.makeFloat(val),
                 .enum_instance => |val| Value.makeObj(Obj.EnumInstance.createComptime(
                     self.manager.allocator,
-                    self.manager.state.modules.getSymbol(self.manager.mod_index, val.sym.symbol_index).obj.as(Obj.Enum),
+                    self.manager.state.modules.getSymbol(self.manager.mod_index, val.sym.symbol_index, .@"enum"),
                     @intCast(val.tag_index),
-                    Value.null_,
+                    .null_,
                 ).asObj()),
                 .null => Value.null_,
                 .string => |val| Value.makeObj(Obj.String.comptimeCopy(
@@ -730,28 +724,23 @@ const Compiler = struct {
         self.block_stack.add(self.manager.allocator, .@"continue", self.emitJump(.loop), data.depth);
     }
 
-    fn enumCreate(self: *Self, data: *const Instruction.EnumCreate) Error!void {
-        // TODO:
-        // PERF: could do like structure literal, no need to push the symbol to stack
-        try self.loadSymbol(&data.sym);
-
+    fn enumLit(self: *Self, data: *const Instruction.EnumLit) Error!void {
         // TODO: Error
         if (data.tag_index >= std.math.maxInt(u8)) {
             @panic("Enum is to big, not implemented yet");
         }
 
-        self.writeOpAndByte(.enum_create, @intCast(data.tag_index));
+        self.symbolAccess(.enum_lit, data.sym);
+        self.writeByte(@intCast(data.tag_index));
     }
 
     fn enumDecl(self: *Self, data: *const Instruction.EnumDecl) Error!void {
-        const enum_val = Obj.Enum.create(
-            self.manager.allocator,
-            self.manager.state.interner.getKey(data.name).?,
-            data.type_id,
-            data.tags,
-            data.is_err,
-        );
-        self.addSymbol(data.sym_index, Value.makeObj(enum_val.asObj()));
+        self.manager.state.modules.addSymbol(self.manager.mod_index, data.sym_index, Module.Enum{
+            .name = self.manager.allocator.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
+            .tags = data.tags,
+            .type_id = data.type_id,
+            .is_err = data.is_err,
+        });
         try self.containerFnDecls(data.functions);
     }
 
@@ -880,16 +869,6 @@ const Compiler = struct {
             },
         };
         self.writeOp(op);
-    }
-
-    // TODO: protect the casts
-    fn loadSymbol(self: *Self, data: *const Instruction.LoadSymbol) Error!void {
-        if (data.module_index) |mod| {
-            self.writeOpAndByte(.load_ext_sym, @intCast(mod.toInt()));
-            self.writeByte(data.symbol_index);
-        } else {
-            self.writeOpAndByte(.load_sym, data.symbol_index);
-        }
     }
 
     fn match(self: *Self, data: *const Instruction.Match) Error!void {
@@ -1036,22 +1015,13 @@ const Compiler = struct {
     }
 
     fn structDecl(self: *Self, data: *const Instruction.StructDecl) Error!void {
-        var structure = Obj.Structure.create(
-            self.manager.allocator,
-            self.manager.state.interner.getKey(data.name).?,
-            data.type_id,
-            data.fields_count,
-        );
-
-        // We forward declare the structure in the globals because when disassembling the
-        // structure's method, they need to refer to the object. Only the name can be refered to
-        // TODO: Create a placeholder that has only the name?
-        self.addSymbol(data.sym_index, Value.makeObj(structure.asObj()));
+        self.manager.state.modules.addSymbol(self.manager.mod_index, data.sym_index, Module.Structure{
+            .name = self.manager.allocator.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
+            .type_id = data.type_id,
+            .field_count = data.fields_count,
+        });
         try self.defaults(data.default_fields);
-
         try self.containerFnDecls(data.functions);
-        const struct_obj = Value.makeObj(structure.asObj());
-        self.addSymbol(data.sym_index, struct_obj);
     }
 
     fn defaults(self: *Self, instrs: []const ir.Index) Error!void {
@@ -1068,19 +1038,45 @@ const Compiler = struct {
             @panic("Impossible? Change Ir to only allow a symbol index + module");
         }
 
-        const sym_data = self.at(data.structure).load_symbol;
-
         try self.compileArgs(data.values);
+        // TODO: protect cast
+        self.symbolAccess(.struct_lit, self.at(data.structure).load_symbol);
+        self.writeByte(@intCast(data.values.len));
+    }
 
+    /// Creates a symbol based on the opcode. If module index isn't null, uses the `_ext` version of the opcode
+    fn symbolAccess(self: *Self, comptime op: OpCode, sym_data: Instruction.LoadSymbol) void {
         if (sym_data.module_index) |mod| {
-            self.writeOpAndByte(.struct_lit_ext, sym_data.symbol_index);
+            if (!@hasField(OpCode, @tagName(op) ++ "_ext")) {
+                @compileError("Opcode " ++ @tagName(op) ++ " doesn't have an `_ext` version");
+            }
+
+            self.writeOpAndByte(@field(OpCode, @tagName(op) ++ "_ext"), sym_data.symbol_index);
             // TODO: protect cast
             self.writeByte(@intCast(mod.toInt()));
         } else {
-            self.writeOpAndByte(.struct_lit, sym_data.symbol_index);
+            self.writeOpAndByte(op, sym_data.symbol_index);
         }
+    }
 
-        self.writeByte(@intCast(data.values.len));
+    fn traitDecl(self: *Self, data: Instruction.TraitDecl) Error!void {
+        _ = self; // autofix
+        _ = data; // autofix
+        // var structure = Obj.Structure.create(
+        //     self.manager.allocator,
+        //     self.manager.state.interner.getKey(data.name).?,
+        //     data.type_id,
+        //     data.fields_count,
+        // );
+        //
+        // // We forward declare the structure in the globals because when disassembling the
+        // // structure's method, they need to refer to the object. Only the name can be refered to
+        // // TODO: Create a placeholder that has only the name?
+        // self.addSymbol(data.sym_index, Value.makeObj(structure.asObj()));
+        //
+        // try self.containerFnDecls(data.functions);
+        // const struct_obj = Value.makeObj(structure.asObj());
+        // self.addSymbol(data.sym_index, struct_obj);
     }
 
     fn trap(self: *Self, data: Instruction.Trap) Error!void {
@@ -1120,7 +1116,7 @@ const Compiler = struct {
         // The purpose is to initialize the slot so when accessed like self.globals[idx] we don't segfault
         // PERF: fix this
         if (data.variable.scope == .global) {
-            self.addGlobal(data.variable.index, .null_);
+            self.manager.state.modules.addGlobal(self.manager.mod_index, data.variable.index, .null_);
         } else if (data.box) {
             self.writeOp(.box);
         }

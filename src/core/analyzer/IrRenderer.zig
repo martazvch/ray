@@ -101,6 +101,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .@"return" => |data| self.returnInstr("Return", data),
         .struct_decl => |*data| self.structDecl(data),
         .struct_literal => |*data| self.structLiteral(data),
+        .trait_decl => |data| self.traitDecl(data),
         .trap => |data| self.trap(data),
         .unary => |*data| self.unary(data),
         .unbox => |index| self.indexInstr("Unbox", index),
@@ -299,7 +300,7 @@ fn continueInstr(self: *Self, data: Instruction.Continue) void {
     self.indentAndPrintSlice("[Continue depth: {}, pop: {}]", .{ data.depth, data.pop_count });
 }
 
-fn enumCreate(self: *Self, data: Instruction.EnumCreate) void {
+fn enumCreate(self: *Self, data: Instruction.EnumLit) void {
     self.indentAndAppendSlice("[Enum create]");
     self.indent_level += 1;
     defer self.indent_level -= 1;
@@ -509,6 +510,16 @@ fn structLiteral(self: *Self, data: *const Instruction.StructLiteral) void {
     self.indentAndAppendSlice("- structure");
     self.parseInstr(data.structure);
     self.argsList("field", data.values);
+}
+
+fn traitDecl(self: *Self, data: Instruction.TraitDecl) void {
+    self.indentAndPrintSlice("[Trait declaration {s}]", .{self.interner.getKey(data.name).?});
+    self.indent_level += 1;
+    defer self.indent_level -= 1;
+
+    for (data.functions) |func| {
+        self.parseInstr(func);
+    }
 }
 
 fn trap(self: *Self, data: Instruction.Trap) void {

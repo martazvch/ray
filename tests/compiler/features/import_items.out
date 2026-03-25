@@ -16,7 +16,7 @@ ret_naked
 -- getVecFromPos --
 get_local index 0
 get_local index 1
-struct_lit index 0, arity 2, <structure Vec2>
+struct_lit index 0, arity 2, Vec2
 ret
 
 -- getInt --
@@ -115,4 +115,4 @@ pop
 ret_naked
 
 -- global scope --
-call_sym index 0, arity 0, <function main>
+call index 0, arity 0, main

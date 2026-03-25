@@ -61,6 +61,6 @@
     [Variable declaration index: 3, scope: local]
         [Structure literal]
             - structure
-            [Load symbol 2]
+            [Load symbol 1]
             - args
             [Variable index: 0, scope: global]

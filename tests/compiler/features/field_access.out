@@ -1,13 +1,13 @@
 -- main --
 load_constant index 3, value Vodka
 push_false
-struct_lit index 0, arity 2, <structure Pet>
+struct_lit index 0, arity 2, Pet
 
 load_constant index 4, value 5
 load_constant index 5, value Tom
 get_local index 0
 incr_ref
-struct_lit index 1, arity 3, <structure Human>
+struct_lit index 1, arity 3, Human
 
 get_local index 1
 get_field index 2
@@ -16,4 +16,4 @@ print
 ret_naked
 
 -- global scope --
-call_sym index 2, arity 0, <function main>
+call index 0, arity 0, main

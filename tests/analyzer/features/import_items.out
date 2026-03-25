@@ -110,4 +110,4 @@
                     [Int 55]
                 [Constant index 8]
                     [Int 333]
-    [Call symbol 2 module 1]
+    [Call symbol 1 module 1]

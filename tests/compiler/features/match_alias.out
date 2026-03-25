@@ -3,7 +3,7 @@ load_constant index 3, value 5
 ret
 
 -- main --
-call_sym index 0, arity 0, <function getValue>
+call index 0, arity 0, getValue
 dup
 
 load_constant index 3, value 5
@@ -22,4 +22,4 @@ pop
 ret_naked
 
 -- global scope --
-call_sym index 1, arity 0, <function main>
+call index 1, arity 0, main

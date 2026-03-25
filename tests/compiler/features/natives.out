@@ -2,11 +2,11 @@
 
 -- main --
 load_constant index 3, value natives.ray
-call_sym_native index 4, arity 1, <native fn open>
+call_native index 4, arity 1, open
 get_local index 0
-call_sym_native index 3, arity 1, <native fn readAll>
+call_native index 3, arity 1, readAll
 print
 ret_naked
 
 -- global scope --
-call_sym index 0, arity 0, <function main>
+call index 0, arity 0, main

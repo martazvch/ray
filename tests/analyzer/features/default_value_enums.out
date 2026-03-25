@@ -23,9 +23,9 @@
             1
     - body
     [Print]
-        [Field access 2]
+        [Field access 1]
             [Variable index: 0, scope: local]
-        [Invoke symbol 2]
+        [Invoke symbol 1]
 [Function declaration markerStuff2]
     - default params
     [Constant index 3]
@@ -36,14 +36,14 @@
             0
     - body
     [Print]
-        [Field access 2]
+        [Field access 1]
             [Variable index: 0, scope: local]
-        [Invoke symbol 2]
+        [Invoke symbol 1]
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
         [Structure literal]
             - structure
-            [Load symbol 3]
+            [Load symbol 0]
             - args
             [Default field constant index 3]
             [Default field constant index 5]
@@ -51,21 +51,21 @@
         [Field access 0]
             [Variable index: 0, scope: local]
     [Print]
-        [Field access 2]
+        [Field access 1]
             [Field access 0]
                 [Variable index: 0, scope: local]
-        [Invoke symbol 2]
+        [Invoke symbol 1]
     [Print]
         [Field access 1]
             [Variable index: 0, scope: local]
     [Print]
-        [Field access 2]
+        [Field access 1]
             [Field access 1]
                 [Variable index: 0, scope: local]
-        [Invoke symbol 2]
-    [Call symbol 4]
+        [Invoke symbol 1]
+    [Call symbol 2]
         - args
         [Default param constant index 5]
-    [Call symbol 5]
+    [Call symbol 3]
         - args
         [Default param constant index 3]

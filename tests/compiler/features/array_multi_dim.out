@@ -25,7 +25,7 @@ array_new length 2, type_id 17
 
 load_constant index 8, value 6
 load_constant index 11, value 7
-call_sym index 1, arity 0, <function getIdx>
+call index 0, arity 0, getIdx
 array_new length 3, type_id 16
 load_constant index 12, value 8
 load_constant index 13, value 9
@@ -34,7 +34,7 @@ add_int
 load_constant index 14, value 11
 array_new length 3, type_id 16
 array_new length 2, type_id 17
-struct_lit index 0, arity 1, <structure Foo>
+struct_lit index 0, arity 1, Foo
 
 get_local index 0
 load_constant index 3, value 1
@@ -54,33 +54,33 @@ load_constant index 17, value 99
 get_local_cow index 0
 load_constant index 15, value -1
 index_arr_cow
-call_sym index 1, arity 0, <function getIdx>
+call index 0, arity 0, getIdx
 array_set
 
 load_constant index 3, value 1
 array_new length 1, type_id 16
 get_local_cow index 2
 get_field_cow index 0
-call_sym index 1, arity 0, <function getIdx>
+call index 0, arity 0, getIdx
 array_set
 
 load_constant index 18, value -9
 get_local_cow index 2
 get_field_cow index 0
-call_sym index 1, arity 0, <function getIdx>
+call index 0, arity 0, getIdx
 index_arr_cow
 load_constant index 3, value 1
 array_set
 
 get_local index 2
 get_field index 0
-call_sym index 1, arity 0, <function getIdx>
+call index 0, arity 0, getIdx
 index_arr
 print
 
 get_local index 2
 get_field index 0
-call_sym index 1, arity 0, <function getIdx>
+call index 0, arity 0, getIdx
 index_arr
 load_constant index 3, value 1
 index_arr
@@ -89,4 +89,4 @@ print
 ret_naked
 
 -- global scope --
-call_sym index 2, arity 0, <function main>
+call index 1, arity 0, main

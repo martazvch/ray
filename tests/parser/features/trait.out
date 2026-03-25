@@ -44,5 +44,133 @@
                 ]
             }
         ]
+    },
+    "struct_decl": {
+        "name": "Foo",
+        "fields": [
+            {
+                "name": "x",
+                "type": "int",
+                "value": {}
+            },
+            {
+                "name": "y",
+                "type": "int",
+                "value": {}
+            }
+        ],
+        "functions": [
+            "fn_decl": {
+                "name": "ownFn",
+                "params": [
+                    {
+                        "name": "self",
+                        "type": "Self",
+                        "value": {}
+                    },
+                    {
+                        "name": "a",
+                        "type": "float",
+                        "value": {}
+                    }
+                ],
+                "return_type": "void",
+                "body": []
+            }
+        ],
+        "traits": [
+            "Bar": {
+                "functions": []
+            },
+            "Baz": {
+                "fn_decl": {
+                    "name": "eq",
+                    "params": [
+                        {
+                            "name": "self",
+                            "type": "Self",
+                            "value": {}
+                        },
+                        {
+                            "name": "other",
+                            "type": "str",
+                            "value": {}
+                        }
+                    ],
+                    "return_type": "bool",
+                    "body": [
+                        "return": {
+                            "bool": "true"
+                        }
+                    ]
+                },
+                "fn_decl": {
+                    "name": "hash",
+                    "params": [],
+                    "return_type": "void",
+                    "body": []
+                }
+            }
+        ]
+    },
+    "enum": {
+        "name": "Foo",
+        "tags": [
+            "x": "",
+            "y": ""
+        ]
+        "functions": [
+            "fn_decl": {
+                "name": "ownFn",
+                "params": [
+                    {
+                        "name": "self",
+                        "type": "Self",
+                        "value": {}
+                    },
+                    {
+                        "name": "a",
+                        "type": "float",
+                        "value": {}
+                    }
+                ],
+                "return_type": "void",
+                "body": []
+            }
+        ],
+        "traits": [
+            "Bar": {
+                "functions": []
+            },
+            "Baz": {
+                "fn_decl": {
+                    "name": "eq",
+                    "params": [
+                        {
+                            "name": "self",
+                            "type": "Self",
+                            "value": {}
+                        },
+                        {
+                            "name": "other",
+                            "type": "str",
+                            "value": {}
+                        }
+                    ],
+                    "return_type": "bool",
+                    "body": [
+                        "return": {
+                            "bool": "true"
+                        }
+                    ]
+                },
+                "fn_decl": {
+                    "name": "hash",
+                    "params": [],
+                    "return_type": "void",
+                    "body": []
+                }
+            }
+        ]
     }
 }

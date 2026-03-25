@@ -21,4 +21,4 @@ pop
 ret_naked
 
 -- global scope --
-call_sym index 0, arity 0, <function main>
+call index 0, arity 0, main

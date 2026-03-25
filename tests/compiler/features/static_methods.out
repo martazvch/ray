@@ -2,20 +2,20 @@
 
 -- new --
 get_local index 0
-struct_lit index 0, arity 1, <structure Vec1>
+struct_lit index 0, arity 1, Vec1
 ret
 
 -- new --
 get_local index 0
 get_local index 1
-struct_lit index 4, arity 2, <structure Vec2>
+struct_lit index 2, arity 2, Vec2
 ret
 
 -- main --
 load_constant index 3, value 5
-call_sym index 1, arity 1, <function new>
+call index 0, arity 1, new
 
-load_sym index 1, <function new>
+load_fn index 0, new
 
 get_local index 1
 load_constant index 4, value 65
@@ -24,9 +24,9 @@ set_local index 0
 
 load_constant index 5, value 12
 load_constant index 6, value 99
-call_sym index 5, arity 2, <function new>
+call index 2, arity 2, new
 
-load_sym index 5, <function new>
+load_fn index 2, new
 
 get_local index 3
 load_constant index 7, value 56
@@ -37,4 +37,4 @@ set_local index 2
 ret_naked
 
 -- global scope --
-call_sym index 2, arity 0, <function main>
+call index 1, arity 0, main

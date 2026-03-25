@@ -450,7 +450,7 @@ fn getType(ty: *const @import("../core/analyzer/types.zig").Type, interner: *con
         .bool => "bool",
         .str => "[]const u8",
         .void => "void",
-        .structure => |s| interner.getKey(s.loc.?.name).?,
+        .structure => |s| interner.getKey(s.loc.name).?,
         else => @panic("Type not supported yet"),
     };
 }

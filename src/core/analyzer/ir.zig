@@ -25,7 +25,7 @@ pub const Instruction = struct {
         @"continue": Continue,
         constant: Constant,
         discard: Index,
-        enum_create: EnumCreate,
+        enum_create: EnumLit,
         enum_decl: EnumDecl,
         fail: Return,
         field: Field,
@@ -49,6 +49,7 @@ pub const Instruction = struct {
         @"return": Return,
         struct_decl: StructDecl,
         struct_literal: StructLiteral,
+        trait_decl: TraitDecl,
         trap: Trap,
         unary: Unary,
         unbox: Index,
@@ -145,7 +146,7 @@ pub const Instruction = struct {
     pub const Constant = struct {
         index: ConstIdx,
     };
-    pub const EnumCreate = struct {
+    pub const EnumLit = struct {
         sym: LoadSymbol,
         tag_index: usize,
     };
@@ -240,7 +241,6 @@ pub const Instruction = struct {
     };
     pub const Return = struct { value: ?Index };
     pub const StructDecl = struct {
-        // Interner index
         name: usize,
         sym_index: SymbolIndex,
         type_id: TypeId,
@@ -251,6 +251,12 @@ pub const Instruction = struct {
     pub const StructLiteral = struct {
         structure: Index,
         values: []const Arg,
+    };
+    pub const TraitDecl = struct {
+        name: usize,
+        sym_index: SymbolIndex,
+        type_id: TypeId,
+        functions: []const Index,
     };
     pub const Trap = struct {
         lhs: Index,

@@ -17,7 +17,7 @@
         [Return]
             [Structure literal]
                 - structure
-                [Load symbol 2]
+                [Load symbol 1]
                 - args
                 [Structure literal]
                     - structure
@@ -42,14 +42,14 @@
     [Variable declaration index: 1, scope: local]
         [Structure literal]
             - structure
-            [Load symbol 2]
+            [Load symbol 1]
             - args
             [Incr rc]
                 [Variable index: 0, scope: local]
     [Variable declaration index: 2, scope: local]
         [Structure literal]
             - structure
-            [Load symbol 4]
+            [Load symbol 2]
             - args
             [Incr rc]
                 [Variable index: 1, scope: local]
@@ -112,24 +112,24 @@
                     [Field access 0]
                         [Variable index: 2, scope: local]
     [Variable declaration index: 12, scope: local]
-        [Field access 3]
+        [Field access 1]
             [Field access 0]
                 [Variable index: 2, scope: local]
-        [Invoke symbol 3]
+        [Invoke symbol 1]
     [Variable declaration index: 13, scope: local]
         [Field access 0]
-            [Field access 3]
+            [Field access 1]
                 [Field access 0]
                     [Variable index: 2, scope: local]
-            [Invoke symbol 3]
+            [Invoke symbol 1]
     [Variable declaration index: 14, scope: local]
         [Field access 0]
             [Field access 0]
-                [Field access 3]
+                [Field access 1]
                     [Field access 0]
                         [Variable index: 2, scope: local]
-                [Invoke symbol 3]
-    [Call symbol 5]
+                [Invoke symbol 1]
+    [Call symbol 2]
         - args
         [Variable index: 0, scope: local]
         [Field access 0]

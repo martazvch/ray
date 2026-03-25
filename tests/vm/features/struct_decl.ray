@@ -1,5 +1,0 @@
-struct Name {}
-
-fn main() {
-    print Name
-}

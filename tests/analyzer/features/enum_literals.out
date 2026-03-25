@@ -23,9 +23,9 @@
             0
     - body
     [Print]
-        [Field access 1]
+        [Field access 0]
             [Variable index: 0, scope: local]
-        [Invoke symbol 1]
+        [Invoke symbol 0]
 [Function declaration markerStuff2]
     - default params
     [Constant index 5]
@@ -36,9 +36,9 @@
             1
     - body
     [Print]
-        [Field access 1]
+        [Field access 0]
             [Variable index: 0, scope: local]
-        [Invoke symbol 1]
+        [Invoke symbol 0]
 [Function declaration getMarker, returns]
     [Return]
         [Constant index 7]
@@ -66,7 +66,7 @@
     [Assignment index: 0, scope: local, cow]
     [Print]
         [Variable index: 0, scope: local]
-    [Call symbol 3]
+    [Call symbol 1]
         - args
         [Constant index 7]
             [Enum create]
@@ -74,7 +74,7 @@
                 [Load symbol 0 module 0]
                 - tag
                 1
-    [Call symbol 4]
+    [Call symbol 2]
         - args
         [Constant index 9]
             [Enum create]
@@ -85,7 +85,7 @@
     [Variable declaration index: 1, scope: local]
         [Structure literal]
             - structure
-            [Load symbol 2]
+            [Load symbol 0]
             - args
             [Default field constant index 3]
             [Default field constant index 7]

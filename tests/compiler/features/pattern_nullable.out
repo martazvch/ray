@@ -3,7 +3,7 @@ load_constant index 3, value 5
 ret
 
 -- main --
-call_sym index 0, arity 0, <function getValue>
+call index 0, arity 0, getValue
 ne_null_push
 jump_false 4 -> 15
 pop
@@ -16,7 +16,7 @@ jump 12 -> 16
 pop2
 
 // While
-call_sym index 0, arity 0, <function getValue>
+call index 0, arity 0, getValue
 ne_null_push
 jump_false 20 -> 31
 pop
@@ -31,4 +31,4 @@ pop2
 ret_naked
 
 -- global scope --
-call_sym index 1, arity 0, <function main>
+call index 1, arity 0, main

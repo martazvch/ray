@@ -10,7 +10,7 @@ load_constant index 6, value 3
 load_constant index 7, value 4
 array_new length 2, type_id 16
 array_new length 2, type_id 17
-struct_lit index 0, arity 3, <structure Point>
+struct_lit index 0, arity 3, Point
 
 load_constant index 8, value 5
 load_constant index 9, value 6
@@ -21,7 +21,7 @@ load_constant index 12, value 9
 load_constant index 13, value 10
 array_new length 2, type_id 16
 array_new length 2, type_id 17
-struct_lit index 0, arity 3, <structure Point>
+struct_lit index 0, arity 3, Point
 
 load_constant index 14, value 11
 load_constant index 15, value 12
@@ -32,7 +32,7 @@ load_constant index 18, value 15
 load_constant index 19, value 16
 array_new length 2, type_id 16
 array_new length 2, type_id 17
-struct_lit index 0, arity 3, <structure Point>
+struct_lit index 0, arity 3, Point
 
 load_constant index 20, value 17
 load_constant index 21, value 18
@@ -43,7 +43,7 @@ load_constant index 24, value 21
 load_constant index 25, value 22
 array_new length 2, type_id 16
 array_new length 2, type_id 17
-struct_lit index 0, arity 3, <structure Point>
+struct_lit index 0, arity 3, Point
 
 get_local index 1
 incr_ref
@@ -56,12 +56,12 @@ get_local index 4
 incr_ref
 array_new length 2, type_id 19
 array_new length 2, type_id 20
-struct_lit index 1, arity 1, <structure Poly>
+struct_lit index 1, arity 1, Poly
 
 get_local index 5
 incr_ref
 load_constant index 3, value object
-struct_lit index 2, arity 2, <structure Object>
+struct_lit index 2, arity 2, Object
 
 get_local index 6
 get_field index 0
@@ -125,4 +125,4 @@ array_set
 ret_naked
 
 -- global scope --
-call_sym index 3, arity 0, <function main>
+call index 0, arity 0, main

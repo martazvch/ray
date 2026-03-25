@@ -197,7 +197,7 @@ pub fn analyzeNode(self: *Self, node: *const Node, expect: ExprResKind, ctx: *Co
         .multi_var_decl => |*n| try self.multiVarDecl(n, ctx),
         .print => |n| try self.print(n, ctx),
         .struct_decl => |*n| try self.structDecl(n, ctx),
-        .trait_decl => unreachable,
+        .trait_decl => |*n| try self.traitDecl(n, ctx),
         .use => |*n| b: {
             try self.use(n);
             // TODO: replace with a error.Noop to skip it?
@@ -304,7 +304,7 @@ fn enumDeclaration(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtRe
     const interned = self.ti.newEnum(.{ .name = name, .container = container_name }, node.is_err);
     const ty = &interned.@"enum";
 
-    const sym = self.scope.forwardDeclareSymbol(self.allocator, name);
+    const sym = self.scope.forwardDeclareSymbol(self.allocator, name, .@"enum");
     sym.type = interned;
 
     ctx.self_type = interned;
@@ -440,7 +440,7 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
     const container_name = self.interner.internKeepRef(self.allocator, self.containers.renderWithSep(&buf, "."));
 
     // Forward declaration in outer scope for recursion
-    var sym = self.scope.forwardDeclareSymbol(self.allocator, name);
+    var sym = self.scope.forwardDeclareSymbol(self.allocator, name, .function);
 
     self.scope.open(self.allocator, null, .{ .barrier = true });
     errdefer _ = self.scope.close();
@@ -781,7 +781,7 @@ fn structDecl(self: *Self, node: *const Ast.StructDecl, ctx: *Context) StmtResul
     const interned = self.ti.newStruct(.{ .name = name, .container = container_name });
     const ty = &interned.structure;
 
-    const sym = self.scope.forwardDeclareSymbol(self.allocator, name);
+    const sym = self.scope.forwardDeclareSymbol(self.allocator, name, .structure);
     sym.type = interned;
 
     ctx.self_type = interned;
@@ -838,6 +838,42 @@ fn structureFields(self: *Self, fields: []const Ast.VarDecl, ty: *Type.Structure
     }
 
     return default_fields.toOwnedSlice(self.allocator) catch oom();
+}
+
+fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult {
+    const span = self.ast.getSpan(node);
+    const name = try self.internIfNotInCurrentScope(node.name);
+
+    var buf: [1024]u8 = undefined;
+    const container_name = self.interner.internKeepRef(self.allocator, self.containers.renderWithSep(&buf, "."));
+
+    const interned = self.ti.intern(.{ .trait = .{
+        .loc = .{ .name = name, .container = container_name },
+        .functions = .empty,
+    } });
+    const ty = &interned.trait;
+
+    const sym = self.scope.forwardDeclareSymbol(self.allocator, name, .trait);
+    sym.type = interned;
+
+    ctx.self_type = interned;
+    defer ctx.self_type = null;
+
+    try self.openContainer(node.name);
+    defer self.closeContainer();
+
+    // const default_fields = try self.structureFields(node.fields, ty, ctx);
+    const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
+
+    return self.irb.addInstr(
+        .{ .trait_decl = .{
+            .name = name,
+            .sym_index = sym.index,
+            .type_id = self.ti.typeId(sym.type),
+            .functions = funcs,
+        } },
+        span.start,
+    );
 }
 
 fn whileStmt(self: *Self, node: *const Ast.While, ctx: *Context) StmtResult {
@@ -1253,7 +1289,7 @@ fn breakExpr(self: *Self, expr: *const Ast.Break, ctx: *Context) Result {
 
 fn closure(self: *Self, expr: *const Ast.FnDecl, ctx: *Context) Result {
     // TODO: create an anonymus name generator mechanism
-    var sym = self.scope.forwardDeclareSymbol(self.allocator, self.interner.intern("azert"));
+    var sym = self.scope.forwardDeclareSymbol(self.allocator, self.interner.intern("azert"), .function);
 
     self.scope.open(self.allocator, null, .{ .barrier = true });
     defer _ = self.scope.close();
@@ -1740,8 +1776,8 @@ fn resolveIdentifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool,
     const sym_name = if (name == self.cached_names.Self) b: {
         const ty = ctx.self_type orelse return self.err(.big_self_outside_decl, span);
         break :b switch (ty.*) {
-            .@"enum" => |t| t.loc.?.name,
-            .structure => |t| t.loc.?.name,
+            .@"enum" => |t| t.loc.name,
+            .structure => |t| t.loc.name,
             else => unreachable,
         };
     } else name;
