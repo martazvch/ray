@@ -20,7 +20,7 @@ struct Foo {
     fn ownFn(self, a: float) {}
 }
 
-enum Foo {
+union Foo {
     x, y,
 
     impl Bar {}

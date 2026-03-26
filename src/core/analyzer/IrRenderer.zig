@@ -76,8 +76,8 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .constant => |data| self.constant(data),
         .@"continue" => |data| self.continueInstr(data),
         .discard => |index| self.indexInstr("Discard", index),
-        .enum_create => |data| self.enumCreate(data),
         .enum_decl => |*data| self.enumDecl(data),
+        // .enum_lit => |data| self.enumLiteral(data),
         .fail => |data| self.returnInstr("Fail", data),
         .field => |data| self.getField(data, false),
         .fn_decl => |*data| self.fnDeclaration(data),
@@ -105,6 +105,8 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .trap => |data| self.trap(data),
         .unary => |*data| self.unary(data),
         .unbox => |index| self.indexInstr("Unbox", index),
+        .union_decl => |*data| self.unionDecl(data),
+        .union_lit => |*data| self.unionLit(data),
         .var_decl => |*data| self.varDecl(data),
         .@"while" => |data| self.whileInstr(data),
 
@@ -207,6 +209,28 @@ fn breakInstr(self: *Self, data: Instruction.Break) void {
     }
 }
 
+fn enumDecl(self: *Self, data: *const Instruction.EnumDecl) void {
+    self.indentAndPrintSlice("[Enum declaration {s}]", .{self.interner.getKey(data.name).?});
+    self.indent_level += 1;
+    defer self.indent_level -= 1;
+
+    self.indentAndAppendSlice("- tags");
+    if (data.tags.len > 0) {
+        for (data.tags) |tag| {
+            self.indentAndAppendSlice(tag);
+            // if (tag.value) |val| {
+            //     self.parseInstr(val);
+            // }
+        }
+    }
+
+    self.indentAndAppendSlice("- functions");
+    for (data.functions) |func| {
+        self.parseInstr(func);
+    }
+    // self.traitImpls(data.traits);
+}
+
 fn discard(self: *Self) void {
     self.indentAndAppendSlice("[Discard]");
     self.indent_level += 1;
@@ -291,7 +315,7 @@ fn constant(self: *Self, data: Instruction.Constant) void {
         .float => |c| self.indentAndPrintSlice("[Float {}]", .{c}),
         .null => self.indentAndAppendSlice("[Null]"),
         .string => |c| self.indentAndPrintSlice("[String {s}]", .{self.interner.getKey(c).?}),
-        .enum_instance => |c| self.enumCreate(c),
+        .enum_lit => |c| self.enumLiteral(c),
     }
     self.indent_level -= 1;
 }
@@ -300,7 +324,7 @@ fn continueInstr(self: *Self, data: Instruction.Continue) void {
     self.indentAndPrintSlice("[Continue depth: {}, pop: {}]", .{ data.depth, data.pop_count });
 }
 
-fn enumCreate(self: *Self, data: Instruction.EnumLit) void {
+fn enumLiteral(self: *Self, data: Instruction.EnumLit) void {
     self.indentAndAppendSlice("[Enum create]");
     self.indent_level += 1;
     defer self.indent_level -= 1;
@@ -310,8 +334,29 @@ fn enumCreate(self: *Self, data: Instruction.EnumLit) void {
     self.indentAndPrintSlice("{}", .{data.tag_index});
 }
 
-fn enumDecl(self: *Self, data: *const Instruction.EnumDecl) void {
-    self.indentAndPrintSlice("[Enum declaration {s}]", .{self.interner.getKey(data.name).?});
+fn unionDecl(self: *Self, data: *const Instruction.UnionDecl) void {
+    self.indentAndPrintSlice("[Union declaration {s}]", .{self.interner.getKey(data.name).?});
+    self.indent_level += 1;
+    defer self.indent_level -= 1;
+
+    for (data.functions) |func| {
+        self.parseInstr(func);
+    }
+    // self.traitImpls(data.traits);
+}
+
+fn unionLit(self: *Self, data: *const Instruction.UnionLit) void {
+    self.indentAndAppendSlice("[Union literal]");
+    self.indent_level += 1;
+    defer self.indent_level -= 1;
+    self.indentAndAppendSlice("- union");
+    self.loadSymbol(&data.sym);
+    self.indentAndAppendSlice("- tag");
+    self.indentAndPrintSlice("{}", .{data.tag_index});
+    if (data.payload) |payload| {
+        self.indentAndAppendSlice("- payload");
+        self.parseInstr(payload);
+    }
 }
 
 fn getField(self: *Self, data: Instruction.Field, cow: bool) void {

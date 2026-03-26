@@ -238,6 +238,7 @@ fn synchronize(self: *Self) void {
             .@"return",
             .@"struct",
             .trait,
+            .@"union",
             .use,
             .@"var",
             .@"while",
@@ -250,25 +251,29 @@ fn synchronize(self: *Self) void {
 fn declaration(self: *Self) Error!Node {
     return if (self.match(.@"var") or self.match(.let))
         self.varDecl()
-    else if (self.match(.@"enum"))
-        self.enumDecl(false)
-    else if (self.match(.@"error"))
-        self.enumDecl(true)
     else if (self.match(.@"fn"))
         self.fnDecl()
     else if (self.match(.@"struct"))
         self.structDecl()
     else if (self.match(.trait))
         self.traitDecl()
+    else if (self.match(.@"enum"))
+        self.enumDecl()
+    else if (self.match(.@"union"))
+        self.unionDecl(false)
+    else if (self.match(.@"error"))
+        self.unionDecl(true)
     else if (self.match(.use))
         self.use()
     else
         self.statement();
 }
 
-fn enumDecl(self: *Self, is_err: bool) Error!Node {
+fn enumDecl(self: *Self) Error!Node {
     const tk = self.token_idx - 1;
-    const name = if (self.matchAndSkip(.identifier)) self.token_idx - 1 else null;
+    try self.expect(.identifier, .expectName("enum"));
+    const name = self.token_idx - 1;
+
     try self.expect(.left_brace, .expectBraceBefore("enum"));
     self.skipNewLines();
 
@@ -279,16 +284,11 @@ fn enumDecl(self: *Self, is_err: bool) Error!Node {
         if (!self.matchAndSkip(.comma)) break;
     }
 
-    if (is_err and tags.items.len == 0) {
-        return self.errAt(name orelse tk, .empty_error_set);
-    }
-
     const functions, const traits = try self.containerFnDecls("enum");
 
     return .{ .enum_decl = .{
         .tk = tk,
         .name = name,
-        .is_err = is_err,
         .tags = tags.toOwnedSlice(self.allocator) catch oom(),
         .functions = functions,
         .traits = traits,
@@ -296,18 +296,20 @@ fn enumDecl(self: *Self, is_err: bool) Error!Node {
 }
 
 fn enumTag(self: *Self) Error!Ast.EnumDecl.Tag {
-    try self.expect(.identifier, .non_ident_enum_tag);
+    try self.expect(.identifier, .non_ident_tag_name);
     const name = self.token_idx - 1;
     self.skipNewLines();
 
-    const payload = if (self.check(.comma) or self.check(.@"fn") or self.check(.right_brace)) null else payload: {
-        try self.expect(.colon, .expect_colon_before_type);
-        const ty = try self.parseType();
+    const value = if (self.check(.comma) or self.check(.@"fn") or self.check(.right_brace) or self.check(.impl))
+        null
+    else value: {
+        try self.expect(.equal, .expect_equal_enum_discr);
+        const value = try self.parsePrecedenceExpr(0);
         self.skipNewLines();
-        break :payload ty;
+        break :value value;
     };
 
-    return .{ .name = name, .payload = payload };
+    return .{ .name = name, .value = value };
 }
 
 fn fnDecl(self: *Self) Error!Node {
@@ -531,6 +533,52 @@ fn traitDecl(self: *Self) !Node {
         .name = name,
         .functions = functions,
     } };
+}
+
+fn unionDecl(self: *Self, is_err: bool) Error!Node {
+    const tk = self.token_idx - 1;
+    const name = if (self.matchAndSkip(.identifier)) self.token_idx - 1 else null;
+    try self.expect(.left_brace, .expectBraceBefore("union"));
+    self.skipNewLines();
+
+    var tags: ArrayList(Ast.UnionDecl.Tag) = .empty;
+    while (!self.check(.@"fn") and !self.check(.impl) and !self.check(.right_brace) and !self.check(.eof)) {
+        const tag = try self.unionTag();
+        tags.append(self.allocator, tag) catch oom();
+        if (!self.matchAndSkip(.comma)) break;
+    }
+
+    if (is_err and tags.items.len == 0) {
+        return self.errAt(name orelse tk, .empty_error_set);
+    }
+
+    const functions, const traits = try self.containerFnDecls("union");
+
+    return .{ .union_decl = .{
+        .tk = tk,
+        .name = name,
+        .is_err = is_err,
+        .tags = tags.toOwnedSlice(self.allocator) catch oom(),
+        .functions = functions,
+        .traits = traits,
+    } };
+}
+
+fn unionTag(self: *Self) Error!Ast.UnionDecl.Tag {
+    try self.expect(.identifier, .non_ident_tag_name);
+    const name = self.token_idx - 1;
+    self.skipNewLines();
+
+    const payload = if (self.check(.comma) or self.check(.@"fn") or self.check(.right_brace) or self.check(.impl))
+        null
+    else payload: {
+        try self.expect(.colon, .expect_colon_before_type);
+        const ty = try self.parseType();
+        self.skipNewLines();
+        break :payload ty;
+    };
+
+    return .{ .name = name, .payload = payload };
 }
 
 fn varDecl(self: *Self) Error!Node {

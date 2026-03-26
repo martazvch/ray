@@ -29,6 +29,7 @@ pub const Type = union(enum) {
     @"enum": Enum,
     error_union: ErrorUnion,
     function: Function,
+    inline_union: InlineUnion,
     module: InternerIdx,
     optional: *const Type,
     structure: Structure,
@@ -77,26 +78,9 @@ pub const Type = union(enum) {
     pub const Loc = struct { name: InternerIdx, container: InternerIdx };
 
     pub const Enum = struct {
-        loc: Loc,
-        tags: Tags,
-        is_err: bool,
+        loc: ?Loc,
+        tags: ArrayMap(InternerIdx, ?InstrIndex),
         functions: MapNameSym,
-
-        pub const empty: Enum = .{ .loc = null, .tags = .empty };
-        pub const Tags = MapNameType;
-
-        pub const Proto = ArrayMap(InternerIdx, bool);
-
-        pub fn proto(self: *const Enum, allocator: Allocator) Proto {
-            var res: Proto = .empty;
-            res.ensureTotalCapacity(allocator, self.tags.count()) catch oom();
-
-            for (self.tags.keys()) |tag| {
-                res.putAssumeCapacity(tag, false);
-            }
-
-            return res;
-        }
     };
 
     pub const ErrorUnion = struct {
@@ -157,6 +141,40 @@ pub const Type = union(enum) {
         }
     };
 
+    pub const InlineUnion = struct {
+        types: []const *const Type,
+
+        pub const Proto = Map(*const Type, bool);
+
+        pub fn proto(self: *const InlineUnion, allocator: Allocator) Proto {
+            var res: Proto = .empty;
+            // TODO: protect the cast?
+            res.ensureTotalCapacity(allocator, @intCast(self.types.len)) catch oom();
+
+            for (self.types) |ty| {
+                res.putAssumeCapacity(ty, false);
+            }
+
+            return res;
+        }
+
+        /// Checks wether a type is contained in the union
+        pub fn contains(self: *const InlineUnion, other: *const Type) bool {
+            for (self.types) |ty| {
+                if (other == ty) return true;
+            }
+            return false;
+        }
+
+        /// Checks if an union is a subset a the union
+        pub fn containsSubset(self: *const InlineUnion, other: *const InlineUnion) bool {
+            for (other.types) |sub| {
+                if (!self.contains(sub)) return false;
+            }
+            return true;
+        }
+    };
+
     pub const Structure = struct {
         loc: Loc,
         fields: FieldsMap,
@@ -205,36 +223,25 @@ pub const Type = union(enum) {
     };
 
     pub const Union = struct {
-        types: []const *const Type,
+        loc: Loc,
+        tags: Tags,
+        is_err: bool,
+        functions: MapNameSym,
 
-        pub const Proto = Map(*const Type, bool);
+        pub const empty: Union = .{ .loc = null, .tags = .empty };
+        pub const Tags = MapNameType;
+
+        pub const Proto = ArrayMap(InternerIdx, bool);
 
         pub fn proto(self: *const Union, allocator: Allocator) Proto {
             var res: Proto = .empty;
-            // TODO: protect the cast?
-            res.ensureTotalCapacity(allocator, @intCast(self.types.len)) catch oom();
+            res.ensureTotalCapacity(allocator, self.tags.count()) catch oom();
 
-            for (self.types) |ty| {
-                res.putAssumeCapacity(ty, false);
+            for (self.tags.keys()) |tag| {
+                res.putAssumeCapacity(tag, false);
             }
 
             return res;
-        }
-
-        /// Checks wether a type is contained in the union
-        pub fn contains(self: *const Union, other: *const Type) bool {
-            for (self.types) |ty| {
-                if (other == ty) return true;
-            }
-            return false;
-        }
-
-        /// Checks if an union is a subset a the union
-        pub fn containsSubset(self: *const Union, other: *const Union) bool {
-            for (other.types) |sub| {
-                if (!self.contains(sub)) return false;
-            }
-            return true;
         }
     };
 
@@ -258,13 +265,13 @@ pub const Type = union(enum) {
     // TODO: values in unions can be heap...
     pub fn isHeap(self: *const Type) bool {
         return switch (self.*) {
-            .void, .int, .float, .bool, .str, .null, .function, .optional, .@"union" => false,
+            .void, .int, .float, .bool, .str, .null, .function, .optional, .inline_union => false,
             else => true,
         };
     }
 
     pub fn isErr(self: *const Type) bool {
-        const e = self.as(.@"enum") orelse return false;
+        const e = self.as(.@"union") orelse return false;
         return e.is_err;
     }
 
@@ -287,9 +294,18 @@ pub const Type = union(enum) {
             .never, .void, .int, .float, .bool, .str, .null => {},
             .array => |ty| ty.child.hash(allocator, hasher),
             .@"enum" => |*ty| {
-                hasher.update(asBytes(&ty.is_err));
-                hasher.update(asBytes(&ty.loc.name));
-                hasher.update(asBytes(&ty.loc.container));
+                if (ty.loc) |loc| {
+                    hasher.update(asBytes(&loc.name));
+                    hasher.update(asBytes(&loc.container));
+                } else {
+                    var it = ty.tags.iterator();
+                    while (it.next()) |entry| {
+                        hasher.update(asBytes(entry.key_ptr));
+                        if (entry.value_ptr.*) |value| {
+                            hasher.update(asBytes(&value));
+                        }
+                    }
+                }
             },
             .error_union => |ty| {
                 ty.ok.hash(allocator, hasher);
@@ -317,7 +333,12 @@ pub const Type = union(enum) {
                 hasher.update(asBytes(&ty.loc.name));
                 hasher.update(asBytes(&ty.loc.container));
             },
-            .@"union" => |u| {
+            .@"union" => |*ty| {
+                hasher.update(asBytes(&ty.is_err));
+                hasher.update(asBytes(&ty.loc.name));
+                hasher.update(asBytes(&ty.loc.container));
+            },
+            .inline_union => |u| {
                 var set = Set(*const Type).fromSlice(allocator, u.types) catch oom();
                 defer set.deinit(allocator);
 
@@ -344,12 +365,21 @@ pub const Type = union(enum) {
                 writer.writeAll(ty.child.toString(allocator, interner, mod_name)) catch oom();
                 writer.writeAll("]") catch oom();
             },
-            .@"enum" => |*ty| {
+            .@"enum" => |ty| {
                 // If symbol is defnined in current mod/file, don't repeat the module
-                if (ty.loc.container == mod_name) {
-                    writer.print("{s}", .{interner.getKey(ty.loc.name).?}) catch oom();
+                if (ty.loc) |loc| {
+                    if (loc.container == mod_name) {
+                        writer.print("{s}", .{interner.getKey(loc.name).?}) catch oom();
+                    } else {
+                        writer.print("{s}.{s}", .{ interner.getKey(loc.container).?, interner.getKey(loc.name).? }) catch oom();
+                    }
                 } else {
-                    writer.print("{s}.{s}", .{ interner.getKey(ty.loc.container).?, interner.getKey(ty.loc.name).? }) catch oom();
+                    writer.writeAll("enum {") catch oom();
+                    for (ty.tags.keys(), 0..) |k, i| {
+                        const last = i < ty.tags.count() - 1;
+                        writer.print("{s}{s}", .{ interner.getKey(k).?, if (last) "" else ", " }) catch oom();
+                    }
+                    writer.writeAll("}") catch oom();
                 }
             },
             .error_union => |ty| {
@@ -390,7 +420,15 @@ pub const Type = union(enum) {
                     writer.print("trait {s}.{s}", .{ interner.getKey(ty.loc.container).?, interner.getKey(ty.loc.name).? }) catch oom();
                 }
             },
-            .@"union" => |u| {
+            .@"union" => |*ty| {
+                // If symbol is defnined in current mod/file, don't repeat the module
+                if (ty.loc.container == mod_name) {
+                    writer.print("{s}", .{interner.getKey(ty.loc.name).?}) catch oom();
+                } else {
+                    writer.print("{s}.{s}", .{ interner.getKey(ty.loc.container).?, interner.getKey(ty.loc.name).? }) catch oom();
+                }
+            },
+            .inline_union => |u| {
                 for (u.types, 0..) |ty, i| {
                     writer.writeAll(ty.toString(allocator, interner, mod_name)) catch oom();
                     if (i < u.types.len - 1) writer.writeAll("|") catch oom();
@@ -492,6 +530,14 @@ pub const TypeInterner = struct {
         return @intCast(self.ids.getIndex(ty).?);
     }
 
+    pub fn newEnum(self: *TypeInterner, loc: Type.Loc) *Type {
+        return self.intern(.{ .@"enum" = .{
+            .loc = loc,
+            .tags = .empty,
+            .functions = .empty,
+        } });
+    }
+
     pub fn newStruct(self: *TypeInterner, loc: Type.Loc) *Type {
         return self.intern(.{ .structure = .{
             .loc = loc,
@@ -501,8 +547,8 @@ pub const TypeInterner = struct {
         } });
     }
 
-    pub fn newEnum(self: *TypeInterner, loc: Type.Loc, is_err: bool) *Type {
-        return self.intern(.{ .@"enum" = .{
+    pub fn newUnion(self: *TypeInterner, loc: Type.Loc, is_err: bool) *Type {
+        return self.intern(.{ .@"union" = .{
             .loc = loc,
             .tags = .empty,
             .is_err = is_err,
@@ -544,9 +590,9 @@ test "inline union" {
     const union1 = &[_]*const Type{ ti.intern(.int), ti.intern(.bool) };
     const union2 = &[_]*const Type{ ti.intern(.bool), ti.intern(.int) };
 
-    try expect(ti.intern(.{ .@"union" = .{ .types = union1 } }) == ti.intern(.{ .@"union" = .{ .types = union1 } }));
-    try expect(ti.intern(.{ .@"union" = .{ .types = union2 } }) == ti.intern(.{ .@"union" = .{ .types = union2 } }));
+    try expect(ti.intern(.{ .inline_union = .{ .types = union1 } }) == ti.intern(.{ .inline_union = .{ .types = union1 } }));
+    try expect(ti.intern(.{ .inline_union = .{ .types = union2 } }) == ti.intern(.{ .inline_union = .{ .types = union2 } }));
 
-    try expect(ti.intern(.{ .@"union" = .{ .types = union1 } }) == ti.intern(.{ .@"union" = .{ .types = union2 } }));
-    try expect(ti.intern(.{ .@"union" = .{ .types = union2 } }) == ti.intern(.{ .@"union" = .{ .types = union1 } }));
+    try expect(ti.intern(.{ .inline_union = .{ .types = union1 } }) == ti.intern(.{ .inline_union = .{ .types = union2 } }));
+    try expect(ti.intern(.{ .inline_union = .{ .types = union2 } }) == ti.intern(.{ .inline_union = .{ .types = union1 } }));
 }

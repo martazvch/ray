@@ -24,10 +24,17 @@ pub const Module = struct {
     constants: []Value,
 
     enums: []Enum,
+    unions: []Union,
     functions: []*Obj.Function,
     structures: []Structure,
 
     pub const Enum = struct {
+        name: []const u8,
+        tags: []const []const u8,
+        type_id: TypeId,
+    };
+
+    pub const Union = struct {
         name: []const u8,
         tags: []const []const u8,
         type_id: TypeId,
@@ -47,6 +54,7 @@ pub const Module = struct {
         .globals = &.{},
         .constants = &.{},
         .enums = &.{},
+        .unions = &.{},
         .functions = &.{},
         .structures = &.{},
     };
@@ -101,6 +109,7 @@ pub fn ensureCompileSizes(self: *Self, allocator: Allocator, index: Index, state
     mod.globals = try allocator.realloc(mod.globals, state.lex_scope.current.variables.count());
     mod.constants = try allocator.realloc(mod.constants, state.const_interner.constants.items.len);
     mod.enums = try allocator.realloc(mod.enums, state.lex_scope.enum_count);
+    mod.unions = try allocator.realloc(mod.unions, state.lex_scope.union_count);
     mod.functions = try allocator.realloc(mod.functions, state.lex_scope.func_count);
     mod.structures = try allocator.realloc(mod.structures, state.lex_scope.struct_count);
 }
@@ -113,6 +122,7 @@ pub fn addSymbol(self: *Self, mod_index: Index, sym_index: usize, value: anytype
     const module = self.getFromIndex(mod_index);
     const array = switch (@TypeOf(value)) {
         Module.Enum => module.enums,
+        Module.Union => module.unions,
         *Obj.Function => module.functions,
         Module.Structure => module.structures,
         else => @compileError("Can only add symbols defined in compiled module, found " ++ @typeName(@TypeOf(value))),
@@ -120,14 +130,16 @@ pub fn addSymbol(self: *Self, mod_index: Index, sym_index: usize, value: anytype
     array[sym_index] = value;
 }
 
-pub fn getSymbol(self: *const Self, mod_index: Index, sym_index: usize, comptime kind: enum { @"enum", structure }) *const switch (kind) {
+pub fn getSymbol(self: *const Self, mod_index: Index, sym_index: usize, comptime kind: enum { @"enum", structure, @"union" }) *const switch (kind) {
     .@"enum" => Module.Enum,
     .structure => Module.Structure,
+    .@"union" => Module.Union,
 } {
     const mod = self.getFromIndex(mod_index);
     return switch (kind) {
         .@"enum" => &mod.enums[sym_index],
         .structure => &mod.structures[sym_index],
+        .@"union" => &mod.unions[sym_index],
     };
 }
 

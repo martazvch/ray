@@ -1,4 +1,4 @@
-[Enum declaration Foo]
+[Union declaration Foo]
 
 [Function declaration failable, returns]
     [Return]

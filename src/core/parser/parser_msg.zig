@@ -17,6 +17,7 @@ pub const ParserMsg = union(enum) {
     expect_colon_before_type,
     expect_comma_array_values,
     expect_colon_struct_lit,
+    expect_equal_enum_discr,
     expect_expr: struct { found: []const u8 },
     expect_field_type_or_default,
     expect_fn_end_container: struct { kind: []const u8 },
@@ -43,7 +44,7 @@ pub const ParserMsg = union(enum) {
     missing_bracket_array_type,
     missing_comma_after_field,
     missing_fn_param_type,
-    non_ident_enum_tag,
+    non_ident_tag_name,
     non_ident_in_type,
     non_ident_alias,
     non_ident_label,
@@ -79,6 +80,7 @@ pub const ParserMsg = union(enum) {
             .expect_colon_before_type => writer.writeAll("invalid variable type declaration"),
             .expect_comma_array_values => writer.writeAll("expect a ',' between array values"),
             .expect_colon_struct_lit => writer.writeAll("expect either ':' or '}' in structure literal field value"),
+            .expect_equal_enum_discr => writer.writeAll("expect '=' before tag's value or nothing"),
             .expect_expr => |e| writer.print("expected expression, found \"{s}\"", .{e.found}),
             .expect_field_type_or_default => writer.writeAll("structure fileds must be typed or have a default value"),
             .expect_fn_end_container => writer.writeAll("expect functions declaration or nothing"),
@@ -105,7 +107,7 @@ pub const ParserMsg = union(enum) {
             .missing_bracket_array_type => writer.writeAll("missing ']' in array type"),
             .missing_comma_after_field => writer.writeAll("comma might be missing between fields"),
             .missing_fn_param_type => writer.writeAll("missing function's parameter's type"),
-            .non_ident_enum_tag => writer.writeAll("expect an identifier"),
+            .non_ident_tag_name => writer.writeAll("expect an identifier"),
             .non_ident_in_type => writer.writeAll("non-identifier in type name"),
             .non_ident_alias => writer.writeAll("alias must be an identifier"),
             .non_ident_label => writer.writeAll("labels of blocks must be identifiers"),
@@ -140,6 +142,7 @@ pub const ParserMsg = union(enum) {
             .expect_block_or_do,
             .expect_closing_pipe,
             .expect_comma_array_values,
+            .expect_equal_enum_discr,
             .expect_identifier_for_binding,
             .expect_name_after_dot,
             .expect_paren_after_fn_args,
@@ -175,7 +178,7 @@ pub const ParserMsg = union(enum) {
             .invalid_struct_literal => writer.writeAll("this syntax is invalid"),
             .match_duplicate_wildcard => writer.writeAll("second occurence of '_'"),
             .match_wildcard_not_last => writer.writeAll("this is not the last case"),
-            .non_ident_enum_tag, .non_ident_in_type, .non_ident_alias, .non_ident_label => writer.writeAll("this is not an identifier"),
+            .non_ident_tag_name, .non_ident_in_type, .non_ident_alias, .non_ident_label => writer.writeAll("this is not an identifier"),
             .positional_after_default_param => writer.writeAll("this parameter"),
             .struct_lit_non_ident_field => writer.writeAll("this field"),
             .typed_self => writer.writeAll("this type"),
@@ -216,6 +219,13 @@ pub const ParserMsg = union(enum) {
                 "values must be separated with commas in array declaration. Maybe you just forgot to close the declaration with ']'?",
             ),
             .expect_colon_struct_lit => writer.writeAll("syntax is either: Foo{ x: value } or Foo{ x } (if a variable 'x' is in scope)"),
+            .expect_equal_enum_discr => writer.writeAll(
+                \\enum declaration syntax is:
+                \\enum <name> {
+                \\    <name>,           // no explicit value
+                \\    <name> = <value>, // explicit value
+                \\}
+            ),
             .expect_paren_after_fn_args => writer.writeAll("add an closing parenthesis ')' after function call"),
             .expect_paren_after_fn_name => writer.writeAll("add an opening parenthesis '(' between function's name and arguments list"),
             .expect_paren_after_fn_params => writer.writeAll("add an closing parenthesis ')' between function's parameters and return type"),
@@ -243,7 +253,7 @@ pub const ParserMsg = union(enum) {
             .missing_bracket_array_type => writer.writeAll("syntax to define array type is: '[]<type-name>'"),
             .missing_comma_after_field => writer.writeAll("structure fields have ot be separated by commas"),
             .missing_fn_param_type => writer.writeAll("function's paramters' types are mandatory, add it after ':'"),
-            .non_ident_enum_tag => writer.writeAll("enumerate tags must be identifiers"),
+            .non_ident_tag_name => writer.writeAll("unions and enums tags must be identifiers"),
             .non_ident_in_type => writer.writeAll("type names must be either one identifier or multiple ones separated with '.'"),
             .non_ident_alias => writer.writeAll("change alias name to a valid identifier"),
             .non_ident_label => writer.writeAll("change block's label to an identifier like ':b {}'"),

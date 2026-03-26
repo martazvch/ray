@@ -1,5 +1,5 @@
-[Enum declaration ValueErr]
-[Enum declaration OtherErr]
+[Union declaration ValueErr]
+[Union declaration OtherErr]
 
 [Function declaration failable, returns]
     [If]

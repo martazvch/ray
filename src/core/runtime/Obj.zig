@@ -39,6 +39,7 @@ const Kind = enum {
     native_fn,
     native_obj,
     string,
+    union_instance,
 
     pub fn fromType(T: type) Kind {
         return switch (T) {
@@ -52,6 +53,7 @@ const Kind = enum {
             NativeFunction => .native_fn,
             NativeObj => .native_obj,
             String => .string,
+            UnionInstance => .union_instance,
             else => @compileError(@typeName(T) ++ " isn't a runtime object type"),
         };
     }
@@ -92,7 +94,7 @@ pub fn deepCopy(self: *Obj, vm: *Vm) *Obj {
     return switch (self.kind) {
         .array => self.as(Array).deepCopy(vm).asObj(),
         // TODO:
-        .enum_instance, .@"error" => @panic("TODO"),
+        .enum_instance, .@"error", .union_instance => @panic("TODO"),
         .instance => self.as(Instance).deepCopy(vm).asObj(),
         // Immutable, shallow copy ok
         .box, .closure, .function, .iterator, .native_fn, .native_obj, .string => self,
@@ -126,6 +128,7 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
             object.deinit(vm);
         },
         .string => self.as(String).deinit(vm.gc_alloc),
+        .union_instance => self.as(UnionInstance).deinit(vm),
     }
 }
 
@@ -160,10 +163,9 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
                 try writer.print("<fn {s}>", .{closure.function.name});
             }
         },
-        .enum_instance, .@"error" => {
+        .enum_instance => {
             const instance = self.as(EnumInstance);
-            try writer.print("<{s} {s}.{s}>", .{
-                if (instance.parent.is_err) "error" else "enum",
+            try writer.print("<enum {s}.{s}>", .{
                 instance.parent.name,
                 instance.parent.tags[instance.tag_id],
             });
@@ -177,6 +179,14 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
         .native_fn => try writer.print("<native fn {s}>", .{self.as(NativeFunction).name}),
         .native_obj => try writer.print("<native object {s}>", .{self.as(NativeObj).name}),
         .string => try writer.print("{s}", .{self.as(String).chars}),
+        .union_instance, .@"error" => {
+            const instance = self.as(UnionInstance);
+            try writer.print("<{s} {s}.{s}>", .{
+                if (instance.parent.is_err) "error" else "enum",
+                instance.parent.name,
+                instance.parent.tags[instance.tag_id],
+            });
+        },
     }
 }
 
@@ -185,13 +195,17 @@ pub fn log(self: *Obj) void {
         .array => std.debug.print("<array>", .{}),
         .box => std.debug.print("box", .{}),
         .closure => std.debug.print("<closure {s}>", .{self.as(Closure).function.name}),
-        .enum_instance => std.debug.print("<enum instance {s}>", .{self.as(EnumInstance).parent.name}),
+        .enum_instance, .@"error" => std.debug.print(
+            "<{s} instance {s}>",
+            .{ if (self.kind == .@"error") "error" else "enum", self.as(EnumInstance).parent.name },
+        ),
         .function => std.debug.print("<fn {s}>", .{self.as(Function).name}),
         .instance => std.debug.print("<instance of {s}>", .{self.as(Instance).parent.name}),
         .iterator => std.debug.print("<iterator>", .{}),
         .native_fn => std.debug.print("<native function {s}>", .{self.as(NativeFunction).name}),
         .native_obj => unreachable,
         .string => std.debug.print("{s}", .{self.as(String).chars}),
+        .union_instance => std.debug.print("<enum instance {s}>", .{self.as(EnumInstance).parent.name}),
     }
 }
 
@@ -611,7 +625,6 @@ pub const EnumInstance = struct {
         obj.parent = parent;
         obj.tag_id = tag_id;
         obj.payload = payload;
-        obj.obj.kind = if (parent.is_err) .@"error" else .enum_instance;
         obj.obj.type_id = parent.type_id;
 
         return obj;
@@ -619,6 +632,46 @@ pub const EnumInstance = struct {
 
     /// Creates a compile time constant that is a naked enum field
     pub fn createComptime(allocator: Allocator, parent: *const Module.Enum, tag_id: u8, payload: Value) *Self {
+        const obj = Obj.allocateComptime(allocator, Self, parent.type_id);
+        obj.parent = parent;
+        obj.tag_id = tag_id;
+        obj.payload = payload;
+        obj.obj.type_id = parent.type_id;
+
+        return obj;
+    }
+
+    pub fn asObj(self: *Self) *Obj {
+        return &self.obj;
+    }
+
+    pub fn deinit(self: *Self, vm: *Vm) void {
+        vm.gc_alloc.destroy(self);
+    }
+};
+
+pub const UnionInstance = struct {
+    obj: Obj,
+    parent: *const Module.Union,
+    tag_id: u8,
+    payload: Value,
+
+    const Self = @This();
+
+    /// Creates a compile time constant that is a naked enum field
+    pub fn create(vm: *Vm, parent: *const Module.Union, tag_id: u8, payload: Value) *Self {
+        const obj = Obj.allocate(vm, Self, parent.type_id);
+        obj.parent = parent;
+        obj.tag_id = tag_id;
+        obj.payload = payload;
+        obj.obj.kind = if (parent.is_err) .@"error" else .enum_instance;
+        obj.obj.type_id = parent.type_id;
+
+        return obj;
+    }
+
+    /// Creates a compile time constant that is a naked enum field
+    pub fn createComptime(allocator: Allocator, parent: *const Module.Union, tag_id: u8, payload: Value) *Self {
         const obj = Obj.allocateComptime(allocator, Self, parent.type_id);
         obj.parent = parent;
         obj.tag_id = tag_id;

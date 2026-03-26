@@ -1,4 +1,4 @@
-enum Foo {a}
+union Foo {a}
 struct Bar {}
 fn buz() {}
 

@@ -1,10 +1,10 @@
-enum Foo {
+union Foo {
     a,
     a,
 }
 
-enum Bar { a, b }
-enum Baz { c, d }
+union Bar { a, b }
+union Baz { c, d }
 
 fn main() {
     var bar = Bar.a

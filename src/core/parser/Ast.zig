@@ -23,6 +23,7 @@ pub const Node = union(enum) {
     print: *Expr,
     struct_decl: StructDecl,
     trait_decl: TraitDecl,
+    union_decl: UnionDecl,
     use: Use,
     var_decl: VarDecl,
     @"while": While,
@@ -43,13 +44,12 @@ pub const EnumDecl = struct {
     tk: TokenIndex,
     name: ?TokenIndex,
     tags: []const Tag,
-    is_err: bool,
     functions: []FnDecl,
     traits: []TraitDecl,
 
     pub const Tag = struct {
         name: TokenIndex,
-        payload: ?*Type,
+        value: ?*Expr,
     };
 };
 
@@ -116,6 +116,20 @@ pub const StructDecl = struct {
 pub const TraitDecl = struct {
     name: TokenIndex,
     functions: []FnDecl,
+};
+
+pub const UnionDecl = struct {
+    tk: TokenIndex,
+    name: ?TokenIndex,
+    tags: []const Tag,
+    is_err: bool,
+    functions: []FnDecl,
+    traits: []TraitDecl,
+
+    pub const Tag = struct {
+        name: TokenIndex,
+        payload: ?*Type,
+    };
 };
 
 pub const Use = struct {
@@ -411,6 +425,10 @@ pub fn getSpan(self: *const @This(), anynode: anytype) Span {
                 .end = self.getSpan(u[u.len - 1]).end,
             },
         },
+        UnionDecl => if (node.name) |name|
+            self.token_spans[name]
+        else
+            self.token_spans[node.tk],
         Use => .{
             .start = self.token_spans[node.names[0]].start,
             .end = self.token_spans[node.names[node.names.len - 1]].end,

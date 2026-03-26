@@ -1,16 +1,16 @@
-[Enum declaration Foo]
-[Enum declaration Bar]
+[Union declaration Foo]
+[Union declaration Bar]
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
         [Constant index 6]
-            [Enum create]
+            [Union create]
                 - enum
                 [Load symbol 0]
                 - tag
                 0
     [Variable declaration index: 1, scope: local]
         [Constant index 7]
-            [Enum create]
+            [Union create]
                 - enum
                 [Load symbol 1]
                 - tag
@@ -19,7 +19,7 @@
         [Binop type: eq_tag]
             [Variable index: 0, scope: local]
             [Constant index 6]
-                [Enum create]
+                [Union create]
                     - enum
                     [Load symbol 0]
                     - tag
@@ -27,7 +27,7 @@
     [Pop]
         [Binop type: eq_tag]
             [Constant index 6]
-                [Enum create]
+                [Union create]
                     - enum
                     [Load symbol 0]
                     - tag
@@ -36,13 +36,13 @@
     [Pop]
         [Binop type: eq_tag]
             [Constant index 6]
-                [Enum create]
+                [Union create]
                     - enum
                     [Load symbol 0]
                     - tag
                     0
             [Constant index 8]
-                [Enum create]
+                [Union create]
                     - enum
                     [Load symbol 0]
                     - tag
@@ -51,7 +51,7 @@
         [Binop type: ne_tag]
             [Variable index: 1, scope: local]
             [Constant index 3]
-                [Enum create]
+                [Union create]
                     - enum
                     [Load symbol 1]
                     - tag
@@ -59,7 +59,7 @@
     [Pop]
         [Binop type: ne_tag]
             [Constant index 3]
-                [Enum create]
+                [Union create]
                     - enum
                     [Load symbol 1]
                     - tag
@@ -68,13 +68,13 @@
     [Pop]
         [Binop type: ne_tag]
             [Constant index 3]
-                [Enum create]
+                [Union create]
                     - enum
                     [Load symbol 1]
                     - tag
                     0
             [Constant index 7]
-                [Enum create]
+                [Union create]
                     - enum
                     [Load symbol 1]
                     - tag

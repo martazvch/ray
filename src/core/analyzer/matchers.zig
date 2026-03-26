@@ -19,12 +19,12 @@ const RangeSet = misc.RangeSet;
 const Set = misc.Set;
 
 pub const Enum = struct {
-    proto: Type.Enum.Proto,
+    proto: Type.Union.Proto,
     has_wildcard: bool = false,
 
     const Self = @This();
 
-    pub fn init(proto: Type.Enum.Proto) Self {
+    pub fn init(proto: Type.Union.Proto) Self {
         return .{
             .proto = proto,
         };
@@ -38,7 +38,7 @@ pub const Enum = struct {
         const tag, const arm_res = switch (value_arm.expr.*) {
             .enum_lit => |e| .{ e, try ana.enumLit(e, ctx) },
             .field => |*e| .{ e.field, try ana.field(e, ctx) },
-            else => return ana.err(.match_enum_invalid_pat, span),
+            else => return ana.err(.match_union_invalid_pat, span),
         };
 
         if (self.proto.getPtr(ana.interner.intern(ana.ast.toSource(tag)))) |found| {
@@ -413,7 +413,7 @@ pub const String = struct {
 };
 
 pub const Union = struct {
-    proto: Type.Union.Proto,
+    proto: Type.InlineUnion.Proto,
     alias: ?usize,
     in_trap: bool,
     value: InstrInfos,
@@ -427,7 +427,7 @@ pub const Union = struct {
 
     pub fn init(
         ana: *Analyzer,
-        ty: Type.Union,
+        ty: Type.InlineUnion,
         alias: ?usize,
         in_trap: bool,
         value: InstrInfos,

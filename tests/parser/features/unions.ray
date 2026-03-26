@@ -1,4 +1,4 @@
-enum Marker {
+union Marker {
     cross,
     circle,
     none

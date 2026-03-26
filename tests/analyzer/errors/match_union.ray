@@ -1,10 +1,10 @@
-enum Marker {
+union Marker {
     cross,
     circle,
     none
 }
 
-enum Bar{a}
+union Bar{a}
 
 fn getMarker() -> Marker {
     return .cross
