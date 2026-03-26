@@ -13,6 +13,8 @@ const Set = misc.Set;
 const oom = misc.oom;
 
 pub const MapNameType = ArrayMap(InternerIdx, *const Type);
+pub const MapNameSym = Map(InternerIdx, LexScope.Symbol);
+pub const TraitMap = ArrayMap(InternerIdx, MapNameSym);
 
 pub const Type = union(enum) {
     never,
@@ -78,7 +80,7 @@ pub const Type = union(enum) {
         loc: Loc,
         tags: Tags,
         is_err: bool,
-        functions: ArrayMap(InternerIdx, LexScope.Symbol),
+        functions: MapNameSym,
 
         pub const empty: Enum = .{ .loc = null, .tags = .empty };
         pub const Tags = MapNameType;
@@ -158,7 +160,8 @@ pub const Type = union(enum) {
     pub const Structure = struct {
         loc: Loc,
         fields: FieldsMap,
-        functions: ArrayMap(InternerIdx, LexScope.Symbol),
+        functions: MapNameSym,
+        traits: TraitMap,
 
         pub const FieldsMap = ArrayMap(InternerIdx, Field);
         pub const Field = struct {
@@ -182,7 +185,23 @@ pub const Type = union(enum) {
 
     pub const Trait = struct {
         loc: Loc,
-        functions: ArrayMap(InternerIdx, LexScope.Symbol),
+        functions: ArrayMap(InternerIdx, TraitFn),
+
+        const FnAst = @import("../parser/Ast.zig").FnDecl;
+        pub const TraitFn = struct { ty: *const Type, ast: ?*FnAst, compiled: ?LexScope.Symbol };
+        pub const Proto = ArrayMap(InternerIdx, struct { done: bool = false, func: TraitFn });
+
+        pub fn proto(self: *const Trait, allocator: Allocator) Proto {
+            var res: Proto = .empty;
+            res.ensureTotalCapacity(allocator, self.functions.count()) catch oom();
+
+            var kv = self.functions.iterator();
+            while (kv.next()) |entry| {
+                res.putAssumeCapacity(entry.key_ptr.*, .{ .func = entry.value_ptr.* });
+            }
+
+            return res;
+        }
     };
 
     pub const Union = struct {
@@ -478,6 +497,7 @@ pub const TypeInterner = struct {
             .loc = loc,
             .fields = .empty,
             .functions = .empty,
+            .traits = .empty,
         } });
     }
 

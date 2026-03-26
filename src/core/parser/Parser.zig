@@ -443,7 +443,7 @@ fn structDecl(self: *Self) !Node {
     defer field_names.deinit(self.allocator);
 
     // If at least one field
-    while (!self.check(.@"fn") and !self.check(.right_brace) and !self.check(.eof)) {
+    while (!self.check(.@"fn") and !self.check(.impl) and !self.check(.right_brace) and !self.check(.eof)) {
         defer field_names.clearRetainingCapacity();
 
         if (!self.check(.identifier)) {

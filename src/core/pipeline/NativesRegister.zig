@@ -71,6 +71,7 @@ fn registerStruct(self: *Self, allocator: Allocator, S: type, interner: *Interne
         .loc = .{ .name = struct_name, .container = interner.intern("std") },
         .fields = .empty,
         .functions = .empty,
+        .traits = .empty,
     };
     s.fields.ensureTotalCapacity(allocator, zig_struct.fields.len) catch oom();
     s.functions.ensureTotalCapacity(allocator, zig_struct.functions.len) catch oom();

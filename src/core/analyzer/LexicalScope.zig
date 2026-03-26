@@ -48,6 +48,7 @@ natives: AutoHashMapUnmanaged(InternerIdx, Symbol),
 enum_count: usize,
 func_count: usize,
 struct_count: usize,
+trait_count: usize,
 
 // Dbg
 save: bool,
@@ -64,6 +65,7 @@ pub const empty: Self = .{
     .enum_count = 0,
     .func_count = 0,
     .struct_count = 0,
+    .trait_count = 0,
 
     .save = false,
     .saved = .empty,
@@ -246,8 +248,8 @@ pub fn getVarInCurrentScopeAt(self: *const Self, index: usize) *Variable {
     return &self.current.variables.values()[index];
 }
 
-/// Forward declares a symbol without incrementing global symbol count
-pub fn forwardDeclareSymbol(
+/// Declares a symbol in current scope
+pub fn declareSymbol(
     self: *Self,
     allocator: Allocator,
     name: InternerIdx,
@@ -257,7 +259,7 @@ pub fn forwardDeclareSymbol(
         .@"enum" => &self.enum_count,
         .function => &self.func_count,
         .structure => &self.struct_count,
-        else => unreachable,
+        .trait => &self.trait_count,
     };
 
     self.current.symbols.put(allocator, name, .{

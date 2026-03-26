@@ -500,6 +500,14 @@ fn structDecl(self: *Self, data: *const Instruction.StructDecl) void {
     for (data.functions) |func| {
         self.parseInstr(func);
     }
+
+    if (data.traits.len > 0) {
+        self.indentAndAppendSlice("- traits");
+
+        for (data.traits) |func| {
+            self.parseInstr(func);
+        }
+    }
 }
 
 fn structLiteral(self: *Self, data: *const Instruction.StructLiteral) void {

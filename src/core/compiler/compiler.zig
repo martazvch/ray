@@ -321,6 +321,21 @@ const Compiler = struct {
         }
     }
 
+    /// Creates a symbol based on the opcode. If module index isn't null, uses the `_ext` version of the opcode
+    fn symbolAccess(self: *Self, comptime op: OpCode, sym_data: Instruction.LoadSymbol) void {
+        if (sym_data.module_index) |mod| {
+            if (!@hasField(OpCode, @tagName(op) ++ "_ext")) {
+                @compileError("Opcode " ++ @tagName(op) ++ " doesn't have an `_ext` version");
+            }
+
+            self.writeOpAndByte(@field(OpCode, @tagName(op) ++ "_ext"), sym_data.symbol_index);
+            // TODO: protect cast
+            self.writeByte(@intCast(mod.toInt()));
+        } else {
+            self.writeOpAndByte(op, sym_data.symbol_index);
+        }
+    }
+
     fn compileInstr(self: *Self, instr: ir.Index) Error!void {
         self.manager.line = self.manager.instr_lines[instr];
 
@@ -652,6 +667,14 @@ const Compiler = struct {
             const fn_name = self.manager.state.interner.getKey(fn_data.name orelse unreachable).?;
             const func = try self.compileFnBody(fn_name, &fn_data);
             self.manager.state.modules.addSymbol(self.manager.mod_index, fn_data.sym_index, func);
+        }
+    }
+
+    fn defaults(self: *Self, instrs: []const ir.Index) Error!void {
+        for (instrs) |instr| {
+            // TODO: protect this
+            const const_data = self.at(instr).constant;
+            try self.constant(const_data.index, null, false);
         }
     }
 
@@ -1022,14 +1045,7 @@ const Compiler = struct {
         });
         try self.defaults(data.default_fields);
         try self.containerFnDecls(data.functions);
-    }
-
-    fn defaults(self: *Self, instrs: []const ir.Index) Error!void {
-        for (instrs) |instr| {
-            // TODO: protect this
-            const const_data = self.at(instr).constant;
-            try self.constant(const_data.index, null, false);
-        }
+        try self.containerFnDecls(data.traits);
     }
 
     fn structLiteral(self: *Self, data: *const Instruction.StructLiteral) Error!void {
@@ -1044,39 +1060,8 @@ const Compiler = struct {
         self.writeByte(@intCast(data.values.len));
     }
 
-    /// Creates a symbol based on the opcode. If module index isn't null, uses the `_ext` version of the opcode
-    fn symbolAccess(self: *Self, comptime op: OpCode, sym_data: Instruction.LoadSymbol) void {
-        if (sym_data.module_index) |mod| {
-            if (!@hasField(OpCode, @tagName(op) ++ "_ext")) {
-                @compileError("Opcode " ++ @tagName(op) ++ " doesn't have an `_ext` version");
-            }
-
-            self.writeOpAndByte(@field(OpCode, @tagName(op) ++ "_ext"), sym_data.symbol_index);
-            // TODO: protect cast
-            self.writeByte(@intCast(mod.toInt()));
-        } else {
-            self.writeOpAndByte(op, sym_data.symbol_index);
-        }
-    }
-
     fn traitDecl(self: *Self, data: Instruction.TraitDecl) Error!void {
-        _ = self; // autofix
-        _ = data; // autofix
-        // var structure = Obj.Structure.create(
-        //     self.manager.allocator,
-        //     self.manager.state.interner.getKey(data.name).?,
-        //     data.type_id,
-        //     data.fields_count,
-        // );
-        //
-        // // We forward declare the structure in the globals because when disassembling the
-        // // structure's method, they need to refer to the object. Only the name can be refered to
-        // // TODO: Create a placeholder that has only the name?
-        // self.addSymbol(data.sym_index, Value.makeObj(structure.asObj()));
-        //
-        // try self.containerFnDecls(data.functions);
-        // const struct_obj = Value.makeObj(structure.asObj());
-        // self.addSymbol(data.sym_index, struct_obj);
+        try self.containerFnDecls(data.functions);
     }
 
     fn trap(self: *Self, data: Instruction.Trap) Error!void {

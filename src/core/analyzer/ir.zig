@@ -247,6 +247,7 @@ pub const Instruction = struct {
         fields_count: usize,
         default_fields: []const Index,
         functions: []const Index,
+        traits: []const Index,
     };
     pub const StructLiteral = struct {
         structure: Index,

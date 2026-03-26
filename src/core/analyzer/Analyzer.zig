@@ -304,7 +304,7 @@ fn enumDeclaration(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtRe
     const interned = self.ti.newEnum(.{ .name = name, .container = container_name }, node.is_err);
     const ty = &interned.@"enum";
 
-    const sym = self.scope.forwardDeclareSymbol(self.allocator, name, .@"enum");
+    const sym = self.scope.declareSymbol(self.allocator, name, .@"enum");
     sym.type = interned;
 
     ctx.self_type = interned;
@@ -361,7 +361,7 @@ fn enumTag(self: *Self, tag: Ast.EnumDecl.Tag, ctx: *const Context) Error!struct
 fn containerFnDecls(
     self: *Self,
     decls: []const Ast.FnDecl,
-    funcs: *AutoArrayHashMapUnmanaged(InternerIdx, LexScope.Symbol),
+    funcs: *type_mod.MapNameSym,
     ctx: *Context,
 ) Error![]const InstrIndex {
     funcs.ensureTotalCapacity(self.allocator, @intCast(decls.len)) catch oom();
@@ -374,6 +374,102 @@ fn containerFnDecls(
         const fn_res = try self.fnDeclaration(f, ctx);
         func_instrs.appendAssumeCapacity(fn_res.instr);
         funcs.putAssumeCapacity(fn_name, fn_res.sym);
+    }
+
+    return func_instrs.toOwnedSlice(self.allocator) catch oom();
+}
+
+/// Analyzes trait implementations in a container (enum or structure)
+fn containerTraitImpls(
+    self: *Self,
+    container: *const Type,
+    decls: []const Ast.TraitDecl,
+    traits: *type_mod.TraitMap,
+    ctx: *Context,
+) Error![]const InstrIndex {
+    traits.ensureTotalCapacity(self.allocator, @intCast(decls.len)) catch oom();
+
+    var func_instrs: ArrayList(InstrIndex) = .empty;
+    func_instrs.ensureUnusedCapacity(self.allocator, decls.len) catch oom();
+
+    for (decls) |*t| {
+        const trait_name_str = self.ast.toSource(t.name);
+        const trait_span = self.ast.getSpan(t.name);
+        const trait_name = self.interner.intern(trait_name_str);
+
+        const sym = self.scope.getSymbol(trait_name) orelse return self.err(
+            .{ .undeclared_trait = .{ .name = trait_name_str } },
+            trait_span,
+        );
+        const trait_def = sym.type.as(.trait) orelse return self.err(
+            .{ .not_a_trait = .{ .name = trait_name_str } },
+            trait_span,
+        );
+
+        const trait_gop = traits.getOrPutAssumeCapacity(trait_name);
+        if (trait_gop.found_existing) return self.err(
+            .{ .already_impl_trait = .{ .ty = self.typeName(container), .trait = trait_name_str } },
+            trait_span,
+        );
+
+        var trait_impl = trait_gop.value_ptr;
+        trait_impl.* = .empty;
+        trait_impl.ensureTotalCapacity(self.allocator, @intCast(trait_def.functions.count())) catch oom();
+
+        var proto = trait_def.proto(self.allocator);
+
+        for (t.functions) |*f| {
+            const fn_name_str = self.ast.toSource(f.name);
+            const fn_name = self.interner.intern(fn_name_str);
+
+            const gop = proto.getOrPutAssumeCapacity(fn_name);
+            if (!gop.found_existing) return self.err(
+                .{ .missing_fn_in_trait = .{ .func = fn_name_str, .trait = trait_name_str } },
+                self.ast.getSpan(f.name),
+            );
+
+            var fn_res = try self.fnDeclaration(f, ctx);
+            // Unreachable because found in proto
+            const fn_decl = trait_def.functions.get(fn_name) orelse unreachable;
+
+            fn_res.sym.type = try self.checkFunctionEq(fn_decl.ty, fn_res.sym.type, true);
+
+            func_instrs.appendAssumeCapacity(fn_res.instr);
+            trait_impl.putAssumeCapacity(fn_name, fn_res.sym);
+            gop.value_ptr.done = true;
+        }
+
+        var it = proto.iterator();
+        while (it.next()) |entry| {
+            if (entry.value_ptr.done) continue;
+
+            // Already compiled once
+            if (entry.value_ptr.func.compiled) |compiled| {
+                trait_impl.putAssumeCapacity(entry.key_ptr.*, compiled);
+            }
+            // Compile for first time
+            else if (entry.value_ptr.func.ast) |def| {
+                const fn_res = try self.fnDeclaration(def, ctx);
+                func_instrs.appendAssumeCapacity(fn_res.instr);
+                trait_impl.putAssumeCapacity(entry.key_ptr.*, fn_res.sym);
+
+                // If trait's definition hasn't been compiled once, we save the compiled symbol
+                // so that futur implementation we'll use the same compile function, avoiding
+                // code gen bloat. We'll be present in next prototype from this trait
+                const compiled_decl = &trait_def.functions.getPtr(entry.key_ptr.*).?.compiled;
+                if (compiled_decl.* == null) {
+                    compiled_decl.* = fn_res.sym;
+                }
+            }
+            // Missing
+            else return self.err(
+                .{ .missing_fn_impl_in_trait = .{
+                    .func = self.interner.getKey(entry.key_ptr.*).?,
+                    .trait = trait_name_str,
+                } },
+                trait_span,
+            );
+        }
     }
 
     return func_instrs.toOwnedSlice(self.allocator) catch oom();
@@ -440,7 +536,7 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
     const container_name = self.interner.internKeepRef(self.allocator, self.containers.renderWithSep(&buf, "."));
 
     // Forward declaration in outer scope for recursion
-    var sym = self.scope.forwardDeclareSymbol(self.allocator, name, .function);
+    var sym = self.scope.declareSymbol(self.allocator, name, .function);
 
     self.scope.open(self.allocator, null, .{ .barrier = true });
     errdefer _ = self.scope.close();
@@ -451,7 +547,7 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
     const captures = try self.loadFunctionCaptures(&node.meta.captures);
     const param_res = try self.fnParams(node.params, ctx);
 
-    var fn_type: Type.Function = .{
+    const fn_type: Type.Function = .{
         .loc = .{ .name = name, .container = container_name },
         .params = param_res.decls,
         .return_type = try self.checkAndGetType(node.return_type, ctx),
@@ -781,17 +877,18 @@ fn structDecl(self: *Self, node: *const Ast.StructDecl, ctx: *Context) StmtResul
     const interned = self.ti.newStruct(.{ .name = name, .container = container_name });
     const ty = &interned.structure;
 
-    const sym = self.scope.forwardDeclareSymbol(self.allocator, name, .structure);
-    sym.type = interned;
-
     ctx.self_type = interned;
     defer ctx.self_type = null;
+
+    const sym = self.scope.declareSymbol(self.allocator, name, .structure);
+    sym.type = interned;
 
     try self.openContainer(node.name);
     defer self.closeContainer();
 
     const default_fields = try self.structureFields(node.fields, ty, ctx);
     const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
+    const traits = try self.containerTraitImpls(interned, node.traits, &ty.traits, ctx);
 
     return self.irb.addInstr(
         .{ .struct_decl = .{
@@ -801,6 +898,7 @@ fn structDecl(self: *Self, node: *const Ast.StructDecl, ctx: *Context) StmtResul
             .fields_count = node.fields.len,
             .default_fields = default_fields,
             .functions = funcs,
+            .traits = traits,
         } },
         span.start,
     );
@@ -853,24 +951,60 @@ fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult 
     } });
     const ty = &interned.trait;
 
-    const sym = self.scope.forwardDeclareSymbol(self.allocator, name, .trait);
-    sym.type = interned;
-
     ctx.self_type = interned;
     defer ctx.self_type = null;
+
+    const sym = self.scope.declareSymbol(self.allocator, name, .trait);
+    sym.type = interned;
 
     try self.openContainer(node.name);
     defer self.closeContainer();
 
-    // const default_fields = try self.structureFields(node.fields, ty, ctx);
-    const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
+    ty.functions.ensureUnusedCapacity(self.allocator, @intCast(node.functions.len)) catch oom();
+
+    var func_instrs: ArrayList(InstrIndex) = .empty;
+    func_instrs.ensureUnusedCapacity(self.allocator, node.functions.len) catch oom();
+
+    for (node.functions) |*f| {
+        const fn_name = self.interner.intern(self.ast.toSource(f.name));
+        const gop = ty.functions.getOrPutAssumeCapacity(fn_name);
+
+        if (gop.found_existing) return self.err(
+            .{ .already_declared_in_trait = .{
+                .trait = self.ast.toSource(node.name),
+                .name = self.ast.toSource(f.name),
+            } },
+            self.ast.getSpan(f.name),
+        );
+
+        self.scope.open(self.allocator, null, .{ .barrier = true });
+        defer _ = self.scope.close();
+        const param_res = try self.fnParams(f.params, ctx);
+
+        const fn_type: Type.Function = .{
+            .loc = .{ .name = fn_name, .container = container_name },
+            .params = param_res.decls,
+            .return_type = try self.checkAndGetType(f.return_type, ctx),
+            .kind = if (param_res.is_method) .method else .normal,
+        };
+        const interned_type = self.ti.intern(.{ .function = fn_type });
+
+        // Semantic analyzis
+        _ = try self.fnDeclaration(f, ctx);
+
+        gop.value_ptr.* = .{
+            .ty = interned_type,
+            .ast = if (f.body != null) f else null,
+            .compiled = null,
+        };
+    }
 
     return self.irb.addInstr(
         .{ .trait_decl = .{
             .name = name,
             .sym_index = sym.index,
             .type_id = self.ti.typeId(sym.type),
-            .functions = funcs,
+            .functions = func_instrs.toOwnedSlice(self.allocator) catch oom(),
         } },
         span.start,
     );
@@ -1289,7 +1423,7 @@ fn breakExpr(self: *Self, expr: *const Ast.Break, ctx: *Context) Result {
 
 fn closure(self: *Self, expr: *const Ast.FnDecl, ctx: *Context) Result {
     // TODO: create an anonymus name generator mechanism
-    var sym = self.scope.forwardDeclareSymbol(self.allocator, self.interner.intern("azert"), .function);
+    var sym = self.scope.declareSymbol(self.allocator, self.interner.intern("azert"), .function);
 
     self.scope.open(self.allocator, null, .{ .barrier = true });
     defer _ = self.scope.close();
@@ -1421,6 +1555,7 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
     const struct_res = try self.analyzeExpr(expr.structure, .any, ctx);
 
     const field_res = switch (struct_res.type.*) {
+        .array => return self.runtimeObjFnAccess(.array, struct_res.instr, expr.field, struct_res.type),
         .@"enum" => |ty| b: {
             const res = try self.enumAccess(struct_res, ty, expr.field);
 
@@ -1429,10 +1564,10 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
                 .decl => |decl| break :b decl,
             }
         },
-        .structure => |*ty| try self.structureAccess(expr.field, ty, struct_res.ti.is_sym, ctx.in_call),
         .module => |ty| return self.moduleAccess(expr.field, ty),
-        .array => return self.runtimeObjFnAccess(.array, struct_res.instr, expr.field, struct_res.type),
         .str => return self.runtimeObjFnAccess(.string, struct_res.instr, expr.field, struct_res.type),
+        .structure => |*ty| try self.structureAccess(expr.field, ty, struct_res.ti.is_sym, ctx.in_call),
+        .trait => |*ty| try self.traitAccess(expr.field, ty),
         else => return self.err(
             .{ .non_struct_field_access = .{ .found = self.typeName(struct_res.type) } },
             span,
@@ -1581,27 +1716,58 @@ fn structureAccess(self: *Self, field_tk: Ast.TokenIndex, ty: *const Type.Struct
     const text = self.ast.toSource(field_tk);
     const field_name = self.interner.intern(text);
 
+    // Fields
     if (ty.fields.getPtr(field_name)) |f| {
         return .{ .type = f.type, .kind = .field, .index = ty.fields.getIndex(field_name).? };
-    } else if (ty.functions.get(field_name)) |f| {
-        const function = &f.type.function;
+    }
+    // Functions
+    else {
+        const func = func: {
+            // Own
+            if (ty.functions.get(field_name)) |f| {
+                break :func f;
+            }
+
+            // Traits
+            for (ty.traits.values()) |trait| {
+                if (trait.get(field_name)) |f| {
+                    break :func f;
+                }
+            }
+
+            return self.err(.{ .undeclared_field_access = .{ .name = text } }, self.ast.getSpan(field_tk));
+        };
 
         if (in_call) {
+            const fn_type = &func.type.function;
             // Call method on type
-            if (is_symbol and function.kind == .method) {
+            if (is_symbol and fn_type.kind == .method) {
                 return self.err(.{ .call_method_on_type = .{ .name = text } }, self.ast.getSpan(field_tk));
             }
             // Call static on instance
-            else if (!is_symbol and function.kind != .method and function.kind != .native_method) {
+            else if (!is_symbol and fn_type.kind != .method and fn_type.kind != .native_method) {
                 return self.err(.{ .call_static_on_instance = .{ .name = text } }, self.ast.getSpan(field_tk));
             }
         }
 
-        // TODO: can remove the 'Array' hashmap for a hashmap
-        return .{ .type = f.type, .kind = .function, .index = f.index };
+        return .{ .type = func.type, .kind = .function, .index = func.index };
     }
+}
 
-    return self.err(.{ .undeclared_field_access = .{ .name = text } }, self.ast.getSpan(field_tk));
+/// This function is called by `field` method but it is only triggered when analyzing trait's default
+/// body. It is used to check if the accesses on `self` refer to actual methods in trait.
+/// The result of this analyzis done by `traitDecl` won't be used, so returning a dummy index is ok
+fn traitAccess(self: *Self, field_tk: Ast.TokenIndex, ty: *const Type.Trait) Error!AccessResult {
+    const fn_name = self.ast.toSource(field_tk);
+    const func = ty.functions.get(self.interner.intern(fn_name)) orelse return self.err(
+        .{ .missing_fn_in_trait = .{
+            .func = fn_name,
+            .trait = self.interner.getKey(ty.loc.name).?,
+        } },
+        self.ast.getSpan(field_tk),
+    );
+
+    return .{ .type = func.ty, .kind = .function, .index = 0 };
 }
 
 fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_idx: InternerIdx) Result {
@@ -2870,7 +3036,7 @@ fn performTypeCoercion(self: *Self, decl: *const Type, value: *const Type, decl_
                 else => |narrowed| return narrowed,
             };
         } else if (value.is(.function)) {
-            return self.checkFunctionEq(decl, value) catch break :check;
+            return self.checkFunctionEq(decl, value, false) catch break :check;
         }
 
         // We check after the other because above checks need the information about a potential void declaration
@@ -2911,8 +3077,11 @@ fn performErrorCoercion(self: *Self, decl: *const Type, value: *const Type, span
 }
 
 /// Checks if two different pointers to function type are equal, due to anonymus ones
+/// Or user function redifinition in trait implementation, as function hash is based on location
+/// `allow_new_default` allow the `value` function to define other values for default parameters
+/// it is useful to allow user to define new default
 /// Assumes that types are functions
-fn checkFunctionEq(self: *Self, decl: *const Type, value: *const Type) Error!*const Type {
+fn checkFunctionEq(self: *Self, decl: *const Type, value: *const Type, allow_new_default: bool) Error!*const Type {
     // Functions function's return types like: 'fn add() -> fn(int) -> int' don't have a declaration
     // There is also the case when assigning to a variable and infering type like: var bound = foo.method
     // Here, we want `bound` to be an anonymus function, it loses all declaration infos because it's a runtime value
@@ -2926,14 +3095,24 @@ fn checkFunctionEq(self: *Self, decl: *const Type, value: *const Type) Error!*co
     const f2 = value.function;
 
     check: {
-        if (f1.loc != null and f2.loc != null or f1.params.count() != f2.params.count()) break :check;
+        if (f1.params.count() != f2.params.count()) break :check;
         if (f1.return_type != f2.return_type) break :check;
 
         for (f1.params.values(), f2.params.values()) |p1, p2| {
             if (p1.type != p2.type) break :check;
+            // If declaration has a default, implementation has too
+            if (p1.default != null and p2.default == null) break :check;
+            // If declaration hasn't a default, only when flag is true we allow one
+            if (p1.default == null and p2.default != null and !allow_new_default) break :check;
+
+            if (allow_new_default) continue;
+            const p1_def = p1.default orelse continue;
+            const p2_def = p2.default orelse continue;
+            if (p1_def.toInt() != p2_def.toInt()) break :check;
         }
 
-        return decl;
+        // We return value in case of default values aren't the same
+        return value;
     }
 
     return error.Err;
