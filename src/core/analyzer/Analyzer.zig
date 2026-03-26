@@ -386,11 +386,9 @@ fn containerTraitImpls(
     decls: []const Ast.TraitDecl,
     traits: *type_mod.TraitMap,
     ctx: *Context,
-) Error![]const InstrIndex {
+) Error![]const Instr.Trait {
     traits.ensureTotalCapacity(self.allocator, @intCast(decls.len)) catch oom();
-
-    var func_instrs: ArrayList(InstrIndex) = .empty;
-    func_instrs.ensureUnusedCapacity(self.allocator, decls.len) catch oom();
+    var trait_res = ArrayList(Instr.Trait).initCapacity(self.allocator, decls.len) catch oom();
 
     for (decls) |*t| {
         const trait_name_str = self.ast.toSource(t.name);
@@ -417,16 +415,17 @@ fn containerTraitImpls(
         trait_impl.ensureTotalCapacity(self.allocator, @intCast(trait_def.functions.count())) catch oom();
 
         var proto = trait_def.proto(self.allocator);
+        var func_instrs = ArrayList(InstrIndex).initCapacity(self.allocator, trait_def.functions.count()) catch oom();
 
         for (t.functions) |*f| {
             const fn_name_str = self.ast.toSource(f.name);
             const fn_name = self.interner.intern(fn_name_str);
 
-            const gop = proto.getOrPutAssumeCapacity(fn_name);
-            if (!gop.found_existing) return self.err(
+            if (!proto.contains(fn_name)) return self.err(
                 .{ .missing_fn_in_trait = .{ .func = fn_name_str, .trait = trait_name_str } },
                 self.ast.getSpan(f.name),
             );
+            const gop = proto.getOrPutAssumeCapacity(fn_name);
 
             var fn_res = try self.fnDeclaration(f, ctx);
             // Unreachable because found in proto
@@ -470,9 +469,14 @@ fn containerTraitImpls(
                 trait_span,
             );
         }
+
+        trait_res.appendAssumeCapacity(.{
+            .name = trait_name,
+            .funcs = func_instrs.toOwnedSlice(self.allocator) catch oom(),
+        });
     }
 
-    return func_instrs.toOwnedSlice(self.allocator) catch oom();
+    return trait_res.toOwnedSlice(self.allocator) catch oom();
 }
 
 fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {

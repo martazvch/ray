@@ -1045,7 +1045,9 @@ const Compiler = struct {
         });
         try self.defaults(data.default_fields);
         try self.containerFnDecls(data.functions);
-        try self.containerFnDecls(data.traits);
+        for (data.traits) |trait| {
+            try self.containerFnDecls(trait.funcs);
+        }
     }
 
     fn structLiteral(self: *Self, data: *const Instruction.StructLiteral) Error!void {

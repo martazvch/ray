@@ -1,0 +1,48 @@
+trait Foo {
+    fn speak() {
+        print "hello"
+    }
+    fn speakNoBody()
+
+    fn withDefault(a=1) -> bool {
+        return a == 1
+    }
+    fn withDefaultNoBody(a=1) -> bool
+
+    fn method0(self) { print "method0" }
+
+    fn method1(self) {
+        self.method0()
+    }
+}
+
+struct Bar {
+    impl Foo {
+        fn speakNoBody() { print "bye" }
+        fn withDefaultNoBody(a=2) -> bool { return a == 2 }
+    }
+}
+
+struct Baz {
+    impl Foo {
+        fn speakNoBody() { print "adios" }
+        fn withDefaultNoBody(a=2) -> bool { return a == 2 }
+    }
+}
+
+fn main() {
+    Bar.speak()
+    Baz.speak()
+    Bar.speakNoBody()
+    Baz.speakNoBody()
+
+    print Bar.withDefault()
+    print Baz.withDefault(4)
+    print Bar.withDefaultNoBody()
+    print Baz.withDefaultNoBody(1)
+
+    let bar = Bar{}
+    bar.method1()
+}
+
+

@@ -1,0 +1,34 @@
+trait Foo {
+    fn first()
+    fn first()
+}
+
+trait Empty {}
+trait One {
+    fn onlyFn()
+}
+
+struct Bar {
+    impl Empty {}
+    impl Empty {}
+}
+
+struct Baz {
+    impl Empty {
+        fn nonExistant() {}
+    }
+}
+
+struct Buz {
+    impl One {}
+}
+
+struct EmptyStruct {}
+struct OtherStruct {
+    impl EmptyStruct {}
+}
+struct LastStruct {
+    impl NonExistentTrait {}
+}
+
+fn main() {}

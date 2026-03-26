@@ -1,0 +1,6 @@
+already_declared_in_trait, Foo, first
+already_impl_trait, Bar, Empty
+missing_fn_in_trait, nonExistant, Empty
+missing_fn_impl_in_trait, onlyFn, One
+not_a_trait, EmptyStruct
+undeclared_trait, NonExistentTrait

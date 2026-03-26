@@ -500,14 +500,7 @@ fn structDecl(self: *Self, data: *const Instruction.StructDecl) void {
     for (data.functions) |func| {
         self.parseInstr(func);
     }
-
-    if (data.traits.len > 0) {
-        self.indentAndAppendSlice("- traits");
-
-        for (data.traits) |func| {
-            self.parseInstr(func);
-        }
-    }
+    self.traitImpls(data.traits);
 }
 
 fn structLiteral(self: *Self, data: *const Instruction.StructLiteral) void {
@@ -527,6 +520,21 @@ fn traitDecl(self: *Self, data: Instruction.TraitDecl) void {
 
     for (data.functions) |func| {
         self.parseInstr(func);
+    }
+}
+
+fn traitImpls(self: *Self, traits: []const Instruction.Trait) void {
+    if (traits.len > 0) {
+        self.indentAndAppendSlice("- traits");
+
+        for (traits) |trait| {
+            self.indent_level += 1;
+            defer self.indent_level -= 1;
+            self.indentAndPrintSlice("{s}:", .{self.interner.getKey(trait.name).?});
+            for (trait.funcs) |func| {
+                self.parseInstr(func);
+            }
+        }
     }
 }
 

@@ -247,7 +247,7 @@ pub const Instruction = struct {
         fields_count: usize,
         default_fields: []const Index,
         functions: []const Index,
-        traits: []const Index,
+        traits: []const Trait,
     };
     pub const StructLiteral = struct {
         structure: Index,
@@ -258,6 +258,10 @@ pub const Instruction = struct {
         sym_index: SymbolIndex,
         type_id: TypeId,
         functions: []const Index,
+    };
+    pub const Trait = struct {
+        name: usize,
+        funcs: []const Index,
     };
     pub const Trap = struct {
         lhs: Index,
