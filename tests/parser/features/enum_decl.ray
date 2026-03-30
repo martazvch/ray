@@ -1,5 +1,5 @@
 enum Marker {
-    cross,
+    cross = 7,
     circle,
     none
 
@@ -9,4 +9,5 @@ enum Marker {
 
     fn toSTring(self) -> str { }
 }
+
 

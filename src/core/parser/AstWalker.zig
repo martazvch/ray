@@ -165,13 +165,13 @@ fn captureFromNode(self: *Self, node: *Ast.Node, ctx: *CaptureCtx) void {
         .@"continue" => {},
         .discard => |e| self.captureFromExpr(e, ctx),
         .enum_decl => {},
+        .fn_decl => |*n| self.functionCaptures(n, ctx),
         .for_loop => |n| {
             self.captureFromExpr(n.expr, ctx);
             for (n.body.nodes) |*body_node| {
                 self.captureFromNode(body_node, ctx);
             }
         },
-        .fn_decl => |*n| self.functionCaptures(n, ctx),
         .multi_var_decl => |*n| {
             for (n.decls) |decl| if (decl.value) |val| {
                 self.captureFromExpr(val, ctx);
@@ -184,6 +184,7 @@ fn captureFromNode(self: *Self, node: *Ast.Node, ctx: *CaptureCtx) void {
                 self.functionCaptures(f, ctx);
             }
         },
+        .union_decl => {},
         .use => {},
         .var_decl => |*n| {
             if (n.value) |val| {
@@ -285,7 +286,7 @@ fn captureFromExpr(self: *Self, expr: *Ast.Expr, ctx: *CaptureCtx) void {
             }
         },
         .unary => |e| self.captureFromExpr(e.expr, ctx),
-        .bool, .enum_lit, .float, .int, .null, .self, .string => {},
+        .bool, .implicit_selector, .float, .int, .null, .self, .string => {},
     }
 }
 

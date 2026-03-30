@@ -1,0 +1,8 @@
+union Foo {
+    a,
+    1,
+}
+union Foo a, b
+
+union Foo {
+    a, b,

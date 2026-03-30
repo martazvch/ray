@@ -147,7 +147,7 @@ fn zigToRay(self: *Self, allocator: Allocator, ty: type, interner: *Interner, ti
                 inline for (u.fields) |f| {
                     childs.appendAssumeCapacity(self.zigToRay(allocator, f.type, interner, ti));
                 }
-                return ti.intern(.{ .@"union" = .{ .types = childs.toOwnedSlice(allocator) catch oom() } });
+                return ti.intern(.{ .inline_union = .{ .types = childs.toOwnedSlice(allocator) catch oom() } });
             },
             .pointer => |ptr| switch (ptr.child) {
                 Obj => unreachable,

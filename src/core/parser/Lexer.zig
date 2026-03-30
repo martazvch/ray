@@ -63,6 +63,7 @@ pub const Token = struct {
         .{ "trait", .trait },
         .{ "trap", .trap },
         .{ "true", .true },
+        .{ "union", .@"union" },
         .{ "use", .use },
         .{ "var", .@"var" },
         .{ "while", .@"while" },
@@ -142,6 +143,7 @@ pub const Token = struct {
         trap,
         true,
         underscore,
+        @"union",
         use,
         @"var",
         @"while",
@@ -662,13 +664,14 @@ test "keywords" {
         \\\and else false for fn if null or print return 
         \\\self struct true var while not do use break 
         \\\as enum match let in fail trap is continue trait impl
+        \\\union
     );
 
     const res = [_]Token.Tag{
-        .@"and",    .@"else",  .false,       .@"for",    .@"fn",   .@"if",  .null,     .@"or", .print,
-        .@"return", .new_line, .self,        .@"struct", .true,    .@"var", .@"while", .not,   .do,
-        .use,       .@"break", .new_line,    .as,        .@"enum", .match,  .let,      .in,    .fail,
-        .trap,      .is,       .@"continue", .trait,     .impl,    .eof,
+        .@"and",    .@"else",  .false,       .@"for",    .@"fn",   .@"if",    .null,     .@"or", .print,
+        .@"return", .new_line, .self,        .@"struct", .true,    .@"var",   .@"while", .not,   .do,
+        .use,       .@"break", .new_line,    .as,        .@"enum", .match,    .let,      .in,    .fail,
+        .trap,      .is,       .@"continue", .trait,     .impl,    .new_line, .@"union", .eof,
     };
 
     for (0..res.len) |i| {

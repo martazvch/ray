@@ -25,7 +25,6 @@ pub const Instruction = struct {
         @"continue": Continue,
         constant: Constant,
         discard: Index,
-        enum_create: EnumLit,
         enum_decl: EnumDecl,
         fail: Return,
         field: Field,
@@ -53,6 +52,8 @@ pub const Instruction = struct {
         trap: Trap,
         unary: Unary,
         unbox: Index,
+        union_decl: UnionDecl,
+        union_lit: UnionLit,
         var_decl: VarDecl,
         @"while": While,
 
@@ -146,17 +147,17 @@ pub const Instruction = struct {
     pub const Constant = struct {
         index: ConstIdx,
     };
-    pub const EnumLit = struct {
-        sym: LoadSymbol,
-        tag_index: usize,
-    };
     pub const EnumDecl = struct {
         name: usize,
         tags: []const []const u8,
         sym_index: SymbolIndex,
         type_id: TypeId,
         functions: []const Index,
-        is_err: bool,
+    };
+    // Used in constant interner
+    pub const EnumLit = struct {
+        sym: LoadSymbol,
+        tag_index: usize,
     };
     pub const Field = struct {
         structure: Index,
@@ -276,6 +277,19 @@ pub const Instruction = struct {
         instr: Index,
 
         pub const Op = enum { minus, bang };
+    };
+    pub const UnionDecl = struct {
+        name: usize,
+        tags: []const []const u8,
+        sym_index: SymbolIndex,
+        type_id: TypeId,
+        functions: []const Index,
+        is_err: bool,
+    };
+    pub const UnionLit = struct {
+        sym: LoadSymbol,
+        tag_index: usize,
+        payload: ?Index,
     };
     pub const VarDecl = struct {
         box: bool,

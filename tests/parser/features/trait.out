@@ -113,7 +113,7 @@
             }
         ]
     },
-    "enum": {
+    "union": {
         "name": "Foo",
         "tags": [
             "x": "",

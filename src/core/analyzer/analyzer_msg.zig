@@ -21,13 +21,10 @@ pub const AnalyzerMsg = union(enum) {
     pat_null_non_optional: struct { found: []const u8 },
     dead_code,
     dot_type_on_non_mod: struct { found: []const u8 },
+    duplicate_tag: struct { kind: []const u8, name: []const u8 },
     duplicate_field: struct { name: []const u8 },
     duplicate_param: struct { name: []const u8 },
-    enum_dup_tag: struct { name: []const u8 },
-    enum_lit_no_type,
-    enum_lit_non_enum: struct { found: []const u8 },
-    enum_tag_access,
-    enum_unknown_decl: struct { @"enum": []const u8, field: []const u8 },
+    container_unknown_decl: struct { kind: []const u8, ty: []const u8, field: []const u8 },
     error_not_in_union: struct { found: []const u8, expect: []const u8 },
     error_with_return: struct { found: []const u8 },
     expect_statement,
@@ -40,18 +37,20 @@ pub const AnalyzerMsg = union(enum) {
     float_equal,
     fn_expect_value: struct { expect: []const u8 },
     for_iter_non_int_range,
+    implicit_select_no_type,
+    implicit_select_invalid_type: struct { found: []const u8 },
     index_assign_str,
     invalid_arithmetic: struct { found: []const u8 },
     invalid_assign_target,
     invalid_call_target,
-    invalid_comparison: struct { found1: []const u8, found2: []const u8 },
+    invalid_comparison: struct { ty1: []const u8, ty2: []const u8 },
     invalid_logical: struct { found: []const u8 },
     invalid_in_type: struct { found: []const u8 },
     invalid_unary: struct { found: []const u8 },
+    instance_tag_access: struct { kind: []const u8 },
     iter_non_iterable: struct { found: []const u8 },
     match_all_arms_dont_return,
     match_duplicate_arm,
-    match_enum_invalid_pat,
     match_is_non_union: struct { found: []const u8 },
     match_non_literal,
     match_non_exhaustive: struct { missing: []const u8 },
@@ -60,6 +59,7 @@ pub const AnalyzerMsg = union(enum) {
     match_num_invalid_unary,
     match_partial_overlap,
     match_regular_on_union: struct { found: []const u8 },
+    match_union_invalid_pat,
     match_unreachable_arm,
     match_useless,
     match_useless_alias,
@@ -99,6 +99,7 @@ pub const AnalyzerMsg = union(enum) {
     undeclared_trait: struct { name: []const u8 },
     undeclared_type: struct { found: []const u8 },
     undeclared_var: struct { name: []const u8 },
+    union_unknown_decl: struct { @"union": []const u8, field: []const u8 },
     unknow_char_escape: struct { found: []const u8 },
     unknown_module: struct { name: []const u8 },
     unknown_param: struct { name: []const u8 },
@@ -140,11 +141,11 @@ pub const AnalyzerMsg = union(enum) {
             .dot_type_on_non_mod => |e| writer.print("can't use a non-module member as a type, found '{s}'", .{e.found}),
             .duplicate_field => |e| writer.print("field '{s}' is already present in structure literal", .{e.name}),
             .duplicate_param => |e| writer.print("parameter '{s}' is already present in function call", .{e.name}),
-            .enum_dup_tag => |e| writer.print("tag '{s}' already declared in enum", .{e.name}),
-            .enum_lit_no_type => writer.writeAll("can't infer enum's type"),
-            .enum_lit_non_enum => |e| writer.print("expect an enum but found '{s}'", .{e.found}),
-            .enum_tag_access => writer.writeAll("can't access enum's tag at runtime"),
-            .enum_unknown_decl => |e| writer.print("enum '{s}' have no declaration '{s}'", .{ e.@"enum", e.field }),
+            .duplicate_tag => |e| writer.print("tag '{s}' already declared in {s}", .{ e.name, e.kind }),
+            .implicit_select_no_type => writer.writeAll("can't infer type"),
+            .implicit_select_invalid_type => |e| writer.print("expect an enum or an union but found '{s}'", .{e.found}),
+            .instance_tag_access => |e| writer.print("can't access {s}'s tags on a runtime instance", .{e.kind}),
+            .container_unknown_decl => |e| writer.print("{s} '{s}' have no declaration '{s}'", .{ e.kind, e.ty, e.field }),
             .error_not_in_union => |e| writer.print("error '{s}' is not part of union '{s}'", .{ e.found, e.expect }),
             .error_with_return => |e| writer.print("can't return error '{s}' with 'return', use 'fail'", .{e.found}),
             .expect_statement => writer.writeAll("did not expect an expression in this context"),
@@ -161,14 +162,14 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_arithmetic => |e| writer.print("invalid arithmetic operation on type '{s}'", .{e.found}),
             .invalid_assign_target => writer.writeAll("invalid assignment target"),
             .invalid_call_target => writer.writeAll("invalid call target, can only call functions and methods"),
-            .invalid_comparison => |e| writer.print("invalid comparison between types '{s}' and '{s}'", .{ e.found1, e.found2 }),
+            .invalid_comparison => |e| writer.print("trait 'Eq' must be implemented to compare type '{s}' with '{s}'", .{ e.ty1, e.ty2 }),
             .invalid_logical => writer.writeAll("logical operators must be used with booleans"),
             .invalid_in_type => |e| writer.print("can't use 'in' expression with '{s}' type", .{e.found}),
             .invalid_unary => writer.writeAll("invalid unary operation"),
             .iter_non_iterable => |e| writer.print("can't iterate over type '{s}'", .{e.found}),
             .match_all_arms_dont_return => writer.writeAll("all paths of match expression don't return a value"),
             .match_duplicate_arm => writer.writeAll("arm is defined multiple times"),
-            .match_enum_invalid_pat => writer.writeAll("invalid pattern for matching enums"),
+            .match_union_invalid_pat => writer.writeAll("invalid pattern for matching unions"),
             .match_is_non_union => |e| writer.print("'match is' can only be used with union type, found: '{s}'", .{e.found}),
             .match_non_literal => writer.writeAll("expect a constant or a literal in patterns"),
             .match_non_exhaustive => |e| writer.print("non-exhaustive pattern matching, missing: '{s}'", .{e.missing}),
@@ -216,6 +217,7 @@ pub const AnalyzerMsg = union(enum) {
             .undeclared_trait => |e| writer.print("undeclared trait '{s}'", .{e.name}),
             .undeclared_type => |e| writer.print("undeclared type '{s}'", .{e.found}),
             .undeclared_var => |e| writer.print("undeclared variable '{s}'", .{e.name}),
+            .union_unknown_decl => |e| writer.print("union '{s}' have no declaration '{s}'", .{ e.@"union", e.field }),
             .unknow_char_escape => |e| writer.print("unknow character escape '{s}'", .{e.found}),
             .unknown_module => |e| writer.print("unknown module '{s}'", .{e.name}),
             .unknown_param => |e| writer.print("function doesn't have parameter '{s}'", .{e.name}),
@@ -250,11 +252,11 @@ pub const AnalyzerMsg = union(enum) {
             .dead_code => writer.writeAll("code after this expression can't be reached"),
             .dot_type_on_non_mod => writer.writeAll("this is not a module"),
             .duplicate_field, .duplicate_param => writer.writeAll("this one"),
-            .enum_dup_tag => writer.writeAll("this tag"),
-            .enum_lit_no_type => writer.writeAll("this expression has no type to infer to"),
-            .enum_lit_non_enum => writer.writeAll("this enum literal don't match any enum"),
-            .enum_tag_access => writer.writeAll("this is one of the enum's tag"),
-            .enum_unknown_decl => writer.writeAll("this name is unknown"),
+            .duplicate_tag => writer.writeAll("this tag"),
+            .implicit_select_no_type => writer.writeAll("this expression has no type to infer to"),
+            .implicit_select_invalid_type => writer.writeAll("can't use implicit selector on this type"),
+            .instance_tag_access => writer.writeAll("this tag"),
+            .container_unknown_decl => writer.writeAll("this name is unknown"),
             .error_not_in_union => writer.writeAll("this is not part of declaration"),
             .error_with_return => writer.writeAll("this is an error"),
             .expect_statement => writer.writeAll("this is an expression"),
@@ -269,7 +271,7 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_arithmetic => writer.writeAll("expression is not a numeric type"),
             .invalid_assign_target => writer.writeAll("cannot assign to this expression"),
             .invalid_call_target => writer.writeAll("this is neither a function neither a method"),
-            .invalid_comparison => writer.writeAll("expressions have different types"),
+            .invalid_comparison => writer.writeAll("this type"),
             .invalid_logical => |e| writer.print("this expression resolves to a '{s}'", .{e.found}),
             .invalid_in_type => writer.writeAll("invalid type"),
             .invalid_unary, .non_bool_cond => writer.writeAll("expression is not a boolean type"),
@@ -277,7 +279,7 @@ pub const AnalyzerMsg = union(enum) {
             .match_all_arms_dont_return => writer.writeAll("this match expression"),
             .match_non_literal => writer.writeAll("this is not a literal"),
             .match_duplicate_arm => writer.writeAll("this case"),
-            .match_enum_invalid_pat => writer.writeAll("here"),
+            .match_union_invalid_pat => writer.writeAll("here"),
             .match_is_non_union => writer.writeAll("this is not an union"),
             .match_non_exhaustive => writer.writeAll("this expression"),
             .match_no_wildcard => writer.writeAll("non-exhaustive match"),
@@ -316,6 +318,7 @@ pub const AnalyzerMsg = union(enum) {
             .type_not_in_union => |e| writer.print("this expression is of type '{s}'", .{e.found}),
             .undeclared_field_access, .undeclared_trait, .undeclared_type, .undeclared_var, .use_uninit_var => writer.writeAll("here"),
             .undeclared_block_label => writer.writeAll("this label"),
+            .union_unknown_decl => writer.writeAll("this name is unknown"),
             .unknow_char_escape => writer.writeAll("unknown character to espace"),
             .unknown_module, .unknown_struct_field => writer.writeAll("this name"),
             .unknown_param, .void_param => writer.writeAll("this parameter"),
@@ -357,17 +360,17 @@ pub const AnalyzerMsg = union(enum) {
             .dot_type_on_non_mod => writer.writeAll("check variable declaration to see it's type"),
             .duplicate_field => writer.writeAll("fields can be defined only once in structure literals"),
             .duplicate_param => writer.writeAll("parameters can be defined only once in function calls"),
-            .enum_dup_tag => writer.writeAll("use another name or introduce numbers, underscore, ..."),
-            .enum_lit_no_type => writer.writeAll(
-                \\to use enum literals, you must provide a type so that the compiler can infer it.
-                \\use either: 'var foo: Foo = .a' or 'var foo = Foo.a'"
+            .duplicate_tag => writer.writeAll("use another name or introduce numbers, underscore, ..."),
+            .implicit_select_no_type => writer.writeAll(
+                \\to use implicit selector syntax, you must provide a type so that the compiler can infer it.
+                \\use either: 'var foo: Foo = .a' or a variable with already known type"
             ),
-            .enum_lit_non_enum => writer.writeAll("enum literal expressions are only allowed with enum types"),
-            .enum_tag_access => writer.writeAll(
-                \\you can either access declarations inside an enum (functions, constants, ...) or test enum's tag
+            .implicit_select_invalid_type => writer.writeAll("implicit selector syntax is only allowed with enum and union types"),
+            .instance_tag_access => writer.writeAll(
+                \\you can either access declarations on the type name or test tag's value
                 \\with an 'if' statement like: 'if foo == .a {}' or with pattern matching via 'match'.
             ),
-            .enum_unknown_decl => writer.writeAll("refer to enum's declaration to see available tags and declarations"),
+            .container_unknown_decl => |e| writer.print("refer to {s}'s declaration to see available tags and declarations", .{e.kind}),
             .error_not_in_union => writer.writeAll("refer to function's declaration to see acceptable errors"),
             .error_with_return => writer.writeAll("'return' keyword is used to write into ok channel and 'fail' writes to the error one"),
             .expect_statement => writer.writeAll(
@@ -407,7 +410,7 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_arithmetic => writer.writeAll("expect a numeric type"),
             .invalid_assign_target => writer.writeAll("can only assign to variables"),
             .invalid_call_target => writer.writeAll("change call target to a function or a method or remove the call"),
-            .invalid_comparison => writer.writeAll("expressions must have the same type when compared"),
+            .invalid_comparison => writer.writeAll("native comparison is only possible for simple native types, otherwise trait 'Eq' must be implemented"),
             .invalid_logical => writer.writeAll("modify the logic to operate on booleans"),
             .invalid_in_type => writer.writeAll("can only use 'in' with int and float ranges, arrays and strings"),
             .invalid_unary => |e| writer.print("can only negate boolean type, found '{s}'", .{e.found}),
@@ -418,13 +421,6 @@ pub const AnalyzerMsg = union(enum) {
             .match_all_arms_dont_return => writer.writeAll("when using a 'match' or 'match is' as an expression, all arms must return a value"),
             .match_duplicate_arm => writer.writeAll("delete the duplicated arm"),
             .match_is_non_union => writer.writeAll("'match is' is meant to be used with union type, for regular types use 'match'"),
-            .match_enum_invalid_pat => writer.writeAll(
-                \\to match on an enum use either enum literals like or direct access on type:
-                \\  match shape {
-                \\      .circle => ...
-                \\      Shape.rectangle => ...
-                \\  }
-            ),
             .match_non_literal => writer.writeAll("non-constant variables and non-literals aren't a valid pattern"),
             .match_num_decrease_range => writer.writeAll("ranges used as patterns must be increasing. Revert range's bounds"),
             .match_num_invalid_unary => writer.writeAll(
@@ -439,6 +435,13 @@ pub const AnalyzerMsg = union(enum) {
                 \\In such case, order of declaration of arms matter as the first one will be executed
             ),
             .match_regular_on_union => writer.writeAll("use 'match is' to pattern match on unions and 'match' for regular types"),
+            .match_union_invalid_pat => writer.writeAll(
+                \\to match on an union use either implicit access or direct access on type:
+                \\  match shape {
+                \\      .circle => ...
+                \\      Shape.rectangle => ...
+                \\  }
+            ),
             .match_unreachable_arm => writer.writeAll("this arm's patterns are already fully covered by other arms"),
             .match_useless => writer.writeAll("if you have only one possibility, collapse the whole match expression to a single expression"),
             .match_useless_alias => writer.writeAll(
@@ -493,6 +496,7 @@ pub const AnalyzerMsg = union(enum) {
             .undeclared_trait => writer.writeAll("consider declaring or importing the trait before use"),
             .undeclared_type => writer.writeAll("consider declaring or importing the type before use"),
             .undeclared_var => writer.writeAll("consider declaring or importing the variable before use"),
+            .union_unknown_decl => writer.writeAll("refer to union's declaration to see available tags and declarations"),
             .unknow_char_escape => writer.writeAll("valid escape characters are '\\t', '\\n', '\\\\', '\\r'"),
             .unknown_module => writer.writeAll("create the module first and bring it in project scope (or maybe just a typo?)"),
             .unknown_param => writer.writeAll("refer to function's definition to see available parameters"),

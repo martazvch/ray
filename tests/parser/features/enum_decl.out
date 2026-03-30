@@ -1,0 +1,44 @@
+{
+    "enum": {
+        "name": "Marker",
+        "tags": [
+            "cross": {
+                "value": {
+                    "int": "7"
+                }
+            },
+            "circle": {},
+            "none": {}
+        ]
+        "functions": [
+            "fn_decl": {
+                "name": "init",
+                "params": [],
+                "return_type": "Self",
+                "body": [
+                    "return": {
+                        "field": {
+                            "structure": {
+                                "identifier": "Self"
+                            },
+                            "field_name": "cross"
+                        }
+                    }
+                ]
+            },
+            "fn_decl": {
+                "name": "toSTring",
+                "params": [
+                    {
+                        "name": "self",
+                        "type": "Self",
+                        "value": {}
+                    }
+                ],
+                "return_type": "str",
+                "body": []
+            }
+        ],
+        "traits": []
+    }
+}

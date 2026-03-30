@@ -7,7 +7,7 @@
         "arms": [
             {
                 "expr": {
-                    "enum_literal": "fileNotFound"
+                    "implicit_selector": "fileNotFound"
                 },
                 "body": {
                     "string": "oui"
@@ -15,7 +15,7 @@
             },
             {
                 "expr": {
-                    "enum_literal": "otherError"
+                    "implicit_selector": "otherError"
                 },
                 "body": {
                     "string": "non"

@@ -23,6 +23,7 @@ pub const Node = union(enum) {
     print: *Expr,
     struct_decl: StructDecl,
     trait_decl: TraitDecl,
+    union_decl: UnionDecl,
     use: Use,
     var_decl: VarDecl,
     @"while": While,
@@ -43,13 +44,12 @@ pub const EnumDecl = struct {
     tk: TokenIndex,
     name: ?TokenIndex,
     tags: []const Tag,
-    is_err: bool,
     functions: []FnDecl,
     traits: []TraitDecl,
 
     pub const Tag = struct {
         name: TokenIndex,
-        payload: ?*Type,
+        value: ?*Expr,
     };
 };
 
@@ -118,6 +118,20 @@ pub const TraitDecl = struct {
     functions: []FnDecl,
 };
 
+pub const UnionDecl = struct {
+    tk: TokenIndex,
+    name: ?TokenIndex,
+    tags: []const Tag,
+    is_err: bool,
+    functions: []FnDecl,
+    traits: []TraitDecl,
+
+    pub const Tag = struct {
+        name: TokenIndex,
+        payload: ?*Type,
+    };
+};
+
 pub const Use = struct {
     names: []const TokenIndex,
     items: ?[]const ItemAndAlias,
@@ -154,7 +168,6 @@ pub const Expr = union(enum) {
     bool: Bool,
     @"break": Break,
     closure: FnDecl,
-    enum_lit: TokenIndex,
     fail: Fail,
     field: Field,
     float: Float,
@@ -162,6 +175,7 @@ pub const Expr = union(enum) {
     grouping: Grouping,
     identifier: Identifier,
     @"if": If,
+    implicit_selector: TokenIndex,
     indexing: Indexing,
     int: Int,
     null: Null,
@@ -411,6 +425,10 @@ pub fn getSpan(self: *const @This(), anynode: anytype) Span {
                 .end = self.getSpan(u[u.len - 1]).end,
             },
         },
+        UnionDecl => if (node.name) |name|
+            self.token_spans[name]
+        else
+            self.token_spans[node.tk],
         Use => .{
             .start = self.token_spans[node.names[0]].start,
             .end = self.token_spans[node.names[node.names.len - 1]].end,

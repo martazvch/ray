@@ -45,10 +45,12 @@ scopes: ArrayList(Scope),
 current: *Scope,
 builtins: AutoHashMapUnmanaged(InternerIdx, *const Type),
 natives: AutoHashMapUnmanaged(InternerIdx, Symbol),
+
 enum_count: usize,
 func_count: usize,
 struct_count: usize,
 trait_count: usize,
+union_count: usize,
 
 // Dbg
 save: bool,
@@ -62,10 +64,12 @@ pub const empty: Self = .{
     .current = undefined,
     .builtins = .empty,
     .natives = .empty,
+
     .enum_count = 0,
     .func_count = 0,
     .struct_count = 0,
     .trait_count = 0,
+    .union_count = 0,
 
     .save = false,
     .saved = .empty,
@@ -253,13 +257,14 @@ pub fn declareSymbol(
     self: *Self,
     allocator: Allocator,
     name: InternerIdx,
-    kind: enum { function, @"enum", structure, trait },
+    kind: enum { function, @"enum", structure, trait, @"union" },
 ) *Symbol {
     const index = switch (kind) {
         .@"enum" => &self.enum_count,
         .function => &self.func_count,
         .structure => &self.struct_count,
         .trait => &self.trait_count,
+        .@"union" => &self.union_count,
     };
 
     self.current.symbols.put(allocator, name, .{

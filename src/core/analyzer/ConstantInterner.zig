@@ -16,7 +16,7 @@ pub const Constant = union(enum) {
     int: i64,
     float: f64,
     bool: bool,
-    enum_instance: Instruction.EnumLit,
+    enum_lit: Instruction.EnumLit,
     null,
     string: misc.Interner.Index,
 };
@@ -76,7 +76,7 @@ fn hash(data: Constant) u64 {
         .float => |*f| hasher.update(asBytes(f)),
         .string => |*s| hasher.update(asBytes(s)),
         .null => {},
-        .enum_instance => |e| {
+        .enum_lit => |e| {
             if (e.sym.module_index) |idx| {
                 hasher.update(asBytes(&idx.toInt()));
             } else {

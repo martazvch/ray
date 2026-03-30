@@ -57,14 +57,22 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
             try self.renderSingleExpr(@tagName(node.*), n, .block, comma);
         },
         .enum_decl => |n| {
-            try self.openKey(if (n.is_err) "error" else "enum", .block);
+            try self.openKey("enum", .block);
             if (n.name) |name| try self.pushKeyValue("name", self.ast.toSource(name), true);
 
             if (n.tags.len > 0) {
                 try self.openKey("tags", .list);
                 for (n.tags, 0..) |tag, i| {
-                    const ty = if (tag.payload) |payload| try self.renderType(payload) else "";
-                    try self.pushKeyValue(self.ast.toSource(tag.name), ty, i < n.tags.len - 1);
+                    const last = i < n.tags.len - 1;
+                    const tag_name = self.ast.toSource(tag.name);
+
+                    if (tag.value) |value| {
+                        try self.openKey(tag_name, .block);
+                        try self.renderSingleExpr("value", value, .block, false);
+                        try self.closeKey(.block, last);
+                    } else {
+                        try self.emptyKey(tag_name, .block, last);
+                    }
                 }
                 try self.closeKey(.list, false);
             }
@@ -73,6 +81,7 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
             try self.renderTraitImpls(n.traits);
             try self.closeKey(.block, comma);
         },
+        .fn_decl => |*n| try self.renderFnDecl(self.ast.toSource(n.name), n, comma),
         .for_loop => |n| {
             try self.openKey(@tagName(node.*), .block);
             try self.pushKeyValue("name", self.ast.toSource(n.binding), true);
@@ -81,7 +90,6 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
             try self.renderBlock(&n.body, "body", false);
             try self.closeKey(.block, comma);
         },
-        .fn_decl => |*n| try self.renderFnDecl(self.ast.toSource(n.name), n, comma),
         .multi_var_decl => |n| {
             try self.openKey(@tagName(node.*), .list);
             for (n.decls, 0..) |*decl, i| {
@@ -129,6 +137,23 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
                 }
                 try self.closeKey(.list, false);
             }
+            try self.closeKey(.block, comma);
+        },
+        .union_decl => |n| {
+            try self.openKey(if (n.is_err) "error" else "union", .block);
+            if (n.name) |name| try self.pushKeyValue("name", self.ast.toSource(name), true);
+
+            if (n.tags.len > 0) {
+                try self.openKey("tags", .list);
+                for (n.tags, 0..) |tag, i| {
+                    const ty = if (tag.payload) |payload| try self.renderType(payload) else "";
+                    try self.pushKeyValue(self.ast.toSource(tag.name), ty, i < n.tags.len - 1);
+                }
+                try self.closeKey(.list, false);
+            }
+
+            try self.renderFnDecls(n.functions, true);
+            try self.renderTraitImpls(n.traits);
             try self.closeKey(.block, comma);
         },
         .use => |n| {
@@ -374,7 +399,6 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
             try self.closeKey(.block, comma);
         },
         .closure => |*e| try self.renderFnDecl("", e, comma),
-        .enum_lit => |e| try self.pushKeyValue("enum_literal", self.ast.toSource(e), comma),
         .fail => |e| try self.renderSingleExpr(@tagName(expr.*), e.expr, .block, comma),
         .float => |e| try self.pushKeyValue(@tagName(expr.*), self.ast.toSource(e), comma),
         .field => |e| {
@@ -419,6 +443,7 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
             }
             try self.closeKey(.block, comma);
         },
+        .implicit_selector => |e| try self.pushKeyValue("implicit_selector", self.ast.toSource(e), comma),
         .indexing => |*e| {
             try self.openKey("indexing", .block);
             try self.renderSingleExpr("expr", e.expr, .block, true);

@@ -1,4 +1,4 @@
-enum_lit_no_type
-enum_lit_non_enum, int
-enum_unknown_decl, Marker, triangle
+implicit_select_no_type
+implicit_select_invalid_type, int
+container_unknown_decl, enum, Marker, triangle
 

@@ -1,4 +1,4 @@
-[Enum declaration ValueErr]
+[Union declaration ValueErr]
 
 [Function declaration failable, returns]
     [If]
@@ -24,41 +24,38 @@
             [Block pop count: 0, is_expr: false]
                 [Pop]
                     [Fail]
-                        [Constant index 5]
-                            [Enum create]
-                                - enum
-                                [Load symbol 0 module 0]
-                                - tag
-                                1
+                        [Union literal]
+                            - union
+                            [Load symbol 0]
+                            - tag
+                            1
     [Fail]
-        [Constant index 6]
-            [Enum create]
-                - enum
-                [Load symbol 0 module 0]
-                - tag
-                0
-
+        [Union literal]
+            - union
+            [Load symbol 0]
+            - tag
+            0
 [Function declaration main]
     [Print]
         [Trap expr]
         - lhs
             [Call symbol 0]
                 - args
-                [Constant index 7]
+                [Constant index 5]
                     [Int 15]
         - rhs
             [Block pop count: 1, is_expr: true]
                 [Print]
                     [Variable index: 0, scope: local]
                 [Break depth: 0, pop: 1]
-                    [Constant index 8]
+                    [Constant index 6]
                         [Int 88]
     [Print]
         [Trap match]
         - lhs
             [Call symbol 0]
                 - args
-                [Constant index 7]
+                [Constant index 5]
                     [Int 15]
         - rhs
             [Match enum]
@@ -66,23 +63,22 @@
                 [Variable index: 0, scope: local]
             - arms:
                 - expr:
-                    [Constant index 6]
-                        [Enum create]
-                            - enum
-                            [Load symbol 0 module 0]
-                            - tag
-                            0
+                    [Union literal]
+                        - union
+                        [Load symbol 0]
+                        - tag
+                        0
                 - body:
-                    [Constant index 9]
+                    [Constant index 7]
                         [Int 1]
                 - wildcard:
-                    [Constant index 10]
+                    [Constant index 8]
                         [Int 4]
         [Trap match]
         - lhs
             [Call symbol 0]
                 - args
-                [Constant index 11]
+                [Constant index 9]
                     [Int 25]
         - rhs
             [Match enum]
@@ -90,26 +86,25 @@
                 [Variable index: 0, scope: local]
             - arms:
                 - expr:
-                    [Constant index 6]
-                        [Enum create]
-                            - enum
-                            [Load symbol 0 module 0]
-                            - tag
-                            0
+                    [Union literal]
+                        - union
+                        [Load symbol 0]
+                        - tag
+                        0
                 - body:
                     [Print]
-                        [Constant index 9]
+                        [Constant index 7]
                             [Int 1]
                 - wildcard:
                     [Print]
-                        [Constant index 10]
+                        [Constant index 8]
                             [Int 4]
             [Print]
                 [Trap expr]
                 - lhs
                     [Call symbol 0]
                         - args
-                        [Constant index 7]
+                        [Constant index 5]
                             [Int 15]
                 - rhs
                     [Block pop count: 1, is_expr: false]

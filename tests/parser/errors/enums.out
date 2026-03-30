@@ -1,3 +1,0 @@
-non_ident_enum_tag
-expect_brace_before, enum
-expect_brace_end_container, enum

@@ -7,75 +7,79 @@ pop
 push_true
 ret
 pop
-jump 12 -> 33
+jump 12 -> 35
 pop
 
 get_local index 0
 load_constant index 4, value 20
 gt_int
-jump_false 21 -> 32
+jump_false 21 -> 34
 pop
-load_constant index 5, value <error ValueErr.tooBig>
+push_null
+union_lit index 0, tag 1, ValueErr
 ret
 pop
-jump 29 -> 33
+jump 31 -> 35
 pop
 
-load_constant index 6, value <error ValueErr.tooSmall>
+push_null
+union_lit index 0, tag 0, ValueErr
 ret
 
 -- main --
-load_constant index 7, value 15
+load_constant index 5, value 15
 call index 0, arity 1, failable
-jump_no_err 5 -> 69
+jump_no_err 5 -> 73
 get_local index 0
 dup
 is_type index 15
-jump_false 13 -> 54
+jump_false 13 -> 58
 pop
 get_local index 0
 get_tag
 dup
-load_constant index 6, value <error ValueErr.tooSmall>
+push_null
+union_lit index 0, tag 0, ValueErr
 get_tag
 eq_int
-jump_false 25 -> 34
+jump_false 27 -> 36
 pop
-load_constant index 8, value 1
-jump 31 -> 50
+load_constant index 6, value 1
+jump 33 -> 54
 pop
 dup
-load_constant index 5, value <error ValueErr.tooBig>
+push_null
+union_lit index 0, tag 1, ValueErr
 get_tag
 eq_int
-jump_false 40 -> 49
+jump_false 44 -> 53
 pop
-load_constant index 9, value 100
-jump 46 -> 50
+load_constant index 7, value 100
+jump 50 -> 54
 pop
 swap_pop
-jump 51 -> 68
+jump 55 -> 72
 pop
 dup
 is_type index 16
-jump_false 58 -> 67
+jump_false 62 -> 71
 pop
-load_constant index 10, value -999
-jump 64 -> 68
+load_constant index 8, value -999
+jump 68 -> 72
 pop
 swap_pop
 swap_pop
 print
 
-load_constant index 7, value 15
+load_constant index 5, value 15
 call index 0, arity 1, failable
-jump_no_err 76 -> 91
+jump_no_err 80 -> 95
 get_local index 0
 print
-load_constant index 11, value 88
+load_constant index 9, value 88
 store_blk_val
 pop
-jump 86 -> 90
+jump 90 -> 94
 pop
 load_blk_val
 print

@@ -353,8 +353,8 @@ const Compiler = struct {
             .@"continue" => |data| self.continueInstr(data),
             .discard => |index| self.wrappedInstr(.pop, index),
 
-            .enum_create => |*data| self.enumLit(data),
             .enum_decl => |*data| self.enumDecl(data),
+            // .enum_lit => |data| self.enumLit(data),
             .fail => |data| self.returnInstr(data),
             .field => |*data| self.field(data),
             .fn_decl => |*data| self.compileFn(data),
@@ -389,6 +389,8 @@ const Compiler = struct {
             .trap => |data| self.trap(data),
             .unary => |*data| self.unary(data),
             .unbox => |index| self.wrappedInstr(.unbox, index),
+            .union_decl => |*data| self.unionDecl(data),
+            .union_lit => |data| self.unionLit(data),
             .var_decl => |*data| self.varDecl(data),
             .@"while" => |data| self.whileInstr(data),
 
@@ -700,7 +702,7 @@ const Compiler = struct {
                 .bool => |c| Value.makeBool(c),
                 .int => |val| Value.makeInt(val),
                 .float => |val| Value.makeFloat(val),
-                .enum_instance => |val| Value.makeObj(Obj.EnumInstance.createComptime(
+                .enum_lit => |val| Value.makeObj(Obj.EnumInstance.createComptime(
                     self.manager.allocator,
                     self.manager.state.modules.getSymbol(self.manager.mod_index, val.sym.symbol_index, .@"enum"),
                     @intCast(val.tag_index),
@@ -747,25 +749,24 @@ const Compiler = struct {
         self.block_stack.add(self.manager.allocator, .@"continue", self.emitJump(.loop), data.depth);
     }
 
-    fn enumLit(self: *Self, data: *const Instruction.EnumLit) Error!void {
-        // TODO: Error
-        if (data.tag_index >= std.math.maxInt(u8)) {
-            @panic("Enum is to big, not implemented yet");
-        }
-
-        self.symbolAccess(.enum_lit, data.sym);
-        self.writeByte(@intCast(data.tag_index));
-    }
-
     fn enumDecl(self: *Self, data: *const Instruction.EnumDecl) Error!void {
         self.manager.state.modules.addSymbol(self.manager.mod_index, data.sym_index, Module.Enum{
             .name = self.manager.allocator.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
             .tags = data.tags,
             .type_id = data.type_id,
-            .is_err = data.is_err,
         });
         try self.containerFnDecls(data.functions);
     }
+
+    // fn enumLit(self: *Self, data: Instruction.EnumLit) Error!void {
+    //     // TODO: Error
+    //     if (data.tag_index >= std.math.maxInt(u8)) {
+    //         @panic("Enum is to big, not implemented yet");
+    //     }
+    //
+    //     self.symbolAccess(.enum_lit, data.sym);
+    //     self.writeByte(@intCast(data.tag_index));
+    // }
 
     fn field(self: *Self, data: *const Instruction.Field) Error!void {
         try self.compileInstr(data.structure);
@@ -1089,6 +1090,33 @@ const Compiler = struct {
         } else {
             self.writeOp(.not);
         }
+    }
+
+    fn unionDecl(self: *Self, data: *const Instruction.UnionDecl) Error!void {
+        self.manager.state.modules.addSymbol(self.manager.mod_index, data.sym_index, Module.Union{
+            .name = self.manager.allocator.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
+            .tags = data.tags,
+            .type_id = data.type_id,
+            .is_err = data.is_err,
+        });
+        try self.containerFnDecls(data.functions);
+    }
+
+    fn unionLit(self: *Self, data: Instruction.UnionLit) Error!void {
+        // TODO: Error
+        if (data.tag_index >= std.math.maxInt(u8)) {
+            @panic("Union is to big, not implemented yet");
+        }
+
+        if (data.payload) |payload| {
+            _ = payload;
+            @panic("Add support for payload");
+        } else {
+            self.writeOp(.push_null);
+        }
+
+        self.symbolAccess(.union_lit, data.sym);
+        self.writeByte(@intCast(data.tag_index));
     }
 
     fn varDecl(self: *Self, data: *const Instruction.VarDecl) Error!void {

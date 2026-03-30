@@ -188,6 +188,8 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .sub_int => self.simpleInstruction(writer, "sub_int", offset),
         .swap_pop => self.simpleInstruction(writer, "swap_pop", offset),
         .unbox => self.simpleInstruction(writer, "unbox", offset),
+        .union_lit => self.unionLiteral(writer, offset),
+        .union_lit_ext => self.unionLiteralExt(writer, offset),
         .wide => unreachable,
     } catch oom();
 }
@@ -402,7 +404,7 @@ fn enumLiteral(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
     const text = "enum_lit";
     const index = self.chunk.code.items[offset + 1];
     const tag = self.chunk.code.items[offset + 2];
-    const sym = self.module.enums[index];
+    const sym = self.module.unions[index];
 
     if (self.render_mode == .@"test") {
         try writer.print("{s} index {}, tag {}, {s}\n", .{ text, index, tag, sym.name });
@@ -453,6 +455,36 @@ fn structLiteralExt(self: *Self, writer: *Writer, offset: usize) Writer.Error!us
         try writer.print("{s} index {}, module {}, arity {}\n", .{ text, index, module, arity });
     } else {
         try writer.print("{s:<20} index {:>4}, module {:>4}, arity {:>4}\n", .{ text, index, module, arity });
+    }
+
+    return offset + 4;
+}
+
+fn unionLiteral(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
+    const text = "union_lit";
+    const index = self.chunk.code.items[offset + 1];
+    const tag = self.chunk.code.items[offset + 2];
+    const sym = self.module.unions[index];
+
+    if (self.render_mode == .@"test") {
+        try writer.print("{s} index {}, tag {}, {s}\n", .{ text, index, tag, sym.name });
+    } else {
+        try writer.print("{s:<20} index {:>4}, tag {:>4}, {s}\n", .{ text, index, tag, sym.name });
+    }
+
+    return offset + 3;
+}
+
+fn unionLiteralExt(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
+    const text = "union_lit_ext";
+    const index = self.chunk.code.items[offset + 1];
+    const module = self.chunk.code.items[offset + 2];
+    const tag = self.chunk.code.items[offset + 3];
+
+    if (self.render_mode == .@"test") {
+        try writer.print("{s} index {}, module {}, tag {}\n", .{ text, index, module, tag });
+    } else {
+        try writer.print("{s:<20} index {:>4}, module {:>4}, tag {:>4}\n", .{ text, index, module, tag });
     }
 
     return offset + 4;

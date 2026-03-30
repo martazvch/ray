@@ -141,6 +141,8 @@ pub const OpCode = enum(u8) {
     struct_lit_ext,
     sub_float,
     sub_int,
+    union_lit,
+    union_lit_ext,
     swap_pop,
     unbox,
     wide,

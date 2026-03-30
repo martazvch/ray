@@ -1,8 +1,9 @@
-enum_dup_tag, a
-enum_unknown_decl, Bar, not_a_field
-enum_tag_access
+duplicate_tag, union, a
+union_unknown_decl, Bar, not_a_field
+instance_tag_access, union
 type_mismatch, Bar, Baz
 expect_value_found_type, Baz
 invalid_comparison, Baz, Bar
 invalid_comparison, Baz, Bar
 invalid_arithmetic, Baz
+invalid_comparison, Bar, Bar

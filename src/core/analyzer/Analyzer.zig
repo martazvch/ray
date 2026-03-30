@@ -191,19 +191,20 @@ pub fn analyzeNode(self: *Self, node: *const Node, expect: ExprResKind, ctx: *Co
         .assignment => |*n| try self.assignment(n, ctx),
         .@"continue" => |n| try self.continueStmt(n, ctx),
         .discard => |n| try self.discard(n, ctx),
-        .enum_decl => |*n| try self.enumDeclaration(n, ctx),
-        .for_loop => |*n| try self.forLoop(n, ctx),
+        .enum_decl => |*n| try self.enumDecl(n, ctx),
         .fn_decl => |*n| (try self.fnDeclaration(n, ctx)).instr,
+        .for_loop => |*n| try self.forLoop(n, ctx),
         .multi_var_decl => |*n| try self.multiVarDecl(n, ctx),
         .print => |n| try self.print(n, ctx),
         .struct_decl => |*n| try self.structDecl(n, ctx),
         .trait_decl => |*n| try self.traitDecl(n, ctx),
+        .union_decl => |*n| try self.unionDecl(n, ctx),
         .use => |*n| b: {
             try self.use(n);
             // TODO: replace with a error.Noop to skip it?
             break :b self.irb.addInstr(.noop, 0);
         },
-        .var_decl => |*n| try self.varDeclaration(n, ctx),
+        .var_decl => |*n| try self.varDecl(n, ctx),
         .@"while" => |*n| try self.whileStmt(n, ctx),
         .expr => |n| return try self.analyzeExpr(n, expect, ctx),
     };
@@ -288,73 +289,6 @@ fn continueStmt(self: *Self, node: Ast.Continue, ctx: *const Context) StmtResult
 fn discard(self: *Self, expr: *const Expr, ctx: *Context) StmtResult {
     const res = try self.analyzeExpr(expr, .value, ctx);
     return self.irb.wrapInstr(.discard, res.instr);
-}
-
-fn enumDeclaration(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
-    const snapshot = ctx.snapshot();
-    defer snapshot.restore();
-
-    var buf: [1024]u8 = undefined;
-    const container_name = self.interner.internKeepRef(self.allocator, self.containers.renderWithSep(&buf, "."));
-
-    // TODO: anonymus enums
-    const name_tk = node.name orelse @panic("anonymus enums aren't supported yet");
-    const name = try self.internIfNotInCurrentScope(name_tk);
-
-    const interned = self.ti.newEnum(.{ .name = name, .container = container_name }, node.is_err);
-    const ty = &interned.@"enum";
-
-    const sym = self.scope.declareSymbol(self.allocator, name, .@"enum");
-    sym.type = interned;
-
-    ctx.self_type = interned;
-    defer ctx.self_type = null;
-
-    try self.openContainer(name_tk);
-    defer self.closeContainer();
-
-    const tags = try self.enumTags(node.tags, ty, ctx);
-    const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
-
-    return self.irb.addInstr(
-        .{ .enum_decl = .{
-            .name = name,
-            .tags = tags,
-            .sym_index = sym.index,
-            .type_id = self.ti.typeId(interned),
-            .functions = funcs,
-            .is_err = node.is_err,
-        } },
-        self.ast.getSpan(node).start,
-    );
-}
-
-fn enumTags(self: *Self, tags: []const Ast.EnumDecl.Tag, ty: *Type.Enum, ctx: *Context) Error![]const []const u8 {
-    ty.tags.ensureTotalCapacity(self.allocator, @intCast(tags.len)) catch oom();
-    var names = ArrayList([]const u8).initCapacity(self.allocator, @intCast(tags.len)) catch oom();
-
-    for (tags) |tag| {
-        const tag_res = try self.enumTag(tag, ctx);
-        const gop = ty.tags.getOrPut(self.allocator, tag_res.name) catch oom();
-
-        if (gop.found_existing) {
-            return self.err(
-                .{ .enum_dup_tag = .{ .name = self.ast.toSource(tag.name) } },
-                self.ast.getSpan(tag.name),
-            );
-        } else {
-            gop.value_ptr.* = tag_res.ty;
-        }
-        names.appendAssumeCapacity(self.allocator.dupe(u8, self.ast.toSource(tag.name)) catch oom());
-    }
-
-    return names.toOwnedSlice(self.allocator) catch oom();
-}
-
-fn enumTag(self: *Self, tag: Ast.EnumDecl.Tag, ctx: *const Context) Error!struct { name: InternerIdx, ty: *const Type } {
-    const name = self.interner.intern(self.ast.toSource(tag.name));
-    const ty = if (tag.payload) |ty| try self.checkAndGetType(ty, ctx) else self.ti.cache.void;
-    return .{ .name = name, .ty = ty };
 }
 
 /// Analyzes function declarations in a container (enum or structure)
@@ -525,6 +459,85 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
         } },
         self.ast.getSpan(node).start,
     );
+}
+
+fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
+    const snapshot = ctx.snapshot();
+    defer snapshot.restore();
+
+    var buf: [1024]u8 = undefined;
+    const container_name = self.interner.internKeepRef(self.allocator, self.containers.renderWithSep(&buf, "."));
+
+    // TODO: anonymus union
+    const name_tk = node.name orelse @panic("anonymus enums aren't supported yet");
+    const name = try self.internIfNotInCurrentScope(name_tk);
+
+    const interned = self.ti.newEnum(.{ .name = name, .container = container_name });
+    const ty = &interned.@"enum";
+
+    const sym = self.scope.declareSymbol(self.allocator, name, .@"enum");
+    sym.type = interned;
+
+    ctx.self_type = interned;
+    defer ctx.self_type = null;
+
+    try self.openContainer(name_tk);
+    defer self.closeContainer();
+
+    const tags = try self.enumTags(node.tags, ty, ctx);
+    const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
+
+    return self.irb.addInstr(
+        .{ .enum_decl = .{
+            .name = name,
+            .tags = tags,
+            .sym_index = sym.index,
+            .type_id = self.ti.typeId(interned),
+            .functions = funcs,
+        } },
+        self.ast.getSpan(node).start,
+    );
+}
+
+// fn enumTags(self: *Self, tags: []const Ast.EnumDecl.Tag, ty: *Type.Enum, ctx: *Context) Error![]const Instr.EnumDecl.Tag {
+fn enumTags(self: *Self, tags: []const Ast.EnumDecl.Tag, ty: *Type.Enum, ctx: *Context) Error![]const []const u8 {
+    ty.tags.ensureTotalCapacity(self.allocator, @intCast(tags.len)) catch oom();
+    // var tag_res = ArrayList(Instr.EnumDecl.Tag).initCapacity(self.allocator, @intCast(tags.len)) catch oom();
+    var names = ArrayList([]const u8).initCapacity(self.allocator, @intCast(tags.len)) catch oom();
+
+    for (tags) |tag| {
+        const tag_name = self.ast.toSource(tag.name);
+        const tag_value = try self.enumTag(tag, ctx);
+        const gop = ty.tags.getOrPut(self.allocator, self.interner.intern(tag_name)) catch oom();
+
+        if (gop.found_existing) {
+            return self.err(
+                .{ .duplicate_tag = .{ .kind = "enum", .name = tag_name } },
+                self.ast.getSpan(tag.name),
+            );
+        }
+        gop.value_ptr.* = if (tag_value) |val| val.instr else null;
+
+        names.appendAssumeCapacity(self.allocator.dupe(u8, self.ast.toSource(tag.name)) catch oom());
+        // tag_names.appendAssumeCapacity(.{
+        //     .name = self.allocator.dupe(u8, self.ast.toSource(tag.name)) catch oom(),
+        //     .value = if (tag_value) |val| val.instr else null,
+        // });
+    }
+
+    return names.toOwnedSlice(self.allocator) catch oom();
+}
+
+fn enumTag(self: *Self, tag: Ast.EnumDecl.Tag, ctx: *Context) Error!?InstrInfos {
+    const tag_value = tag.value orelse return null;
+
+    const value = try self.analyzeExpr(tag_value, .value, ctx);
+
+    // TODO: error
+    if (!value.ti.comp_time) @panic("Must be comptime");
+    if (!value.type.is(.int)) @panic("Must be an int");
+
+    return value;
 }
 
 const FnDeclRes = struct { instr: usize, sym: LexScope.Symbol };
@@ -733,64 +746,6 @@ fn print(self: *Self, expr: *const Expr, ctx: *Context) StmtResult {
     return self.irb.wrapInstr(.print, res.instr);
 }
 
-fn use(self: *Self, node: *const Ast.Use) Error!void {
-    const name_token = if (node.alias) |alias| alias else node.names[node.names.len - 1];
-    const module_name = self.interner.intern(self.ast.toSource(name_token));
-
-    if (self.scope.isModuleImported(module_name)) {
-        return self.err(
-            .{ .already_declared = .{ .name = self.ast.toSource(name_token) } },
-            self.ast.getSpan(name_token),
-        );
-    }
-
-    const old_path_length = self.path.len();
-    defer self.path.shrink(self.allocator, old_path_length);
-
-    const result = Importer.fetchImportedFile(self.allocator, self.ast, node.names, self.path);
-    const file = switch (result) {
-        .ok => |f| f,
-        .err => |e| {
-            self.errs.append(self.allocator, e) catch oom();
-            return error.Err;
-        },
-    };
-
-    // TODO: don't check only path but path + name?
-    const interned = self.interner.intern(file.path);
-
-    if (!self.state.modules.has(interned)) {
-        Pipeline.runSubPipeline(self.allocator, self.state, file.name, file.path, file.content);
-    }
-
-    if (node.items) |items| {
-        const mod = self.state.modules.getFromName(interned).?;
-        const mod_index = self.state.modules.getIndex(interned).?;
-
-        for (items) |item| {
-            const item_name = self.interner.intern(self.ast.toSource(item.item));
-            const sym = mod.sym_infos.get(item_name) orelse return self.err(
-                .{ .missing_symbol_in_module = .{
-                    .module = self.ast.toSource(node.names[node.names.len - 1]),
-                    .symbol = self.ast.toSource(item.item),
-                } },
-                self.ast.getSpan(item.item),
-            );
-
-            // TODO: error
-            if (!sym.type.is(.function) and !sym.type.is(.structure)) {
-                @panic("Import not supported yet");
-            }
-
-            const item_token = if (item.alias) |alias| alias else item.item;
-            const item_interned = self.interner.intern(self.ast.toSource(item_token));
-            self.scope.declareExternSymbol(self.allocator, item_interned, mod_index, sym);
-        }
-    } else {
-        self.scope.declareModule(self.allocator, module_name, self.ti.intern(.{ .module = interned }));
-    }
-}
-
 fn expectAssignableValue(self: *Self, expr: *const Ast.Expr, ctx: *Context) Result {
     const span = self.ast.getSpan(expr);
 
@@ -818,7 +773,7 @@ fn checkWrap(self: *Self, instr: *InstrIndex, heap: bool) void {
     }
 }
 
-fn varDeclaration(self: *Self, node: *const Ast.VarDecl, ctx: *Context) StmtResult {
+fn varDecl(self: *Self, node: *const Ast.VarDecl, ctx: *Context) StmtResult {
     const span = self.ast.getSpan(node.name);
     const name = try self.internIfNotInCurrentScope(node.name);
     var checked_type = try self.checkAndGetType(node.typ, ctx);
@@ -862,7 +817,7 @@ fn multiVarDecl(self: *Self, node: *const Ast.MultiVarDecl, ctx: *Context) StmtR
     decls.ensureTotalCapacity(self.allocator, node.decls.len) catch oom();
 
     for (node.decls) |*n| {
-        decls.appendAssumeCapacity(try self.varDeclaration(n, ctx));
+        decls.appendAssumeCapacity(try self.varDecl(n, ctx));
     }
 
     return self.irb.addInstr(
@@ -1014,6 +969,131 @@ fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult 
     );
 }
 
+fn unionDecl(self: *Self, node: *const Ast.UnionDecl, ctx: *Context) StmtResult {
+    const snapshot = ctx.snapshot();
+    defer snapshot.restore();
+
+    var buf: [1024]u8 = undefined;
+    const container_name = self.interner.internKeepRef(self.allocator, self.containers.renderWithSep(&buf, "."));
+
+    // TODO: anonymus union
+    const name_tk = node.name orelse @panic("anonymus enums aren't supported yet");
+    const name = try self.internIfNotInCurrentScope(name_tk);
+
+    const interned = self.ti.newUnion(.{ .name = name, .container = container_name }, node.is_err);
+    const ty = &interned.@"union";
+
+    const sym = self.scope.declareSymbol(self.allocator, name, .@"union");
+    sym.type = interned;
+
+    ctx.self_type = interned;
+    defer ctx.self_type = null;
+
+    try self.openContainer(name_tk);
+    defer self.closeContainer();
+
+    const tags = try self.unionTags(node.tags, ty, ctx);
+    const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
+
+    return self.irb.addInstr(
+        .{ .union_decl = .{
+            .name = name,
+            .tags = tags,
+            .sym_index = sym.index,
+            .type_id = self.ti.typeId(interned),
+            .functions = funcs,
+            .is_err = node.is_err,
+        } },
+        self.ast.getSpan(node).start,
+    );
+}
+
+fn unionTags(self: *Self, tags: []const Ast.UnionDecl.Tag, ty: *Type.Union, ctx: *Context) Error![]const []const u8 {
+    ty.tags.ensureTotalCapacity(self.allocator, @intCast(tags.len)) catch oom();
+    var names = ArrayList([]const u8).initCapacity(self.allocator, @intCast(tags.len)) catch oom();
+
+    for (tags) |tag| {
+        const tag_res = try self.unionTag(tag, ctx);
+        const gop = ty.tags.getOrPut(self.allocator, tag_res.name) catch oom();
+
+        if (gop.found_existing) {
+            return self.err(
+                .{ .duplicate_tag = .{ .kind = "union", .name = self.ast.toSource(tag.name) } },
+                self.ast.getSpan(tag.name),
+            );
+        } else {
+            gop.value_ptr.* = tag_res.ty;
+        }
+        names.appendAssumeCapacity(self.allocator.dupe(u8, self.ast.toSource(tag.name)) catch oom());
+    }
+
+    return names.toOwnedSlice(self.allocator) catch oom();
+}
+
+fn unionTag(self: *Self, tag: Ast.UnionDecl.Tag, ctx: *const Context) Error!struct { name: InternerIdx, ty: *const Type } {
+    const name = self.interner.intern(self.ast.toSource(tag.name));
+    const ty = if (tag.payload) |ty| try self.checkAndGetType(ty, ctx) else self.ti.cache.void;
+    return .{ .name = name, .ty = ty };
+}
+
+fn use(self: *Self, node: *const Ast.Use) Error!void {
+    const name_token = if (node.alias) |alias| alias else node.names[node.names.len - 1];
+    const module_name = self.interner.intern(self.ast.toSource(name_token));
+
+    if (self.scope.isModuleImported(module_name)) {
+        return self.err(
+            .{ .already_declared = .{ .name = self.ast.toSource(name_token) } },
+            self.ast.getSpan(name_token),
+        );
+    }
+
+    const old_path_length = self.path.len();
+    defer self.path.shrink(self.allocator, old_path_length);
+
+    const result = Importer.fetchImportedFile(self.allocator, self.ast, node.names, self.path);
+    const file = switch (result) {
+        .ok => |f| f,
+        .err => |e| {
+            self.errs.append(self.allocator, e) catch oom();
+            return error.Err;
+        },
+    };
+
+    // TODO: don't check only path but path + name?
+    const interned = self.interner.intern(file.path);
+
+    if (!self.state.modules.has(interned)) {
+        Pipeline.runSubPipeline(self.allocator, self.state, file.name, file.path, file.content);
+    }
+
+    if (node.items) |items| {
+        const mod = self.state.modules.getFromName(interned).?;
+        const mod_index = self.state.modules.getIndex(interned).?;
+
+        for (items) |item| {
+            const item_name = self.interner.intern(self.ast.toSource(item.item));
+            const sym = mod.sym_infos.get(item_name) orelse return self.err(
+                .{ .missing_symbol_in_module = .{
+                    .module = self.ast.toSource(node.names[node.names.len - 1]),
+                    .symbol = self.ast.toSource(item.item),
+                } },
+                self.ast.getSpan(item.item),
+            );
+
+            // TODO: error
+            if (!sym.type.is(.function) and !sym.type.is(.structure)) {
+                @panic("Import not supported yet");
+            }
+
+            const item_token = if (item.alias) |alias| alias else item.item;
+            const item_interned = self.interner.intern(self.ast.toSource(item_token));
+            self.scope.declareExternSymbol(self.allocator, item_interned, mod_index, sym);
+        }
+    } else {
+        self.scope.declareModule(self.allocator, module_name, self.ti.intern(.{ .module = interned }));
+    }
+}
+
 fn whileStmt(self: *Self, node: *const Ast.While, ctx: *Context) StmtResult {
     const span = self.ast.getSpan(node.pattern);
     const cond_res = try self.pattern(node.pattern, ctx);
@@ -1047,7 +1127,6 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
         .bool => |e| self.boolLit(e),
         .@"break" => |*e| self.breakExpr(e, ctx),
         .closure => |*e| self.closure(e, ctx),
-        .enum_lit => |e| self.enumLit(e, ctx),
         .fail => |e| self.fail(e, ctx),
         .field => |*e| self.field(e, ctx),
         .float => |e| self.floatLit(e, false),
@@ -1055,6 +1134,7 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
         .grouping => |*e| self.analyzeExpr(e.expr, expect, ctx),
         .identifier => |e| self.identifier(e, ctx),
         .@"if" => |*e| self.ifExpr(e, expect, ctx),
+        .implicit_selector => |e| self.implicitSelector(e, ctx),
         .indexing => |*e| self.indexing(e, ctx),
         .int => |e| self.intLit(e, false),
         .match => |e| self.match(e, expect, ctx),
@@ -1260,11 +1340,11 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
                 break :instr .{ getArithmeticOp(expr.op, ty), lhs_instr, rhs_instr, self.ti.getCached(.bool) };
             },
             .equal_equal, .bang_equal => {
-                const lhs_instr, const rhs_instr, const ty = binopComparisonCoercion(lhs, rhs) catch |e| return switch (e) {
+                const lhs_instr, const rhs_instr, const ty = self.binopComparisonCoercion(lhs, rhs) catch |e| return switch (e) {
                     error.NonNullLhs => self.err(.{ .non_null_comp_optional = .{ .found = self.typeName(lhs_type) } }, lhs_span),
                     error.NonNullRhs => self.err(.{ .non_null_comp_optional = .{ .found = self.typeName(rhs_type) } }, rhs_span),
                     error.Invalid => self.err(
-                        .{ .invalid_comparison = .{ .found1 = self.typeName(lhs_type), .found2 = self.typeName(rhs_type) } },
+                        .{ .invalid_comparison = .{ .ty1 = self.typeName(lhs_type), .ty2 = self.typeName(rhs_type) } },
                         self.ast.getSpan(expr),
                     ),
                 };
@@ -1344,16 +1424,21 @@ fn getArithmeticOp(op: TokenTag, ty: *const Type) Instr.Binop.Op {
 }
 
 fn binopComparisonCoercion(
+    self: *Self,
     lhs: InstrInfos,
     rhs: InstrInfos,
 ) error{ NonNullLhs, NonNullRhs, Invalid }!struct { InstrIndex, InstrIndex, *const Type } {
     const lhs_type = lhs.type;
     const rhs_type = rhs.type;
 
-    if (lhs_type == rhs_type) return .{ lhs.instr, rhs.instr, lhs_type };
+    if (lhs_type.isNumeric() and rhs_type.isNumeric()) {
+        return .{ lhs.instr, rhs.instr, lhs_type };
+    }
 
-    arithmetic: {
-        return binopArithmeticCoercion(lhs, rhs) catch break :arithmetic;
+    if (lhs_type == rhs_type and
+        (lhs_type.is(.str) or lhs_type.is(.@"enum")))
+    {
+        return .{ lhs.instr, rhs.instr, lhs_type };
     }
 
     if (lhs_type.is(.optional) or rhs_type.is(.optional)) {
@@ -1368,6 +1453,10 @@ fn binopComparisonCoercion(
         if (lhs_type.is(.optional)) return error.NonNullRhs;
         if (rhs_type.is(.optional)) return error.NonNullLhs;
     }
+
+    // TODO: Eq trait
+    const lhs_eq = lhs_type.hasTrait(self.interner.intern("Eq")) orelse return error.Invalid;
+    _ = lhs_eq; // autofix
 
     return error.Invalid;
 }
@@ -1469,28 +1558,45 @@ fn closure(self: *Self, expr: *const Ast.FnDecl, ctx: *Context) Result {
     };
 }
 
-pub fn enumLit(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result {
+pub fn implicitSelector(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result {
     const span = self.ast.getSpan(tag);
-    const decl = ctx.decl_type orelse return self.err(.enum_lit_no_type, span);
+    const decl = ctx.decl_type orelse return self.err(.implicit_select_no_type, span);
     const tag_name = self.interner.intern(self.ast.toSource(tag));
 
     const tag_res = try self.tagIndex(decl, tag_name, span) orelse return self.err(
-        .{ .enum_unknown_decl = .{ .@"enum" = self.typeName(decl), .field = self.ast.toSource(tag) } },
+        .{ .container_unknown_decl = .{
+            .kind = if (decl.is(.@"union")) "union" else "enum",
+            .ty = self.typeName(decl),
+            .field = self.ast.toSource(tag),
+        } },
         span,
     );
 
-    // It must exist because type parsed before expression, so if not existing it would have error already
-    const name = self.scope.getSymbolName(tag_res.enum_type).?;
+    // It must exist because type parsed before expression, so if not existing it would have errored already
+    const name = self.scope.getSymbolName(tag_res.ty).?;
     const sym = self.symbolIdentifier(name, span).?;
 
-    return .{
-        .type = tag_res.enum_type,
-        .ti = .{ .comp_time = tag_res.enum_type.@"enum".tags.get(tag_name).?.is(.void) },
+    return if (decl.is(.@"enum") or (decl.is(.inline_union) and tag_res.ty.is(.@"enum"))) .{
+        .type = tag_res.ty,
+        .ti = .{ .comp_time = true },
         .instr = self.addConstant(
             // TODO: protect the cast
-            .{ .enum_instance = .{
-                .sym = .{ .module_index = .toIndex(0), .symbol_index = @intCast(sym.sym.index) },
+            .{ .enum_lit = .{
+                .sym = .{ .module_index = null, .symbol_index = @intCast(sym.sym.index) },
                 .tag_index = @intCast(tag_res.index),
+            } },
+            span.start,
+        ),
+    }
+    // Union
+    else return .{
+        .type = tag_res.ty,
+        .instr = self.irb.addInstr(
+            // TODO: protect the cast
+            .{ .union_lit = .{
+                .sym = .{ .module_index = null, .symbol_index = @intCast(sym.sym.index) },
+                .tag_index = @intCast(tag_res.index),
+                .payload = null,
             } },
             span.start,
         ),
@@ -1499,28 +1605,38 @@ pub fn enumLit(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result {
 
 const TagRes = struct {
     index: usize,
-    enum_type: *const Type,
+    ty: *const Type,
 };
 fn tagIndex(self: *Self, ty: *const Type, tag: InternerIdx, span: Span) Error!?TagRes {
     switch (ty.*) {
         .@"enum" => |t| return .{
             .index = t.tags.getIndex(tag) orelse return null,
-            .enum_type = ty,
+            .ty = ty,
         },
-        .@"union" => |*t| return findEnumLitInUnion(t, tag),
+        .inline_union => |*t| return findImplicitSelctInUnion(t, tag),
+        .@"union" => |t| return .{
+            .index = t.tags.getIndex(tag) orelse return null,
+            .ty = ty,
+        },
         else => return self.err(
-            .{ .enum_lit_non_enum = .{ .found = self.typeName(ty) } },
+            .{ .implicit_select_invalid_type = .{ .found = self.typeName(ty) } },
             span,
         ),
     }
 }
 
-fn findEnumLitInUnion(ty: *const Type.Union, tag: InternerIdx) ?TagRes {
+fn findImplicitSelctInUnion(ty: *const Type.InlineUnion, tag: InternerIdx) ?TagRes {
     for (ty.types) |t| {
-        const enum_ty = t.as(.@"enum") orelse continue;
+        const tag_res = if (t.as(.@"enum")) |e|
+            e.tags.getIndex(tag)
+        else if (t.as(.@"union")) |u|
+            u.tags.getIndex(tag)
+        else
+            continue;
+
         return .{
-            .index = enum_ty.tags.getIndex(tag) orelse continue,
-            .enum_type = t,
+            .index = tag_res orelse continue,
+            .ty = t,
         };
     }
 
@@ -1572,6 +1688,14 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
         .str => return self.runtimeObjFnAccess(.string, struct_res.instr, expr.field, struct_res.type),
         .structure => |*ty| try self.structureAccess(expr.field, ty, struct_res.ti.is_sym, ctx.in_call),
         .trait => |*ty| try self.traitAccess(expr.field, ty),
+        .@"union" => |ty| b: {
+            const res = try self.unionAccess(struct_res, ty, expr.field);
+
+            switch (res) {
+                .tag => |tag| return tag,
+                .decl => |decl| break :b decl,
+            }
+        },
         else => return self.err(
             .{ .non_struct_field_access = .{ .found = self.typeName(struct_res.type) } },
             span,
@@ -1606,6 +1730,44 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
                 span.start,
             ),
     };
+}
+
+fn enumAccess(self: *Self, enum_info: InstrInfos, ty: Type.Enum, tag_tk: Ast.TokenIndex) Error!UnionResult {
+    const span = self.ast.getSpan(tag_tk);
+    const text = self.ast.toSource(tag_tk);
+    const tag_name = self.interner.intern(text);
+
+    if (ty.tags.getIndex(tag_name)) |index| {
+        // Can't access a tag on an instance
+        if (!enum_info.ti.is_sym) {
+            return self.err(.{ .instance_tag_access = .{ .kind = "enum" } }, span);
+        }
+
+        return .{
+            .tag = .{
+                .type = self.ti.intern(.{ .@"enum" = ty }),
+                .ti = .{ .comp_time = true },
+                .instr = self.addConstant(
+                    .{ .enum_lit = .{
+                        .sym = self.irb.data(enum_info.instr).load_symbol,
+                        .tag_index = index,
+                    } },
+                    self.ast.getSpan(tag_tk).start,
+                ),
+            },
+        };
+    } else if (ty.functions.get(tag_name)) |func| {
+        return .{ .decl = .{ .type = func.type, .kind = .function, .index = func.index } };
+    }
+
+    return self.err(
+        .{ .container_unknown_decl = .{
+            .kind = "enum",
+            .ty = self.typeName(enum_info.type),
+            .field = self.ast.toSource(tag_tk),
+        } },
+        span,
+    );
 }
 
 fn runtimeObjFnAccess(self: *Self, kind: Instr.ObjFn.Kind, instr: InstrIndex, fn_tk: Ast.TokenIndex, ty: *const Type) Result {
@@ -1677,30 +1839,32 @@ const AccessResult = struct {
     index: usize,
 };
 
-const EnumResult = union(enum) {
+const UnionResult = union(enum) {
     tag: InstrInfos,
     decl: AccessResult,
 };
 
-fn enumAccess(self: *Self, enum_info: InstrInfos, ty: Type.Enum, tag_tk: Ast.TokenIndex) Error!EnumResult {
+fn unionAccess(self: *Self, union_info: InstrInfos, ty: Type.Union, tag_tk: Ast.TokenIndex) Error!UnionResult {
     const span = self.ast.getSpan(tag_tk);
     const text = self.ast.toSource(tag_tk);
     const tag_name = self.interner.intern(text);
 
     if (ty.tags.getIndex(tag_name)) |index| {
         // Can't access a tag on an instance
-        if (!enum_info.ti.is_sym) {
-            return self.err(.enum_tag_access, span);
+        // TODO: no, create an union unwrap
+        if (!union_info.ti.is_sym) {
+            return self.err(.{ .instance_tag_access = .{ .kind = "union" } }, span);
         }
 
         return .{
             .tag = .{
-                .type = self.ti.intern(.{ .@"enum" = ty }),
+                .type = self.ti.intern(.{ .@"union" = ty }),
                 .ti = .{ .comp_time = ty.tags.get(tag_name).?.is(.void) },
-                .instr = self.addConstant(
-                    .{ .enum_instance = .{
-                        .sym = self.irb.data(enum_info.instr).load_symbol,
+                .instr = self.irb.addInstr(
+                    .{ .union_lit = .{
+                        .sym = self.irb.data(union_info.instr).load_symbol,
                         .tag_index = index,
+                        .payload = null,
                     } },
                     self.ast.getSpan(tag_tk).start,
                 ),
@@ -1711,7 +1875,7 @@ fn enumAccess(self: *Self, enum_info: InstrInfos, ty: Type.Enum, tag_tk: Ast.Tok
     }
 
     return self.err(
-        .{ .enum_unknown_decl = .{ .@"enum" = self.typeName(enum_info.type), .field = self.ast.toSource(tag_tk) } },
+        .{ .union_unknown_decl = .{ .@"union" = self.typeName(union_info.type), .field = self.ast.toSource(tag_tk) } },
         span,
     );
 }
@@ -1943,10 +2107,12 @@ fn resolveIdentifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool,
         };
     }
 
+    // TODO: anonymus enum
     const sym_name = if (name == self.cached_names.Self) b: {
         const ty = ctx.self_type orelse return self.err(.big_self_outside_decl, span);
         break :b switch (ty.*) {
-            .@"enum" => |t| t.loc.name,
+            .@"enum" => |t| if (t.loc) |loc| loc.name else @panic("TODO"),
+            .@"union" => |t| t.loc.name,
             .structure => |t| t.loc.name,
             else => unreachable,
         };
@@ -2362,7 +2528,11 @@ pub fn matchValue(
             var matcher = matchers.String.init();
             break :ana .{ .string, matcher.matcher() };
         },
-        .@"union" => return self.err(
+        .@"union" => |t| {
+            var matcher = matchers.Enum.init(t.proto(self.allocator));
+            break :ana .{ .@"enum", matcher.matcher() };
+        },
+        .inline_union => return self.err(
             .{ .match_regular_on_union = .{ .found = self.typeName(value.type) } },
             value_span,
         ),
@@ -2446,12 +2616,12 @@ fn matchType(
     expect: ExprResKind,
     ctx: *Context,
 ) Result {
-    if (!value.type.is(.@"union")) return self.err(
+    if (!value.type.is(.inline_union)) return self.err(
         .{ .match_is_non_union = .{ .found = self.typeName(value.type) } },
         value_span,
     );
 
-    const union_ty: Type.Union = value.type.as(.@"union").?;
+    const union_ty: Type.InlineUnion = value.type.as(.inline_union).?;
     var matcher: matchers.Union = .init(self, union_ty, alias, ctx.in_trap, value, value_span, kw);
     defer matcher.terminate();
 
@@ -2883,7 +3053,7 @@ pub fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) E
                 }
 
                 if (err_union.errs.len > 1) {
-                    break :err self.ti.intern(.{ .@"union" = .{
+                    break :err self.ti.intern(.{ .inline_union = .{
                         .types = errs.toOwnedSlice(self.allocator) catch oom(),
                     } });
                 } else {
@@ -2968,7 +3138,7 @@ pub fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) E
 
                 // Flattens unions
                 switch (child_type.*) {
-                    .@"union" => |child_union| {
+                    .inline_union => |child_union| {
                         types.ensureUnusedCapacity(self.allocator, child_union.types.len) catch oom();
 
                         for (child_union.types) |child_ty| {
@@ -2979,7 +3149,7 @@ pub fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) E
                 }
             }
 
-            return self.ti.intern(.{ .@"union" = .{ .types = types.toOwnedSlice(self.allocator) catch oom() } });
+            return self.ti.intern(.{ .inline_union = .{ .types = types.toOwnedSlice(self.allocator) catch oom() } });
         },
         .self => if (ctx.self_type) |struct_type| struct_type else self.err(.self_outside_decl, self.ast.getSpan(t)),
     };
@@ -2995,7 +3165,7 @@ fn mergeTypes(self: *Self, types: []const *const Type) *const Type {
     if (set.count() == 0) return self.ti.getCached(.void);
 
     const optional = set.remove(self.ti.getCached(.null));
-    const ty = if (set.count() == 1) set.keys()[0] else self.ti.intern(.{ .@"union" = .{ .types = set.toOwned() } });
+    const ty = if (set.count() == 1) set.keys()[0] else self.ti.intern(.{ .inline_union = .{ .types = set.toOwned() } });
 
     return if (optional) self.ti.intern(.{ .optional = ty }) else ty;
 }
@@ -3026,7 +3196,7 @@ fn performTypeCoercion(self: *Self, decl: *const Type, value: *const Type, decl_
     }
 
     check: {
-        if (decl.is(.@"union")) {
+        if (decl.is(.inline_union)) {
             return checkUnionType(decl, value) catch |e| return switch (e) {
                 error.Mismatch => break :check,
                 error.NotInUnion => self.err(
@@ -3063,7 +3233,7 @@ fn performErrorCoercion(self: *Self, decl: *const Type, value: *const Type, span
 
     if (value.isErr()) {
         switch (error_union.err.*) {
-            .@"union" => |u| {
+            .inline_union => |u| {
                 for (u.types) |union_err| {
                     if (union_err == value) return decl;
                 }
@@ -3130,17 +3300,17 @@ fn checkUnionType(decl: *const Type, value: *const Type) error{ Mismatch, NotInU
     }
 
     // Only declaration is an union
-    if (!value.is(.@"union")) {
-        if (decl.@"union".contains(value)) {
+    if (!value.is(.inline_union)) {
+        if (decl.inline_union.contains(value)) {
             return decl;
         }
     }
     // Value is an union but not declaration
-    else if (!decl.is(.@"union")) {
+    else if (!decl.is(.inline_union)) {
         return error.Mismatch;
     }
     // Both are unions
-    else if (decl.@"union".containsSubset(&value.@"union")) {
+    else if (decl.inline_union.containsSubset(&value.inline_union)) {
         return decl;
     }
 
@@ -3169,7 +3339,7 @@ fn checkArrayType(self: *Self, decl: *const Type, value: *const Type, span: Span
 
             if (!child_value.is(.void)) {
                 // Additional check for cases like: var a: []int|float = [1, 2, 3]
-                if (current_decl.as(.@"union")) |*u| {
+                if (current_decl.as(.inline_union)) |*u| {
                     return if (self.checkArrayOfUnion(u, value)) decl else error.mismatch;
                 }
                 if (child_value != current_decl) break :check;
@@ -3184,7 +3354,7 @@ fn checkArrayType(self: *Self, decl: *const Type, value: *const Type, span: Span
     return error.mismatch;
 }
 
-fn checkArrayOfUnion(self: *Self, decl: *const Type.Union, value: *const Type) bool {
+fn checkArrayOfUnion(self: *Self, decl: *const Type.InlineUnion, value: *const Type) bool {
     for (decl.types) |ty| {
         if (self.ti.intern(.{ .array = .{ .child = ty } }) == value) return true;
     }
