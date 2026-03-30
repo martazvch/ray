@@ -1127,7 +1127,6 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
         .bool => |e| self.boolLit(e),
         .@"break" => |*e| self.breakExpr(e, ctx),
         .closure => |*e| self.closure(e, ctx),
-        .enum_lit => |e| self.enumLit(e, ctx),
         .fail => |e| self.fail(e, ctx),
         .field => |*e| self.field(e, ctx),
         .float => |e| self.floatLit(e, false),
@@ -1135,6 +1134,7 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
         .grouping => |*e| self.analyzeExpr(e.expr, expect, ctx),
         .identifier => |e| self.identifier(e, ctx),
         .@"if" => |*e| self.ifExpr(e, expect, ctx),
+        .implicit_selector => |e| self.implicitSelector(e, ctx),
         .indexing => |*e| self.indexing(e, ctx),
         .int => |e| self.intLit(e, false),
         .match => |e| self.match(e, expect, ctx),
@@ -1340,11 +1340,11 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
                 break :instr .{ getArithmeticOp(expr.op, ty), lhs_instr, rhs_instr, self.ti.getCached(.bool) };
             },
             .equal_equal, .bang_equal => {
-                const lhs_instr, const rhs_instr, const ty = binopComparisonCoercion(lhs, rhs) catch |e| return switch (e) {
+                const lhs_instr, const rhs_instr, const ty = self.binopComparisonCoercion(lhs, rhs) catch |e| return switch (e) {
                     error.NonNullLhs => self.err(.{ .non_null_comp_optional = .{ .found = self.typeName(lhs_type) } }, lhs_span),
                     error.NonNullRhs => self.err(.{ .non_null_comp_optional = .{ .found = self.typeName(rhs_type) } }, rhs_span),
                     error.Invalid => self.err(
-                        .{ .invalid_comparison = .{ .found1 = self.typeName(lhs_type), .found2 = self.typeName(rhs_type) } },
+                        .{ .invalid_comparison = .{ .ty1 = self.typeName(lhs_type), .ty2 = self.typeName(rhs_type) } },
                         self.ast.getSpan(expr),
                     ),
                 };
@@ -1424,16 +1424,21 @@ fn getArithmeticOp(op: TokenTag, ty: *const Type) Instr.Binop.Op {
 }
 
 fn binopComparisonCoercion(
+    self: *Self,
     lhs: InstrInfos,
     rhs: InstrInfos,
 ) error{ NonNullLhs, NonNullRhs, Invalid }!struct { InstrIndex, InstrIndex, *const Type } {
     const lhs_type = lhs.type;
     const rhs_type = rhs.type;
 
-    if (lhs_type == rhs_type) return .{ lhs.instr, rhs.instr, lhs_type };
+    if (lhs_type.isNumeric() and rhs_type.isNumeric()) {
+        return .{ lhs.instr, rhs.instr, lhs_type };
+    }
 
-    arithmetic: {
-        return binopArithmeticCoercion(lhs, rhs) catch break :arithmetic;
+    if (lhs_type == rhs_type and
+        (lhs_type.is(.str) or lhs_type.is(.@"enum")))
+    {
+        return .{ lhs.instr, rhs.instr, lhs_type };
     }
 
     if (lhs_type.is(.optional) or rhs_type.is(.optional)) {
@@ -1448,6 +1453,10 @@ fn binopComparisonCoercion(
         if (lhs_type.is(.optional)) return error.NonNullRhs;
         if (rhs_type.is(.optional)) return error.NonNullLhs;
     }
+
+    // TODO: Eq trait
+    const lhs_eq = lhs_type.hasTrait(self.interner.intern("Eq")) orelse return error.Invalid;
+    _ = lhs_eq; // autofix
 
     return error.Invalid;
 }
@@ -1549,28 +1558,45 @@ fn closure(self: *Self, expr: *const Ast.FnDecl, ctx: *Context) Result {
     };
 }
 
-pub fn enumLit(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result {
+pub fn implicitSelector(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result {
     const span = self.ast.getSpan(tag);
-    const decl = ctx.decl_type orelse return self.err(.enum_lit_no_type, span);
+    const decl = ctx.decl_type orelse return self.err(.implicit_select_no_type, span);
     const tag_name = self.interner.intern(self.ast.toSource(tag));
 
     const tag_res = try self.tagIndex(decl, tag_name, span) orelse return self.err(
-        .{ .union_unknown_decl = .{ .@"union" = self.typeName(decl), .field = self.ast.toSource(tag) } },
+        .{ .container_unknown_decl = .{
+            .kind = if (decl.is(.@"union")) "union" else "enum",
+            .ty = self.typeName(decl),
+            .field = self.ast.toSource(tag),
+        } },
         span,
     );
 
-    // It must exist because type parsed before expression, so if not existing it would have error already
+    // It must exist because type parsed before expression, so if not existing it would have errored already
     const name = self.scope.getSymbolName(tag_res.ty).?;
     const sym = self.symbolIdentifier(name, span).?;
 
-    return .{
+    return if (decl.is(.@"enum") or (decl.is(.inline_union) and tag_res.ty.is(.@"enum"))) .{
         .type = tag_res.ty,
         .ti = .{ .comp_time = true },
         .instr = self.addConstant(
             // TODO: protect the cast
             .{ .enum_lit = .{
-                .sym = .{ .module_index = .toIndex(0), .symbol_index = @intCast(sym.sym.index) },
+                .sym = .{ .module_index = null, .symbol_index = @intCast(sym.sym.index) },
                 .tag_index = @intCast(tag_res.index),
+            } },
+            span.start,
+        ),
+    }
+    // Union
+    else return .{
+        .type = tag_res.ty,
+        .instr = self.irb.addInstr(
+            // TODO: protect the cast
+            .{ .union_lit = .{
+                .sym = .{ .module_index = null, .symbol_index = @intCast(sym.sym.index) },
+                .tag_index = @intCast(tag_res.index),
+                .payload = null,
             } },
             span.start,
         ),
@@ -1582,29 +1608,34 @@ const TagRes = struct {
     ty: *const Type,
 };
 fn tagIndex(self: *Self, ty: *const Type, tag: InternerIdx, span: Span) Error!?TagRes {
-    // TODO: do enum
     switch (ty.*) {
         .@"enum" => |t| return .{
             .index = t.tags.getIndex(tag) orelse return null,
             .ty = ty,
         },
-        .inline_union => |*t| return findEnumLitInUnion(t, tag),
+        .inline_union => |*t| return findImplicitSelctInUnion(t, tag),
         .@"union" => |t| return .{
             .index = t.tags.getIndex(tag) orelse return null,
             .ty = ty,
         },
         else => return self.err(
-            .{ .enum_lit_non_enum = .{ .found = self.typeName(ty) } },
+            .{ .implicit_select_invalid_type = .{ .found = self.typeName(ty) } },
             span,
         ),
     }
 }
 
-fn findEnumLitInUnion(ty: *const Type.InlineUnion, tag: InternerIdx) ?TagRes {
+fn findImplicitSelctInUnion(ty: *const Type.InlineUnion, tag: InternerIdx) ?TagRes {
     for (ty.types) |t| {
-        const enum_ty = t.as(.@"union") orelse continue;
+        const tag_res = if (t.as(.@"enum")) |e|
+            e.tags.getIndex(tag)
+        else if (t.as(.@"union")) |u|
+            u.tags.getIndex(tag)
+        else
+            continue;
+
         return .{
-            .index = enum_ty.tags.getIndex(tag) orelse continue,
+            .index = tag_res orelse continue,
             .ty = t,
         };
     }
@@ -1730,7 +1761,11 @@ fn enumAccess(self: *Self, enum_info: InstrInfos, ty: Type.Enum, tag_tk: Ast.Tok
     }
 
     return self.err(
-        .{ .enum_unknown_decl = .{ .@"enum" = self.typeName(enum_info.type), .field = self.ast.toSource(tag_tk) } },
+        .{ .container_unknown_decl = .{
+            .kind = "enum",
+            .ty = self.typeName(enum_info.type),
+            .field = self.ast.toSource(tag_tk),
+        } },
         span,
     );
 }
@@ -1816,6 +1851,7 @@ fn unionAccess(self: *Self, union_info: InstrInfos, ty: Type.Union, tag_tk: Ast.
 
     if (ty.tags.getIndex(tag_name)) |index| {
         // Can't access a tag on an instance
+        // TODO: no, create an union unwrap
         if (!union_info.ti.is_sym) {
             return self.err(.{ .instance_tag_access = .{ .kind = "union" } }, span);
         }
@@ -2476,7 +2512,10 @@ pub fn matchValue(
             var matcher = matchers.Bool.init();
             break :ana .{ .bool, matcher.matcher() };
         },
-        .@"enum" => @panic("TODO"),
+        .@"enum" => |t| {
+            var matcher = matchers.Enum.init(t.proto(self.allocator));
+            break :ana .{ .@"enum", matcher.matcher() };
+        },
         .float => {
             var matcher = matchers.Num(f64).init();
             break :ana .{ .float, matcher.matcher() };

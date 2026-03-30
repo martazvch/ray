@@ -1,0 +1,13 @@
+enum Marker {
+    cross = 7,
+    circle,
+    none
+
+    fn init() -> Self {
+        return Self.cross
+    }
+
+    fn toSTring(self) -> str { }
+}
+
+

@@ -59,7 +59,7 @@
                 "arms": [
                     {
                         "expr": {
-                            "enum_literal": "fileNotFound"
+                            "implicit_selector": "fileNotFound"
                         },
                         "body": {
                             "block": {}

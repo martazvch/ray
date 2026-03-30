@@ -286,7 +286,7 @@ fn captureFromExpr(self: *Self, expr: *Ast.Expr, ctx: *CaptureCtx) void {
             }
         },
         .unary => |e| self.captureFromExpr(e.expr, ctx),
-        .bool, .enum_lit, .float, .int, .null, .self, .string => {},
+        .bool, .implicit_selector, .float, .int, .null, .self, .string => {},
     }
 }
 

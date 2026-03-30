@@ -81,6 +81,20 @@ pub const Type = union(enum) {
         loc: ?Loc,
         tags: ArrayMap(InternerIdx, ?InstrIndex),
         functions: MapNameSym,
+        traits: TraitMap,
+
+        pub const Proto = ArrayMap(InternerIdx, bool);
+
+        pub fn proto(self: *const Enum, allocator: Allocator) Proto {
+            var res: Proto = .empty;
+            res.ensureTotalCapacity(allocator, self.tags.count()) catch oom();
+
+            for (self.tags.keys()) |tag| {
+                res.putAssumeCapacity(tag, false);
+            }
+
+            return res;
+        }
     };
 
     pub const ErrorUnion = struct {
@@ -227,6 +241,7 @@ pub const Type = union(enum) {
         tags: Tags,
         is_err: bool,
         functions: MapNameSym,
+        traits: TraitMap,
 
         pub const empty: Union = .{ .loc = null, .tags = .empty };
         pub const Tags = MapNameType;
@@ -273,6 +288,15 @@ pub const Type = union(enum) {
     pub fn isErr(self: *const Type) bool {
         const e = self.as(.@"union") orelse return false;
         return e.is_err;
+    }
+
+    pub fn hasTrait(self: *const Type, name: InternerIdx) ?MapNameSym {
+        return switch (self.*) {
+            .@"enum" => |t| t.traits.get(name),
+            .structure => |t| t.traits.get(name),
+            .@"union" => |t| t.traits.get(name),
+            else => null,
+        };
     }
 
     pub fn hash(self: Type, allocator: Allocator, hasher: anytype) void {
@@ -535,6 +559,7 @@ pub const TypeInterner = struct {
             .loc = loc,
             .tags = .empty,
             .functions = .empty,
+            .traits = .empty,
         } });
     }
 
@@ -553,6 +578,7 @@ pub const TypeInterner = struct {
             .tags = .empty,
             .is_err = is_err,
             .functions = .empty,
+            .traits = .empty,
         } });
     }
 };

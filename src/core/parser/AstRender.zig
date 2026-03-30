@@ -399,7 +399,6 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
             try self.closeKey(.block, comma);
         },
         .closure => |*e| try self.renderFnDecl("", e, comma),
-        .enum_lit => |e| try self.pushKeyValue("enum_literal", self.ast.toSource(e), comma),
         .fail => |e| try self.renderSingleExpr(@tagName(expr.*), e.expr, .block, comma),
         .float => |e| try self.pushKeyValue(@tagName(expr.*), self.ast.toSource(e), comma),
         .field => |e| {
@@ -444,6 +443,7 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
             }
             try self.closeKey(.block, comma);
         },
+        .implicit_selector => |e| try self.pushKeyValue("implicit_selector", self.ast.toSource(e), comma),
         .indexing => |*e| {
             try self.openKey("indexing", .block);
             try self.renderSingleExpr("expr", e.expr, .block, true);

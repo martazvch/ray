@@ -9,32 +9,32 @@ pop
 get_local index 0
 get_tag
 dup
-load_constant index 4, value <enum Foo.a>
+load_constant index 3, value <enum Foo.a>
 get_tag
 eq_int
 jump_false 19 -> 29
 pop
-load_constant index 5, value a
+load_constant index 4, value a
 print
 jump 26 -> 62
 pop
 dup
-load_constant index 6, value <enum Foo.b>
+load_constant index 5, value <enum Foo.b>
 get_tag
 eq_int
 jump_false 35 -> 45
 pop
-load_constant index 7, value b
+load_constant index 6, value b
 print
 jump 42 -> 62
 pop
 dup
-load_constant index 8, value <enum Foo.c>
+load_constant index 7, value <enum Foo.c>
 get_tag
 eq_int
 jump_false 51 -> 61
 pop
-load_constant index 9, value c
+load_constant index 8, value c
 print
 jump 58 -> 62
 pop
@@ -45,7 +45,7 @@ dup
 is_int
 jump_false 69 -> 79
 pop
-load_constant index 10, value int
+load_constant index 9, value int
 print
 jump 76 -> 80
 pop

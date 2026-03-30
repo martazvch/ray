@@ -1,4 +1,42 @@
 [Enum declaration Marker]
+    - tags
+    cross
+    circle
+    none
+    - functions
+    [Function declaration toString, returns]
+        [If]
+        - condition:
+            [Binop type: eq_tag]
+                [Variable index: 0, scope: local]
+                [Constant index 3]
+                    [Enum create]
+                        - enum
+                        [Load symbol 0]
+                        - tag
+                        0
+        - then:
+            [Return]
+                [Constant index 4]
+                    [String x]
+        [If]
+        - condition:
+            [Binop type: eq_tag]
+                [Variable index: 0, scope: local]
+                [Constant index 5]
+                    [Enum create]
+                        - enum
+                        [Load symbol 0]
+                        - tag
+                        1
+        - then:
+            [Return]
+                [Constant index 6]
+                    [String o]
+        [Return]
+            [Constant index 4]
+                [String x]
+
 [Structure declaration Cell]
     - default values
     [Constant index 3]
@@ -7,10 +45,10 @@
             [Load symbol 0]
             - tag
             0
-    [Constant index 7]
+    [Constant index 5]
         [Enum create]
             - enum
-            [Load symbol 0 module 0]
+            [Load symbol 0]
             - tag
             1
 [Function declaration markerStuff]
@@ -41,26 +79,26 @@
         [Invoke symbol 0]
 [Function declaration getMarker, returns]
     [Return]
-        [Constant index 7]
+        [Constant index 5]
             [Enum create]
                 - enum
-                [Load symbol 0 module 0]
+                [Load symbol 0]
                 - tag
                 1
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
-        [Constant index 8]
+        [Constant index 7]
             [Enum create]
                 - enum
-                [Load symbol 0 module 0]
+                [Load symbol 0]
                 - tag
                 2
     [Print]
         [Variable index: 0, scope: local]
-    [Constant index 7]
+    [Constant index 5]
         [Enum create]
             - enum
-            [Load symbol 0 module 0]
+            [Load symbol 0]
             - tag
             1
     [Assignment index: 0, scope: local, cow]
@@ -68,18 +106,18 @@
         [Variable index: 0, scope: local]
     [Call symbol 1]
         - args
-        [Constant index 7]
+        [Constant index 5]
             [Enum create]
                 - enum
-                [Load symbol 0 module 0]
+                [Load symbol 0]
                 - tag
                 1
     [Call symbol 2]
         - args
-        [Constant index 9]
+        [Constant index 3]
             [Enum create]
                 - enum
-                [Load symbol 0 module 0]
+                [Load symbol 0]
                 - tag
                 0
     [Variable declaration index: 1, scope: local]
@@ -88,11 +126,11 @@
             [Load symbol 0]
             - args
             [Default field constant index 3]
-            [Default field constant index 7]
-    [Constant index 7]
+            [Default field constant index 5]
+    [Constant index 5]
         [Enum create]
             - enum
-            [Load symbol 0 module 0]
+            [Load symbol 0]
             - tag
             1
     [Field assignment]
@@ -108,19 +146,19 @@
         [Binop type: eq_tag]
             [Field access 0]
                 [Variable index: 1, scope: local]
-            [Constant index 7]
+            [Constant index 5]
                 [Enum create]
                     - enum
-                    [Load symbol 0 module 0]
+                    [Load symbol 0]
                     - tag
                     1
     [Print]
         [Binop type: ne_tag]
             [Field access 0]
                 [Variable index: 1, scope: local]
-            [Constant index 7]
+            [Constant index 5]
                 [Enum create]
                     - enum
-                    [Load symbol 0 module 0]
+                    [Load symbol 0]
                     - tag
                     1

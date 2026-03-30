@@ -1086,7 +1086,7 @@ fn parseExpr(self: *Self) Error!*Expr {
 
     const expr = try switch (self.prev(.tag)) {
         .@"break" => self.breakExpr(),
-        .dot => self.enumLit(),
+        .dot => self.implicitSelector(),
         .fail => self.fail(),
         .false => self.literal(.bool),
         .float => self.literal(.float),
@@ -1260,13 +1260,6 @@ fn closure(self: *Self) Error!*Expr {
     return expr;
 }
 
-fn enumLit(self: *Self) Error!*Expr {
-    const expr = self.allocator.create(Expr) catch oom();
-    try self.expect(.identifier, .enum_lit_non_ident);
-    expr.* = .{ .enum_lit = self.token_idx - 1 };
-    return expr;
-}
-
 fn fail(self: *Self) Error!*Expr {
     const kw = self.token_idx - 1;
     const expr = self.allocator.create(Expr) catch oom();
@@ -1322,6 +1315,13 @@ fn ifExpr(self: *Self) Error!*Expr {
         .if_token = tk,
     } };
 
+    return expr;
+}
+
+fn implicitSelector(self: *Self) Error!*Expr {
+    const expr = self.allocator.create(Expr) catch oom();
+    try self.expect(.identifier, .implicit_select_non_ident);
+    expr.* = .{ .implicit_selector = self.token_idx - 1 };
     return expr;
 }
 

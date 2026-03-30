@@ -657,13 +657,13 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
             .union_lit => {
                 const index = frame.readByte();
                 const tag = frame.readByte();
-                self.stack.push(.makeObj(Obj.UnionInstance.create(self, &frame.module.unions[index], tag, .null).asObj()));
+                self.stack.push(.makeObj(Obj.UnionInstance.create(self, &frame.module.unions[index], tag, self.stack.pop()).asObj()));
             },
             .union_lit_ext => {
                 const index = frame.readByte();
                 const module = frame.readByte();
                 const tag = frame.readByte();
-                self.stack.push(.makeObj(Obj.UnionInstance.create(self, &self.modules[module].unions[index], tag, .null).asObj()));
+                self.stack.push(.makeObj(Obj.UnionInstance.create(self, &self.modules[module].unions[index], tag, self.stack.pop()).asObj()));
             },
             .wide => unreachable,
         }

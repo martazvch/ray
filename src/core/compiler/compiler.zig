@@ -1108,14 +1108,15 @@ const Compiler = struct {
             @panic("Union is to big, not implemented yet");
         }
 
-        self.symbolAccess(.union_lit, data.sym);
-        self.writeByte(@intCast(data.tag_index));
-
         if (data.payload) |payload| {
-            // TODO: support payload
             _ = payload;
             @panic("Add support for payload");
+        } else {
+            self.writeOp(.push_null);
         }
+
+        self.symbolAccess(.union_lit, data.sym);
+        self.writeByte(@intCast(data.tag_index));
     }
 
     fn varDecl(self: *Self, data: *const Instruction.VarDecl) Error!void {

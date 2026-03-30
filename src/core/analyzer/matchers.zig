@@ -36,7 +36,7 @@ pub const Enum = struct {
         const span = ana.ast.getSpan(value_arm.expr);
 
         const tag, const arm_res = switch (value_arm.expr.*) {
-            .enum_lit => |e| .{ e, try ana.enumLit(e, ctx) },
+            .implicit_selector => |e| .{ e, try ana.implicitSelector(e, ctx) },
             .field => |*e| .{ e.field, try ana.field(e, ctx) },
             else => return ana.err(.match_union_invalid_pat, span),
         };
