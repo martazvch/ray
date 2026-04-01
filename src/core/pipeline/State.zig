@@ -17,6 +17,7 @@ const ffi = @import("../builtins/ffi.zig");
 const misc = @import("misc");
 const Interner = misc.Interner;
 const Sb = misc.StringBuilder;
+const oom = misc.oom;
 
 config: Config,
 interner: Interner,
@@ -67,7 +68,7 @@ fn defaultPrint(text: []const u8) void {
 //     try stderr.flush();
 // }
 
-pub fn new(allocator: Allocator, config: Config, comptime natives: []const ffi.ZigFnMeta) Self {
+pub fn new(allocator: Allocator, config: Config) Self {
     var ctx: Self = .{
         .config = config,
         .interner = .init(allocator),
@@ -86,27 +87,31 @@ pub fn new(allocator: Allocator, config: Config, comptime natives: []const ffi.Z
     ctx.registerMod(allocator, @import("../builtins/builtins.zig"));
     ctx.registerMod(allocator, @import("..//builtins/file.zig"));
 
-    inline for (natives) |*native| {
-        _ = ctx.native_reg.registerFn(allocator, native, &ctx.interner, &ctx.type_interner);
-    }
-
     ctx.lex_scope.save = config.dbg_infos;
-    ctx.lex_scope.initGlobalScope(allocator, &ctx);
 
-    // If embedded/Repl, all code is treated as local code to allow impur code
-    if (ctx.config.embedded) {
-        ctx.lex_scope.open(allocator, null, .{ .barrier = true });
+    // If we're not embedded, we won't add native functions so we can init the global scope
+    if (!config.embedded) {
+        ctx.lex_scope.initGlobalScope(allocator, &ctx);
     }
 
     return ctx;
+}
+
+/// Should only be called when embedded to end native functions registration to initialize global scope
+pub fn initGlobalScope(self: *Self, allocator: Allocator) void {
+    if (self.config.embedded) {
+        self.lex_scope.initGlobalScope(allocator, self);
+        // If embedded/Repl, all code is treated as local code to allow impur code
+        self.lex_scope.open(allocator, null, .{ .barrier = true });
+    }
 }
 
 pub fn registerMod(self: *Self, allocator: Allocator, Module: type) void {
     self.native_reg.registerMod(allocator, &self.interner, &self.type_interner, Module);
 }
 
-pub fn registerFn(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMeta) void {
-    _ = self.native_reg.registerFn(allocator, func, &self.interner, &self.type_interner);
+pub fn registerFn(self: *Self, allocator: Allocator, func: ffi.ZigFnMeta) void {
+    _ = self.native_reg.registerFn(allocator, &func, &self.interner, &self.type_interner);
 }
 
 pub fn updateModWithScope(self: *Self, allocator: Allocator, index: ModIndex) void {

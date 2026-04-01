@@ -27,9 +27,17 @@ pub fn create(allocator: Allocator) Self {
     };
 }
 
-pub fn init(self: *Self, config: Config, comptime natives: []const RayFn) void {
+pub fn init(self: *Self, config: Config) void {
     self.allocator = self.arena.allocator();
-    self.state = .new(self.allocator, config, natives);
+    self.state = .new(self.allocator, config);
+}
+
+pub fn registerFn(self: *Self, func: RayFn) void {
+    self.state.registerFn(self.allocator, func);
+}
+
+pub fn initGlobalScope(self: *Self) void {
+    self.state.initGlobalScope(self.allocator);
     self.vm.init(self.allocator, &self.state);
 }
 

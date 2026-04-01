@@ -28,13 +28,12 @@ pub fn testDir(allocator: Allocator, path: []const u8) !void {
             .embedded = true,
             .printFn = printFn,
         },
-        &.{
-            .init("isLess", isLess, "", &.{
-                .{ .name = "a" },
-                .{ .name = "b" },
-            }),
-        },
     );
+    vm.registerFn(.init("isLess", isLess, "", &.{
+        .{ .name = "a" },
+        .{ .name = "b" },
+    }));
+    vm.initGlobalScope();
 
     var cwd = std.fs.cwd();
     var test_dir = try cwd.openDir(path, .{ .iterate = true });

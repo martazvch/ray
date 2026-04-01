@@ -21,12 +21,6 @@ pub fn main() !void {
             .print_ir = true,
             .print_bytecode = true,
         },
-        &.{
-            .init("isLess", isLess, "", &.{
-                .{ .name = "a" },
-                .{ .name = "b" },
-            }),
-        },
     );
 
     try vm.run("print 14");
