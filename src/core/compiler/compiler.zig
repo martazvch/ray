@@ -758,16 +758,6 @@ const Compiler = struct {
         try self.containerFnDecls(data.functions);
     }
 
-    // fn enumLit(self: *Self, data: Instruction.EnumLit) Error!void {
-    //     // TODO: Error
-    //     if (data.tag_index >= std.math.maxInt(u8)) {
-    //         @panic("Enum is to big, not implemented yet");
-    //     }
-    //
-    //     self.symbolAccess(.enum_lit, data.sym);
-    //     self.writeByte(@intCast(data.tag_index));
-    // }
-
     fn field(self: *Self, data: *const Instruction.Field) Error!void {
         try self.compileInstr(data.structure);
         self.writeOpAndByte(

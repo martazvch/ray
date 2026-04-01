@@ -86,6 +86,7 @@ fn init(self: *Self, allocator: Allocator, config: State.Config) void {
 
 fn deinit(self: *Self) void {
     self.terminal.disableRawMode();
+    self.vm.deinit();
     self.arena.deinit();
 }
 
