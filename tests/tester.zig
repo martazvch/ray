@@ -273,12 +273,14 @@ const Tester = struct {
         @memcpy(output_file[0..name.len], name);
         @memcpy(output_file[name.len..], ".out");
 
+        const path_opt = "-p=../..";
+
         const argv = if (stage == .vm or stage == .standalone)
-            &[_][]const u8{ self.exe_path, file_name }
+            &[_][]const u8{ self.exe_path, file_name, path_opt }
         else if (eql(u8, category, "warnings"))
-            &[_][]const u8{ self.exe_path, file_name, stage.toOpt(), "-s" }
+            &[_][]const u8{ self.exe_path, file_name, stage.toOpt(), "-s", path_opt }
         else
-            &[_][]const u8{ self.exe_path, file_name, stage.toOpt() };
+            &[_][]const u8{ self.exe_path, file_name, stage.toOpt(), path_opt };
 
         var buf: [std.fs.max_path_bytes]u8 = undefined;
         const path = try std.os.getFdPath(dir.fd, &buf);

@@ -22,7 +22,11 @@
     [Return]
         [Constant index 4]
             [Int 12]
-[Function declaration getIntDefault, returns]
+[Function declaration getInt2, returns]
+    [Return]
+        [Constant index 4]
+            [Int 12]
+[Function declaration getIntDef, returns]
     - default params
     [Constant index 5]
         [Int 9]
@@ -108,6 +112,6 @@
             - args
             [Default param constant index 4]
     [Print]
-        [Call symbol 4 module 1]
+        [Call symbol 5 module 1]
             - args
             [Default param constant index 5, module 1]

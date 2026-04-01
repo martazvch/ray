@@ -23,8 +23,12 @@ ret
 load_constant index 4, value 12
 ret
 
--- getIntDef --
+-- getInt2 --
 load_constant index 4, value 12
+ret
+
+-- getIntDef --
+get_local index 0
 ret
 
 -- global scope --

@@ -1043,7 +1043,13 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
     const old_path_length = self.path.len();
     defer self.path.shrink(self.allocator, old_path_length);
 
-    const result = Importer.fetchImportedFile(self.allocator, self.ast, node.names, self.path);
+    const result = Importer.fetchImportedFile(
+        self.allocator,
+        self.ast,
+        node.names,
+        self.state.config.path,
+        self.path,
+    );
     const file = switch (result) {
         .ok => |f| f,
         .err => |e| {

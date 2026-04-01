@@ -39,6 +39,7 @@ pub const Config = struct {
     static_analyzis: bool = false,
     print_ir: bool = false,
     dbg_infos: bool = false,
+    path: ?[]const u8 = null,
 
     printFn: *const fn ([]const u8) void = defaultPrint,
     // errorFn: *const fn ([]const u8) void = defaultErr,

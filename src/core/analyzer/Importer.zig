@@ -18,25 +18,45 @@ pub const Result = union(enum) {
 /// Import rules and order
 /// - If path starts with a '.', consider it as a relative path and fails if not found
 /// - If path starts with an identifier, consider it as an absolute path from where the process was invoked
-///     If fails, consider it as an imported package
+///     If fails, tries to fetch from `path` cli option if provided, otherwise consider it as an imported package
 /// - If considered as a package, look for it in package place TODO:
 ///
 /// Naming rules
 /// - Last identifier is the file to import
 ///
 /// **Caller owns memory of result**
-pub fn fetchImportedFile(allocator: Allocator, ast: *const Ast, path_chunks: []const Ast.TokenIndex, sb: *Sb) Result {
+pub fn fetchImportedFile(
+    allocator: Allocator,
+    ast: *const Ast,
+    path_chunks: []const Ast.TokenIndex,
+    path: ?[]const u8,
+    sb: *Sb,
+) Result {
     if (ast.token_tags[path_chunks[0]] == .dot) {
-        return fetchRelative(allocator, ast, path_chunks[1..], sb);
+        var buf_path: [std.fs.max_path_bytes]u8 = undefined;
+        const buf_written = sb.render(&buf_path);
+        const cwd = std.fs.openDirAbsolute(buf_written, .{}) catch unreachable;
+
+        return fetchFrom(allocator, cwd, ast, path_chunks[1..], sb);
+    }
+
+    if (path) |p| {
+        const cwd = cwd: {
+            if (std.fs.path.isAbsolute(p)) {
+                break :cwd std.fs.openDirAbsolute(p, .{}) catch unreachable;
+            } else {
+                var cwd = std.fs.cwd();
+                break :cwd cwd.openDir(p, .{}) catch unreachable;
+            }
+        };
+        return fetchFrom(allocator, cwd, ast, path_chunks, sb);
     }
 
     @panic("Absolute imports not yet implemented");
 }
 
-fn fetchRelative(allocator: Allocator, ast: *const Ast, path_chunks: []const Ast.TokenIndex, sb: *Sb) Result {
-    var buf_path: [std.fs.max_path_bytes]u8 = undefined;
-    const buf_written = sb.render(&buf_path);
-    var cwd = std.fs.openDirAbsolute(buf_written, .{}) catch unreachable;
+fn fetchFrom(allocator: Allocator, init_dir: std.fs.Dir, ast: *const Ast, path_chunks: []const Ast.TokenIndex, sb: *Sb) Result {
+    var cwd = init_dir;
 
     for (path_chunks, 0..) |part, i| {
         const name = ast.toSource(part);

@@ -22,7 +22,11 @@
     [Return]
         [Constant index 4]
             [Int 12]
-[Function declaration getIntDefault, returns]
+[Function declaration getInt2, returns]
+    [Return]
+        [Constant index 4]
+            [Int 12]
+[Function declaration getIntDef, returns]
     - default params
     [Constant index 5]
         [Int 9]

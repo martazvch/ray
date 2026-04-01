@@ -16,4 +16,5 @@ fn getVecFromPos(x: int, y: int) -> Vec2 {
 }
 
 fn getInt() -> int { return 12 }
-fn getIntDefault(a = 9) -> int { return a }
+fn getInt2(a: int) -> int { return 12 }
+fn getIntDef(a=9) -> int { return a }

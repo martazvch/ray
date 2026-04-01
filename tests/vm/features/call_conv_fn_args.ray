@@ -1,4 +1,4 @@
-use .data.math 
+use data.math 
 
 struct Foo {
     function: fn(bool) -> int
@@ -13,25 +13,31 @@ struct Bar {
         return self.value
     }
 
-    fn importFuncFromMethod(self) -> fn(bool) -> int {
+    fn importFuncFromMethod(self) -> fn(int) -> int {
         return math.getInt2
     }
 }
 
 fn copy(b: bool) -> int { return 5 }
 
-fn argsCallConv(arg1: fn(bool)->int, arg2: fn(bool)->int, arg3: fn(bool)->int) {
+fn argsCallConv(arg1: fn(bool)->int, arg2: fn(bool)->int, arg3: fn(int)->int) {
     print arg1(true)
     print arg2(false)
-    print arg3(true)
+    print arg3(8)
+}
+
+fn argsCallConv2(arg1: fn(bool)->int, arg2: fn(int)->int, arg3: fn(bool)->int) {
+    print arg1(true)
+    print arg2(10)
+    print arg3(false)
 }
 
 fn main() {
     var bar = Bar{}
     var foo = Foo{function: copy}
 
-    argsCallConv(copy, math.getInt2, foo.function)
     argsCallConv(Bar.static, bar.method, bar.importFuncFromMethod())
+    argsCallConv2(copy, math.getInt2, foo.function)
 }
 
 

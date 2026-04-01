@@ -17,6 +17,7 @@ const Args = struct {
     print_ir: Arg(bool) = .{ .desc = "Prints the IR" },
     print_bytecode: Arg(bool) = .{ .desc = "Prints the compiled bytecode" },
     static_analyzis: Arg(bool) = .{ .desc = "Statically checks the file without running it (shows warnings)", .short = 's' },
+    path: Arg(.string) = .{ .desc = "Path to fetch additional modules", .short = 'p' },
 
     compile: Arg(compile.Args) = .{ .desc = "Compiles to a native executable (WIP)", .short = 'c' },
 
@@ -61,6 +62,7 @@ pub fn main() !void {
         .static_analyzis = parsed.static_analyzis,
         .print_ir = parsed.print_ir,
         .embedded = parsed.file == null,
+        .path = parsed.path,
     };
 
     if (parsed.compile) |cmd| {
