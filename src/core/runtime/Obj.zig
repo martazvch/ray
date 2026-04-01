@@ -15,6 +15,7 @@ const ObjFns = type_mod.ObjFns;
 const Chunk = @import("../compiler/Chunk.zig");
 const Module = @import("../pipeline/ModuleManager.zig").Module;
 const ffi = @import("../builtins/ffi.zig");
+const cffi = @import("../builtins/cffi.zig");
 const oom = @import("misc").oom;
 const Value = @import("values.zig").Value;
 const Vm = @import("Vm.zig");
@@ -36,7 +37,8 @@ const Kind = enum {
     function,
     instance,
     iterator,
-    native_fn,
+    native_zfn,
+    native_cfn,
     native_obj,
     string,
     union_instance,
@@ -50,7 +52,8 @@ const Kind = enum {
             Function => .function,
             Instance => .instance,
             Iterator => .iterator,
-            NativeFunction => .native_fn,
+            ZigFn => .native_zfn,
+            CFn => .native_zfn,
             NativeObj => .native_obj,
             String => .string,
             UnionInstance => .union_instance,
@@ -97,7 +100,7 @@ pub fn deepCopy(self: *Obj, vm: *Vm) *Obj {
         .enum_instance, .@"error", .union_instance => @panic("TODO"),
         .instance => self.as(Instance).deepCopy(vm).asObj(),
         // Immutable, shallow copy ok
-        .box, .closure, .function, .iterator, .native_fn, .native_obj, .string => self,
+        .box, .closure, .function, .iterator, .native_cfn, .native_zfn, .native_obj, .string => self,
     };
 }
 
@@ -119,8 +122,12 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
             const iterator = self.as(Iterator);
             iterator.deinit(vm.gc_alloc);
         },
-        .native_fn => {
-            const function = self.as(NativeFunction);
+        .native_cfn => {
+            const function = self.as(CFn);
+            function.deinit(vm.gc_alloc);
+        },
+        .native_zfn => {
+            const function = self.as(ZigFn);
             function.deinit(vm.gc_alloc);
         },
         .native_obj => {
@@ -176,7 +183,8 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
         },
         .instance => try writer.print("<instance of {s}>", .{self.as(Instance).parent.name}),
         .iterator => try writer.writeAll("<iterator>"),
-        .native_fn => try writer.print("<native fn {s}>", .{self.as(NativeFunction).name}),
+        .native_cfn => try writer.print("<native c fn {s}>", .{self.as(CFn).name}),
+        .native_zfn => try writer.print("<native zig fn {s}>", .{self.as(ZigFn).name}),
         .native_obj => try writer.print("<native object {s}>", .{self.as(NativeObj).name}),
         .string => try writer.print("{s}", .{self.as(String).chars}),
         .union_instance, .@"error" => {
@@ -202,7 +210,8 @@ pub fn log(self: *Obj) void {
         .function => std.debug.print("<fn {s}>", .{self.as(Function).name}),
         .instance => std.debug.print("<instance of {s}>", .{self.as(Instance).parent.name}),
         .iterator => std.debug.print("<iterator>", .{}),
-        .native_fn => std.debug.print("<native function {s}>", .{self.as(NativeFunction).name}),
+        .native_cfn => std.debug.print("<native c fn {s}>", .{self.as(CFn).name}),
+        .native_zfn => std.debug.print("<native zig fn {s}>", .{self.as(ZigFn).name}),
         .native_obj => unreachable,
         .string => std.debug.print("{s}", .{self.as(String).chars}),
         .union_instance => std.debug.print("<enum instance {s}>", .{self.as(EnumInstance).parent.name}),
@@ -540,7 +549,7 @@ pub const Box = struct {
     }
 };
 
-pub const NativeFunction = struct {
+pub const ZigFn = struct {
     obj: Obj,
     name: []const u8,
     function: ffi.ZigFn,
@@ -555,7 +564,33 @@ pub const NativeFunction = struct {
         return obj;
     }
 
-    pub fn asObj(self: *NativeFunction) *Obj {
+    pub fn asObj(self: *Self) *Obj {
+        return &self.obj;
+    }
+
+    pub fn deinit(self: *Self, allocator: Allocator) void {
+        allocator.destroy(self);
+    }
+};
+
+pub const CFn = struct {
+    obj: Obj,
+    name: []const u8,
+    function: cffi.Fn,
+    returns: bool,
+
+    const Self = @This();
+
+    pub fn create(allocator: Allocator, name: []const u8, function: cffi.Fn, returns: bool) *Self {
+        const obj = Obj.allocateComptime(allocator, Self, undefined);
+        obj.name = name;
+        obj.function = function;
+        obj.returns = returns;
+
+        return obj;
+    }
+
+    pub fn asObj(self: *Self) *Obj {
         return &self.obj;
     }
 

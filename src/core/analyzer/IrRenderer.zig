@@ -252,10 +252,10 @@ fn call(self: *Self, data: *const Instruction.Call) void {
 
                 if (data.ext_mod) |mod| {
                     self.indentAndPrintSlice("[Invoke symbol {} module {}]", .{ f.index, mod.toInt() });
-                } else if (data.native) {
-                    self.indentAndPrintSlice("[Invoke native symbol {}]", .{f.index});
-                } else {
-                    self.indentAndPrintSlice("[Invoke symbol {}]", .{f.index});
+                } else switch (data.kind) {
+                    .c => self.indentAndPrintSlice("[Invoke C symbol {}]", .{f.index}),
+                    .zig, .zig_method => self.indentAndPrintSlice("[Invoke Zig symbol {}]", .{f.index}),
+                    else => self.indentAndPrintSlice("[Invoke symbol {}]", .{f.index}),
                 }
             }
         },
@@ -267,7 +267,11 @@ fn call(self: *Self, data: *const Instruction.Call) void {
             }
         },
         .load_builtin, .identifier => {
-            self.indentAndAppendSlice(if (data.native) "[Native fn call]" else "[Fn call]");
+            self.indentAndAppendSlice(switch (data.kind) {
+                .c => "[C fn call]",
+                .zig, .zig_method => "[Zig fn call]",
+                else => "[Fn call]",
+            });
             self.indent_level += 1;
             defer self.indent_level -= 1;
             self.parseInstr(data.callee);

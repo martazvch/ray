@@ -18,6 +18,9 @@ pub fn build(b: *std.Build) !void {
     const test_mode = b.option(bool, "test-mode", "Compiles in test mode to enable certain behaviors") orelse false;
     options.addOption(bool, "test_mode", test_mode);
 
+    const gen_lib = b.option(bool, "gen-embed", "Generates the embedabble dynamic library") orelse false;
+    options.addOption(bool, "gen_lib", gen_lib);
+
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
@@ -72,6 +75,24 @@ pub fn build(b: *std.Build) !void {
     });
     _ = embed_mod;
 
+    const embed_c_lib = b.addLibrary(.{
+        .name = "ray",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/embed_c.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "misc", .module = misc_mod },
+                .{ .name = "options", .module = options.createModule() },
+            },
+        }),
+        .linkage = .dynamic,
+    });
+
+    if (gen_lib) {
+        b.installArtifact(embed_c_lib);
+    }
+
     // --------
     // For ZLS
     // --------
@@ -125,10 +146,44 @@ pub fn build(b: *std.Build) !void {
 
     test_step.dependOn(&run_tester.step);
 
-    // Embedded unit tests
+    // Zig embedded tests
     var embed_tests = b.addSystemCommand(
         &.{ "zig", "build", "test" },
     );
     embed_tests.setCwd(b.path(b.pathJoin(&.{ "tests", "embed", "zig" })));
     test_step.dependOn(&embed_tests.step);
+
+    // C embedded tests
+    const install_embed_c_lib = b.addInstallArtifact(embed_c_lib, .{
+        .dest_dir = .{ .override = .{ .custom = "tests/embed/c" } },
+    });
+
+    const c_embed_test_exe = b.addExecutable(.{
+        .name = "tester",
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    c_embed_test_exe.addCSourceFiles(.{
+        .root = b.path("tests/embed/c"),
+        .files = &.{ "main.c", "reader.c", "tester.c" },
+        .flags = &.{ "-Wall", "-Wextra", "-std=c99" },
+    });
+    c_embed_test_exe.addIncludePath(b.path("tests/embed/c"));
+    c_embed_test_exe.addIncludePath(b.path("src"));
+    c_embed_test_exe.linkLibrary(embed_c_lib);
+    const lib_dir = b.getInstallPath(.{ .custom = "tests/embed/c" }, "");
+    c_embed_test_exe.addRPath(.{ .cwd_relative = lib_dir });
+
+    const install_c_tester = b.addInstallArtifact(c_embed_test_exe, .{
+        .dest_dir = .{ .override = .{ .custom = "tests/embed/c" } },
+    });
+    install_c_tester.step.dependOn(&install_embed_c_lib.step);
+
+    const tester_path = b.getInstallPath(.{ .custom = "tests/embed/c" }, "tester");
+    const run_c_embed_test = b.addSystemCommand(&.{tester_path});
+    run_c_embed_test.setCwd(b.path("tests/embed/c"));
+    run_c_embed_test.step.dependOn(&install_c_tester.step);
+    test_step.dependOn(&run_c_embed_test.step);
 }

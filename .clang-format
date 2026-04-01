@@ -1,0 +1,8 @@
+Language: C
+BasedOnStyle: LLVM
+IndentWidth: 4
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortBlocksOnASingleLine: Empty
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortLoopsOnASingleLine: false
+

@@ -39,7 +39,7 @@ pub const CompilationUnit = struct {
     render: bool,
 
     // For disassembler
-    native_funcs: []const *Obj.NativeFunction,
+    native_funcs: []const *Obj.ZigFn,
 
     const Self = @This();
     const Error = error{ Err, TooManyConst } || std.posix.WriteError;
@@ -54,7 +54,7 @@ pub const CompilationUnit = struct {
             .errs = .empty,
             .instr_data = undefined,
             .instr_lines = undefined,
-            .native_funcs = state.native_reg.funcs.items,
+            .native_funcs = state.native_reg.zig_fns.items,
             .constants = state.const_interner.constants.items,
             .line = 0,
             .compiled_constants = .empty,
@@ -601,10 +601,10 @@ const Compiler = struct {
         if (sym_mod) |mod| {
             self.writeOpAndByte(.call_ext, @intCast(sym_index));
             self.writeByte(@intCast(mod.toInt()));
-        } else if (data.native) {
-            self.writeOpAndByte(.call_native, @intCast(sym_index));
-        } else {
-            self.writeOpAndByte(.call, @intCast(sym_index));
+        } else switch (data.kind) {
+            .c => {},
+            .zig, .zig_method => self.writeOpAndByte(.call_zig, @intCast(sym_index)),
+            else => self.writeOpAndByte(.call, @intCast(sym_index)),
         }
         self.writeByte(@intCast(data.args.len + arity_offset));
     }

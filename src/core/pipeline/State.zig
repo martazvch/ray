@@ -13,6 +13,7 @@ const ConstInterner = @import("../analyzer/ConstantInterner.zig");
 const ConstIdx = ConstInterner.ConstIdx;
 const Constant = ConstInterner.Constant;
 const ffi = @import("../builtins/ffi.zig");
+const cffi = @import("../builtins/cffi.zig");
 
 const misc = @import("misc");
 const Interner = misc.Interner;
@@ -46,7 +47,7 @@ pub const Config = struct {
     // errorFn: *const fn ([]const u8) void = defaultErr,
 };
 
-fn defaultPrint(text: []const u8) void {
+pub fn defaultPrint(text: []const u8) void {
     errdefer @panic("failed to write to stdout");
 
     var buf: [1024]u8 = undefined;
@@ -111,7 +112,11 @@ pub fn registerMod(self: *Self, allocator: Allocator, Module: type) void {
 }
 
 pub fn registerFn(self: *Self, allocator: Allocator, func: ffi.ZigFnMeta) void {
-    _ = self.native_reg.registerFn(allocator, &func, &self.interner, &self.type_interner);
+    _ = self.native_reg.registerZigFn(allocator, &func, &self.interner, &self.type_interner);
+}
+
+pub fn registerCFn(self: *Self, allocator: Allocator, func: cffi.FnProto) void {
+    _ = self.native_reg.registerCFn(allocator, &func, &self.interner, &self.type_interner);
 }
 
 pub fn updateModWithScope(self: *Self, allocator: Allocator, index: ModIndex) void {

@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
 const ffi = @import("../builtins/ffi.zig");
+const cffi = @import("../builtins/cffi.zig");
 const MapNameType = @import("../analyzer/types.zig").MapNameType;
 const Type = @import("../analyzer/types.zig").Type;
 const TypeInterner = @import("../analyzer/types.zig").TypeInterner;
@@ -15,10 +16,10 @@ const misc = @import("misc");
 const Interner = misc.Interner;
 const oom = misc.oom;
 
-/// Native functions used at runtime
-funcs: ArrayList(*Obj.NativeFunction),
-/// Native functions translated to Ray's type system for compilation
-funcs_meta: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
+/// Native Zig functions used at runtime
+zig_fns: ArrayList(*Obj.ZigFn),
+/// Native Zig functions translated to Ray's type system for compilation
+zig_fns_meta: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
 /// Native structures used at runtime
 structs: ArrayList(struct { name: []const u8, func: Value }),
 /// Native structures translated to Ray's type system for compilation
@@ -26,14 +27,21 @@ structs_meta: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
 /// Native structures translated to Ray's type system used here for self references
 scratch_structs: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
 
+/// Native C functions used at runtime
+c_fns: ArrayList(*Obj.CFn),
+/// Native C functions translated to Ray's type system for compilation
+c_fns_meta: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
+
 const Self = @This();
 
 pub const empty: Self = .{
-    .funcs_meta = .empty,
-    .funcs = .empty,
+    .zig_fns = .empty,
+    .zig_fns_meta = .empty,
     .structs = .empty,
     .structs_meta = .empty,
     .scratch_structs = .empty,
+    .c_fns = .empty,
+    .c_fns_meta = .empty,
 };
 
 pub fn registerMod(self: *Self, allocator: Allocator, interner: *Interner, ti: *TypeInterner, Module: type) void {
@@ -51,7 +59,7 @@ pub fn registerMod(self: *Self, allocator: Allocator, interner: *Interner, ti: *
     }
 
     inline for (mod.functions) |func| {
-        _ = self.registerFn(allocator, &func, interner, ti);
+        _ = self.registerZigFn(allocator, &func, interner, ti);
     }
 }
 
@@ -86,24 +94,31 @@ fn registerStruct(self: *Self, allocator: Allocator, S: type, interner: *Interne
             @panic("Already declared function");
         }
 
-        const index, const fn_type = self.registerFn(allocator, func, interner, ti);
-        ty.structure.functions.putAssumeCapacity(interned_name, .{ .name = interned_name, .index = index, .type = fn_type });
+        const reg = self.registerZigFn(allocator, func, interner, ti);
+        ty.structure.functions.putAssumeCapacity(
+            interned_name,
+            .{ .name = interned_name, .index = reg.index, .type = reg.type },
+        );
     }
 
     // TODO: use assume capacity (check all the 'put')
     self.structs_meta.put(allocator, struct_name, ty) catch oom();
 }
 
+const Registered = struct {
+    index: usize,
+    type: *const Type,
+};
 // We can use pointers here because we refer to comptime declarations in Module
 // TODO: no check on already defined with same name?
-pub fn registerFn(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMeta, interner: *Interner, ti: *TypeInterner) struct { usize, *const Type } {
+pub fn registerZigFn(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMeta, interner: *Interner, ti: *TypeInterner) Registered {
     const fn_type = self.fnZigToRay(allocator, func, interner, ti);
-    self.funcs_meta.put(allocator, interner.intern(func.name), fn_type) catch oom();
-    const native = Obj.NativeFunction.create(allocator, func.name, func.function);
+    self.zig_fns_meta.put(allocator, interner.intern(func.name), fn_type) catch oom();
+    const native = Obj.ZigFn.create(allocator, func.name, func.function);
 
-    self.funcs.append(allocator, native) catch oom();
+    self.zig_fns.append(allocator, native) catch oom();
 
-    return .{ self.funcs.items.len - 1, fn_type };
+    return .{ .index = self.zig_fns.items.len - 1, .type = fn_type };
 }
 
 fn fnZigToRay(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMeta, interner: *Interner, ti: *TypeInterner) *const Type {
@@ -125,7 +140,7 @@ fn fnZigToRay(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMeta, int
 
     // TODO: handle container name properly
     const ty: Type.Function = .{
-        .kind = if (offset == 2) .native_method else .native,
+        .kind = if (offset == 2) .zig_method else .zig,
         .loc = .{ .name = interner.intern(func.name), .container = interner.intern("std") },
         .return_type = self.zigToRay(allocator, func.info.return_type.?, interner, ti),
         .params = params,
@@ -164,5 +179,58 @@ fn zigToRay(self: *Self, allocator: Allocator, ty: type, interner: *Interner, ti
             },
             else => @compileError("Zig to Ray type conversion not supported for type: " ++ @typeName(ty)),
         },
+    };
+}
+
+pub fn registerCFn(self: *Self, allocator: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) Registered {
+    const fn_type = fnCToRay(allocator, proto, interner, ti);
+    const name = std.mem.span(proto.name);
+    self.c_fns_meta.put(allocator, interner.intern(name), fn_type) catch oom();
+    const native = Obj.CFn.create(allocator, name, proto.func, proto.return_type != .void);
+
+    self.c_fns.append(allocator, native) catch oom();
+
+    return .{ .index = self.c_fns.items.len - 1, .type = fn_type };
+}
+
+fn fnCToRay(allocator: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) *const Type {
+    var params: Type.Function.ParamsMap = .empty;
+    params.ensureTotalCapacity(allocator, proto.params.len - 1) catch oom();
+
+    for (proto.params[0..@as(usize, @intCast(proto.arity))]) |*p| {
+        const param_ty = cTypeToRay(p.ty, ti);
+        const param_name = interner.intern(std.mem.span(p.name));
+
+        params.putAssumeCapacity(
+            param_name,
+            .{
+                .name = param_name,
+                .type = param_ty,
+                .default = null,
+                .captured = false,
+            },
+        );
+    }
+
+    // TODO: handle container name properly
+    const ty: Type.Function = .{
+        .kind = .c,
+        .loc = .{
+            .name = interner.intern(std.mem.span(proto.name)),
+            .container = interner.intern("std"),
+        },
+        .return_type = cTypeToRay(proto.return_type, ti),
+        .params = params,
+    };
+
+    return ti.intern(.{ .function = ty });
+}
+
+fn cTypeToRay(ty: cffi.cType, ti: *TypeInterner) *const Type {
+    return switch (ty) {
+        .void => ti.getCached(.void),
+        .int => ti.getCached(.int),
+        .float => ti.getCached(.float),
+        .bool => ti.getCached(.bool),
     };
 }

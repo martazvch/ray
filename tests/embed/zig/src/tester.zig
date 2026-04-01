@@ -95,7 +95,7 @@ fn runTest(vm: anytype, part: Reader.Part) Error!void {
             std.debug.print(
                 \\Expected nothing but got
                 \\ Got:
-                \\ ---------
+                \\ ----
                 \\{s}
                 \\
             ,

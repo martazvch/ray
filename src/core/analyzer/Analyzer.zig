@@ -1912,7 +1912,7 @@ fn structureAccess(self: *Self, field_tk: Ast.TokenIndex, ty: *const Type.Struct
                 return self.err(.{ .call_method_on_type = .{ .name = text } }, self.ast.getSpan(field_tk));
             }
             // Call static on instance
-            else if (!is_symbol and fn_type.kind != .method and fn_type.kind != .native_method) {
+            else if (!is_symbol and fn_type.kind != .method and fn_type.kind != .zig_method) {
                 return self.err(.{ .call_static_on_instance = .{ .name = text } }, self.ast.getSpan(field_tk));
             }
         }
@@ -1990,7 +1990,7 @@ fn call(self: *Self, expr: *const Ast.FnCall, ctx: *Context) Result {
                 .callee = callee.instr,
                 .args = args_res,
                 .ext_mod = callee.ti.ext_mod,
-                .native = callee.type.function.kind == .native or callee.type.function.kind == .native_method,
+                .kind = callee.type.function.kind,
             } },
             span.start,
         ),
@@ -2129,6 +2129,10 @@ fn resolveIdentifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool,
         return .{ .type = res.sym.type, .kind = .symbol, .instr = res.instr };
     }
 
+    if (self.builtinSymbolC(sym_name, span)) |res| {
+        return .{ .type = res.sym.type, .kind = .symbol, .instr = res.instr };
+    }
+
     if (self.scope.getModule(name)) |mod| {
         return .{ .type = mod, .kind = .symbol, .instr = 0 };
     }
@@ -2200,6 +2204,17 @@ fn externSymbolIdentifier(self: *Self, name: InternerIdx, span: Span) ?struct { 
 /// Tries to find a symbol in scopes and returns it while emitting an instruction
 fn builtinSymbol(self: *Self, name: InternerIdx, span: Span) ?struct { sym: *LexScope.Symbol, instr: InstrIndex } {
     const sym = self.scope.getBuiltinSymbol(name) orelse return null;
+
+    // TODO: protect cast
+    return .{
+        .sym = sym,
+        .instr = self.irb.addInstr(.{ .load_builtin = @intCast(sym.index) }, span.start),
+    };
+}
+
+/// Tries to find a symbol in scopes and returns it while emitting an instruction
+fn builtinSymbolC(self: *Self, name: InternerIdx, span: Span) ?struct { sym: *LexScope.Symbol, instr: InstrIndex } {
+    const sym = self.scope.getBuiltinSymbolC(name) orelse return null;
 
     // TODO: protect cast
     return .{

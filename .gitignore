@@ -4,5 +4,6 @@ zig-out
 .zig-profile
 .vscode/
 .zed/
-/data/
 test.ray
+*.o
+tester

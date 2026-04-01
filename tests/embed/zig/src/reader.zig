@@ -14,13 +14,13 @@ pub const Cases = ArrayList(Case);
 pub const Error = error{ MissingFile, FileTooLong };
 
 const State = enum {
+    none,
     case,
     part,
     pre_code,
     code,
     pre_res,
     res,
-    none,
 };
 
 pub fn read(allocator: Allocator, cwd: *std.fs.Dir, file_name: []const u8) Error!Cases {

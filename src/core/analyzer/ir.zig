@@ -7,6 +7,7 @@ pub const Type = enum(u2) { float, int };
 pub const Index = usize;
 
 pub const TypeId = @import("types.zig").TypeId;
+pub const CallKind = @import("types.zig").Type.Function.Kind;
 pub const SymbolIndex = usize;
 
 pub const Instruction = struct {
@@ -134,7 +135,7 @@ pub const Instruction = struct {
         callee: Index,
         args: []const Arg,
         ext_mod: ?ModIndex,
-        native: bool,
+        kind: CallKind,
     };
     pub const Arg = union(enum) {
         instr: Index,

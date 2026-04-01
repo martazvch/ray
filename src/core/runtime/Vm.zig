@@ -24,7 +24,8 @@ gc_alloc: Allocator,
 strings: *std.AutoHashMapUnmanaged(usize, *Obj.String),
 objects: ?*Obj,
 modules: []Module,
-natives: []*Obj.NativeFunction,
+c_fns: []*Obj.CFn,
+zig_fns: []*Obj.ZigFn,
 state: *State,
 
 // Used ti-ype ids at runtime
@@ -53,7 +54,8 @@ pub fn init(self: *Self, allocator: Allocator, state: *State) void {
     self.frame_stack = .empty;
     self.objects = null;
     self.state = state;
-    self.natives = state.native_reg.funcs.items;
+    self.c_fns = state.native_reg.c_fns.items;
+    self.zig_fns = state.native_reg.zig_fns.items;
 
     self.arr_str_type_id = state.type_interner.typeId(
         state.type_interner.intern(.{ .array = .{ .child = state.type_interner.getCached(.str) } }),
@@ -160,7 +162,7 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
             const stdout = &stdout_writer.interface;
             defer stdout.flush() catch oom();
 
-            var dis = Disassembler.init(&frame.function.chunk, frame.module, self.natives);
+            var dis = Disassembler.init(&frame.function.chunk, frame.module, self.zig_fns);
             const instr_nb = frame.instructionNb();
             _ = dis.disInstruction(stdout, instr_nb);
         }
@@ -238,8 +240,8 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
                 const callee = self.stack.peekRef(args_count).obj;
 
                 switch (callee.kind) {
-                    .native_fn => {
-                        const native = callee.as(Obj.NativeFunction).function;
+                    .native_zfn => {
+                        const native = callee.as(Obj.ZigFn).function;
                         const result = native(self, (self.stack.top - args_count)[0..args_count]);
 
                         self.stack.top -= args_count + 1;
@@ -265,11 +267,26 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
                 frame = try self.frame_stack.newKeepMod();
                 frame.call(self.modules[module].functions[index], &self.stack, arity, self.modules);
             },
-            .call_native => {
+            .call_c => {
+                const index = frame.readByte();
+                const arity = frame.readByte();
+                const base = self.stack.top - arity;
+                const obj = self.c_fns[index];
+                obj.function(@ptrCast(self));
+
+                if (obj.returns) {
+                    const res = self.stack.pop();
+                    self.stack.top = base;
+                    self.stack.push(res);
+                } else {
+                    self.stack.top = base;
+                }
+            },
+            .call_zig => {
                 const index = frame.readByte();
                 const args_count = frame.readByte();
-                const native = self.natives[index].function;
-                const result = native(self, (self.stack.top - args_count)[0..args_count]);
+                const f = self.zig_fns[index].function;
+                const result = f(self, (self.stack.top - args_count)[0..args_count]);
 
                 self.stack.top -= args_count;
                 if (result) |res| self.stack.push(res);
@@ -510,7 +527,7 @@ fn execute(self: *Self, first_frame: *CallFrame) !void {
             },
             .load_fn_builtin => {
                 const symbol_idx = frame.readByte();
-                self.stack.push(.makeObj(self.natives[symbol_idx].asObj()));
+                self.stack.push(.makeObj(self.zig_fns[symbol_idx].asObj()));
             },
             .load_fn => {
                 const symbol_idx = frame.readByte();
