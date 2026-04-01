@@ -499,10 +499,8 @@ fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
     );
 }
 
-// fn enumTags(self: *Self, tags: []const Ast.EnumDecl.Tag, ty: *Type.Enum, ctx: *Context) Error![]const Instr.EnumDecl.Tag {
 fn enumTags(self: *Self, tags: []const Ast.EnumDecl.Tag, ty: *Type.Enum, ctx: *Context) Error![]const []const u8 {
     ty.tags.ensureTotalCapacity(self.allocator, @intCast(tags.len)) catch oom();
-    // var tag_res = ArrayList(Instr.EnumDecl.Tag).initCapacity(self.allocator, @intCast(tags.len)) catch oom();
     var names = ArrayList([]const u8).initCapacity(self.allocator, @intCast(tags.len)) catch oom();
 
     for (tags) |tag| {
@@ -517,12 +515,7 @@ fn enumTags(self: *Self, tags: []const Ast.EnumDecl.Tag, ty: *Type.Enum, ctx: *C
             );
         }
         gop.value_ptr.* = if (tag_value) |val| val.instr else null;
-
         names.appendAssumeCapacity(self.allocator.dupe(u8, self.ast.toSource(tag.name)) catch oom());
-        // tag_names.appendAssumeCapacity(.{
-        //     .name = self.allocator.dupe(u8, self.ast.toSource(tag.name)) catch oom(),
-        //     .value = if (tag_value) |val| val.instr else null,
-        // });
     }
 
     return names.toOwnedSlice(self.allocator) catch oom();

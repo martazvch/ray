@@ -416,6 +416,7 @@ pub fn next(self: *Self) Token {
             self.index += 1;
 
             switch (self.source[self.index]) {
+                0 => res.tag = .eof,
                 '\n' => continue :state .start,
                 else => continue :state .comment,
             }
@@ -573,6 +574,7 @@ pub fn next(self: *Self) Token {
             self.index += 1;
 
             switch (self.source[self.index]) {
+                0 => res.tag = .eof,
                 '\\' => {
                     self.index += 1;
                     continue :state .string;
