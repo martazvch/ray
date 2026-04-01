@@ -273,7 +273,7 @@ const Tester = struct {
         @memcpy(output_file[0..name.len], name);
         @memcpy(output_file[name.len..], ".out");
 
-        const path_opt = "-p=../..";
+        const path_opt = "-p=.." ++ std.fs.path.sep_str ++ "..";
 
         const argv = if (stage == .vm or stage == .standalone)
             &[_][]const u8{ self.exe_path, file_name, path_opt }

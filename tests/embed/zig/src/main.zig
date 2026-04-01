@@ -36,9 +36,8 @@ pub fn main() !void {
 }
 
 test {
-    try Tester.testMod(@import("tests/simple.zig"));
-    try Tester.testMod(@import("tests/declare_local.zig"));
-    try Tester.testMod(@import("tests/declare_fn.zig"));
-    try Tester.testMod(@import("tests/builtins.zig"));
-    try Tester.testMod(@import("tests/register_natives.zig"));
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    try Tester.testDir(arena.allocator(), "../cases");
 }
