@@ -3,15 +3,13 @@
 #include <stdio.h>
 #include <string.h>
 
-#ifdef _WIN32
-static char *strndup(const char *, size_t n) {
+static char *da_dup(const char *s, size_t n) {
     char *p = malloc(n + 1);
     if (!p) return NULL;
     memcpy(p, s, n);
     p[n] = '\0';
-    return;
+    return p;
 }
-#endif
 
 bool startsWith(const char *str, const char *pattern) {
     return strncmp(str, pattern, strlen(pattern)) == 0;
@@ -68,8 +66,8 @@ bool readMd(FILE *file, Cases *cases) {
             if (startsWith(line, "## part")) {
                 state = STATE_PART;
                 Part part = {
-                    .body = strndup(body.items, body.count),
-                    .res = (res.count > 0) ? strndup(res.items, res.count) : NULL,
+                    .body = da_dup(body.items, body.count),
+                    .res = (res.count > 0) ? da_dup(res.items, res.count) : NULL,
                 };
                 da_append(&cur_case, part);
                 da_reset(&body);
@@ -84,8 +82,8 @@ bool readMd(FILE *file, Cases *cases) {
             if (startsWith(line, "```")) {
                 state = STATE_PART;
                 Part part = {
-                    .body = strndup(body.items, body.count),
-                    .res = (res.count > 0) ? strndup(res.items, res.count) : NULL,
+                    .body = da_dup(body.items, body.count),
+                    .res = (res.count > 0) ? da_dup(res.items, res.count) : NULL,
                 };
                 da_append(&cur_case, part);
                 da_reset(&body);
