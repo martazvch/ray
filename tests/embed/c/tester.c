@@ -23,10 +23,12 @@ void isLess(RayVm *vm) {
     raySetBool(vm, 0, a < b);
 }
 
-static const char *output = NULL;
+static char *output = NULL;
 
 void print(const char *text) {
-    output = strdup(text);
+    size_t len = strlen(text);
+    output = malloc(len + 1);
+    if (output) memcpy(output, text, len + 1);
 }
 
 void logError(const char *file_name, int part_id, const char *fmt, ...) {
@@ -43,6 +45,17 @@ void logError(const char *file_name, int part_id, const char *fmt, ...) {
 bool runTest(RayVm *vm, const char *file_name, Part *part, int part_id) {
     output = NULL;
     Result result = rayRun(vm, part->body);
+
+    switch (result) {
+    case RES_COMPILE_ERR:
+        logError(file_name, part_id, "Compilation error");
+        return false;
+    case RES_RUNTIME_ERR:
+        logError(file_name, part_id, "Runtime error");
+        return false;
+    case RES_OK:
+        break;
+    }
 
     if (part->res) {
         if (output) {
