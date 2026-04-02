@@ -103,7 +103,6 @@ bool testDir(const char *path) {
         da_foreach(Case, c, &cases) {
             rayCreate((Config){
                 .embedded = true,
-                // .print_ir = true,
                 .printFn = print,
             });
             rayRegisterFn((RayFnProto){

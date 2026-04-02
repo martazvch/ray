@@ -1,14 +1,12 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const State = @import("core/pipeline/State.zig");
+const core = @import("core");
+const State = core.State;
 pub const Config = State.Config;
-
-const Pipeline = @import("core/pipeline/pipeline.zig");
-pub const Vm = @import("core/runtime/Vm.zig");
-
-const cffi = @import("core/builtins/cffi.zig");
-pub const FnProto = cffi.FnProto;
+const Pipeline = core.Pipeline;
+pub const Vm = core.Vm;
+pub const FnProto = core.cffi.FnProto;
 
 var arena: std.heap.ArenaAllocator = .init(std.heap.smp_allocator);
 var allocator = arena.allocator();

@@ -41,6 +41,16 @@ pub fn build(b: *std.Build) !void {
         .root_source_file = b.path("src/misc/misc.zig"),
     });
 
+    const core_mod = b.createModule(.{
+        .optimize = optimize,
+        .target = target,
+        .root_source_file = b.path("src/core/core.zig"),
+        .imports = &.{
+            .{ .name = "misc", .module = misc_mod },
+            .{ .name = "options", .module = options.createModule() },
+        },
+    });
+
     const clarg = b.dependency("clarg", .{
         .target = target,
         .optimize = optimize,
@@ -67,8 +77,9 @@ pub fn build(b: *std.Build) !void {
     const embed_mod = b.addModule("embed", .{
         .target = target,
         .optimize = optimize,
-        .root_source_file = b.path("src/embed.zig"),
+        .root_source_file = b.path("src/embed/embed.zig"),
         .imports = &.{
+            .{ .name = "core", .module = core_mod },
             .{ .name = "misc", .module = misc_mod },
             .{ .name = "options", .module = options.createModule() },
         },
@@ -78,10 +89,11 @@ pub fn build(b: *std.Build) !void {
     const embed_c_lib = b.addLibrary(.{
         .name = "ray",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/embed_c.zig"),
+            .root_source_file = b.path("src/embed/embed_c.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
+                .{ .name = "core", .module = core_mod },
                 .{ .name = "misc", .module = misc_mod },
                 .{ .name = "options", .module = options.createModule() },
             },
@@ -163,6 +175,7 @@ pub fn build(b: *std.Build) !void {
         .root_module = b.createModule(.{
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
         }),
     });
     c_embed_test_exe.addCSourceFiles(.{
@@ -171,7 +184,7 @@ pub fn build(b: *std.Build) !void {
         .flags = &.{ "-Wall", "-Wextra", "-std=c99" },
     });
     c_embed_test_exe.addIncludePath(b.path("tests/embed/c"));
-    c_embed_test_exe.addIncludePath(b.path("src"));
+    c_embed_test_exe.addIncludePath(b.path("src/embed"));
     c_embed_test_exe.linkLibrary(embed_c_lib);
     const lib_dir = b.getInstallPath(.{ .custom = "tests/embed/c" }, "");
     c_embed_test_exe.addRPath(.{ .cwd_relative = lib_dir });

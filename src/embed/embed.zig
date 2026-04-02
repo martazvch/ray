@@ -1,14 +1,13 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const State = @import("core/pipeline/State.zig");
+const core = @import("core");
+const State = core.State;
 pub const Config = State.Config;
-
-const Pipeline = @import("core/pipeline/pipeline.zig");
-pub const Vm = @import("core/runtime/Vm.zig");
-
-const ffi = @import("core/builtins/ffi.zig");
-pub const RayFn = ffi.ZigFnMeta;
+const Pipeline = core.Pipeline;
+pub const Vm = core.Vm;
+const ffi = core.ffi;
+const RayFn = ffi.ZigFnMeta;
 
 arena: std.heap.ArenaAllocator,
 allocator: Allocator,
