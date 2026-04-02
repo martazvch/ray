@@ -9,6 +9,14 @@ pub const Error = error{
     ExpectNothingButGot,
 };
 
+fn logError(file_name: []const u8, part_id: usize, comptime fmt: []const u8, args: anytype) void {
+    std.debug.print(
+        "Error in embedded Zig test in file: {s}, part n°{}",
+        .{ file_name, part_id },
+    );
+    std.log.debug(fmt, args);
+}
+
 var output: ?[]const u8 = null;
 
 pub fn printFn(text: []const u8) void {
@@ -45,15 +53,15 @@ pub fn testDir(allocator: Allocator, path: []const u8) !void {
         const cases = try Reader.read(allocator, &test_dir, entry.basename);
 
         for (cases.items) |case| {
-            for (case.items) |part| {
-                try runTest(&vm, part);
+            for (case.items, 0..) |part, i| {
+                try runTest(&vm, entry.basename, i, part);
             }
         }
     }
 }
 
 /// `vm` must be of type ray.Vm, but it isn't marked as public
-fn runTest(vm: anytype, part: Reader.Part) Error!void {
+fn runTest(vm: anytype, file_name: []const u8, part_id: usize, part: Reader.Part) Error!void {
     output = null;
 
     vm.run(part.body) catch {
@@ -63,7 +71,9 @@ fn runTest(vm: anytype, part: Reader.Part) Error!void {
     if (part.res) |expect| {
         if (output) |out| {
             if (!std.mem.eql(u8, expect, out)) {
-                std.debug.print(
+                logError(
+                    file_name,
+                    part_id,
                     \\Mismatch between expected and output
                     \\ Expected:
                     \\ ---------
@@ -79,7 +89,9 @@ fn runTest(vm: anytype, part: Reader.Part) Error!void {
                 return error.TestFailed;
             }
         } else {
-            std.debug.print(
+            logError(
+                file_name,
+                part_id,
                 \\Expected output but got nothing
                 \\ Expected:
                 \\ ---------
@@ -92,7 +104,9 @@ fn runTest(vm: anytype, part: Reader.Part) Error!void {
         }
     } else {
         if (output) |out| {
-            std.debug.print(
+            logError(
+                file_name,
+                part_id,
                 \\Expected nothing but got
                 \\ Got:
                 \\ ----
