@@ -1,9 +1,9 @@
 .zig-cache
 zig-out
 .DS_STORE
-.zig-profile
 .vscode/
 .zed/
 test.ray
 *.o
 tester
+tester.exe

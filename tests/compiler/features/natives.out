@@ -2,9 +2,9 @@
 
 -- main --
 load_constant index 3, value natives.ray
-call_native index 4, arity 1, open
+call_zig index 4, arity 1, open
 get_local index 0
-call_native index 3, arity 1, readAll
+call_zig index 3, arity 1, readAll
 print
 ret_naked
 

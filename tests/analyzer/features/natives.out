@@ -1,6 +1,6 @@
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
-        [Native fn call]
+        [Zig fn call]
             [Builtin symbol: 4]
             - args
             [Constant index 3]
@@ -8,4 +8,4 @@
     [Print]
         [Field access 3]
             [Variable index: 0, scope: local]
-        [Invoke native symbol 3]
+        [Invoke Zig symbol 3]

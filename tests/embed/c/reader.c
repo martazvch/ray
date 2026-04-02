@@ -3,11 +3,21 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef _WIN32
+static char *strndup(const char *, size_t n) {
+    char *p = malloc(n + 1);
+    if (!p) return NULL;
+    memcpy(p, s, n);
+    p[n] = '\0';
+    return;
+}
+#endif
+
 bool startsWith(const char *str, const char *pattern) {
     return strncmp(str, pattern, strlen(pattern)) == 0;
 }
 
-bool read(FILE *file, Cases *cases) {
+bool readMd(FILE *file, Cases *cases) {
     State state = STATE_NONE;
     Case cur_case = {0};
     String body = {0};
@@ -85,7 +95,6 @@ bool read(FILE *file, Cases *cases) {
             break;
         }
 
-        printf("Line: -%s-\n", line);
         if (strlen(line) == 0) {
             continue;
         }

@@ -1,20 +1,20 @@
 -- main --
 load_constant index 3, value 5.6
-call_native index 0, arity 1, int
+call_zig index 0, arity 1, int
 
 load_constant index 4, value 5
-call_native index 0, arity 1, int
+call_zig index 0, arity 1, int
 set_local index 0
 
 load_constant index 5, value 6
-call_native index 1, arity 1, float
+call_zig index 1, arity 1, float
 
 load_constant index 6, value 6.4
-call_native index 1, arity 1, float
+call_zig index 1, arity 1, float
 set_local index 1
 
 load_constant index 4, value 5
-call_native index 2, arity 1, str
+call_zig index 2, arity 1, str
 print
 
 ret_naked

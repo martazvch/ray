@@ -1,8 +1,8 @@
 Language: C
 BasedOnStyle: LLVM
 IndentWidth: 4
-AllowShortIfStatementsOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
 AllowShortBlocksOnASingleLine: Empty
 AllowShortFunctionsOnASingleLine: Empty
 AllowShortLoopsOnASingleLine: false
-
+ColumnLimit: 0

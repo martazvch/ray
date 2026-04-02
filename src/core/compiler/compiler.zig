@@ -39,7 +39,8 @@ pub const CompilationUnit = struct {
     render: bool,
 
     // For disassembler
-    native_funcs: []const *Obj.ZigFn,
+    zig_fns: []const *Obj.ZigFn,
+    c_fns: []const *Obj.CFn,
 
     const Self = @This();
     const Error = error{ Err, TooManyConst } || std.posix.WriteError;
@@ -54,7 +55,8 @@ pub const CompilationUnit = struct {
             .errs = .empty,
             .instr_data = undefined,
             .instr_lines = undefined,
-            .native_funcs = state.native_reg.zig_fns.items,
+            .zig_fns = state.native_reg.zig_fns.items,
+            .c_fns = state.native_reg.c_fns.items,
             .constants = state.const_interner.constants.items,
             .line = 0,
             .compiled_constants = .empty,
@@ -295,7 +297,8 @@ const Compiler = struct {
             var dis = Disassembler.init(
                 &self.function.chunk,
                 self.manager.state.modules.getFromIndex(self.manager.mod_index),
-                self.manager.native_funcs,
+                self.manager.zig_fns,
+                self.manager.c_fns,
             );
             dis.disChunk(&alloc_writer.writer, self.function.name);
 
@@ -602,7 +605,7 @@ const Compiler = struct {
             self.writeOpAndByte(.call_ext, @intCast(sym_index));
             self.writeByte(@intCast(mod.toInt()));
         } else switch (data.kind) {
-            .c => {},
+            .c => self.writeOpAndByte(.call_c, @intCast(sym_index)),
             .zig, .zig_method => self.writeOpAndByte(.call_zig, @intCast(sym_index)),
             else => self.writeOpAndByte(.call, @intCast(sym_index)),
         }

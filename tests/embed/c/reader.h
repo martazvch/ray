@@ -38,6 +38,6 @@ typedef struct {
     char *items;
 } String;
 
-bool read(FILE *file, Cases *cases);
+bool readMd(FILE *file, Cases *cases);
 
 #endif // READER_H

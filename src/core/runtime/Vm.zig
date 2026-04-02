@@ -162,7 +162,12 @@ fn execute(self: *Self) !void {
             const stdout = &stdout_writer.interface;
             defer stdout.flush() catch oom();
 
-            var dis = Disassembler.init(&self.frame.function.chunk, self.frame.module, self.zig_fns);
+            var dis = Disassembler.init(
+                &self.frame.function.chunk,
+                self.frame.module,
+                self.zig_fns,
+                self.c_fns,
+            );
             const instr_nb = self.frame.instructionNb();
             _ = dis.disInstruction(stdout, instr_nb);
         }
@@ -275,9 +280,7 @@ fn execute(self: *Self) !void {
                 obj.function(@ptrCast(self));
 
                 if (obj.returns) {
-                    const res = self.stack.pop();
-                    self.stack.top = base;
-                    self.stack.push(res);
+                    self.stack.top = base + 1;
                 } else {
                     self.stack.top = base;
                 }

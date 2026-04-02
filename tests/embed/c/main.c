@@ -1,9 +1,7 @@
 #include "tester.h"
-#include <stdio.h>
 
 int main() {
-    const char *path = "../cases";
-    if (testDir(path)) {
+    if (testDir("../cases")) {
         return 0;
     } else {
         return 1;

@@ -3,55 +3,80 @@
 #include "ray.h"
 #include "reader.h"
 #include "tinydir.h"
+#include <stdarg.h>
 #include <stdio.h>
 
+void printCases(Cases *cases) {
+    da_foreach(Case, c, cases) {
+        printf("-- Case\n");
+        da_foreach(Part, part, c) {
+            printf("  -- Part\n");
+            printf("    -- body\n%s\n", part->body);
+            printf("    -- res\n%s\n", part->res);
+        }
+    }
+}
+
 void isLess(RayVm *vm) {
-    printf("CALLED\n");
+    int a = rayGetInt(vm, 0);
+    int b = rayGetInt(vm, 1);
+    raySetBool(vm, 0, a < b);
 }
 
 static const char *output = NULL;
 
 void print(const char *text) {
-    printf("Gonna print: %s\n", text);
     output = strdup(text);
-    printf("Printed: %s\n", output);
 }
 
-bool runTest(Part *part) {
+void logError(const char *file_name, int part_id, const char *fmt, ...) {
+    fprintf(stderr,
+            "Error in embedded C tests in file: %s, part n°%d\n",
+            file_name, part_id);
+
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
+}
+
+bool runTest(RayVm *vm, const char *file_name, Part *part, int part_id) {
     output = NULL;
-    Result result = rayRun(part->body);
-    printf("Printed: %s\n", output);
+    Result result = rayRun(vm, part->body);
 
     if (part->res) {
         if (output) {
             if (strcmp(part->res, output) != 0) {
-                printf("Mismatch between exoected and output\n"
-                       " Expected:\n"
-                       "----------\n"
-                       "%s\n\n"
-                       "Got:\n"
-                       "----\n"
-                       "%s\n\n",
-                       part->res, output);
+                logError(file_name, part_id,
+                         "Mismatch between expected and output\n"
+                         " Expected:\n"
+                         "----------\n"
+                         "%s\n\n"
+                         "Got:\n"
+                         "----\n"
+                         "%s\n\n",
+                         part->res, output);
 
                 return false;
             }
         } else {
-            printf("Expected output but got nothing\n"
-                   " Expected:\n"
-                   " ---------\n"
-                   "%s\n\n",
-                   part->res);
+            logError(file_name, part_id,
+                     "Expected output but got nothing\n"
+                     " Expected:\n"
+                     " ---------\n"
+                     "%s\n\n",
+                     part->res);
 
             return false;
         }
 
     } else if (output) {
-        printf("Expect nothing but got\n"
-               " Got:\n"
-               " ----\n"
-               "%s\n\n",
-               output);
+        logError(file_name, part_id,
+                 "Expect nothing but got\n"
+                 " Got:\n"
+                 " ----\n"
+                 "%s\n\n",
+                 output);
 
         return false;
     }
@@ -60,7 +85,6 @@ bool runTest(Part *part) {
 }
 
 bool testDir(const char *path) {
-
     tinydir_dir dir;
     if (tinydir_open(&dir, path) == -1) {
         return false;
@@ -86,47 +110,39 @@ bool testDir(const char *path) {
 
         Cases cases = {0};
         FILE *f = fopen(file.path, "r");
-        printf("Oui\n");
-        read(f, &cases);
+        readMd(f, &cases);
         fclose(f);
 
-        printf("Testing file: %s\n", file.name);
         da_foreach(Case, c, &cases) {
-            printf("-- Case\n");
-            da_foreach(Part, part, c) {
-                printf("  -- Part\n");
-                printf("    -- body\n%s\n", part->body);
-                printf("    -- res\n%s\n", part->res);
-            }
-        }
-
-        da_foreach(Case, c, &cases) {
-            rayCreate((Config){
+            RayVm *vm = rayNewVm((Config){
                 .embedded = true,
                 .printFn = print,
             });
-            rayRegisterFn((RayFnProto){
-                .name = "isLess",
-                .arity = 2,
-                .params =
-                    {
-                        {.name = "a", .type = TYPE_INT},
-                        {.name = "b", .type = TYPE_INT},
-                    },
-                .return_type = TYPE_BOOL,
-                .func = isLess,
+            rayRegisterFn(
+                vm,
+                (RayFnProto){
+                    .name = "isLess",
+                    .arity = 2,
+                    .params =
+                        {
+                            {.name = "a", .type = TYPE_INT},
+                            {.name = "b", .type = TYPE_INT},
+                        },
+                    .return_type = TYPE_BOOL,
+                    .func = isLess,
+                });
+            rayInitGlobalScope(vm);
 
-            });
-            rayInitGlobalScope();
-
+            int part_id = 0;
             da_foreach(Part, part, c) {
-                if (!runTest(part)) {
-                    rayDeinit();
+                if (!runTest(vm, file.name, part, part_id)) {
+                    rayDeinitVm(vm);
                     return false;
                 }
+                part_id++;
             }
 
-            rayDeinit();
+            rayDeinitVm(vm);
         }
 
     next:

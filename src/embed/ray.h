@@ -2,8 +2,19 @@
 #define RAY_H
 
 #include <stdbool.h>
+#include <stddef.h>
 
+// ---------
+//  Opaques
+typedef struct RayVm RayVm;
+typedef struct RayReg RayReg;
+
+// ----------
+//  Typedefs
+typedef void (*RayFn)(RayVm *);
 typedef void (*RayPrintFn)(const char *);
+
+typedef size_t Index;
 
 typedef struct {
     bool embedded;
@@ -35,9 +46,6 @@ typedef struct {
 } RayParam;
 
 #define MAX_PARAM 256
-typedef struct RayVm RayVm;
-typedef void (*RayFn)(RayVm *);
-
 typedef struct {
     char *name;
     int arity;
@@ -46,10 +54,23 @@ typedef struct {
     RayFn func;
 } RayFnProto;
 
-extern void rayCreate(Config);
-extern void rayRegisterFn(RayFnProto);
-extern void rayInitGlobalScope();
-extern Result rayRun(const char *source);
-extern void rayDeinit();
+// -----------
+//  Functions
+extern RayVm *rayNewVm(Config);
+extern void rayRegisterFn(RayVm *, RayFnProto);
+extern void rayInitGlobalScope(RayVm *);
+extern Result rayRun(RayVm *, const char *source);
+extern void rayDeinitVm(RayVm *);
+
+// ---------
+//  Getters
+extern double rayGetFloat(RayVm *, Index);
+extern int rayGetInt(RayVm *, Index);
+
+// ---------
+//  Setters
+extern void raySetFloat(RayVm *, Index, double);
+extern void raySetInt(RayVm *, Index, int);
+extern void raySetBool(RayVm *, Index, bool);
 
 #endif // RAY_H

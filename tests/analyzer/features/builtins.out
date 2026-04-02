@@ -1,23 +1,23 @@
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
-        [Native fn call]
+        [Zig fn call]
             [Builtin symbol: 0]
             - args
             [Constant index 3]
                 [Float 5.6]
-    [Native fn call]
+    [Zig fn call]
         [Builtin symbol: 0]
         - args
         [Constant index 4]
             [Int 5]
     [Assignment index: 0, scope: local]
     [Variable declaration index: 1, scope: local]
-        [Native fn call]
+        [Zig fn call]
             [Builtin symbol: 1]
             - args
             [Constant index 5]
                 [Int 6]
-    [Native fn call]
+    [Zig fn call]
         [Builtin symbol: 1]
         - args
         [Constant index 6]
@@ -32,7 +32,7 @@
             [Constant index 3]
                 [Float 5.6]
     [Print]
-        [Native fn call]
+        [Zig fn call]
             [Builtin symbol: 2]
             - args
             [Constant index 4]

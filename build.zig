@@ -77,7 +77,7 @@ pub fn build(b: *std.Build) !void {
     const embed_mod = b.addModule("embed", .{
         .target = target,
         .optimize = optimize,
-        .root_source_file = b.path("src/embed/embed.zig"),
+        .root_source_file = b.path("src/embed/zig.zig"),
         .imports = &.{
             .{ .name = "core", .module = core_mod },
             .{ .name = "misc", .module = misc_mod },
@@ -89,7 +89,7 @@ pub fn build(b: *std.Build) !void {
     const embed_c_lib = b.addLibrary(.{
         .name = "ray",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/embed/embed_c.zig"),
+            .root_source_file = b.path("src/embed/c.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -166,12 +166,10 @@ pub fn build(b: *std.Build) !void {
     test_step.dependOn(&embed_tests.step);
 
     // C embedded tests
-    const install_embed_c_lib = b.addInstallArtifact(embed_c_lib, .{
-        .dest_dir = .{ .override = .{ .custom = "tests/embed/c" } },
-    });
+    const install_embed_c_lib = b.addInstallArtifact(embed_c_lib, .{});
 
     const c_embed_test_exe = b.addExecutable(.{
-        .name = "tester",
+        .name = "c-tester",
         .root_module = b.createModule(.{
             .target = target,
             .optimize = optimize,
@@ -186,15 +184,13 @@ pub fn build(b: *std.Build) !void {
     c_embed_test_exe.addIncludePath(b.path("tests/embed/c"));
     c_embed_test_exe.addIncludePath(b.path("src/embed"));
     c_embed_test_exe.linkLibrary(embed_c_lib);
-    const lib_dir = b.getInstallPath(.{ .custom = "tests/embed/c" }, "");
+    const lib_dir = b.getInstallPath(.lib, "");
     c_embed_test_exe.addRPath(.{ .cwd_relative = lib_dir });
 
-    const install_c_tester = b.addInstallArtifact(c_embed_test_exe, .{
-        .dest_dir = .{ .override = .{ .custom = "tests/embed/c" } },
-    });
+    const install_c_tester = b.addInstallArtifact(c_embed_test_exe, .{});
     install_c_tester.step.dependOn(&install_embed_c_lib.step);
 
-    const tester_path = b.getInstallPath(.{ .custom = "tests/embed/c" }, "tester");
+    const tester_path = b.getInstallPath(.bin, "c-tester");
     const run_c_embed_test = b.addSystemCommand(&.{tester_path});
     run_c_embed_test.setCwd(b.path("tests/embed/c"));
     run_c_embed_test.step.dependOn(&install_c_tester.step);

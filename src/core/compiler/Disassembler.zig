@@ -12,7 +12,8 @@ const OpCode = Chunk.OpCode;
 const Module = @import("../pipeline/ModuleManager.zig").Module;
 
 chunk: *const Chunk,
-natives: []const *Obj.ZigFn,
+zig_fns: []const *Obj.ZigFn,
+c_fns: []const *Obj.CFn,
 render_mode: RenderMode,
 module: *const Module,
 wide: bool,
@@ -22,11 +23,17 @@ prev_line: usize = 0,
 const Self = @This();
 pub const RenderMode = enum { normal, @"test" };
 
-pub fn init(chunk: *const Chunk, module: *const Module, natives: []const *Obj.ZigFn) Self {
+pub fn init(
+    chunk: *const Chunk,
+    module: *const Module,
+    zig_fns: []const *Obj.ZigFn,
+    c_fns: []const *Obj.CFn,
+) Self {
     return .{
         .chunk = chunk,
         .render_mode = if (options.test_mode) .@"test" else .normal,
-        .natives = natives,
+        .zig_fns = zig_fns,
+        .c_fns = c_fns,
         .module = module,
         .wide = false,
     };
@@ -85,8 +92,8 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .call_array, .call_string => self.callObjFn(writer, op, offset),
         .call => self.call(writer, offset),
         .call_ext => self.callExt(writer, offset),
-        .call_c => self.callZig(writer, offset),
-        .call_zig => self.callZig(writer, offset),
+        .call_c => self.callNative(writer, .c, offset),
+        .call_zig => self.callNative(writer, .zig, offset),
         .closure => self.indexInstruction(writer, "closure", offset),
         .def_global => self.indexInstruction(writer, "def_global", offset),
         .div_float => self.simpleInstruction(writer, "div_float", offset),
@@ -373,31 +380,16 @@ fn callExt(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
     return offset + 4;
 }
 
-fn callZig(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
-    const text = "call_zig";
+fn callNative(self: *Self, writer: *Writer, comptime kind: enum { c, zig }, offset: usize) Writer.Error!usize {
+    const text = "call_" ++ @tagName(kind);
     const index = self.chunk.code.items[offset + 1];
     const arity = self.chunk.code.items[offset + 2];
-    const native = self.natives[index];
+    const name = if (kind == .c) self.c_fns[index].name else self.zig_fns[index].name;
 
     if (self.render_mode == .@"test") {
-        try writer.print("{s} index {}, arity {}, {s}\n", .{ text, index, arity, native.name });
+        try writer.print("{s} index {}, arity {}, {s}\n", .{ text, index, arity, name });
     } else {
-        try writer.print("{s:<20} index {:>4}, arity {:>4}, {s}\n", .{ text, index, arity, native.name });
-    }
-
-    return offset + 3;
-}
-
-fn callC(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
-    const text = "call_c";
-    const index = self.chunk.code.items[offset + 1];
-    const arity = self.chunk.code.items[offset + 2];
-    const native = self.natives[index];
-
-    if (self.render_mode == .@"test") {
-        try writer.print("{s} index {}, arity {}, {s}\n", .{ text, index, arity, native.name });
-    } else {
-        try writer.print("{s:<20} index {:>4}, arity {:>4}, {s}\n", .{ text, index, arity, native.name });
+        try writer.print("{s:<20} index {:>4}, arity {:>4}, {s}\n", .{ text, index, arity, name });
     }
 
     return offset + 3;
