@@ -33,5 +33,5 @@ test {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    try Tester.testDir(arena.allocator(), ".." ++ std.fs.path.sep_str ++ "cases");
+    try Tester.testDir(arena.allocator(), "../cases");
 }

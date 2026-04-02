@@ -36,7 +36,9 @@ pub fn read(allocator: Allocator, cwd: *std.fs.Dir, file_name: []const u8) Error
 
     errdefer unreachable;
 
-    while (it.next()) |line| {
+    while (it.next()) |raw_line| {
+        const line = std.mem.trimRight(u8, raw_line, "\r");
+
         switch (state) {
             .none => if (startsWith(u8, line, "# case")) {
                 state = .case;
