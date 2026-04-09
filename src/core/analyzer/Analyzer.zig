@@ -23,6 +23,9 @@ const Constant = @import("ConstantInterner.zig").Constant;
 const Pipeline = @import("../pipeline/pipeline.zig");
 const State = @import("../pipeline/State.zig");
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
+const cffi = @import("../builtins/cffi.zig");
+const Value = @import("../runtime/values.zig").Value;
+const CFn = @import("../runtime/Obj.zig").CFn;
 
 const type_mod = @import("types.zig");
 const Type = type_mod.Type;
@@ -1043,31 +1046,69 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
     const old_path_length = self.path.len();
     defer self.path.shrink(self.allocator, old_path_length);
 
-    const result = Importer.fetchImportedFile(
+    var result = Importer.fetchImportedFile(
         self.allocator,
         self.ast,
         node.names,
         self.state.config.path,
         self.path,
     );
-    const file = switch (result) {
-        .ok => |f| f,
-        .err => |e| {
-            self.errs.append(self.allocator, e) catch oom();
-            return error.Err;
+    const path = path: switch (result) {
+        .dynlib => |*dynlib| {
+            const handcheck = dynlib.lib.lookup(cffi.Handcheck, "handcheck") orelse {
+                @panic("Not an extension");
+            };
+            var reg: cffi.Register = .{
+                .allocator = self.allocator,
+                .funcs = .empty,
+                .interner = self.interner,
+                .ti = self.ti,
+            };
+            handcheck(@ptrCast(&reg), &cffi.api);
+
+            const interned = self.interner.intern(dynlib.path);
+            const mod_index = self.state.modules.open(self.allocator, interned, module_name);
+            const mod = self.state.modules.getFromIndex(mod_index);
+
+            mod.foreign_funcs = self.allocator.alloc(*CFn, reg.funcs.items.len) catch oom();
+            mod.sym_infos.ensureTotalCapacity(self.allocator, reg.funcs.items.len) catch oom();
+
+            for (reg.funcs.items, 0..) |func, i| {
+                mod.foreign_funcs[i] = CFn.create(
+                    self.allocator,
+                    self.interner.getKey(func.name).?,
+                    func.func,
+                    func.returns,
+                );
+                mod.sym_infos.putAssumeCapacity(func.name, .{
+                    .name = func.name,
+                    .type = func.type,
+                    .index = func.index,
+                });
+            }
+            break :path interned;
         },
+        .rayfile => |f| {
+            const interned = self.interner.intern(f.path);
+
+            if (!self.state.modules.has(interned)) {
+                Pipeline.runSubPipeline(self.allocator, self.state, f.name, f.path, f.content);
+            }
+            break :path interned;
+        },
+        .missing_file => |e| return self.err(
+            .{ .missing_file_in_module = .{ .file = self.ast.toSource(e) } },
+            self.ast.getSpan(e),
+        ),
+        .unknown_mod => |e| return self.err(
+            .{ .unknown_module = .{ .name = self.ast.toSource(e) } },
+            self.ast.getSpan(e),
+        ),
     };
 
-    // TODO: don't check only path but path + name?
-    const interned = self.interner.intern(file.path);
-
-    if (!self.state.modules.has(interned)) {
-        Pipeline.runSubPipeline(self.allocator, self.state, file.name, file.path, file.content);
-    }
-
     if (node.items) |items| {
-        const mod = self.state.modules.getFromName(interned).?;
-        const mod_index = self.state.modules.getIndex(interned).?;
+        const mod = self.state.modules.getFromName(path).?;
+        const mod_index = self.state.modules.getIndex(path).?;
 
         for (items) |item| {
             const item_name = self.interner.intern(self.ast.toSource(item.item));
@@ -1089,7 +1130,7 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
             self.scope.declareExternSymbol(self.allocator, item_interned, mod_index, sym);
         }
     } else {
-        self.scope.declareModule(self.allocator, module_name, self.ti.intern(.{ .module = interned }));
+        self.scope.declareModule(self.allocator, module_name, self.ti.intern(.{ .module = path }));
     }
 }
 

@@ -1,4 +1,4 @@
-missing_file_in_module, pipou.ray
-missing_file_in_module, mathh.ray
+missing_file_in_module, pipou
+missing_file_in_module, mathh
 unknown_module, trash
 missing_symbol_in_module, missing_func, math

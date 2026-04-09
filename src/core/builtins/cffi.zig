@@ -29,7 +29,7 @@ pub const Fn = *const fn (*cVm) callconv(.c) void;
 const Index = usize;
 
 const cApi = extern struct {
-    register_fn: *const fn (*cRegister, Fn, FnProto) callconv(.c) void,
+    register_fn: *const fn (*cRegister, FnProto) callconv(.c) void,
     get_float: *const fn (*cVm, Index) callconv(.c) f64,
     set_float: *const fn (*cVm, Index, f64) callconv(.c) void,
 };
@@ -62,14 +62,14 @@ pub const FnProto = extern struct {
 };
 
 fn registerFn(c_register: *cRegister, proto: FnProto) callconv(.c) void {
-    var register: *Register = @ptrCast(@alignCast(c_register));
+    var reg: *Register = @ptrCast(@alignCast(c_register));
 
-    register.funcs.append(
-        register.allocator,
+    reg.funcs.append(
+        reg.allocator,
         .{
-            .name = register.interner.intern(std.mem.span(proto.name)),
-            .type = NativeReg.fnCToRay(register, proto),
-            .index = register.funcs.items.len,
+            .name = reg.interner.intern(std.mem.span(proto.name)),
+            .type = NativeReg.fnCToRay(reg.allocator, &proto, reg.interner, reg.ti),
+            .index = reg.funcs.items.len,
             .func = @ptrCast(proto.func),
             .returns = proto.return_type != .void,
         },

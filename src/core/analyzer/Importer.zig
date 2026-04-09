@@ -2,7 +2,6 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const Ast = @import("../parser/Ast.zig");
-const AnalyzerReport = @import("Analyzer.zig").AnalyzerReport;
 
 const misc = @import("misc");
 const Sb = misc.StringBuilder;
@@ -10,9 +9,18 @@ const oom = misc.oom;
 
 const Self = @This();
 pub const Result = union(enum) {
-    ok: struct { name: []const u8, path: []const u8, content: [:0]const u8 },
-    // TODO: would be nice to remove this dependence
-    err: AnalyzerReport,
+    rayfile: struct {
+        name: []const u8,
+        path: []const u8,
+        content: [:0]const u8,
+    },
+    dynlib: struct {
+        name: []const u8,
+        path: []const u8,
+        lib: std.DynLib,
+    },
+    unknown_mod: usize,
+    missing_file: usize,
 };
 
 /// Import rules and order
@@ -37,6 +45,7 @@ pub fn fetchImportedFile(
         const buf_written = sb.render(&buf_path);
         const cwd = std.fs.openDirAbsolute(buf_written, .{}) catch unreachable;
 
+        // TODO: could it be only a dot? And thus it would break at the [1..]
         return fetchFrom(allocator, cwd, ast, path_chunks[1..], sb);
     }
 
@@ -62,36 +71,63 @@ fn fetchFrom(allocator: Allocator, init_dir: std.fs.Dir, ast: *const Ast, path_c
         const name = ast.toSource(part);
 
         if (i == path_chunks.len - 1) {
-            const file_name = allocator.alloc(u8, name.len + 4) catch oom();
-            @memcpy(file_name[0..name.len], name);
-            @memcpy(file_name[name.len..], ".ray");
+            inline for (.{ ".ray", ".dylib" }, .{ rayFile, dynLib }) |ext, func| {
+                const file_name = allocator.alloc(u8, name.len + ext.len) catch oom();
+                @memcpy(file_name[0..name.len], name);
+                @memcpy(file_name[name.len..], ext);
 
-            const file = cwd.openFile(file_name, .{}) catch {
-                const owned_name = allocator.dupe(u8, file_name) catch oom();
-                const span = ast.getSpan(part);
-                return .{ .err = .err(.{ .missing_file_in_module = .{ .file = owned_name } }, span.start, span.end) };
-            };
-            defer file.close();
+                if (cwd.access(file_name, .{})) {
+                    return func(allocator, &cwd, file_name, sb);
+                } else |_| {}
 
-            // The file has a new line inserted by default
-            const size = file.getEndPos() catch @panic("Ray internal error: wrong import file end position");
-            const buf = allocator.allocSentinel(u8, size, 0) catch oom();
-            _ = file.readAll(buf) catch @panic("Ray internal error: error while reading imported file");
-
-            sb.append(allocator, ".");
-            sb.append(allocator, file_name);
-            defer sb.popMany(2);
-
-            return .{ .ok = .{ .name = file_name, .path = sb.renderAlloc(allocator), .content = buf } };
+                // If not found, we free the buffer
+                allocator.free(file_name);
+            }
         } else {
-            cwd = cwd.openDir(name, .{}) catch {
-                const span = ast.getSpan(part);
-                return .{ .err = .err(.{ .unknown_module = .{ .name = name } }, span.start, span.end) };
-            };
+            cwd = cwd.openDir(name, .{}) catch return .{ .unknown_mod = part };
             sb.append(allocator, std.fs.path.sep_str);
             sb.append(allocator, name);
         }
     }
 
-    unreachable;
+    return .{ .missing_file = path_chunks[path_chunks.len - 1] };
+}
+
+fn rayFile(allocator: Allocator, cwd: *std.fs.Dir, file_name: []const u8, sb: *Sb) Result {
+    const file = cwd.openFile(file_name, .{}) catch unreachable;
+    defer file.close();
+
+    // The file has a new line inserted by default
+    const size = file.getEndPos() catch @panic("Ray internal error: wrong import file end position");
+    const buf = allocator.allocSentinel(u8, size, 0) catch oom();
+    _ = file.readAll(buf) catch @panic("Ray internal error: error while reading imported file");
+
+    sb.append(allocator, ".");
+    sb.append(allocator, file_name);
+    defer sb.popMany(2);
+
+    return .{ .rayfile = .{
+        .name = file_name,
+        .path = sb.renderAlloc(allocator),
+        .content = buf,
+    } };
+}
+
+fn dynLib(allocator: Allocator, _: *std.fs.Dir, file_name: []const u8, sb: *Sb) Result {
+    sb.append(allocator, std.fs.path.sep_str);
+    sb.append(allocator, file_name);
+    std.log.debug("Path: {s}", .{sb.renderAlloc(allocator)});
+
+    const dynlib = std.DynLib.open(sb.renderAlloc(allocator)) catch unreachable;
+    sb.popMany(2);
+
+    sb.append(allocator, ".");
+    sb.append(allocator, file_name);
+    defer sb.popMany(2);
+
+    return .{ .dynlib = .{
+        .name = file_name,
+        .path = sb.renderAlloc(allocator),
+        .lib = dynlib,
+    } };
 }

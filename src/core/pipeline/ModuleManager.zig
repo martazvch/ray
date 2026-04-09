@@ -26,6 +26,7 @@ pub const Module = struct {
     enums: []Enum,
     unions: []Union,
     functions: []*Obj.Function,
+    foreign_funcs: []*Obj.CFn,
     structures: []Structure,
 
     pub const Enum = struct {
@@ -56,6 +57,7 @@ pub const Module = struct {
         .enums = &.{},
         .unions = &.{},
         .functions = &.{},
+        .foreign_funcs = &.{},
         .structures = &.{},
     };
 };

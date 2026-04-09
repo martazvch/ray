@@ -150,6 +150,24 @@ pub fn build(b: *std.Build) !void {
     run_tester.step.dependOn(&install_tester.step);
     run_tester.step.dependOn(b.getInstallStep());
 
+    // C module needs to build dynamic library
+    const cmodule_lib = b.addLibrary(.{
+        .name = "cmodule",
+        .linkage = .dynamic,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    cmodule_lib.addCSourceFiles(.{
+        .root = b.path("tests/data/cmodule/"),
+        .files = &.{"module.c"},
+        .flags = &.{ "-Wall", "-Wextra", "-std=c99" },
+    });
+    cmodule_lib.addIncludePath(b.path("tests/embed/c"));
+    const install_c_module = b.addInstallArtifact(cmodule_lib, .{});
+    test_step.dependOn(&install_c_module.step);
+
     if (b.args) |args| {
         run_tester.addArgs(args);
     } else {

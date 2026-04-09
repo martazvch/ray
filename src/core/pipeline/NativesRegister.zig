@@ -193,7 +193,7 @@ pub fn registerCFn(self: *Self, allocator: Allocator, proto: *const cffi.FnProto
     return .{ .index = self.c_fns.items.len - 1, .type = fn_type };
 }
 
-fn fnCToRay(allocator: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) *const Type {
+pub fn fnCToRay(allocator: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) *const Type {
     var params: Type.Function.ParamsMap = .empty;
     params.ensureTotalCapacity(allocator, proto.params.len - 1) catch oom();
 
