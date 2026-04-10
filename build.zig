@@ -151,22 +151,9 @@ pub fn build(b: *std.Build) !void {
     run_tester.step.dependOn(b.getInstallStep());
 
     // C module needs to build dynamic library
-    const cmodule_lib = b.addLibrary(.{
-        .name = "cmodule",
-        .linkage = .dynamic,
-        .root_module = b.createModule(.{
-            .target = target,
-            .optimize = optimize,
-        }),
-    });
-    cmodule_lib.addCSourceFiles(.{
-        .root = b.path("tests/data/cmodule/"),
-        .files = &.{"module.c"},
-        .flags = &.{ "-Wall", "-Wextra", "-std=c99" },
-    });
-    cmodule_lib.addIncludePath(b.path("tests/embed/c"));
-    const install_c_module = b.addInstallArtifact(cmodule_lib, .{});
-    test_step.dependOn(&install_c_module.step);
+    buildC(b, test_step, "cmodule", "module.c", target, optimize);
+    buildC(b, test_step, "not_cmodule", "not_module.c", target, optimize);
+    buildC(b, test_step, "invalid_cmodule", "invalid_module.c", target, optimize);
 
     if (b.args) |args| {
         run_tester.addArgs(args);
@@ -213,4 +200,33 @@ pub fn build(b: *std.Build) !void {
     run_c_embed_test.setCwd(b.path("tests/embed/c"));
     run_c_embed_test.step.dependOn(&install_c_tester.step);
     test_step.dependOn(&run_c_embed_test.step);
+}
+
+fn buildC(
+    b: *std.Build,
+    test_step: *std.Build.Step,
+    name: []const u8,
+    file_name: []const u8,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) void {
+    const cmodule_lib = b.addLibrary(.{
+        .name = name,
+        .linkage = .dynamic,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    cmodule_lib.addCSourceFiles(.{
+        .root = b.path("tests/data/cmodule/"),
+        .files = &.{file_name},
+        .flags = &.{ "-Wall", "-Wextra", "-std=c99" },
+    });
+    cmodule_lib.addIncludePath(b.path("tests/embed/c"));
+    const install_c_module = b.addInstallArtifact(cmodule_lib, .{
+        .dest_dir = .{ .override = .{ .custom = "../tests/data/cmodule" } },
+    });
+    test_step.dependOn(&install_c_module.step);
 }

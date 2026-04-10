@@ -16,8 +16,8 @@ const Self = @This();
 pub const Module = struct {
     path: InternerIndex,
     name: InternerIndex,
-    /// Type infos gathered by the analyzer
-    // TODO: used for what?
+    /// Type infos gathered by the analyzer used when importing a module
+    /// It has all the analyzis-time data to type check
     sym_infos: SymbolArrMap,
     /// Compiled values/symbols used at runtime
     globals: []Value,
@@ -26,7 +26,7 @@ pub const Module = struct {
     enums: []Enum,
     unions: []Union,
     functions: []*Obj.Function,
-    foreign_funcs: []*Obj.CFn,
+    foreign_funcs: std.ArrayList(*Obj.ForeignFn),
     structures: []Structure,
 
     pub const Enum = struct {
@@ -57,7 +57,7 @@ pub const Module = struct {
         .enums = &.{},
         .unions = &.{},
         .functions = &.{},
-        .foreign_funcs = &.{},
+        .foreign_funcs = .empty,
         .structures = &.{},
     };
 };
@@ -153,8 +153,8 @@ pub fn getFromIndex(self: *const Self, index: Index) *Module {
     return &self.modules.values()[index.toInt()];
 }
 
-pub fn getFromName(self: *Self, name: InternerIndex) ?*Module {
-    return self.modules.getPtr(name);
+pub fn getFromPath(self: *Self, path: InternerIndex) ?*Module {
+    return self.modules.getPtr(path);
 }
 
 pub fn getIndex(self: *const Self, name: InternerIndex) ?Index {

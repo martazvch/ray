@@ -32,6 +32,8 @@ pub const ParserMsg = union(enum) {
     expect_paren_after_fn_params,
     expect_ternary_colon,
     expect_type_or_value_in_decl,
+    extern_fn_has_body,
+    extern_sym_not_fn,
     import_alias_with_items,
     invalid_discard,
     invalid_label,
@@ -95,6 +97,8 @@ pub const ParserMsg = union(enum) {
             .expect_paren_after_fn_params => writer.writeAll("expect closing parenthesis ')' after function's parameters"),
             .expect_ternary_colon => writer.writeAll("expect a ':' after 'then' branch of ternary expression"),
             .expect_type_or_value_in_decl => writer.writeAll("expect either a value or a type in varibale declaration"),
+            .extern_fn_has_body => writer.writeAll("unexpected extern function's body"),
+            .extern_sym_not_fn => writer.writeAll("can only declare extern functions"),
             .import_alias_with_items => writer.writeAll("can't use a module alias when importing specific items"),
             .invalid_discard => writer.writeAll("invalid discard expression"),
             .invalid_label => writer.writeAll("can't label this expression"),
@@ -162,8 +166,9 @@ pub const ParserMsg = union(enum) {
             .expect_colon_struct_lit => writer.writeAll("expect to be after this"),
             .implicit_select_non_ident => writer.writeAll("this is not an identifier"),
             .expect_field_type_or_default => writer.writeAll("this field has no type and not default value"),
-            .expect_fn_end_container => writer.writeAll("this is unexpected"),
+            .expect_fn_end_container, .extern_fn_has_body => writer.writeAll("this is unexpected"),
             .expect_in => writer.writeAll("before this"),
+            .extern_sym_not_fn => writer.writeAll("this is not a function declaration"),
             .default_value_self,
             .expect_expr,
             .expect_new_line,
@@ -239,6 +244,9 @@ pub const ParserMsg = union(enum) {
             .expect_new_line_pm_arm => writer.writeAll("each arm of pattern matching construct (match and when) have to be on their own line"),
             .expect_ternary_colon => writer.writeAll("ternary expression syntax is: <condition> ? <then> : <else>"),
             .expect_type_or_value_in_decl => writer.writeAll("provide either a default value so that the compiler can infer the type or a type"),
+            .extern_fn_has_body => writer.writeAll(
+                \\extern functions can't have body, they only declare function prototypes that will be found in native dynamic libraries
+            ),
             .import_alias_with_items => writer.writeAll(
                 "you can either alias the whole module without importing specific items or alias each specific items",
             ),

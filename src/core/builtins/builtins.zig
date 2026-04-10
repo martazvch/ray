@@ -1,9 +1,9 @@
 const std = @import("std");
-const ffi = @import("ffi.zig");
+const zffi = @import("../ffi/zffi.zig");
 const Value = @import("../runtime/values.zig").Value;
 const Vm = @import("../runtime/Vm.zig");
 
-pub const module: ffi.ZigModule = .{
+pub const module: zffi.Module = .{
     .is_module = false,
     .functions = &.{
         .init("int", int, "", &.{
@@ -18,23 +18,23 @@ pub const module: ffi.ZigModule = .{
     },
 };
 
-fn int(_: *Vm, value: ffi.Union(&.{ .int, .float, .str })) ffi.Int {
+fn int(_: *Vm, value: zffi.Union(&.{ .int, .float, .str })) zffi.Int {
     return switch (value) {
         .int => |i| i,
         .float => |f| @intFromFloat(f),
-        .str => |s| std.fmt.parseInt(ffi.Int, s, 10) catch unreachable,
+        .str => |s| std.fmt.parseInt(zffi.Int, s, 10) catch unreachable,
     };
 }
 
-fn float(_: *Vm, value: ffi.Union(&.{ .int, .float, .str })) ffi.Float {
+fn float(_: *Vm, value: zffi.Union(&.{ .int, .float, .str })) zffi.Float {
     return switch (value) {
         .int => |i| @floatFromInt(i),
         .float => |f| f,
-        .str => |s| std.fmt.parseFloat(ffi.Float, s) catch unreachable,
+        .str => |s| std.fmt.parseFloat(zffi.Float, s) catch unreachable,
     };
 }
 
-fn str(vm: *Vm, value: ffi.Union(&.{ .int, .float })) ffi.Str {
+fn str(vm: *Vm, value: zffi.Union(&.{ .int, .float })) zffi.Str {
     errdefer unreachable;
 
     return switch (value) {

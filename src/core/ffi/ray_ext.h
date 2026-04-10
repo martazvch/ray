@@ -15,39 +15,12 @@
 
 // ----------
 //  Opaques
-typedef struct RayReg RayReg;
 typedef struct RayVm RayVm;
 
 // -----------
 //  Typedefs
 typedef void (*RayFn)(RayVm *);
-
-// ----------
-//  Types
-typedef enum {
-    TYPE_VOID,
-    TYPE_INT,
-    TYPE_FLOAT,
-    TYPE_BOOL,
-} RayType;
-
 typedef size_t Index;
-
-typedef struct {
-    char *name;
-    RayType type;
-} Param;
-
-#define MAX_PARAM 256
-typedef struct {
-    char *name;
-    RayFn func;
-    int arity;
-    Param params[MAX_PARAM];
-    int return_type;
-} RayFnProto;
-
-typedef void (*RayRegisterFn)(RayReg *, RayFnProto);
 
 // ----------
 //  Accessors
@@ -60,9 +33,8 @@ typedef void (*RaySetFloat)(RayVm *, Index, double);
 // ----------------
 //  Function table
 typedef struct {
-    RayRegisterFn ray_register_fn;
-    RayGetFloat ray_get_float;
-    RaySetFloat ray_set_float;
+    RayGetFloat get_float;
+    RaySetFloat set_float;
 } RayApi;
 
 #endif // RAY_EXT_H

@@ -13,7 +13,7 @@ const Module = @import("../pipeline/ModuleManager.zig").Module;
 
 chunk: *const Chunk,
 zig_fns: []const *Obj.ZigFn,
-c_fns: []const *Obj.CFn,
+c_fns: []const *Obj.ForeignFn,
 render_mode: RenderMode,
 module: *const Module,
 wide: bool,
@@ -27,7 +27,7 @@ pub fn init(
     chunk: *const Chunk,
     module: *const Module,
     zig_fns: []const *Obj.ZigFn,
-    c_fns: []const *Obj.CFn,
+    c_fns: []const *Obj.ForeignFn,
 ) Self {
     return .{
         .chunk = chunk,
@@ -91,8 +91,10 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .call_any => self.indexInstruction(writer, "call", offset),
         .call_array, .call_string => self.callObjFn(writer, op, offset),
         .call => self.call(writer, offset),
-        .call_ext => self.callExt(writer, offset),
-        .call_c => self.callNative(writer, .c, offset),
+        .call_ext => self.callExt(writer, false, offset),
+        .call_foreign => self.callNative(writer, .foreign, offset),
+        .call_foreign_ext => self.callExt(writer, true, offset),
+        .call_foreign_glob => self.callForeignGlob(writer, offset),
         .call_zig => self.callNative(writer, .zig, offset),
         .closure => self.indexInstruction(writer, "closure", offset),
         .def_global => self.indexInstruction(writer, "def_global", offset),
@@ -365,8 +367,8 @@ fn call(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
     return offset + 3;
 }
 
-fn callExt(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
-    const text = "call_ext";
+fn callExt(self: *Self, writer: *Writer, native: bool, offset: usize) Writer.Error!usize {
+    const text = if (native) "call_foreign_ext" else "call_ext";
     const index = self.chunk.code.items[offset + 1];
     const module = self.chunk.code.items[offset + 2];
     const arity = self.chunk.code.items[offset + 3];
@@ -380,11 +382,26 @@ fn callExt(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
     return offset + 4;
 }
 
-fn callNative(self: *Self, writer: *Writer, comptime kind: enum { c, zig }, offset: usize) Writer.Error!usize {
+fn callForeignGlob(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
+    const text = "call_foreign_glob";
+    const index = self.chunk.code.items[offset + 1];
+    const arity = self.chunk.code.items[offset + 2];
+    const func = self.c_fns[index];
+
+    if (self.render_mode == .@"test") {
+        try writer.print("{s} index {}, arity {}, {s}\n", .{ text, index, arity, func.name });
+    } else {
+        try writer.print("{s:<20} index {:>4}, arity {:>4}, {s}\n", .{ text, index, arity, func.name });
+    }
+
+    return offset + 3;
+}
+
+fn callNative(self: *Self, writer: *Writer, comptime kind: enum { foreign, zig }, offset: usize) Writer.Error!usize {
     const text = "call_" ++ @tagName(kind);
     const index = self.chunk.code.items[offset + 1];
     const arity = self.chunk.code.items[offset + 2];
-    const name = if (kind == .c) self.c_fns[index].name else self.zig_fns[index].name;
+    const name = if (kind == .foreign) self.module.foreign_funcs.items[index].name else self.zig_fns[index].name;
 
     if (self.render_mode == .@"test") {
         try writer.print("{s} index {}, arity {}, {s}\n", .{ text, index, arity, name });

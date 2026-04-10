@@ -40,7 +40,7 @@ pub const CompilationUnit = struct {
 
     // For disassembler
     zig_fns: []const *Obj.ZigFn,
-    c_fns: []const *Obj.CFn,
+    c_fns: []const *Obj.ForeignFn,
 
     const Self = @This();
     const Error = error{ Err, TooManyConst } || std.posix.WriteError;
@@ -56,7 +56,7 @@ pub const CompilationUnit = struct {
             .instr_data = undefined,
             .instr_lines = undefined,
             .zig_fns = state.native_reg.zig_fns.items,
-            .c_fns = state.native_reg.c_fns.items,
+            .c_fns = state.native_reg.foreign_fns.items,
             .constants = state.const_interner.constants.items,
             .line = 0,
             .compiled_constants = .empty,
@@ -602,10 +602,11 @@ const Compiler = struct {
     fn callSymbol(self: *Self, data: *const Instruction.Call, arity_offset: usize, sym_index: usize, sym_mod: ?ModIndex) Error!void {
         try self.compileArgs(data.args);
         if (sym_mod) |mod| {
-            self.writeOpAndByte(.call_ext, @intCast(sym_index));
+            self.writeOpAndByte(if (data.kind == .foreign) .call_foreign_ext else .call_ext, @intCast(sym_index));
             self.writeByte(@intCast(mod.toInt()));
         } else switch (data.kind) {
-            .c => self.writeOpAndByte(.call_c, @intCast(sym_index)),
+            .foreign => self.writeOpAndByte(.call_foreign, @intCast(sym_index)),
+            .foreign_glob => self.writeOpAndByte(.call_foreign_glob, @intCast(sym_index)),
             .zig, .zig_method => self.writeOpAndByte(.call_zig, @intCast(sym_index)),
             else => self.writeOpAndByte(.call, @intCast(sym_index)),
         }

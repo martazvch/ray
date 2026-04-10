@@ -7,4 +7,5 @@ expect_paren_after_fn_params
 expect_arrow_before_fn_type
 expect_brace_before, function
 too_many_fn_args, parameter
+extern_fn_has_body
 

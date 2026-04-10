@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const MultiArrayList = std.MultiArrayList;
@@ -23,9 +24,9 @@ const Constant = @import("ConstantInterner.zig").Constant;
 const Pipeline = @import("../pipeline/pipeline.zig");
 const State = @import("../pipeline/State.zig");
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
-const cffi = @import("../builtins/cffi.zig");
+const ffi = @import("../ffi/ffi.zig");
 const Value = @import("../runtime/values.zig").Value;
-const CFn = @import("../runtime/Obj.zig").CFn;
+const CFn = @import("../runtime/Obj.zig").ForeignFn;
 
 const type_mod = @import("types.zig");
 const Type = type_mod.Type;
@@ -132,6 +133,7 @@ irb: IrBuilder,
 main: ?usize,
 
 mod_name: InternerIdx,
+mod_index: ModIndex,
 cached_names: struct { empty: usize, main: usize, std: usize, self: usize, Self: usize, init: usize },
 
 pub fn init(allocator: Allocator, state: *State) Self {
@@ -150,6 +152,7 @@ pub fn init(allocator: Allocator, state: *State) Self {
         .main = null,
 
         .mod_name = undefined,
+        .mod_index = undefined,
         .cached_names = .{
             .empty = state.interner.intern(""),
             .main = state.interner.intern("main"),
@@ -170,10 +173,11 @@ pub fn warn(self: *Self, kind: AnalyzerMsg, span: Span) void {
     self.warns.append(self.allocator, AnalyzerReport.warn(kind, span.start, span.end)) catch oom();
 }
 
-pub fn analyze(self: *Self, ast: *const Ast, mod_name: []const u8, expect_main: bool) void {
+pub fn analyze(self: *Self, ast: *const Ast, mod_name: []const u8, mod_index: ModIndex, expect_main: bool) void {
     self.ast = ast;
     var ctx: Context = .empty;
 
+    self.mod_index = mod_index;
     self.mod_name = self.interner.intern(mod_name);
     self.containers.append(self.allocator, mod_name);
 
@@ -471,7 +475,7 @@ fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
     var buf: [1024]u8 = undefined;
     const container_name = self.interner.internKeepRef(self.allocator, self.containers.renderWithSep(&buf, "."));
 
-    // TODO: anonymus union
+    // TODO: anonymus enum
     const name_tk = node.name orelse @panic("anonymus enums aren't supported yet");
     const name = try self.internIfNotInCurrentScope(name_tk);
 
@@ -542,43 +546,65 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
     const snapshot = ctx.snapshot();
     defer snapshot.restore();
 
-    const span = self.ast.getSpan(node);
     const name = try self.internIfNotInCurrentScope(node.name);
 
     var buf: [1024]u8 = undefined;
     const container_name = self.interner.internKeepRef(self.allocator, self.containers.renderWithSep(&buf, "."));
 
     // Forward declaration in outer scope for recursion
-    var sym = self.scope.declareSymbol(self.allocator, name, .function);
+    const sym = self.scope.declareSymbol(self.allocator, name, .function);
 
     self.scope.open(self.allocator, null, .{ .barrier = true });
-    errdefer _ = self.scope.close();
 
     self.containers.append(self.allocator, self.ast.toSource(node.name));
     defer _ = self.containers.pop();
+    const loc: Type.Loc = .{ .name = name, .container = container_name };
 
-    const captures = try self.loadFunctionCaptures(&node.meta.captures);
-    const param_res = try self.fnParams(node.params, ctx);
+    if (node.is_extern) {
+        defer _ = self.scope.close();
+        return self.endExternFnDecl(node, name, loc, sym, ctx);
+    } else {
+        return self.endRayFnDecl(node, name, loc, sym, ctx);
+    }
+}
 
-    const fn_type: Type.Function = .{
-        .loc = .{ .name = name, .container = container_name },
-        .params = param_res.decls,
-        .return_type = try self.checkAndGetType(node.return_type, ctx),
-        .kind = if (param_res.is_method) .method else .normal,
+fn endRayFnDecl(
+    self: *Self,
+    node: *const Ast.FnDecl,
+    name: InternerIdx,
+    loc: Type.Loc,
+    sym: *LexScope.Symbol,
+    ctx: *Context,
+) Error!FnDeclRes {
+    const span = self.ast.getSpan(node);
+
+    const captures, const params, const ty, const body, const returns = info: {
+        errdefer _ = self.scope.close();
+
+        const captures = try self.loadFunctionCaptures(&node.meta.captures);
+        const params = try self.fnParams(node.params, ctx);
+
+        const fn_type: Type.Function = .{
+            .loc = loc,
+            .params = params.decls,
+            .return_type = try self.checkAndGetType(node.return_type, ctx),
+            .kind = if (params.is_method) .method else .normal,
+        };
+        const interned_type = self.ti.intern(.{ .function = fn_type });
+        sym.type = interned_type;
+        ctx.fn_type = interned_type;
+
+        ctx.decl_type = fn_type.return_type;
+        defer ctx.decl_type = null;
+
+        const body_instrs, const returns = try self.fnBody(node.body, &fn_type, span, ctx);
+        break :info .{ captures, params, interned_type, body_instrs, returns };
     };
-    const interned_type = self.ti.intern(.{ .function = fn_type });
-    sym.type = interned_type;
-    ctx.fn_type = interned_type;
-
-    ctx.decl_type = fn_type.return_type;
-    defer ctx.decl_type = null;
-
-    const body_instrs, const returns = try self.fnBody(node.body, &fn_type, span, ctx);
     _ = self.scope.close();
 
     // If it's a closure, it lives on the stack at runtime
     if (captures.len > 0) {
-        _ = try self.declareVariable(name, interned_type, .{}, span);
+        _ = try self.declareVariable(name, ty, .{}, span);
     }
 
     if (name == self.cached_names.main and self.scope.isGlobal()) {
@@ -589,11 +615,69 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
         .instr = self.irb.addInstr(
             .{ .fn_decl = .{
                 .sym_index = sym.index,
+                .type_id = self.ti.typeId(ty),
+                .name = name,
+                .body = body,
+                .defaults = params.defaults,
+                .captures = captures,
+                .returns = returns,
+            } },
+            span.start,
+        ),
+        .sym = sym.*,
+    };
+}
+
+fn endExternFnDecl(
+    self: *Self,
+    node: *const Ast.FnDecl,
+    name: InternerIdx,
+    loc: Type.Loc,
+    sym: *LexScope.Symbol,
+    ctx: *Context,
+) Error!FnDeclRes {
+    const span = self.ast.getSpan(node.name);
+    const name_text = self.ast.toSource(node.name);
+
+    const params = try self.fnParams(node.params, ctx);
+
+    const return_ty = try self.checkAndGetType(node.return_type, ctx);
+    const fn_type: Type.Function = .{
+        .loc = loc,
+        .params = params.decls,
+        .return_type = return_ty,
+        .kind = .foreign,
+    };
+    const interned_type = self.ti.intern(.{ .function = fn_type });
+    sym.type = interned_type;
+
+    const mod = self.state.modules.getFromIndex(self.mod_index);
+
+    const lib = self.state.dynlib orelse return self.err(
+        .{ .extern_fn_not_in_rayn = .{ .name = name_text } },
+        span,
+    );
+
+    const name_sentinel = self.allocator.dupeZ(u8, name_text) catch oom();
+    defer self.allocator.free(name_sentinel);
+    const func = lib.lookup(ffi.Fn, name_sentinel) orelse return self.err(
+        .{ .extern_fn_not_in_lib = .{ .name = name_text } },
+        span,
+    );
+    const returns = !return_ty.is(.void);
+    const obj_func = CFn.create(self.allocator, name_text, func, returns);
+
+    mod.foreign_funcs.append(self.allocator, obj_func) catch oom();
+
+    return .{
+        .instr = self.irb.addInstr(
+            .{ .fn_decl = .{
+                .sym_index = sym.index,
                 .type_id = self.ti.typeId(interned_type),
                 .name = name,
-                .body = body_instrs,
-                .defaults = param_res.defaults,
-                .captures = captures,
+                .body = &.{},
+                .defaults = params.defaults,
+                .captures = &.{},
                 .returns = returns,
             } },
             span.start,
@@ -1055,37 +1139,21 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
     );
     const path = path: switch (result) {
         .dynlib => |*dynlib| {
-            const handcheck = dynlib.lib.lookup(cffi.Handcheck, "handcheck") orelse {
-                @panic("Not an extension");
-            };
-            var reg: cffi.Register = .{
-                .allocator = self.allocator,
-                .funcs = .empty,
-                .interner = self.interner,
-                .ti = self.ti,
-            };
-            handcheck(@ptrCast(&reg), &cffi.api);
-
             const interned = self.interner.intern(dynlib.path);
-            const mod_index = self.state.modules.open(self.allocator, interned, module_name);
-            const mod = self.state.modules.getFromIndex(mod_index);
+            const handcheck = dynlib.lib.lookup(ffi.Handcheck, "handcheck") orelse return self.err(
+                .{ .dynlib_not_module = .{ .name = self.ast.toSource(dynlib.token) } },
+                self.ast.getSpan(dynlib.token),
+            );
+            handcheck(&ffi.api);
 
-            mod.foreign_funcs = self.allocator.alloc(*CFn, reg.funcs.items.len) catch oom();
-            mod.sym_infos.ensureTotalCapacity(self.allocator, reg.funcs.items.len) catch oom();
+            const prev_dynlib = self.state.dynlib;
+            self.state.dynlib = &dynlib.lib;
+            defer self.state.dynlib = prev_dynlib;
 
-            for (reg.funcs.items, 0..) |func, i| {
-                mod.foreign_funcs[i] = CFn.create(
-                    self.allocator,
-                    self.interner.getKey(func.name).?,
-                    func.func,
-                    func.returns,
-                );
-                mod.sym_infos.putAssumeCapacity(func.name, .{
-                    .name = func.name,
-                    .type = func.type,
-                    .index = func.index,
-                });
+            if (!self.state.modules.has(interned)) {
+                Pipeline.runSubPipeline(self.allocator, self.state, dynlib.name, dynlib.path, dynlib.rayn_content);
             }
+
             break :path interned;
         },
         .rayfile => |f| {
@@ -1100,14 +1168,22 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
             .{ .missing_file_in_module = .{ .file = self.ast.toSource(e) } },
             self.ast.getSpan(e),
         ),
+        .missing_dynlib_file => |e| return self.err(
+            .{ .dynlib_missing_lib = .{ .name = self.ast.toSource(e) } },
+            self.ast.getSpan(e),
+        ),
         .unknown_mod => |e| return self.err(
             .{ .unknown_module = .{ .name = self.ast.toSource(e) } },
             self.ast.getSpan(e),
         ),
+        .unsupported_os => return self.err(
+            .{ .dynlib_unsupported_os = .{ .name = @tagName(builtin.os.tag) } },
+            self.ast.getSpan(node.names[0]),
+        ),
     };
 
     if (node.items) |items| {
-        const mod = self.state.modules.getFromName(path).?;
+        const mod = self.state.modules.getFromPath(path).?;
         const mod_index = self.state.modules.getIndex(path).?;
 
         for (items) |item| {
@@ -1983,7 +2059,7 @@ fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_idx: InternerIdx) 
     const text = self.ast.toSource(field_tk);
 
     const field_name = self.interner.intern(text);
-    const module = self.state.modules.getFromName(module_idx).?;
+    const module = self.state.modules.getFromPath(module_idx).?;
     const sym = module.sym_infos.get(field_name) orelse return self.err(
         .{ .missing_symbol_in_module = .{ .module = self.interner.getKey(module.name).?, .symbol = text } },
         span,
@@ -3135,7 +3211,7 @@ pub fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) E
             );
 
             // If `identifier` returned no error and it's a module, safe unwrap
-            const module = self.state.modules.getFromName(module_type.module).?;
+            const module = self.state.modules.getFromPath(module_type.module).?;
 
             const symbol_token = fields[1];
             const symbol_name = self.interner.intern(self.ast.toSource(symbol_token));

@@ -1,0 +1,6 @@
+use data.cmodule.cmodule
+
+fn main() {
+    print cmodule.ret_arg(4.)
+    print cmodule.rayFunc(8.)
+}

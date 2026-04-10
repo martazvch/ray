@@ -173,8 +173,8 @@ pub fn initGlobalScope(self: *Self, allocator: Allocator, state: *State) void {
         });
     }
 
-    self.c_natives.ensureTotalCapacity(allocator, @intCast(state.native_reg.c_fns_meta.count())) catch oom();
-    it = state.native_reg.c_fns_meta.iterator();
+    self.c_natives.ensureTotalCapacity(allocator, @intCast(state.native_reg.foreign_fns_meta.count())) catch oom();
+    it = state.native_reg.foreign_fns_meta.iterator();
     while (it.next()) |entry| {
         self.c_natives.putAssumeCapacity(entry.key_ptr.*, .{
             .name = entry.key_ptr.*,

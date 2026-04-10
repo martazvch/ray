@@ -12,8 +12,8 @@ const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
 const ConstInterner = @import("../analyzer/ConstantInterner.zig");
 const ConstIdx = ConstInterner.ConstIdx;
 const Constant = ConstInterner.Constant;
-const ffi = @import("../builtins/ffi.zig");
-const cffi = @import("../builtins/cffi.zig");
+const zffi = @import("../ffi/zffi.zig");
+const ffi = @import("../ffi/ffi.zig");
 
 const misc = @import("misc");
 const Interner = misc.Interner;
@@ -31,6 +31,9 @@ native_reg: NativeRegister,
 strings: std.AutoHashMapUnmanaged(usize, *Obj.String),
 array_fns: ObjFns,
 string_fns: ObjFns,
+/// Associated dynamic library to this module. When importing a native module, we open
+/// a subpipeline with the associated library to fetch symbols
+dynlib: ?*std.DynLib,
 
 const Self = @This();
 
@@ -82,6 +85,7 @@ pub fn new(allocator: Allocator, config: Config) Self {
         .strings = .empty,
         .array_fns = Obj.Array.getFns(),
         .string_fns = Obj.String.getFns(),
+        .dynlib = null,
     };
 
     ctx.type_interner.cacheFrequentTypes();
@@ -111,12 +115,12 @@ pub fn registerMod(self: *Self, allocator: Allocator, Module: type) void {
     self.native_reg.registerMod(allocator, &self.interner, &self.type_interner, Module);
 }
 
-pub fn registerFn(self: *Self, allocator: Allocator, func: ffi.ZigFnMeta) void {
+pub fn registerFn(self: *Self, allocator: Allocator, func: zffi.FnMeta) void {
     _ = self.native_reg.registerZigFn(allocator, &func, &self.interner, &self.type_interner);
 }
 
-pub fn registerCFn(self: *Self, allocator: Allocator, func: cffi.FnProto) void {
-    _ = self.native_reg.registerCFn(allocator, &func, &self.interner, &self.type_interner);
+pub fn registerCFn(self: *Self, allocator: Allocator, func: ffi.FnProto) void {
+    _ = self.native_reg.registerForeignFn(allocator, &func, &self.interner, &self.type_interner);
 }
 
 pub fn updateModWithScope(self: *Self, allocator: Allocator, index: ModIndex) void {

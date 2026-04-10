@@ -29,7 +29,3 @@ void void_args(RayVm *vm) {
     double arg1 = api->get_float(vm, 0);
     double arg2 = api->get_float(vm, 1);
 }
-
-void handcheck(RayApi *const in_api) {
-    api = in_api;
-}

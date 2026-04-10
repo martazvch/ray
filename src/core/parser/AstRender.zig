@@ -223,7 +223,10 @@ fn renderSingleNode(self: *Self, name: ?[]const u8, node: *const Ast.Node, tag: 
 }
 
 fn renderFnDecl(self: *Self, name: []const u8, decl: *const Ast.FnDecl, comma: bool) !void {
-    try self.openKey(if (decl.is_closure) "closure_decl" else "fn_decl", .block);
+    try self.openKey(
+        if (decl.is_closure) "closure_decl" else if (decl.is_extern) "extern_fn_decl" else "fn_decl",
+        .block,
+    );
     try self.pushKeyValue("name", name, true);
 
     if (decl.params.len == 0) {

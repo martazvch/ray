@@ -1,0 +1,40 @@
+//---- cmodule ----
+
+-- ret_no_arg --
+
+-- ret_arg --
+
+-- ret_args --
+
+-- void_no_arg --
+ret_naked
+
+-- void_arg --
+ret_naked
+
+-- void_args --
+ret_naked
+
+-- rayFunc --
+load_constant index 3, value 2
+get_local index 0
+mul_float
+call_foreign index 1, arity 1, ret_arg
+ret
+
+-- global scope --
+exit_repl
+
+//---- test ----
+
+-- main --
+load_constant index 3, value 4
+call_foreign_ext index 1, module 1, arity 1
+print
+load_constant index 4, value 8
+call_ext index 6, module 1, arity 1
+print
+ret_naked
+
+-- global scope --
+call index 0, arity 0, main

@@ -1,12 +1,12 @@
 const std = @import("std");
-const ffi = @import("ffi.zig");
+const zffi = @import("../ffi/zffi.zig");
 const Value = @import("../runtime/values.zig").Value;
 const Obj = @import("../runtime/Obj.zig");
 const Vm = @import("../runtime/Vm.zig");
 
 // TODO: handle errors
 
-pub const module: ffi.ZigModule = .{
+pub const module: zffi.Module = .{
     .is_module = false,
     .functions = &.{
         .init("open", open, "", &.{.{ .name = "path" }}),
@@ -21,7 +21,7 @@ const File = struct {
 
     const Self = @This();
 
-    pub const zig_struct: ffi.ZigStructMeta = .{
+    pub const zig_struct: zffi.StructMeta = .{
         .name = "File",
         .functions = &.{
             .init("readAll", readAll, "", &.{}),

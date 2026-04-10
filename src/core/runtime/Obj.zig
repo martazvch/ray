@@ -14,8 +14,8 @@ const ObjFns = type_mod.ObjFns;
 
 const Chunk = @import("../compiler/Chunk.zig");
 const Module = @import("../pipeline/ModuleManager.zig").Module;
-const ffi = @import("../builtins/ffi.zig");
-const cffi = @import("../builtins/cffi.zig");
+const zffi = @import("../ffi/zffi.zig");
+const ffi = @import("../ffi/ffi.zig");
 const oom = @import("misc").oom;
 const Value = @import("values.zig").Value;
 const Vm = @import("Vm.zig");
@@ -38,7 +38,7 @@ const Kind = enum {
     instance,
     iterator,
     native_zfn,
-    native_cfn,
+    foreign_fn,
     native_obj,
     string,
     union_instance,
@@ -53,7 +53,7 @@ const Kind = enum {
             Instance => .instance,
             Iterator => .iterator,
             ZigFn => .native_zfn,
-            CFn => .native_zfn,
+            ForeignFn => .foreign_fn,
             NativeObj => .native_obj,
             String => .string,
             UnionInstance => .union_instance,
@@ -100,7 +100,7 @@ pub fn deepCopy(self: *Obj, vm: *Vm) *Obj {
         .enum_instance, .@"error", .union_instance => @panic("TODO"),
         .instance => self.as(Instance).deepCopy(vm).asObj(),
         // Immutable, shallow copy ok
-        .box, .closure, .function, .iterator, .native_cfn, .native_zfn, .native_obj, .string => self,
+        .box, .closure, .function, .iterator, .foreign_fn, .native_zfn, .native_obj, .string => self,
     };
 }
 
@@ -122,8 +122,8 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
             const iterator = self.as(Iterator);
             iterator.deinit(vm.gc_alloc);
         },
-        .native_cfn => {
-            const function = self.as(CFn);
+        .foreign_fn => {
+            const function = self.as(ForeignFn);
             function.deinit(vm.gc_alloc);
         },
         .native_zfn => {
@@ -183,7 +183,7 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
         },
         .instance => try writer.print("<instance of {s}>", .{self.as(Instance).parent.name}),
         .iterator => try writer.writeAll("<iterator>"),
-        .native_cfn => try writer.print("<native c fn {s}>", .{self.as(CFn).name}),
+        .foreign_fn => try writer.print("<foreign fn {s}>", .{self.as(ForeignFn).name}),
         .native_zfn => try writer.print("<native zig fn {s}>", .{self.as(ZigFn).name}),
         .native_obj => try writer.print("<native object {s}>", .{self.as(NativeObj).name}),
         .string => try writer.print("{s}", .{self.as(String).chars}),
@@ -210,7 +210,7 @@ pub fn log(self: *Obj) void {
         .function => std.debug.print("<fn {s}>", .{self.as(Function).name}),
         .instance => std.debug.print("<instance of {s}>", .{self.as(Instance).parent.name}),
         .iterator => std.debug.print("<iterator>", .{}),
-        .native_cfn => std.debug.print("<native c fn {s}>", .{self.as(CFn).name}),
+        .foreign_fn => std.debug.print("<foreign fn {s}>", .{self.as(ForeignFn).name}),
         .native_zfn => std.debug.print("<native zig fn {s}>", .{self.as(ZigFn).name}),
         .native_obj => unreachable,
         .string => std.debug.print("{s}", .{self.as(String).chars}),
@@ -552,11 +552,11 @@ pub const Box = struct {
 pub const ZigFn = struct {
     obj: Obj,
     name: []const u8,
-    function: ffi.ZigFn,
+    function: zffi.Fn,
 
     const Self = @This();
 
-    pub fn create(allocator: Allocator, name: []const u8, function: ffi.ZigFn) *Self {
+    pub fn create(allocator: Allocator, name: []const u8, function: zffi.Fn) *Self {
         const obj = Obj.allocateComptime(allocator, Self, undefined);
         obj.name = name;
         obj.function = function;
@@ -573,15 +573,15 @@ pub const ZigFn = struct {
     }
 };
 
-pub const CFn = struct {
+pub const ForeignFn = struct {
     obj: Obj,
     name: []const u8,
-    function: cffi.Fn,
+    function: ffi.Fn,
     returns: bool,
 
     const Self = @This();
 
-    pub fn create(allocator: Allocator, name: []const u8, function: cffi.Fn, returns: bool) *Self {
+    pub fn create(allocator: Allocator, name: []const u8, function: ffi.Fn, returns: bool) *Self {
         const obj = Obj.allocateComptime(allocator, Self, undefined);
         obj.name = name;
         obj.function = function;
@@ -901,11 +901,11 @@ pub const NativeObj = struct {
     obj: Obj,
     name: []const u8,
     child: *anyopaque,
-    deinit_fn: ffi.DeinitFn,
+    deinit_fn: zffi.DeinitFn,
 
     const Self = @This();
 
-    pub fn create(allocator: Allocator, name: []const u8, child: *anyopaque, deinit_fn: ffi.DeinitFn) *Self {
+    pub fn create(allocator: Allocator, name: []const u8, child: *anyopaque, deinit_fn: zffi.DeinitFn) *Self {
         // Fields first for GC because other wise allocating fields after creation
         // of the instance may trigger GC in between
         const obj = Obj.allocateComptime(allocator, Self, undefined);

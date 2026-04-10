@@ -1,0 +1,12 @@
+extern fn ret_no_arg() -> float
+extern fn ret_arg(a: float) -> float
+extern fn ret_args(a: float, b: float) -> float
+extern fn void_no_arg()
+extern fn void_arg(a: float)
+extern fn void_args(a: float, b: float)
+
+extern fn nonExistent()
+
+fn rayFunc(a: float) -> float {
+    return ret_arg(2. * a)
+}

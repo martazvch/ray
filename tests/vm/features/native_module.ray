@@ -1,0 +1,16 @@
+use data.cmodule.cmodule
+
+fn sqrt(a: float) -> float {
+    return 2.*a
+}
+
+fn calcul(value: float) -> float {
+    return sqrt(2.*value)
+}
+
+fn main() {
+    print calcul(4.)
+    print cmodule.ret_arg(4.)
+    print cmodule.rayFunc(8.)
+}
+

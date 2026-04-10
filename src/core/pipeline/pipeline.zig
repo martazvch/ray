@@ -41,7 +41,9 @@ pub fn run(
 
     const ast = try parse(allocator, state, file_name, source);
 
-    const mod_name = file_name[0 .. file_name.len - 4];
+    // Extension could be either .ray or .rayn so we split dynamically
+    var it = std.mem.splitScalar(u8, file_name, '.');
+    const mod_name = it.next().?;
     const mod_index = state.modules.open(
         allocator,
         state.interner.intern(path),
@@ -49,7 +51,7 @@ pub fn run(
     );
 
     var analyzer: Analyzer = .init(allocator, state);
-    analyzer.analyze(&ast, mod_name, !is_sub and !state.config.embedded);
+    analyzer.analyze(&ast, mod_name, mod_index, !is_sub and !state.config.embedded);
 
     // Analyzed Ast printer
     if (analyzer.warns.items.len > 0) {
@@ -91,10 +93,18 @@ pub fn runFrontend(allocator: Allocator, state: *State, is_sub: bool, file_name:
     // Initiliaze the path builder
     state.path_builder.append(allocator, std.fs.cwd().realpathAlloc(allocator, ".") catch oom());
 
+    var it = std.mem.splitScalar(u8, file_name, '.');
+    const mod_name = it.next().?;
+    const mod_index = state.modules.open(
+        allocator,
+        state.interner.intern(file_name),
+        state.interner.intern(mod_name),
+    );
+
     const ast = try parse(allocator, state, file_name, source);
 
     var analyzer: Analyzer = .init(allocator, state);
-    _ = analyzer.analyze(&ast, file_name, !is_sub);
+    _ = analyzer.analyze(&ast, file_name, mod_index, !is_sub);
 
     // Analyzed Ast printer
     if (analyzer.warns.items.len > 0) {
@@ -172,7 +182,7 @@ pub fn runSubPipeline(allocator: Allocator, state: *State, file_name: []const u8
     state.const_interner = .init(allocator);
 
     _ = run(allocator, state, true, file_name, path, source) catch {
-        std.process.exit(0);
+        std.process.exit(1);
     };
 
     state.lex_scope = prev_scope;

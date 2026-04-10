@@ -6,7 +6,9 @@ const State = core.State;
 pub const Config = State.Config;
 const Pipeline = core.Pipeline;
 pub const Vm = core.Vm;
-pub const FnProto = core.cffi.FnProto;
+const ffi = core.ffi;
+const cVm = ffi.cVm;
+const Fn = ffi.Fn;
 
 const oom = @import("misc").oom;
 
@@ -38,8 +40,7 @@ fn cPrintWrapper(text: []const u8) void {
     f(&buf);
 }
 
-const OpaqueVm = opaque {};
-pub export fn rayNewVm(config: ConfigC) *OpaqueVm {
+pub export fn rayNewVm(config: ConfigC) *cVm {
     const print_fn: *const fn ([]const u8) void = if (config.printFn) |f| blk: {
         c_print_fn = f;
         break :blk cPrintWrapper;
@@ -63,25 +64,25 @@ pub export fn rayNewVm(config: ConfigC) *OpaqueVm {
     return @ptrCast(heap_vm);
 }
 
-pub export fn rayDeinitVm(opaque_vm: *OpaqueVm) void {
+pub export fn rayDeinitVm(opaque_vm: *cVm) void {
     const vm: *Vm = @ptrCast(@alignCast(opaque_vm));
     allocator.destroy(vm.state);
     vm.deinit();
     allocator.destroy(vm);
 }
 
-pub export fn rayRegisterFn(opaque_vm: *OpaqueVm, func: FnProto) void {
+pub export fn rayRegisterFn(opaque_vm: *cVm, func: ffi.FnProto) void {
     const vm: *Vm = @ptrCast(@alignCast(opaque_vm));
     vm.state.registerCFn(allocator, func);
 }
 
-pub export fn rayInitGlobalScope(opaque_vm: *OpaqueVm) void {
+pub export fn rayInitGlobalScope(opaque_vm: *cVm) void {
     const vm: *Vm = @ptrCast(@alignCast(opaque_vm));
     vm.state.initGlobalScope(allocator);
     vm.init(allocator, vm.state);
 }
 
-pub export fn rayRun(opaque_vm: *OpaqueVm, code: [*c]const u8) c_int {
+pub export fn rayRun(opaque_vm: *cVm, code: [*c]const u8) c_int {
     const vm: *Vm = @ptrCast(@alignCast(opaque_vm));
     const entry_point = Pipeline.run(allocator, vm.state, false, "host", ".", std.mem.span(code)) catch |e| switch (e) {
         error.ExitOnPrint => return 0,
@@ -93,17 +94,17 @@ pub export fn rayRun(opaque_vm: *OpaqueVm, code: [*c]const u8) c_int {
 
 const Index = usize;
 
-pub export fn raySetInt(opaque_vm: *OpaqueVm, index: Index, value: i64) void {
+pub export fn raySetInt(opaque_vm: *cVm, index: Index, value: i64) void {
     const vm: *Vm = @ptrCast(@alignCast(opaque_vm));
     vm.frame.slots[index] = .makeInt(value);
 }
 
-pub export fn raySetBool(opaque_vm: *OpaqueVm, index: Index, value: bool) void {
+pub export fn raySetBool(opaque_vm: *cVm, index: Index, value: bool) void {
     const vm: *Vm = @ptrCast(@alignCast(opaque_vm));
     vm.frame.slots[index] = .makeBool(value);
 }
 
-pub export fn rayGetInt(opaque_vm: *OpaqueVm, index: Index) i64 {
+pub export fn rayGetInt(opaque_vm: *cVm, index: Index) i64 {
     const vm: *Vm = @ptrCast(@alignCast(opaque_vm));
     return vm.frame.slots[index].int;
 }

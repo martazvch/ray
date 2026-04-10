@@ -82,7 +82,7 @@ pub fn parse(self: *Self, source: [:0]const u8, token_tags: []const Token.Tag, t
         if (self.match(.eof)) break;
 
         // After each nodes we expect a new line
-        if (!self.check(.new_line)) {
+        if (!self.check(.new_line) and self.prev(.tag) != .new_line) {
             const start = self.prev(.span).end;
             self.errAtSpan(.{ .start = start, .end = start + 1 }, .expect_new_line) catch {};
             self.synchronize();
@@ -228,6 +228,7 @@ fn synchronize(self: *Self) void {
     while (!self.check(.eof)) {
         switch (self.token_tags[self.token_idx]) {
             .@"enum",
+            .@"extern",
             .@"fn",
             .@"for",
             .@"if",
@@ -252,7 +253,7 @@ fn declaration(self: *Self) Error!Node {
     return if (self.match(.@"var") or self.match(.let))
         self.varDecl()
     else if (self.match(.@"fn"))
-        self.fnDecl()
+        self.fnDecl(false)
     else if (self.match(.@"struct"))
         self.structDecl()
     else if (self.match(.trait))
@@ -265,8 +266,13 @@ fn declaration(self: *Self) Error!Node {
         self.unionDecl(true)
     else if (self.match(.use))
         self.use()
-    else
-        self.statement();
+    else if (self.match(.@"extern")) {
+        if (self.match(.@"fn")) {
+            return self.fnDecl(true);
+        } else {
+            return self.errAtPrev(.extern_sym_not_fn);
+        }
+    } else self.statement();
 }
 
 fn enumDecl(self: *Self) Error!Node {
@@ -312,7 +318,7 @@ fn enumTag(self: *Self) Error!Ast.EnumDecl.Tag {
     return .{ .name = name, .value = value };
 }
 
-fn fnDecl(self: *Self) Error!Node {
+fn fnDecl(self: *Self, is_extern: bool) Error!Node {
     try self.expect(.identifier, .expectName("function"));
     const name = self.token_idx - 1;
 
@@ -326,12 +332,17 @@ fn fnDecl(self: *Self) Error!Node {
 
     const body: ?Ast.Block, const has_callable = body: {
         if (!self.match(.left_brace)) {
-            if (self.ctx.in_trait) {
+            if (self.ctx.in_trait or is_extern) {
                 break :body .{ null, false };
             } else {
                 return self.errAtPrev(.expectBraceBefore("function"));
             }
         }
+
+        if (is_extern) {
+            return self.errAtPrev(.extern_fn_has_body);
+        }
+
         const block_expr, const has_callable = try self.block();
         break :body .{ block_expr.block, has_callable };
     };
@@ -343,6 +354,7 @@ fn fnDecl(self: *Self) Error!Node {
         .return_type = return_type,
         .has_callable = has_callable,
         .is_closure = false,
+        .is_extern = is_extern,
     } };
 }
 
@@ -496,7 +508,7 @@ fn containerFnDecls(self: *Self, kind: []const u8) Error!struct { []Ast.FnDecl, 
 
     while (!self.check(.right_brace) and !self.check(.eof)) {
         if (self.match(.@"fn")) {
-            functions.append(self.allocator, (try self.fnDecl()).fn_decl) catch oom();
+            functions.append(self.allocator, (try self.fnDecl(false)).fn_decl) catch oom();
         } else if (self.match(.impl)) {
             traits.append(self.allocator, (try self.traitDecl()).trait_decl) catch oom();
         } else {
@@ -1255,6 +1267,7 @@ fn closure(self: *Self) Error!*Expr {
         .return_type = return_type,
         .has_callable = false,
         .is_closure = true,
+        .is_extern = false,
     } };
 
     return expr;

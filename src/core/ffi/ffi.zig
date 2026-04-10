@@ -9,33 +9,17 @@ const Vm = @import("../runtime/Vm.zig");
 const Interner = misc.Interner;
 const oom = misc.oom;
 
-const cVm = opaque {};
-const cRegister = opaque {};
-pub const Register = struct {
-    allocator: std.mem.Allocator,
-    funcs: std.ArrayList(struct {
-        name: Interner.Index,
-        type: *const Type,
-        index: usize,
-        func: Fn,
-        returns: bool,
-    }),
-    interner: *Interner,
-    ti: *TypeInterner,
-};
-
-pub const Handcheck = *const fn (*cRegister, *const cApi) callconv(.c) void;
+pub const cVm = opaque {};
+pub const Handcheck = *const fn (*const cApi) callconv(.c) void;
 pub const Fn = *const fn (*cVm) callconv(.c) void;
 const Index = usize;
 
 const cApi = extern struct {
-    register_fn: *const fn (*cRegister, FnProto) callconv(.c) void,
     get_float: *const fn (*cVm, Index) callconv(.c) f64,
     set_float: *const fn (*cVm, Index, f64) callconv(.c) void,
 };
 
 pub const api: cApi = .{
-    .register_fn = registerFn,
     .get_float = getFloat,
     .set_float = setFloat,
 };
@@ -60,21 +44,6 @@ pub const FnProto = extern struct {
         ty: cType,
     };
 };
-
-fn registerFn(c_register: *cRegister, proto: FnProto) callconv(.c) void {
-    var reg: *Register = @ptrCast(@alignCast(c_register));
-
-    reg.funcs.append(
-        reg.allocator,
-        .{
-            .name = reg.interner.intern(std.mem.span(proto.name)),
-            .type = NativeReg.fnCToRay(reg.allocator, &proto, reg.interner, reg.ti),
-            .index = reg.funcs.items.len,
-            .func = @ptrCast(proto.func),
-            .returns = proto.return_type != .void,
-        },
-    ) catch oom();
-}
 
 fn setFloat(c_vm: *cVm, index: Index, value: f64) callconv(.c) void {
     const vm: *Vm = @ptrCast(@alignCast(c_vm));

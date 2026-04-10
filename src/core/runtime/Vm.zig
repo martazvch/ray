@@ -25,8 +25,8 @@ gc_alloc: Allocator,
 strings: *std.AutoHashMapUnmanaged(usize, *Obj.String),
 objects: ?*Obj,
 modules: []Module,
-c_fns: []*Obj.CFn,
-zig_fns: []*Obj.ZigFn,
+glob_zig_fns: []*Obj.ZigFn,
+glob_foreign_fns: []*Obj.ForeignFn,
 state: *State,
 
 // Used ti-ype ids at runtime
@@ -56,8 +56,8 @@ pub fn init(self: *Self, allocator: Allocator, state: *State) void {
     self.frame_stack = .empty;
     self.objects = null;
     self.state = state;
-    self.c_fns = state.native_reg.c_fns.items;
-    self.zig_fns = state.native_reg.zig_fns.items;
+    self.glob_zig_fns = state.native_reg.zig_fns.items;
+    self.glob_foreign_fns = state.native_reg.foreign_fns.items;
 
     self.arr_str_type_id = state.type_interner.typeId(
         state.type_interner.intern(.{ .array = .{ .child = state.type_interner.getCached(.str) } }),
@@ -165,8 +165,8 @@ fn execute(self: *Self) !void {
             var dis = Disassembler.init(
                 &self.frame.function.chunk,
                 self.frame.module,
-                self.zig_fns,
-                self.c_fns,
+                self.glob_zig_fns,
+                self.glob_foreign_fns,
             );
             const instr_nb = self.frame.instructionNb();
             _ = dis.disInstruction(stdout, instr_nb);
@@ -272,23 +272,29 @@ fn execute(self: *Self) !void {
                 self.frame = try self.frame_stack.newKeepMod();
                 self.frame.call(self.modules[module].functions[index], &self.stack, arity, self.modules);
             },
-            .call_c => {
+            .call_foreign => {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const base = self.stack.top - arity;
-                const obj = self.c_fns[index];
-                obj.function(@ptrCast(self));
-
-                if (obj.returns) {
-                    self.stack.top = base + 1;
-                } else {
-                    self.stack.top = base;
-                }
+                const obj = self.frame.module.foreign_funcs.items[index];
+                self.callForeign(obj, arity);
+            },
+            .call_foreign_ext => {
+                const index = self.frame.readByte();
+                const module = self.frame.readByte();
+                const arity = self.frame.readByte();
+                const obj = self.modules[module].foreign_funcs.items[index];
+                self.callForeign(obj, arity);
+            },
+            .call_foreign_glob => {
+                const index = self.frame.readByte();
+                const arity = self.frame.readByte();
+                const obj = self.glob_foreign_fns[index];
+                self.callForeign(obj, arity);
             },
             .call_zig => {
                 const index = self.frame.readByte();
                 const args_count = self.frame.readByte();
-                const f = self.zig_fns[index].function;
+                const f = self.glob_zig_fns[index].function;
                 const result = f(self, (self.stack.top - args_count)[0..args_count]);
 
                 self.stack.top -= args_count;
@@ -530,7 +536,7 @@ fn execute(self: *Self) !void {
             },
             .load_fn_builtin => {
                 const symbol_idx = self.frame.readByte();
-                self.stack.push(.makeObj(self.zig_fns[symbol_idx].asObj()));
+                self.stack.push(.makeObj(self.glob_zig_fns[symbol_idx].asObj()));
             },
             .load_fn => {
                 const symbol_idx = self.frame.readByte();
@@ -687,6 +693,21 @@ fn execute(self: *Self) !void {
             },
             .wide => unreachable,
         }
+    }
+}
+
+fn callForeign(self: *Self, obj: *Obj.ForeignFn, arity: usize) void {
+    const base = self.stack.top - arity;
+    const prev_slot = self.frame.slots;
+    defer self.frame.slots = prev_slot;
+
+    self.frame.slots = base;
+    obj.function(@ptrCast(self));
+
+    if (obj.returns) {
+        self.stack.top = base + 1;
+    } else {
+        self.stack.top = base;
     }
 }
 

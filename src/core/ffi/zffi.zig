@@ -50,19 +50,19 @@ pub fn Union(types: []const std.meta.FieldEnum(All)) type {
     } });
 }
 
-pub const ZigModule = struct {
+pub const Module = struct {
     name: ?[]const u8 = null,
     is_module: bool = true,
-    functions: []const ZigFnMeta = &.{},
+    functions: []const FnMeta = &.{},
     structures: []const type = &.{},
 };
 
-pub const ZigFnMeta = struct {
+pub const FnMeta = struct {
     name: []const u8,
     params: []const Param,
     desc: []const u8,
     info: std.builtin.Type.Fn,
-    function: ZigFn,
+    function: Fn,
 
     // NOTE: it is not possible in Zig 0.15.2 to reflect on parameters name, we have to provide them
     pub const Param = struct {
@@ -70,7 +70,7 @@ pub const ZigFnMeta = struct {
         desc: []const u8 = "",
     };
 
-    pub fn init(name: []const u8, func: anytype, desc: []const u8, params: []const Param) ZigFnMeta {
+    pub fn init(name: []const u8, func: anytype, desc: []const u8, params: []const Param) FnMeta {
         if (name.len == 0) {
             @compileError("Function's name can't be empty");
         }
@@ -90,13 +90,13 @@ pub const ZigFnMeta = struct {
     }
 };
 
-pub const ZigFn = *const fn (*Vm, []const Value) ?Value;
+pub const Fn = *const fn (*Vm, []const Value) ?Value;
 pub const DeinitFn = *const fn (*anyopaque, *Vm) void;
 
-pub const ZigStructMeta = struct {
+pub const StructMeta = struct {
     name: []const u8,
     fields: []const Field = &.{},
-    functions: []const ZigFnMeta = &.{},
+    functions: []const FnMeta = &.{},
     deinit_fn: DeinitFn,
 
     pub const Field = struct {
@@ -105,8 +105,8 @@ pub const ZigStructMeta = struct {
         offset: usize,
     };
 
-    pub fn getFunctions(self: *const ZigStructMeta) []const ZigFn {
-        comptime var funcs: [self.functions.len]ZigFn = undefined;
+    pub fn getFunctions(self: *const StructMeta) []const Fn {
+        comptime var funcs: [self.functions.len]Fn = undefined;
 
         inline for (self.functions, 0..) |func, i| {
             funcs[i] = func.function;
@@ -117,7 +117,7 @@ pub const ZigStructMeta = struct {
     }
 };
 
-pub fn makeNative(func: anytype) ZigFn {
+pub fn makeNative(func: anytype) Fn {
     return struct {
         pub fn call(vm: *Vm, stack: []const Value) ?Value {
             const ArgsType, const vm_index = ArgsTuple(@TypeOf(func));

@@ -1,0 +1,3 @@
+use data.cmodule.invalid_cmodule
+
+fn main() { }

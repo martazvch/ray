@@ -18,17 +18,21 @@ pub const AnalyzerMsg = union(enum) {
     call_static_on_instance: struct { name: []const u8 },
     cant_continue_scope: struct { name: []const u8 },
     cant_infer_array_type,
-    pat_null_non_optional: struct { found: []const u8 },
     dead_code,
     dot_type_on_non_mod: struct { found: []const u8 },
     duplicate_tag: struct { kind: []const u8, name: []const u8 },
     duplicate_field: struct { name: []const u8 },
     duplicate_param: struct { name: []const u8 },
+    dynlib_not_module: struct { name: []const u8 },
+    dynlib_unsupported_os: struct { name: []const u8 },
+    dynlib_missing_lib: struct { name: []const u8 },
     container_unknown_decl: struct { kind: []const u8, ty: []const u8, field: []const u8 },
     error_not_in_union: struct { found: []const u8, expect: []const u8 },
     error_with_return: struct { found: []const u8 },
     expect_statement,
     expect_value_found_type: struct { found: []const u8 },
+    extern_fn_not_in_rayn: struct { name: []const u8 },
+    extern_fn_not_in_lib: struct { name: []const u8 },
     fallback_err_on_non_err: struct { found: []const u8 },
     fallback_opt_on_non_opt: struct { found: []const u8 },
     fail_no_err: struct { found: []const u8 },
@@ -49,6 +53,7 @@ pub const AnalyzerMsg = union(enum) {
     invalid_unary: struct { found: []const u8 },
     instance_tag_access: struct { kind: []const u8 },
     iter_non_iterable: struct { found: []const u8 },
+    invalid_index: struct { found: []const u8 },
     match_all_arms_dont_return,
     match_duplicate_arm,
     match_is_non_union: struct { found: []const u8 },
@@ -77,11 +82,11 @@ pub const AnalyzerMsg = union(enum) {
     non_bool_cond: struct { what: []const u8, found: []const u8 },
     non_indexable_type: struct { found: []const u8 },
     not_a_trait: struct { name: []const u8 },
-    invalid_index: struct { found: []const u8 },
     non_null_comp_optional: struct { found: []const u8 },
     non_struct_field_access: struct { found: []const u8 },
     non_struct_struct_literal,
     null_assign_to_non_optional: struct { expect: []const u8 },
+    pat_null_non_optional: struct { found: []const u8 },
     range_non_num: struct { found: []const u8 },
     range_mix_int_float,
     return_outside_fn,
@@ -136,12 +141,14 @@ pub const AnalyzerMsg = union(enum) {
             .call_static_on_instance => |e| writer.print("static function '{s}' called on an instance", .{e.name}),
             .cant_continue_scope => |e| writer.print("block '{s}' isn't continuable", .{e.name}),
             .cant_infer_array_type => writer.writeAll("can't infer array type with empty array and not declared type"),
-            .pat_null_non_optional => |e| writer.print("can't use the 'if let' / 'if var' pattern on a non nullable type, found: '{s}", .{e.found}),
             .dead_code => writer.writeAll("unreachable code"),
             .dot_type_on_non_mod => |e| writer.print("can't use a non-module member as a type, found '{s}'", .{e.found}),
             .duplicate_field => |e| writer.print("field '{s}' is already present in structure literal", .{e.name}),
             .duplicate_param => |e| writer.print("parameter '{s}' is already present in function call", .{e.name}),
             .duplicate_tag => |e| writer.print("tag '{s}' already declared in {s}", .{ e.name, e.kind }),
+            .dynlib_missing_lib => |e| writer.print("missing dynamic library for module '{s}'", .{e.name}),
+            .dynlib_not_module => |e| writer.print("module '{s}' is not a native Ray module", .{e.name}),
+            .dynlib_unsupported_os => |e| writer.print("Unsupported plateform '{s}' for native modules", .{e.name}),
             .implicit_select_no_type => writer.writeAll("can't infer type"),
             .implicit_select_invalid_type => |e| writer.print("expect an enum or an union but found '{s}'", .{e.found}),
             .instance_tag_access => |e| writer.print("can't access {s}'s tags on a runtime instance", .{e.kind}),
@@ -150,6 +157,8 @@ pub const AnalyzerMsg = union(enum) {
             .error_with_return => |e| writer.print("can't return error '{s}' with 'return', use 'fail'", .{e.found}),
             .expect_statement => writer.writeAll("did not expect an expression in this context"),
             .expect_value_found_type => |e| writer.print("expect a value found type '{s}'", .{e.found}),
+            .extern_fn_not_in_lib => |e| writer.print("function '{s}' not found in dynamic library", .{e.name}),
+            .extern_fn_not_in_rayn => |e| writer.print("can't declare '{s}' as 'extern' function outside of a 'rayn' interface file", .{e.name}),
             .fallback_err_on_non_err => |e| writer.print("expect an error union, found '{s}", .{e.found}),
             .fallback_opt_on_non_opt => |e| writer.print("expect an optional type, found '{s}", .{e.found}),
             .fail_no_err => |e| writer.print("'fail' is used to return errors from functions, found '{s}'", .{e.found}),
@@ -200,6 +209,7 @@ pub const AnalyzerMsg = union(enum) {
             .non_struct_field_access => writer.writeAll("attempting to access a field on a non structure type"),
             .non_struct_struct_literal => writer.writeAll("expect a structure type in structure literal expressions"),
             .null_assign_to_non_optional => |e| writer.print("can't assign 'null' to non-optional type '{s}'", .{e.expect}),
+            .pat_null_non_optional => |e| writer.print("can't use the 'if let' / 'if var' pattern on a non nullable type, found: '{s}", .{e.found}),
             .range_mix_int_float => writer.writeAll("found a mix of 'int' and 'float' types in range"),
             .range_non_num => |e| writer.print("range values must be 'int' or float, found '{s}'", .{e.found}),
             .return_outside_fn => writer.writeAll("return outside of a function"),
@@ -238,6 +248,9 @@ pub const AnalyzerMsg = union(enum) {
             .already_declared_param,
             .already_declared_in_trait,
             .already_impl_trait,
+            .dynlib_not_module,
+            .extern_fn_not_in_rayn,
+            .extern_fn_not_in_lib,
             => writer.writeAll("this name"),
             .assign_to_constant => writer.writeAll("this variable is declared as a constant"),
             .assign_to_struct_fn => writer.writeAll("this field is a function"),
@@ -248,6 +261,8 @@ pub const AnalyzerMsg = union(enum) {
             .call_method_on_type, .call_static_on_instance => writer.writeAll("wrong calling convention"),
             .cant_continue_scope, .no_continuable_scope => writer.writeAll("invalid continue"),
             .cant_infer_array_type => writer.writeAll("empty arrays don't convey any type information"),
+            .dynlib_missing_lib => writer.writeAll("can't find this dynamic library"),
+            .dynlib_unsupported_os => writer.writeAll("this compiled module can't be loaded"),
             .pat_null_non_optional => writer.writeAll("this isn't a nullable type"),
             .dead_code => writer.writeAll("code after this expression can't be reached"),
             .dot_type_on_non_mod => writer.writeAll("this is not a module"),
@@ -355,22 +370,15 @@ pub const AnalyzerMsg = union(enum) {
                 \\signature like: 'var arr: [int] = []' or initialize the array with at least one value (not possible every time).
                 \\Also, doing 'var arr: [int] = []' is equivalent to 'var arr: [int]'.
             ),
-            .pat_null_non_optional => writer.writeAll("refer to value's defnintion to see its type or use a regular control flow"),
+            .container_unknown_decl => |e| writer.print("refer to {s}'s declaration to see available tags and declarations", .{e.kind}),
             .dead_code => writer.writeAll("remove unreachable code"),
             .dot_type_on_non_mod => writer.writeAll("check variable declaration to see it's type"),
             .duplicate_field => writer.writeAll("fields can be defined only once in structure literals"),
             .duplicate_param => writer.writeAll("parameters can be defined only once in function calls"),
             .duplicate_tag => writer.writeAll("use another name or introduce numbers, underscore, ..."),
-            .implicit_select_no_type => writer.writeAll(
-                \\to use implicit selector syntax, you must provide a type so that the compiler can infer it.
-                \\use either: 'var foo: Foo = .a' or a variable with already known type"
-            ),
-            .implicit_select_invalid_type => writer.writeAll("implicit selector syntax is only allowed with enum and union types"),
-            .instance_tag_access => writer.writeAll(
-                \\you can either access declarations on the type name or test tag's value
-                \\with an 'if' statement like: 'if foo == .a {}' or with pattern matching via 'match'.
-            ),
-            .container_unknown_decl => |e| writer.print("refer to {s}'s declaration to see available tags and declarations", .{e.kind}),
+            .dynlib_missing_lib => writer.writeAll("to load a native module, the dynamic library must be next to the '.rayn' file"),
+            .dynlib_not_module => writer.writeAll("a valid native Ray module has to define 'handcheck' function (see ray_ext.h)"),
+            .dynlib_unsupported_os => writer.writeAll("Only Windows, Linux and MacOS are supported for native module dynamic loading"),
             .error_not_in_union => writer.writeAll("refer to function's declaration to see acceptable errors"),
             .error_with_return => writer.writeAll("'return' keyword is used to write into ok channel and 'fail' writes to the error one"),
             .expect_statement => writer.writeAll(
@@ -378,6 +386,10 @@ pub const AnalyzerMsg = union(enum) {
                 \\you might be trying to put an expression in global scope for example
             ),
             .expect_value_found_type => writer.writeAll("types can't be used as a runtime value"),
+            .extern_fn_not_in_lib => writer.writeAll("incoherence between function's name declared in '.rayn' file and the dynamic library"),
+            .extern_fn_not_in_rayn => writer.writeAll(
+                \\'extern' function can only be used in interface '.rayn' file to expose functions prototypes that we'll be dynamically loaded
+            ),
             .fallback_err_on_non_err => writer.writeAll(
                 \\fallback operator '!!' is meant to provide a value in case of an error union value is an error
                 \\It can't be used with any other type
@@ -406,6 +418,15 @@ pub const AnalyzerMsg = union(enum) {
                 \\              1.2..5.6 => ...
                 \\           }
             ),
+            .implicit_select_no_type => writer.writeAll(
+                \\to use implicit selector syntax, you must provide a type so that the compiler can infer it.
+                \\use either: 'var foo: Foo = .a' or a variable with already known type"
+            ),
+            .implicit_select_invalid_type => writer.writeAll("implicit selector syntax is only allowed with enum and union types"),
+            .instance_tag_access => writer.writeAll(
+                \\you can either access declarations on the type name or test tag's value
+                \\with an 'if' statement like: 'if foo == .a {}' or with pattern matching via 'match'.
+            ),
             .index_assign_str => writer.writeAll("strings are immutable, you can't change the underlying data"),
             .invalid_arithmetic => writer.writeAll("expect a numeric type"),
             .invalid_assign_target => writer.writeAll("can only assign to variables"),
@@ -413,6 +434,8 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_comparison => writer.writeAll("native comparison is only possible for simple native types, otherwise trait 'Eq' must be implemented"),
             .invalid_logical => writer.writeAll("modify the logic to operate on booleans"),
             .invalid_in_type => writer.writeAll("can only use 'in' with int and float ranges, arrays and strings"),
+            // TODO: when there will be Range, modify
+            .invalid_index => writer.writeAll("can only use integer or ranges as index"),
             .invalid_unary => |e| writer.print("can only negate boolean type, found '{s}'", .{e.found}),
             .iter_non_iterable => writer.writeAll(
                 \\it is only possible to iterate over builtin types array, string, range and maps and over types
@@ -468,14 +491,15 @@ pub const AnalyzerMsg = union(enum) {
             .non_indexable_type => writer.writeAll(
                 \\can only use index syntax '[]' for builtin types array, string and map or types defining the Indexable trait
             ),
-            // TODO: when there will be Range, modify
-            .invalid_index => writer.writeAll("can only use integer or ranges as index"),
             .non_bool_cond => |e| writer.print("'{s}' conditions can only be boolean type", .{e.what}),
+            .non_comptime_default => writer.writeAll("only compilation time known expressions are allowed for default values"),
+            .non_comptime_in_global => writer.writeAll("use a constant expression or initialize the value later in a local scope"),
             .non_null_comp_optional => writer.writeAll("replace the compared value with 'null' literal or change the condition"),
             .non_struct_field_access => writer.writeAll("refer to variable's definition to know its type"),
             .non_struct_struct_literal => writer.writeAll("refer to type's definition"),
             .not_a_trait => writer.writeAll("types can only implement traits"),
             .null_assign_to_non_optional => writer.writeAll("only optional types declared with '?' can be assigned 'null'"),
+            .pat_null_non_optional => writer.writeAll("refer to value's defnintion to see its type or use a regular control flow"),
             .range_mix_int_float => writer.writeAll("a range must be made of 'int' or 'float' and both bounds must share the same type"),
             .range_non_num => writer.writeAll(
                 \\ranges can only be constructed with numeric values and float ranges can only be used in pattern matching
@@ -501,8 +525,6 @@ pub const AnalyzerMsg = union(enum) {
             .unknown_module => writer.writeAll("create the module first and bring it in project scope (or maybe just a typo?)"),
             .unknown_param => writer.writeAll("refer to function's definition to see available parameters"),
             .unknown_struct_field => writer.writeAll("refer to the structure's declaration to see available fields"),
-            .non_comptime_default => writer.writeAll("only compilation time known expressions are allowed for default values"),
-            .non_comptime_in_global => writer.writeAll("use a constant expression or initialize the value later in a local scope"),
             .use_uninit_var => writer.writeAll("consider initializing the variable before use"),
             .void_array => writer.writeAll("use any other type to declare an array"),
             .void_param => writer.writeAll("use a any other type than 'void' or remove parameter"),

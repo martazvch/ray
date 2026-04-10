@@ -60,6 +60,7 @@ pub const FnDecl = struct {
     return_type: ?*Type,
     has_callable: bool,
     is_closure: bool,
+    is_extern: bool,
 
     /// Meta data gathered by the Ast walker
     meta: Meta = .empty,

@@ -2,8 +2,8 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
-const ffi = @import("../builtins/ffi.zig");
-const cffi = @import("../builtins/cffi.zig");
+const zffi = @import("../ffi/zffi.zig");
+const ffi = @import("../ffi/ffi.zig");
 const MapNameType = @import("../analyzer/types.zig").MapNameType;
 const Type = @import("../analyzer/types.zig").Type;
 const TypeInterner = @import("../analyzer/types.zig").TypeInterner;
@@ -27,10 +27,10 @@ structs_meta: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
 /// Native structures translated to Ray's type system used here for self references
 scratch_structs: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
 
-/// Native C functions used at runtime
-c_fns: ArrayList(*Obj.CFn),
-/// Native C functions translated to Ray's type system for compilation
-c_fns_meta: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
+/// Foreign functions used at runtime
+foreign_fns: ArrayList(*Obj.ForeignFn),
+/// Foreign functions translated to Ray's type system for compilation
+foreign_fns_meta: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
 
 const Self = @This();
 
@@ -40,8 +40,8 @@ pub const empty: Self = .{
     .structs = .empty,
     .structs_meta = .empty,
     .scratch_structs = .empty,
-    .c_fns = .empty,
-    .c_fns_meta = .empty,
+    .foreign_fns = .empty,
+    .foreign_fns_meta = .empty,
 };
 
 pub fn registerMod(self: *Self, allocator: Allocator, interner: *Interner, ti: *TypeInterner, Module: type) void {
@@ -50,8 +50,8 @@ pub fn registerMod(self: *Self, allocator: Allocator, interner: *Interner, ti: *
     }
 
     const mod = @field(Module, "module");
-    if (@TypeOf(mod) != ffi.ZigModule) {
-        @compileError("Native Zig module's 'module' variable must be of type " ++ @typeName(ffi.ZigModule));
+    if (@TypeOf(mod) != zffi.Module) {
+        @compileError("Native Zig module's 'module' variable must be of type " ++ @typeName(zffi.Module));
     }
 
     inline for (mod.structures) |s| {
@@ -69,8 +69,8 @@ fn registerStruct(self: *Self, allocator: Allocator, S: type, interner: *Interne
     }
 
     const zig_struct = @field(S, "zig_struct");
-    if (@TypeOf(zig_struct) != ffi.ZigStructMeta) {
-        @compileError("zig_struct constant must be of type: " ++ @typeName(ffi.ZigStructMeta));
+    if (@TypeOf(zig_struct) != zffi.StructMeta) {
+        @compileError("zig_struct constant must be of type: " ++ @typeName(zffi.StructMeta));
     }
 
     // TODO: handle container name properly
@@ -111,7 +111,7 @@ const Registered = struct {
 };
 // We can use pointers here because we refer to comptime declarations in Module
 // TODO: no check on already defined with same name?
-pub fn registerZigFn(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMeta, interner: *Interner, ti: *TypeInterner) Registered {
+pub fn registerZigFn(self: *Self, allocator: Allocator, func: *const zffi.FnMeta, interner: *Interner, ti: *TypeInterner) Registered {
     const fn_type = self.fnZigToRay(allocator, func, interner, ti);
     self.zig_fns_meta.put(allocator, interner.intern(func.name), fn_type) catch oom();
     const native = Obj.ZigFn.create(allocator, func.name, func.function);
@@ -121,7 +121,7 @@ pub fn registerZigFn(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMe
     return .{ .index = self.zig_fns.items.len - 1, .type = fn_type };
 }
 
-fn fnZigToRay(self: *Self, allocator: Allocator, func: *const ffi.ZigFnMeta, interner: *Interner, ti: *TypeInterner) *const Type {
+fn fnZigToRay(self: *Self, allocator: Allocator, func: *const zffi.FnMeta, interner: *Interner, ti: *TypeInterner) *const Type {
     var params: Type.Function.ParamsMap = .empty;
 
     // We don't take into account param *Vm and if it's in second place, it means 'self' is in first and we skip it too
@@ -182,18 +182,18 @@ fn zigToRay(self: *Self, allocator: Allocator, ty: type, interner: *Interner, ti
     };
 }
 
-pub fn registerCFn(self: *Self, allocator: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) Registered {
-    const fn_type = fnCToRay(allocator, proto, interner, ti);
+pub fn registerForeignFn(self: *Self, allocator: Allocator, proto: *const ffi.FnProto, interner: *Interner, ti: *TypeInterner) Registered {
+    const fn_type = foreignFnToRay(allocator, proto, interner, ti);
     const name = std.mem.span(proto.name);
-    self.c_fns_meta.put(allocator, interner.intern(name), fn_type) catch oom();
-    const native = Obj.CFn.create(allocator, name, proto.func, proto.return_type != .void);
+    self.foreign_fns_meta.put(allocator, interner.intern(name), fn_type) catch oom();
+    const native = Obj.ForeignFn.create(allocator, name, proto.func, proto.return_type != .void);
 
-    self.c_fns.append(allocator, native) catch oom();
+    self.foreign_fns.append(allocator, native) catch oom();
 
-    return .{ .index = self.c_fns.items.len - 1, .type = fn_type };
+    return .{ .index = self.foreign_fns.items.len - 1, .type = fn_type };
 }
 
-pub fn fnCToRay(allocator: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) *const Type {
+pub fn foreignFnToRay(allocator: Allocator, proto: *const ffi.FnProto, interner: *Interner, ti: *TypeInterner) *const Type {
     var params: Type.Function.ParamsMap = .empty;
     params.ensureTotalCapacity(allocator, proto.params.len - 1) catch oom();
 
@@ -214,7 +214,7 @@ pub fn fnCToRay(allocator: Allocator, proto: *const cffi.FnProto, interner: *Int
 
     // TODO: handle container name properly
     const ty: Type.Function = .{
-        .kind = .c,
+        .kind = .foreign_glob,
         .loc = .{
             .name = interner.intern(std.mem.span(proto.name)),
             .container = interner.intern("std"),
@@ -226,7 +226,7 @@ pub fn fnCToRay(allocator: Allocator, proto: *const cffi.FnProto, interner: *Int
     return ti.intern(.{ .function = ty });
 }
 
-fn cTypeToRay(ty: cffi.cType, ti: *TypeInterner) *const Type {
+fn cTypeToRay(ty: ffi.cType, ti: *TypeInterner) *const Type {
     return switch (ty) {
         .void => ti.getCached(.void),
         .int => ti.getCached(.int),

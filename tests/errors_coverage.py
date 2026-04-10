@@ -84,7 +84,7 @@ success = test(
     "Analyzer",
     os.path.join(os.getcwd(), "src", "core", "analyzer", "analyzer_msg.zig"),
     os.path.join(os.getcwd(), "tests", "analyzer"),
-    ["too_many_types"]
+    ["too_many_types", "dynlib_unsupported_os"]
 ) and success
 
 success = test(

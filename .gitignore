@@ -7,3 +7,5 @@ test.ray
 *.o
 tester
 tester.exe
+*.dylib
+

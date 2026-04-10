@@ -1,0 +1,2 @@
+extern_sym_not_fn
+expect_brace_before, structure
