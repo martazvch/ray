@@ -198,7 +198,7 @@ pub fn makeNative(func: anytype) Fn {
                             *Obj.NativeObj,
                             @alignCast(@fieldParentPtr(
                                 "child",
-                                @as(*align(@alignOf(@FieldType(Obj.NativeObj, "child"))) *anyopaque, @ptrCast(@alignCast(value))),
+                                @as(**anyopaque, @ptrCast(@alignCast(value))),
                             )),
                         );
 

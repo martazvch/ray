@@ -164,10 +164,7 @@ fn zigToRay(self: *Self, allocator: Allocator, ty: type, interner: *Interner, ti
                 }
                 return ti.intern(.{ .inline_union = .{ .types = childs.toOwnedSlice(allocator) catch oom() } });
             },
-            .pointer => |ptr| switch (ptr.child) {
-                Obj => unreachable,
-                else => |C| self.zigToRay(allocator, C, interner, ti),
-            },
+            .pointer => |ptr| self.zigToRay(allocator, ptr.child, interner, ti),
             .@"struct" => {
                 if (self.scratch_structs.get(interner.intern(@typeName(ty)))) |t| {
                     return t;
