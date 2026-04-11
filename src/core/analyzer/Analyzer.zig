@@ -320,7 +320,7 @@ fn containerFnDecls(
     return func_instrs.toOwnedSlice(self.allocator) catch oom();
 }
 
-/// Analyzes trait implementations in a container (enum or structure)
+/// Analyzes trait implementations in a container (enum, structure, ..)
 fn containerTraitImpls(
     self: *Self,
     container: *const Type,
@@ -372,7 +372,7 @@ fn containerTraitImpls(
             // Unreachable because found in proto
             const fn_decl = trait_def.functions.get(fn_name) orelse unreachable;
 
-            fn_res.sym.type = try self.checkFunctionEq(fn_decl.ty, fn_res.sym.type, true);
+            fn_res.sym.type = try self.checkFunctionEq(fn_decl.ty, fn_res.sym.type, true, self.ast.getSpan(f.name));
 
             func_instrs.appendAssumeCapacity(fn_res.instr);
             trait_impl.putAssumeCapacity(fn_name, fn_res.sym);
@@ -392,14 +392,6 @@ fn containerTraitImpls(
                 const fn_res = try self.fnDeclaration(def, ctx);
                 func_instrs.appendAssumeCapacity(fn_res.instr);
                 trait_impl.putAssumeCapacity(entry.key_ptr.*, fn_res.sym);
-
-                // If trait's definition hasn't been compiled once, we save the compiled symbol
-                // so that futur implementation we'll use the same compile function, avoiding
-                // code gen bloat. We'll be present in next prototype from this trait
-                const compiled_decl = &trait_def.functions.getPtr(entry.key_ptr.*).?.compiled;
-                if (compiled_decl.* == null) {
-                    compiled_decl.* = fn_res.sym;
-                }
             }
             // Missing
             else return self.err(
@@ -720,7 +712,11 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
         const param_name = self.interner.intern(self.ast.toSource(p.name));
 
         if (i == 0 and param_name == self.cached_names.self) {
+            // if (ctx.self_type == null) {
+            //     return self.err(.self_outside_decl, span);
+            // }
             const self_type = ctx.self_type orelse return self.err(.self_outside_decl, span);
+            // const self_type = self.ti.intern(.{ .self = .{ .trait_bound = undefined } });
 
             is_method = true;
             _ = try self.declareVariable(param_name, self_type, .{ .captured = p.meta.captured }, .zero);
@@ -1571,8 +1567,8 @@ fn binopComparisonCoercion(
     }
 
     // TODO: Eq trait
-    const lhs_eq = lhs_type.hasTrait(self.interner.intern("Eq")) orelse return error.Invalid;
-    _ = lhs_eq; // autofix
+    const lhs_eq = lhs_type.getTrait(self.interner.intern("Eq")) orelse return error.Invalid;
+    _ = lhs_eq;
 
     return error.Invalid;
 }
@@ -3341,7 +3337,9 @@ fn performTypeCoercion(self: *Self, decl: *const Type, value: *const Type, decl_
                 else => |narrowed| return narrowed,
             };
         } else if (value.is(.function)) {
-            return self.checkFunctionEq(decl, value, false) catch break :check;
+            return self.checkFunctionEq(decl, value, false, span);
+        } else if (decl.as(.trait)) |t| {
+            if (value.getTrait(t.loc.name) != null) return decl;
         }
 
         // We check after the other because above checks need the information about a potential void declaration
@@ -3386,7 +3384,7 @@ fn performErrorCoercion(self: *Self, decl: *const Type, value: *const Type, span
 /// `allow_new_default` allow the `value` function to define other values for default parameters
 /// it is useful to allow user to define new default
 /// Assumes that types are functions
-fn checkFunctionEq(self: *Self, decl: *const Type, value: *const Type, allow_new_default: bool) Error!*const Type {
+fn checkFunctionEq(self: *Self, decl: *const Type, value: *const Type, allow_new_default: bool, span: Span) Error!*const Type {
     // Functions function's return types like: 'fn add() -> fn(int) -> int' don't have a declaration
     // There is also the case when assigning to a variable and infering type like: var bound = foo.method
     // Here, we want `bound` to be an anonymus function, it loses all declaration infos because it's a runtime value
@@ -3400,10 +3398,29 @@ fn checkFunctionEq(self: *Self, decl: *const Type, value: *const Type, allow_new
     const f2 = value.function;
 
     check: {
-        if (f1.params.count() != f2.params.count()) break :check;
+        // We check if both are method or non-method
+        const is_method = met: {
+            if (f1.kind == .method) {
+                if (f2.kind == .method) break :met true;
+                break :check;
+            }
+            if (f2.kind == .method) {
+                if (f1.kind == .method) break :met true;
+                break :check;
+            }
+            break :met false;
+        };
+
+        // In case of method, we skip the comparison of `self` as it can be different
+        // across trait implementations
+        const offset = @intFromBool(is_method);
+        const params1 = f1.params.values()[offset..];
+        const params2 = f2.params.values()[offset..];
+
+        if (params1.len != params2.len) break :check;
         if (f1.return_type != f2.return_type) break :check;
 
-        for (f1.params.values(), f2.params.values()) |p1, p2| {
+        for (params1, params2) |p1, p2| {
             if (p1.type != p2.type) break :check;
             // If declaration has a default, implementation has too
             if (p1.default != null and p2.default == null) break :check;
@@ -3420,8 +3437,12 @@ fn checkFunctionEq(self: *Self, decl: *const Type, value: *const Type, allow_new
         return value;
     }
 
-    return error.Err;
+    return self.err(
+        .{ .type_mismatch = .{ .expect = self.typeName(decl), .found = self.typeName(value) } },
+        span,
+    );
 }
+
 /// Checks if two different types (with at least one of them being an unoion) fits in one or the other
 /// Assumes `decl` is an union
 fn checkUnionType(decl: *const Type, value: *const Type) error{ Mismatch, NotInUnion }!*const Type {

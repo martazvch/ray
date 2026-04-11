@@ -1,0 +1,36 @@
+-- speak --
+load_constant index 3, value I'm Bar
+print
+ret_naked
+
+-- other --
+get_local index 0
+call index 2, arity 1, speak
+ret_naked
+
+-- speak --
+load_constant index 4, value I'm Baz
+print
+ret_naked
+
+-- other --
+get_local index 0
+call index 4, arity 1, speak
+ret_naked
+
+-- main --
+struct_lit index 0, arity 0, Bar
+get_local index 0
+call index 2, arity 1, speak
+get_local index 0
+call index 3, arity 1, other
+struct_lit index 1, arity 0, Baz
+get_local index 1
+call index 4, arity 1, speak
+get_local index 1
+call index 5, arity 1, other
+ret_naked
+
+-- global scope --
+call index 6, arity 0, main
+

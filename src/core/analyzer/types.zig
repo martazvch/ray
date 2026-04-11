@@ -290,7 +290,7 @@ pub const Type = union(enum) {
         return e.is_err;
     }
 
-    pub fn hasTrait(self: *const Type, name: InternerIdx) ?MapNameSym {
+    pub fn getTrait(self: *const Type, name: InternerIdx) ?MapNameSym {
         return switch (self.*) {
             .@"enum" => |t| t.traits.get(name),
             .structure => |t| t.traits.get(name),
@@ -302,14 +302,11 @@ pub const Type = union(enum) {
     pub fn hash(self: Type, allocator: Allocator, hasher: anytype) void {
         const asBytes = std.mem.asBytes;
 
-        comptime {
-            if (@typeInfo(@TypeOf(hasher)) != .pointer) {
-                @compileError("You must pass a pointer to a haser");
-            }
-
-            if (!@hasDecl(@TypeOf(hasher.*), "update")) {
-                @compileError("Hasher must have an 'update' method");
-            }
+        if (@typeInfo(@TypeOf(hasher)) != .pointer) {
+            @compileError("You must pass a pointer to a haser");
+        }
+        if (!@hasDecl(@TypeOf(hasher.*), "update")) {
+            @compileError("Hasher must have an 'update' method");
         }
 
         hasher.update(asBytes(&@intFromEnum(self)));
@@ -439,9 +436,9 @@ pub const Type = union(enum) {
             .trait => |ty| {
                 // If symbol is defnined in current mod/file, don't repeat the module
                 if (ty.loc.container == mod_name) {
-                    writer.print("trait {s}", .{interner.getKey(ty.loc.name).?}) catch oom();
+                    writer.print("{s}", .{interner.getKey(ty.loc.name).?}) catch oom();
                 } else {
-                    writer.print("trait {s}.{s}", .{ interner.getKey(ty.loc.container).?, interner.getKey(ty.loc.name).? }) catch oom();
+                    writer.print("{s}.{s}", .{ interner.getKey(ty.loc.container).?, interner.getKey(ty.loc.name).? }) catch oom();
                 }
             },
             .@"union" => |*ty| {
