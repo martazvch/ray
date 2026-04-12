@@ -1,0 +1,31 @@
+trait Foo {
+    fn speak(self)
+}
+
+struct Bar {
+    impl Foo {
+        fn speak(self) {
+            print "Bar"
+        }
+    }
+}
+
+struct Baz {
+    impl Foo {
+        fn speak(self) {
+            print "Baz"
+        }
+    }
+}
+
+fn f(value: Foo) {
+    value.speak()
+}
+
+fn main() {
+    let bar = Bar{}
+    f(bar)
+    let baz = Baz{}
+    f(baz)
+}
+

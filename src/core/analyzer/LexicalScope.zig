@@ -52,6 +52,7 @@ func_count: usize,
 struct_count: usize,
 trait_count: usize,
 union_count: usize,
+vtable_count: usize,
 
 // Dbg
 save: bool,
@@ -72,6 +73,7 @@ pub const empty: Self = .{
     .struct_count = 0,
     .trait_count = 0,
     .union_count = 0,
+    .vtable_count = 0,
 
     .save = false,
     .saved = .empty,
@@ -198,6 +200,13 @@ fn updateCurrent(self: *Self) void {
 
 pub fn isGlobal(self: *Self) bool {
     return self.scopes.items.len == 1;
+}
+
+/// Creates a new vtable which will be filled by the compiler. This functions keeps track
+/// of the number of vtable and return the index of the next one
+pub fn newVTable(self: *Self) usize {
+    defer self.vtable_count += 1;
+    return self.vtable_count;
 }
 
 pub fn declareVar(

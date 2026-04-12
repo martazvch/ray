@@ -16,6 +16,7 @@ pub const AnalyzerMsg = union(enum) {
     break_val_in_non_val_block,
     call_method_on_type: struct { name: []const u8 },
     call_static_on_instance: struct { name: []const u8 },
+    call_fn_on_trait: struct { name: []const u8 },
     cant_continue_scope: struct { name: []const u8 },
     cant_infer_array_type,
     dead_code,
@@ -137,6 +138,7 @@ pub const AnalyzerMsg = union(enum) {
             .big_self_outside_decl => writer.writeAll("can't use 'Self' outside a declaration"),
             .block_all_path_dont_return => writer.writeAll("all paths of block expression don't return a value"),
             .break_val_in_non_val_block => writer.writeAll("can't return a value from this scope"),
+            .call_fn_on_trait => |e| writer.print("'{s}' is trait, can't call functions on it", .{e.name}),
             .call_method_on_type => |e| writer.print("method '{s}' called on a type", .{e.name}),
             .call_static_on_instance => |e| writer.print("static function '{s}' called on an instance", .{e.name}),
             .cant_continue_scope => |e| writer.print("block '{s}' isn't continuable", .{e.name}),
@@ -258,6 +260,7 @@ pub const AnalyzerMsg = union(enum) {
             .big_self_outside_decl => writer.writeAll("this is not a declaration scope"),
             .block_all_path_dont_return => writer.writeAll("this block"),
             .break_val_in_non_val_block => writer.writeAll("can't have this expression"),
+            .call_fn_on_trait => writer.writeAll("this is a trait"),
             .call_method_on_type, .call_static_on_instance => writer.writeAll("wrong calling convention"),
             .cant_continue_scope, .no_continuable_scope => writer.writeAll("invalid continue"),
             .cant_infer_array_type => writer.writeAll("empty arrays don't convey any type information"),
@@ -361,6 +364,7 @@ pub const AnalyzerMsg = union(enum) {
                 \\you are either trying to return a value from a non expression block (like a 'while' body) or the block
                 \\isn't used in an expression
             ),
+            .call_fn_on_trait => writer.writeAll("you can only call functions on types implementing traits, not trait themselves"),
             .call_method_on_type, .call_static_on_instance => writer.writeAll(
                 "static functions can only be called on types and methods can only be called on instances",
             ),

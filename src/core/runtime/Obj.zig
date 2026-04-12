@@ -41,6 +41,7 @@ const Kind = enum {
     foreign_fn,
     native_obj,
     string,
+    trait_obj,
     union_instance,
 
     pub fn fromType(T: type) Kind {
@@ -56,6 +57,7 @@ const Kind = enum {
             ForeignFn => .foreign_fn,
             NativeObj => .native_obj,
             String => .string,
+            TraitObj => .trait_obj,
             UnionInstance => .union_instance,
             else => @compileError(@typeName(T) ++ " isn't a runtime object type"),
         };
@@ -93,131 +95,14 @@ fn allocateComptime(allocator: Allocator, comptime T: type, type_id: TypeId) *T 
     return ptr;
 }
 
-pub fn deepCopy(self: *Obj, vm: *Vm) *Obj {
-    return switch (self.kind) {
-        .array => self.as(Array).deepCopy(vm).asObj(),
-        // TODO:
-        .enum_instance, .@"error", .union_instance => @panic("TODO"),
-        .instance => self.as(Instance).deepCopy(vm).asObj(),
-        // Immutable, shallow copy ok
-        .box, .closure, .function, .iterator, .foreign_fn, .native_zfn, .native_obj, .string => self,
-    };
-}
-
-pub fn destroy(self: *Obj, vm: *Vm) void {
-    switch (self.kind) {
-        .array => self.as(Array).deinit(vm),
-        .box => self.as(Box).deinit(vm),
-        .closure => self.as(Closure).deinit(vm),
-        .enum_instance, .@"error" => self.as(EnumInstance).deinit(vm),
-        .function => {
-            const function = self.as(Function);
-            function.deinit(vm);
-        },
-        .instance => {
-            const instance = self.as(Instance);
-            instance.deinit(vm.gc_alloc);
-        },
-        .iterator => {
-            const iterator = self.as(Iterator);
-            iterator.deinit(vm.gc_alloc);
-        },
-        .foreign_fn => {
-            const function = self.as(ForeignFn);
-            function.deinit(vm.gc_alloc);
-        },
-        .native_zfn => {
-            const function = self.as(ZigFn);
-            function.deinit(vm.gc_alloc);
-        },
-        .native_obj => {
-            const object = self.as(NativeObj);
-            object.deinit(vm);
-        },
-        .string => self.as(String).deinit(vm.gc_alloc),
-        .union_instance => self.as(UnionInstance).deinit(vm),
-    }
-}
-
 pub inline fn as(self: *Obj, comptime T: type) *T {
     comptime assert(@hasField(T, "obj"));
 
     return @alignCast(@fieldParentPtr("obj", self));
 }
 
-pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
-    switch (self.kind) {
-        .array => {
-            const array = self.as(Array);
-            try writer.writeAll("[");
-            for (array.values.items, 0..) |val, i| {
-                val.print(writer);
-                if (i < array.values.items.len - 1) try writer.writeAll(", ");
-            }
-            try writer.writeAll("]");
-        },
-        .box => {
-            const box = self.as(Box);
-            try writer.writeAll("Box ");
-            box.value.print(writer);
-        },
-        .closure => {
-            const closure = self.as(Closure);
-
-            if (comptime @import("builtin").mode == .Debug) {
-                try writer.print("<closure {s}>", .{closure.function.name});
-            } else {
-                try writer.print("<fn {s}>", .{closure.function.name});
-            }
-        },
-        .enum_instance => {
-            const instance = self.as(EnumInstance);
-            try writer.print("<enum {s}.{s}>", .{
-                instance.parent.name,
-                instance.parent.tags[instance.tag_id],
-            });
-        },
-        .function => {
-            const function = self.as(Function);
-            try writer.print("<function {s}>", .{function.name});
-        },
-        .instance => try writer.print("<instance of {s}>", .{self.as(Instance).parent.name}),
-        .iterator => try writer.writeAll("<iterator>"),
-        .foreign_fn => try writer.print("<foreign fn {s}>", .{self.as(ForeignFn).name}),
-        .native_zfn => try writer.print("<native zig fn {s}>", .{self.as(ZigFn).name}),
-        .native_obj => try writer.print("<native object {s}>", .{self.as(NativeObj).name}),
-        .string => try writer.print("{s}", .{self.as(String).chars}),
-        .union_instance, .@"error" => {
-            const instance = self.as(UnionInstance);
-            try writer.print("<{s} {s}.{s}>", .{
-                if (instance.parent.is_err) "error" else "enum",
-                instance.parent.name,
-                instance.parent.tags[instance.tag_id],
-            });
-        },
-    }
-}
-
-pub fn log(self: *Obj) void {
-    switch (self.kind) {
-        .array => std.debug.print("<array>", .{}),
-        .box => std.debug.print("box", .{}),
-        .closure => std.debug.print("<closure {s}>", .{self.as(Closure).function.name}),
-        .enum_instance, .@"error" => std.debug.print(
-            "<{s} instance {s}>",
-            .{ if (self.kind == .@"error") "error" else "enum", self.as(EnumInstance).parent.name },
-        ),
-        .function => std.debug.print("<fn {s}>", .{self.as(Function).name}),
-        .instance => std.debug.print("<instance of {s}>", .{self.as(Instance).parent.name}),
-        .iterator => std.debug.print("<iterator>", .{}),
-        .foreign_fn => std.debug.print("<foreign fn {s}>", .{self.as(ForeignFn).name}),
-        .native_zfn => std.debug.print("<native zig fn {s}>", .{self.as(ZigFn).name}),
-        .native_obj => unreachable,
-        .string => std.debug.print("{s}", .{self.as(String).chars}),
-        .union_instance => std.debug.print("<enum instance {s}>", .{self.as(EnumInstance).parent.name}),
-    }
-}
-
+// ----
+// Api
 fn BuiltinFn(T: type) type {
     return *const fn (*T, *Vm, []Value) ?Value;
 }
@@ -259,6 +144,8 @@ fn getDefApiFns(T: type) std.StaticStringMap(ObjFnInfos) {
     return .initComptime(kvs);
 }
 
+// ---------
+//  Objects
 pub const Array = struct {
     obj: Obj,
     values: ArrayList(Value),
@@ -925,3 +812,166 @@ pub const NativeObj = struct {
         vm.gc_alloc.destroy(self);
     }
 };
+
+pub const TraitObj = struct {
+    obj: Obj,
+    data: *Obj,
+    vtable: *const Module.VTable,
+
+    const Self = @This();
+
+    pub fn create(vm: *Vm, data: *Obj, vtable: *const Module.VTable) *Self {
+        const obj = Obj.allocate(vm, Self, undefined);
+        obj.data = data;
+        obj.vtable = vtable;
+
+        return obj;
+    }
+
+    pub fn asObj(self: *Self) *Obj {
+        return &self.obj;
+    }
+
+    pub fn deinit(self: *Self, vm: *Vm) void {
+        vm.gc_alloc.destroy(self);
+    }
+};
+
+pub fn deepCopy(self: *Obj, vm: *Vm) *Obj {
+    return switch (self.kind) {
+        .array => self.as(Array).deepCopy(vm).asObj(),
+        // TODO:
+        .enum_instance, .@"error", .union_instance => @panic("TODO"),
+        .instance => self.as(Instance).deepCopy(vm).asObj(),
+        // Immutable, shallow copy ok
+        .box, .closure, .function, .iterator, .foreign_fn, .native_zfn, .native_obj, .string, .trait_obj => self,
+    };
+}
+
+pub fn destroy(self: *Obj, vm: *Vm) void {
+    switch (self.kind) {
+        .array => self.as(Array).deinit(vm),
+        .box => self.as(Box).deinit(vm),
+        .closure => self.as(Closure).deinit(vm),
+        .enum_instance, .@"error" => self.as(EnumInstance).deinit(vm),
+        .function => {
+            const function = self.as(Function);
+            function.deinit(vm);
+        },
+        .instance => {
+            const instance = self.as(Instance);
+            instance.deinit(vm.gc_alloc);
+        },
+        .iterator => {
+            const iterator = self.as(Iterator);
+            iterator.deinit(vm.gc_alloc);
+        },
+        .foreign_fn => {
+            const function = self.as(ForeignFn);
+            function.deinit(vm.gc_alloc);
+        },
+        .native_zfn => {
+            const function = self.as(ZigFn);
+            function.deinit(vm.gc_alloc);
+        },
+        .native_obj => {
+            const object = self.as(NativeObj);
+            object.deinit(vm);
+        },
+        .string => self.as(String).deinit(vm.gc_alloc),
+        .trait_obj => self.as(TraitObj).deinit(vm),
+        .union_instance => self.as(UnionInstance).deinit(vm),
+    }
+}
+pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
+    switch (self.kind) {
+        .array => {
+            const array = self.as(Array);
+            try writer.writeAll("[");
+            for (array.values.items, 0..) |val, i| {
+                val.print(writer);
+                if (i < array.values.items.len - 1) try writer.writeAll(", ");
+            }
+            try writer.writeAll("]");
+        },
+        .box => {
+            const box = self.as(Box);
+            try writer.writeAll("Box ");
+            box.value.print(writer);
+        },
+        .closure => {
+            const closure = self.as(Closure);
+
+            if (comptime @import("builtin").mode == .Debug) {
+                try writer.print("<closure {s}>", .{closure.function.name});
+            } else {
+                try writer.print("<fn {s}>", .{closure.function.name});
+            }
+        },
+        .enum_instance => {
+            const instance = self.as(EnumInstance);
+            try writer.print("<enum {s}.{s}>", .{
+                instance.parent.name,
+                instance.parent.tags[instance.tag_id],
+            });
+        },
+        .function => {
+            const function = self.as(Function);
+            try writer.print("<function {s}>", .{function.name});
+        },
+        .instance => try writer.print("<instance of {s}>", .{self.as(Instance).parent.name}),
+        .iterator => try writer.writeAll("<iterator>"),
+        .foreign_fn => try writer.print("<foreign fn {s}>", .{self.as(ForeignFn).name}),
+        .native_zfn => try writer.print("<native zig fn {s}>", .{self.as(ZigFn).name}),
+        .native_obj => try writer.print("<native object {s}>", .{self.as(NativeObj).name}),
+        .string => try writer.print("{s}", .{self.as(String).chars}),
+        .trait_obj => {
+            const trait_obj = self.as(TraitObj);
+            const name = switch (trait_obj.obj.kind) {
+                .enum_instance => trait_obj.obj.as(EnumInstance).parent.name,
+                .instance => trait_obj.obj.as(Instance).parent.name,
+                .union_instance => trait_obj.obj.as(UnionInstance).parent.name,
+                else => unreachable,
+            };
+            try writer.print("{s}", .{name});
+        },
+        .union_instance, .@"error" => {
+            const instance = self.as(UnionInstance);
+            try writer.print("<{s} {s}.{s}>", .{
+                if (instance.parent.is_err) "error" else "enum",
+                instance.parent.name,
+                instance.parent.tags[instance.tag_id],
+            });
+        },
+    }
+}
+
+pub fn log(self: *Obj) void {
+    switch (self.kind) {
+        .array => std.debug.print("<array>", .{}),
+        .box => std.debug.print("box", .{}),
+        .closure => std.debug.print("<closure {s}>", .{self.as(Closure).function.name}),
+        .enum_instance, .@"error" => std.debug.print(
+            "<{s} instance {s}>",
+            .{ if (self.kind == .@"error") "error" else "enum", self.as(EnumInstance).parent.name },
+        ),
+        .function => std.debug.print("<fn {s}>", .{self.as(Function).name}),
+        .instance => std.debug.print("<instance of {s}>", .{self.as(Instance).parent.name}),
+        .iterator => std.debug.print("<iterator>", .{}),
+        .foreign_fn => std.debug.print("<foreign fn {s}>", .{self.as(ForeignFn).name}),
+        .native_zfn => std.debug.print("<native zig fn {s}>", .{self.as(ZigFn).name}),
+        .native_obj => unreachable,
+        .string => std.debug.print("{s}", .{self.as(String).chars}),
+        .trait_obj => {
+            const trait_obj = self.as(TraitObj);
+            const name = switch (trait_obj.obj.kind) {
+                .enum_instance => trait_obj.obj.as(EnumInstance).parent.name,
+                .instance => trait_obj.obj.as(Instance).parent.name,
+                .union_instance => trait_obj.obj.as(UnionInstance).parent.name,
+                else => unreachable,
+            };
+            std.debug.print("{s}", .{name});
+        },
+        .union_instance => std.debug.print("<enum instance {s}>", .{self.as(EnumInstance).parent.name}),
+    }
+}

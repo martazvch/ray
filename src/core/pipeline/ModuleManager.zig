@@ -28,6 +28,7 @@ pub const Module = struct {
     functions: []*Obj.Function,
     foreign_funcs: std.ArrayList(*Obj.ForeignFn),
     structures: []Structure,
+    vtables: []VTable,
 
     pub const Enum = struct {
         name: []const u8,
@@ -48,6 +49,10 @@ pub const Module = struct {
         field_count: usize,
     };
 
+    pub const VTable = struct {
+        functions: []*Obj.Function,
+    };
+
     pub const empty: Module = .{
         .path = undefined,
         .name = undefined,
@@ -59,6 +64,7 @@ pub const Module = struct {
         .functions = &.{},
         .foreign_funcs = .empty,
         .structures = &.{},
+        .vtables = &.{},
     };
 };
 
@@ -104,9 +110,9 @@ pub fn updateWithSymsInfo(self: *Self, allocator: Allocator, index: Index, symbo
 }
 
 pub fn ensureCompileSizes(self: *Self, allocator: Allocator, index: Index, state: *const State) void {
-    errdefer oom();
     const mod = self.getFromIndex(index);
 
+    errdefer oom();
     // We use realloc because of REPL mode that keeps defining symbols in current module
     mod.globals = try allocator.realloc(mod.globals, state.lex_scope.current.variables.count());
     mod.constants = try allocator.realloc(mod.constants, state.const_interner.constants.items.len);
@@ -114,6 +120,7 @@ pub fn ensureCompileSizes(self: *Self, allocator: Allocator, index: Index, state
     mod.unions = try allocator.realloc(mod.unions, state.lex_scope.union_count);
     mod.functions = try allocator.realloc(mod.functions, state.lex_scope.func_count);
     mod.structures = try allocator.realloc(mod.structures, state.lex_scope.struct_count);
+    mod.vtables = try allocator.realloc(mod.vtables, state.lex_scope.vtable_count);
 }
 
 pub fn addGlobal(self: *Self, mod: Index, index: usize, value: Value) void {

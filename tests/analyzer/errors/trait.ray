@@ -31,4 +31,6 @@ struct LastStruct {
     impl NonExistentTrait {}
 }
 
-fn main() {}
+fn main() {
+    One.onlyFn()
+}

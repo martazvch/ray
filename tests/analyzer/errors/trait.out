@@ -4,3 +4,4 @@ missing_fn_in_trait, nonExistant, Empty
 missing_fn_impl_in_trait, onlyFn, One
 not_a_trait, EmptyStruct
 undeclared_trait, NonExistentTrait
+call_fn_on_trait, One

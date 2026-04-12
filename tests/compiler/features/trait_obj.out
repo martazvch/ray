@@ -1,0 +1,33 @@
+-- speak --
+load_constant index 3, value Bar
+print
+ret_naked
+
+-- speak --
+load_constant index 4, value Baz
+print
+ret_naked
+
+-- f --
+get_local index 0
+call_virtual index 0, arity 0
+ret_naked
+
+-- main --
+struct_lit index 0, arity 0, Bar
+
+get_local index 0
+trait_obj index 0
+call index 3, arity 1, f
+
+struct_lit index 1, arity 0, Baz
+
+get_local index 1
+trait_obj index 1
+call index 3, arity 1, f
+
+ret_naked
+
+-- global scope --
+call index 4, arity 0, main
+

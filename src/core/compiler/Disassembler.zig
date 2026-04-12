@@ -88,13 +88,14 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .array_set => self.simpleInstruction(writer, "array_set", offset),
         .bound_method => self.indexInstruction(writer, "bound_method", offset),
         .box => self.simpleInstruction(writer, "box", offset),
-        .call_any => self.indexInstruction(writer, "call", offset),
-        .call_array, .call_string => self.callObjFn(writer, op, offset),
         .call => self.call(writer, offset),
+        .call_any => self.indexInstruction(writer, "call", offset),
+        .call_array, .call_string => self.callIndexArity(writer, op, offset),
         .call_ext => self.callExt(writer, false, offset),
         .call_foreign => self.callNative(writer, .foreign, offset),
         .call_foreign_ext => self.callExt(writer, true, offset),
         .call_foreign_glob => self.callForeignGlob(writer, offset),
+        .call_virtual => self.callIndexArity(writer, op, offset),
         .call_zig => self.callNative(writer, .zig, offset),
         .closure => self.indexInstruction(writer, "closure", offset),
         .def_global => self.indexInstruction(writer, "def_global", offset),
@@ -197,6 +198,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .sub_float => self.simpleInstruction(writer, "sub_float", offset),
         .sub_int => self.simpleInstruction(writer, "sub_int", offset),
         .swap_pop => self.simpleInstruction(writer, "swap_pop", offset),
+        .trait_obj => self.indexInstruction(writer, "trait_obj", offset),
         .unbox => self.simpleInstruction(writer, "unbox", offset),
         .union_lit => self.unionLiteral(writer, offset),
         .union_lit_ext => self.unionLiteralExt(writer, offset),
@@ -412,7 +414,7 @@ fn callNative(self: *Self, writer: *Writer, comptime kind: enum { foreign, zig }
     return offset + 3;
 }
 
-fn callObjFn(self: *Self, writer: *Writer, op: OpCode, offset: usize) Writer.Error!usize {
+fn callIndexArity(self: *Self, writer: *Writer, op: OpCode, offset: usize) Writer.Error!usize {
     const index = self.chunk.code.items[offset + 1];
     const arity = self.chunk.code.items[offset + 2];
 

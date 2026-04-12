@@ -102,6 +102,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .struct_decl => |*data| self.structDecl(data),
         .struct_literal => |*data| self.structLiteral(data),
         .trait_decl => |data| self.traitDecl(data),
+        .trait_obj => |data| self.traitObj(data),
         .trap => |data| self.trap(data),
         .unary => |*data| self.unary(data),
         .unbox => |index| self.indexInstr("Unbox", index),
@@ -565,6 +566,18 @@ fn traitDecl(self: *Self, data: Instruction.TraitDecl) void {
         self.parseInstr(func);
     }
 }
+
+fn traitObj(self: *Self, data: Instruction.TraitObj) void {
+    self.indentAndAppendSlice("[Trait object]");
+    self.indent_level += 1;
+    defer self.indent_level -= 1;
+
+    self.indentAndAppendSlice("- variable");
+    self.parseInstr(data.variable);
+    self.indentAndAppendSlice("- vtable");
+    self.indentAndPrintSlice("{}", .{data.vtable_index});
+}
+
 fn traitImpls(self: *Self, traits: []const Instruction.Trait) void {
     if (traits.len > 0) {
         self.indentAndAppendSlice("- traits");
@@ -572,7 +585,10 @@ fn traitImpls(self: *Self, traits: []const Instruction.Trait) void {
         for (traits) |trait| {
             self.indent_level += 1;
             defer self.indent_level -= 1;
-            self.indentAndPrintSlice("{s}:", .{self.interner.getKey(trait.name).?});
+            self.indentAndPrintSlice("{s}, vtable {}:", .{
+                self.interner.getKey(trait.name).?,
+                trait.vtable_index,
+            });
             for (trait.funcs) |func| {
                 self.parseInstr(func);
             }

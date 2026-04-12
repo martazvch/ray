@@ -1,7 +1,7 @@
 [Trait declaration Foo]
 [Structure declaration Bar]
     - traits
-        Foo:
+        Foo, vtable 0:
         [Function declaration speak]
             [Print]
                 [Constant index 3]
@@ -12,7 +12,7 @@
             [Invoke symbol 2]
 [Structure declaration Baz]
     - traits
-        Foo:
+        Foo, vtable 1:
         [Function declaration speak]
             [Print]
                 [Constant index 4]

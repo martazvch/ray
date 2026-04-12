@@ -389,6 +389,7 @@ const Compiler = struct {
             .struct_decl => |*data| self.structDecl(data),
             .struct_literal => |*data| self.structLiteral(data),
             .trait_decl => |data| self.traitDecl(data),
+            .trait_obj => |data| self.traitObj(data),
             .trap => |data| self.trap(data),
             .unary => |*data| self.unary(data),
             .unbox => |index| self.wrappedInstr(.unbox, index),
@@ -573,6 +574,9 @@ const Compiler = struct {
                 if (f.kind == .function) {
                     return self.invoke(data, f);
                 }
+                if (f.kind == .virtual) {
+                    return self.virtualCall(data, f);
+                }
             },
             .load_symbol => |sym| {
                 return self.callSymbol(data, 0, sym.symbol_index, sym.module_index);
@@ -596,6 +600,13 @@ const Compiler = struct {
     fn invoke(self: *Self, data: *const Instruction.Call, callee: Instruction.Field) Error!void {
         try self.compileInstr(callee.structure);
         try self.callSymbol(data, 1, callee.index, data.ext_mod);
+    }
+
+    fn virtualCall(self: *Self, data: *const Instruction.Call, callee: Instruction.Field) Error!void {
+        try self.compileInstr(callee.structure);
+        try self.compileArgs(data.args);
+        self.writeOpAndByte(.call_virtual, @intCast(callee.index));
+        self.writeByte(@intCast(data.args.len));
     }
 
     // TODO: protect casts
@@ -670,9 +681,28 @@ const Compiler = struct {
         for (decls) |decl| {
             const fn_data = self.manager.instr_data[decl].fn_decl;
             // Structures and enums' functions have a name
+            // TODO: not all the time
             const fn_name = self.manager.state.interner.getKey(fn_data.name orelse unreachable).?;
             const func = try self.compileFnBody(fn_name, &fn_data);
             self.manager.state.modules.addSymbol(self.manager.mod_index, fn_data.sym_index, func);
+        }
+    }
+
+    fn containerTraitDecls(self: *Self, decls: []const Instruction.Trait) Error!void {
+        for (decls) |decl| {
+            const mod = self.manager.state.modules.getFromIndex(self.manager.mod_index);
+            const vtable = &mod.vtables[decl.vtable_index];
+            vtable.functions = self.manager.allocator.alloc(*Obj.Function, decl.funcs.len) catch oom();
+
+            for (decl.funcs, 0..) |func, i| {
+                const fn_data = self.manager.instr_data[func].fn_decl;
+                // Structures and enums' functions have a name
+                // TODO: not all the time
+                const fn_name = self.manager.state.interner.getKey(fn_data.name orelse unreachable).?;
+                const body = try self.compileFnBody(fn_name, &fn_data);
+                vtable.functions[i] = body;
+                self.manager.state.modules.addSymbol(self.manager.mod_index, fn_data.sym_index, body);
+            }
         }
     }
 
@@ -1040,9 +1070,7 @@ const Compiler = struct {
         });
         try self.defaults(data.default_fields);
         try self.containerFnDecls(data.functions);
-        for (data.traits) |trait| {
-            try self.containerFnDecls(trait.funcs);
-        }
+        try self.containerTraitDecls(data.traits);
     }
 
     fn structLiteral(self: *Self, data: *const Instruction.StructLiteral) Error!void {
@@ -1059,6 +1087,12 @@ const Compiler = struct {
 
     fn traitDecl(self: *Self, data: Instruction.TraitDecl) Error!void {
         try self.containerFnDecls(data.functions);
+    }
+
+    fn traitObj(self: *Self, data: Instruction.TraitObj) Error!void {
+        try self.compileInstr(data.variable);
+        // TODO: error
+        self.writeOpAndByte(.trait_obj, @intCast(data.vtable_index));
     }
 
     fn trap(self: *Self, data: Instruction.Trap) Error!void {

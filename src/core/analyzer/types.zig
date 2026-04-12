@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayMap = std.AutoArrayHashMapUnmanaged;
 const Map = std.AutoHashMapUnmanaged;
+const asBytes = std.mem.asBytes;
 
 const LexScope = @import("LexicalScope.zig");
 const InstrIndex = @import("ir.zig").Index;
@@ -14,7 +15,9 @@ const oom = misc.oom;
 
 pub const MapNameType = ArrayMap(InternerIdx, *const Type);
 pub const MapNameSym = Map(InternerIdx, LexScope.Symbol);
-pub const TraitMap = ArrayMap(InternerIdx, MapNameSym);
+
+pub const TraitImpl = struct { vtable_index: usize, symbols: MapNameSym };
+pub const TraitMap = ArrayMap(InternerIdx, TraitImpl);
 
 pub const Type = union(enum) {
     never,
@@ -34,6 +37,7 @@ pub const Type = union(enum) {
     optional: *const Type,
     structure: Structure,
     trait: Trait,
+    trait_obj: TraitObj,
     @"union": Union,
 
     pub const Array = struct {
@@ -75,7 +79,10 @@ pub const Type = union(enum) {
         }
     };
 
-    pub const Loc = struct { name: InternerIdx, container: InternerIdx };
+    pub const Loc = struct {
+        name: InternerIdx,
+        container: InternerIdx,
+    };
 
     pub const Enum = struct {
         loc: ?Loc,
@@ -236,6 +243,15 @@ pub const Type = union(enum) {
         }
     };
 
+    pub const TraitObj = struct {
+        funcs: *const MapNameSym,
+        vtable_index: usize,
+        /// Used for interning
+        trait: Loc,
+        /// Used for interning
+        structure: Loc,
+    };
+
     pub const Union = struct {
         loc: Loc,
         tags: Tags,
@@ -290,7 +306,7 @@ pub const Type = union(enum) {
         return e.is_err;
     }
 
-    pub fn getTrait(self: *const Type, name: InternerIdx) ?MapNameSym {
+    pub fn getTraitImpl(self: *const Type, name: InternerIdx) ?TraitImpl {
         return switch (self.*) {
             .@"enum" => |t| t.traits.get(name),
             .structure => |t| t.traits.get(name),
@@ -299,9 +315,16 @@ pub const Type = union(enum) {
         };
     }
 
-    pub fn hash(self: Type, allocator: Allocator, hasher: anytype) void {
-        const asBytes = std.mem.asBytes;
+    pub fn getLoc(self: *const Type) ?Loc {
+        return switch (self.*) {
+            .@"enum" => |t| t.loc,
+            .structure => |t| t.loc,
+            .@"union" => |t| t.loc,
+            else => null,
+        };
+    }
 
+    pub fn hash(self: Type, allocator: Allocator, hasher: anytype) void {
         if (@typeInfo(@TypeOf(hasher)) != .pointer) {
             @compileError("You must pass a pointer to a haser");
         }
@@ -316,8 +339,7 @@ pub const Type = union(enum) {
             .array => |ty| ty.child.hash(allocator, hasher),
             .@"enum" => |*ty| {
                 if (ty.loc) |loc| {
-                    hasher.update(asBytes(&loc.name));
-                    hasher.update(asBytes(&loc.container));
+                    hashLoc(hasher, loc);
                 } else {
                     var it = ty.tags.iterator();
                     while (it.next()) |entry| {
@@ -334,8 +356,7 @@ pub const Type = union(enum) {
             },
             .function => |ty| {
                 if (ty.loc) |loc| {
-                    hasher.update(asBytes(&loc.name));
-                    hasher.update(asBytes(&loc.container));
+                    hashLoc(hasher, loc);
                 } else {
                     for (ty.params.values()) |param| {
                         param.type.hash(allocator, hasher);
@@ -346,18 +367,16 @@ pub const Type = union(enum) {
             .module => |interned| hasher.update(asBytes(&interned)),
             .optional => |child| child.hash(allocator, hasher),
             .range => |r| r.hash(allocator, hasher),
-            .structure => |ty| {
-                hasher.update(asBytes(&ty.loc.name));
-                hasher.update(asBytes(&ty.loc.container));
-            },
-            .trait => |ty| {
-                hasher.update(asBytes(&ty.loc.name));
-                hasher.update(asBytes(&ty.loc.container));
+            .structure => |ty| hashLoc(hasher, ty.loc),
+            .trait => |ty| hashLoc(hasher, ty.loc),
+            .trait_obj => |ty| {
+                hashLoc(hasher, ty.trait);
+                hashLoc(hasher, ty.structure);
+                hasher.update(asBytes(&ty.vtable_index));
             },
             .@"union" => |*ty| {
                 hasher.update(asBytes(&ty.is_err));
-                hasher.update(asBytes(&ty.loc.name));
-                hasher.update(asBytes(&ty.loc.container));
+                hashLoc(hasher, ty.loc);
             },
             .inline_union => |u| {
                 var set = Set(*const Type).fromSlice(allocator, u.types) catch oom();
@@ -374,6 +393,10 @@ pub const Type = union(enum) {
             },
         }
     }
+    pub fn hashLoc(hasher: anytype, loc: Loc) void {
+        hasher.update(asBytes(&loc.name));
+        hasher.update(asBytes(&loc.container));
+    }
 
     pub fn toString(self: *const Type, allocator: Allocator, interner: *const Interner, mod_name: InternerIdx) []const u8 {
         var res: std.ArrayList(u8) = .empty;
@@ -389,11 +412,7 @@ pub const Type = union(enum) {
             .@"enum" => |ty| {
                 // If symbol is defnined in current mod/file, don't repeat the module
                 if (ty.loc) |loc| {
-                    if (loc.container == mod_name) {
-                        writer.print("{s}", .{interner.getKey(loc.name).?}) catch oom();
-                    } else {
-                        writer.print("{s}.{s}", .{ interner.getKey(loc.container).?, interner.getKey(loc.name).? }) catch oom();
-                    }
+                    locToString(&writer, loc, interner, mod_name);
                 } else {
                     writer.writeAll("enum {") catch oom();
                     for (ty.tags.keys(), 0..) |k, i| {
@@ -425,30 +444,10 @@ pub const Type = union(enum) {
             .optional => |opt| {
                 writer.print("?{s}", .{opt.toString(allocator, interner, mod_name)}) catch oom();
             },
-            .structure => |ty| {
-                // If symbol is defnined in current mod/file, don't repeat the module
-                if (ty.loc.container == mod_name) {
-                    writer.print("{s}", .{interner.getKey(ty.loc.name).?}) catch oom();
-                } else {
-                    writer.print("{s}.{s}", .{ interner.getKey(ty.loc.container).?, interner.getKey(ty.loc.name).? }) catch oom();
-                }
-            },
-            .trait => |ty| {
-                // If symbol is defnined in current mod/file, don't repeat the module
-                if (ty.loc.container == mod_name) {
-                    writer.print("{s}", .{interner.getKey(ty.loc.name).?}) catch oom();
-                } else {
-                    writer.print("{s}.{s}", .{ interner.getKey(ty.loc.container).?, interner.getKey(ty.loc.name).? }) catch oom();
-                }
-            },
-            .@"union" => |*ty| {
-                // If symbol is defnined in current mod/file, don't repeat the module
-                if (ty.loc.container == mod_name) {
-                    writer.print("{s}", .{interner.getKey(ty.loc.name).?}) catch oom();
-                } else {
-                    writer.print("{s}.{s}", .{ interner.getKey(ty.loc.container).?, interner.getKey(ty.loc.name).? }) catch oom();
-                }
-            },
+            .structure => |ty| locToString(&writer, ty.loc, interner, mod_name),
+            .trait => |ty| locToString(&writer, ty.loc, interner, mod_name),
+            .trait_obj => |ty| locToString(&writer, ty.trait, interner, mod_name),
+            .@"union" => |*ty| locToString(&writer, ty.loc, interner, mod_name),
             .inline_union => |u| {
                 for (u.types, 0..) |ty, i| {
                     writer.writeAll(ty.toString(allocator, interner, mod_name)) catch oom();
@@ -458,6 +457,16 @@ pub const Type = union(enum) {
         }
 
         return res.toOwnedSlice(allocator) catch oom();
+    }
+
+    pub fn locToString(writer: *std.ArrayList(u8).Writer, loc: Loc, interner: *const Interner, mod_name: InternerIdx) void {
+        errdefer oom();
+
+        if (loc.container == mod_name) {
+            try writer.print("{s}", .{interner.getKey(loc.name).?});
+        } else {
+            try writer.print("{s}.{s}", .{ interner.getKey(loc.container).?, interner.getKey(loc.name).? });
+        }
     }
 };
 

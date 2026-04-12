@@ -2,7 +2,7 @@
 
 [Structure declaration Bar]
     - traits
-        Foo:
+        Foo, vtable 0:
         [Function declaration speakNoBody]
             [Print]
                 [Constant index 6]
@@ -42,7 +42,7 @@
 
 [Structure declaration Baz]
     - traits
-        Foo:
+        Foo, vtable 1:
         [Function declaration speakNoBody]
             [Print]
                 [Constant index 6]

@@ -352,8 +352,8 @@ fn containerTraitImpls(
         );
 
         var trait_impl = trait_gop.value_ptr;
-        trait_impl.* = .empty;
-        trait_impl.ensureTotalCapacity(self.allocator, @intCast(trait_def.functions.count())) catch oom();
+        trait_impl.* = .{ .vtable_index = self.scope.newVTable(), .symbols = .empty };
+        trait_impl.symbols.ensureTotalCapacity(self.allocator, @intCast(trait_def.functions.count())) catch oom();
 
         var proto = trait_def.proto(self.allocator);
         var func_instrs = ArrayList(InstrIndex).initCapacity(self.allocator, trait_def.functions.count()) catch oom();
@@ -375,7 +375,7 @@ fn containerTraitImpls(
             fn_res.sym.type = try self.checkFunctionEq(fn_decl.ty, fn_res.sym.type, true, self.ast.getSpan(f.name));
 
             func_instrs.appendAssumeCapacity(fn_res.instr);
-            trait_impl.putAssumeCapacity(fn_name, fn_res.sym);
+            trait_impl.symbols.putAssumeCapacity(fn_name, fn_res.sym);
             gop.value_ptr.done = true;
         }
 
@@ -385,13 +385,13 @@ fn containerTraitImpls(
 
             // Already compiled once
             if (entry.value_ptr.func.compiled) |compiled| {
-                trait_impl.putAssumeCapacity(entry.key_ptr.*, compiled);
+                trait_impl.symbols.putAssumeCapacity(entry.key_ptr.*, compiled);
             }
             // Compile for first time
             else if (entry.value_ptr.func.ast) |def| {
                 const fn_res = try self.fnDeclaration(def, ctx);
                 func_instrs.appendAssumeCapacity(fn_res.instr);
-                trait_impl.putAssumeCapacity(entry.key_ptr.*, fn_res.sym);
+                trait_impl.symbols.putAssumeCapacity(entry.key_ptr.*, fn_res.sym);
             }
             // Missing
             else return self.err(
@@ -405,6 +405,7 @@ fn containerTraitImpls(
 
         trait_res.appendAssumeCapacity(.{
             .name = trait_name,
+            .vtable_index = trait_impl.vtable_index,
             .funcs = func_instrs.toOwnedSlice(self.allocator) catch oom(),
         });
     }
@@ -1567,7 +1568,7 @@ fn binopComparisonCoercion(
     }
 
     // TODO: Eq trait
-    const lhs_eq = lhs_type.getTrait(self.interner.intern("Eq")) orelse return error.Invalid;
+    const lhs_eq = lhs_type.getTraitImpl(self.interner.intern("Eq")) orelse return error.Invalid;
     _ = lhs_eq;
 
     return error.Invalid;
@@ -1799,7 +1800,8 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
         .module => |ty| return self.moduleAccess(expr.field, ty),
         .str => return self.runtimeObjFnAccess(.string, struct_res.instr, expr.field, struct_res.type),
         .structure => |*ty| try self.structureAccess(expr.field, ty, struct_res.ti.is_sym, ctx.in_call),
-        .trait => |*ty| try self.traitAccess(expr.field, ty),
+        // Only reachable inside trait declaration
+        .trait => try self.traitAccess(expr, struct_res.type, struct_res.ti.is_sym),
         .@"union" => |ty| b: {
             const res = try self.unionAccess(struct_res, ty, expr.field);
 
@@ -2010,7 +2012,7 @@ fn structureAccess(self: *Self, field_tk: Ast.TokenIndex, ty: *const Type.Struct
 
             // Traits
             for (ty.traits.values()) |trait| {
-                if (trait.get(field_name)) |f| {
+                if (trait.symbols.get(field_name)) |f| {
                     break :func f;
                 }
             }
@@ -2037,17 +2039,25 @@ fn structureAccess(self: *Self, field_tk: Ast.TokenIndex, ty: *const Type.Struct
 /// This function is called by `field` method but it is only triggered when analyzing trait's default
 /// body. It is used to check if the accesses on `self` refer to actual methods in trait.
 /// The result of this analyzis done by `traitDecl` won't be used, so returning a dummy index is ok
-fn traitAccess(self: *Self, field_tk: Ast.TokenIndex, ty: *const Type.Trait) Error!AccessResult {
-    const fn_name = self.ast.toSource(field_tk);
-    const func = ty.functions.get(self.interner.intern(fn_name)) orelse return self.err(
-        .{ .missing_fn_in_trait = .{
-            .func = fn_name,
-            .trait = self.interner.getKey(ty.loc.name).?,
-        } },
-        self.ast.getSpan(field_tk),
+fn traitAccess(self: *Self, expr: *const Ast.Field, ty: *const Type, is_sym: bool) Error!AccessResult {
+    if (is_sym) return self.err(
+        .{ .call_fn_on_trait = .{ .name = self.typeName(ty) } },
+        self.ast.getSpan(expr.structure),
     );
 
-    return .{ .type = func.ty, .kind = .function, .index = 0 };
+    const trait_ty = &ty.trait;
+
+    const fn_name = self.ast.toSource(expr.field);
+    const interned = self.interner.intern(fn_name);
+    const func = trait_ty.functions.get(interned) orelse return self.err(
+        .{ .missing_fn_in_trait = .{
+            .func = fn_name,
+            .trait = self.interner.getKey(trait_ty.loc.name).?,
+        } },
+        self.ast.getSpan(expr.field),
+    );
+
+    return .{ .type = func.ty, .kind = .virtual, .index = trait_ty.functions.getIndex(interned).? };
 }
 
 fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_idx: InternerIdx) Result {
@@ -2171,7 +2181,8 @@ fn fnArgsList(
         ctx.decl_type = param_info.type;
         var value = try self.analyzeExpr(arg.value, .value, ctx);
 
-        _ = try self.performTypeCoercion(param_info.type, value.type, false, span);
+        const inferred = try self.performTypeCoercion(param_info.type, value.type, false, span);
+        value.instr = try self.checkTraitObj(param_info.type, inferred, value.instr);
 
         self.checkWrap(&value.instr, false);
         if (param_info.captured) value.instr = self.irb.wrapPreviousInstr(.box);
@@ -2188,6 +2199,21 @@ fn fnArgsList(
     }
 
     return if (err_count < self.errs.items.len) error.Err else instrs;
+}
+
+/// Checks if we must create a trait object, if not return instruction
+fn checkTraitObj(self: *Self, decl: *const Type, inferred: *const Type, instr: InstrIndex) Error!InstrIndex {
+    if (decl == inferred) return instr;
+    const trait_obj = inferred.as(.trait_obj) orelse return instr;
+
+    // It is a trait object, can only be created on a valid variable access
+    const data = self.irb.getInstr(instr);
+    // TODO: is it possible to not be?
+    if (data != .identifier) @panic("Must be a variable access");
+    return self.irb.addInstr(
+        .{ .trait_obj = .{ .variable = instr, .vtable_index = trait_obj.vtable_index } },
+        self.irb.instrOffset(instr),
+    );
 }
 
 const IdentRes = struct {
@@ -3331,15 +3357,29 @@ fn performTypeCoercion(self: *Self, decl: *const Type, value: *const Type, decl_
                     span,
                 ),
             };
-        } else if (value.is(.array)) {
+        }
+        // Array
+        else if (value.is(.array)) {
             return self.checkArrayType(decl, value, span) catch |e| switch (e) {
                 error.mismatch => break :check,
                 else => |narrowed| return narrowed,
             };
-        } else if (value.is(.function)) {
+        }
+        // Function
+        else if (value.is(.function)) {
             return self.checkFunctionEq(decl, value, false, span);
-        } else if (decl.as(.trait)) |t| {
-            if (value.getTrait(t.loc.name) != null) return decl;
+        }
+        // Trait object
+        else if (decl.as(.trait)) |t| {
+            if (value.getTraitImpl(t.loc.name)) |*trait| {
+                // Safe unwrap because types with traits have loc
+                return self.ti.intern(.{ .trait_obj = .{
+                    .funcs = &trait.symbols,
+                    .vtable_index = trait.vtable_index,
+                    .trait = t.loc,
+                    .structure = value.getLoc().?,
+                } });
+            }
         }
 
         // We check after the other because above checks need the information about a potential void declaration

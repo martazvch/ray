@@ -291,13 +291,20 @@ fn execute(self: *Self) !void {
                 const obj = self.glob_foreign_fns[index];
                 self.callForeign(obj, arity);
             },
+            .call_virtual => {
+                const index = self.frame.readByte();
+                const arity = self.frame.readByte();
+                self.frame = try self.frame_stack.newKeepMod();
+                const func = self.stack.peekRef(arity).obj.as(Obj.TraitObj).vtable.functions[index];
+                self.frame.call(func, &self.stack, arity, self.modules);
+            },
             .call_zig => {
                 const index = self.frame.readByte();
-                const args_count = self.frame.readByte();
+                const arity = self.frame.readByte();
                 const f = self.glob_zig_fns[index].function;
-                const result = f(self, (self.stack.top - args_count)[0..args_count]);
+                const result = f(self, (self.stack.top - arity)[0..arity]);
 
-                self.stack.top -= args_count;
+                self.stack.top -= arity;
                 if (result) |res| self.stack.push(res);
             },
             .closure => {
@@ -679,17 +686,35 @@ fn execute(self: *Self) !void {
                 self.stack.peekRef(1).* = self.stack.peek(0);
                 self.stack.top -= 1;
             },
+            .trait_obj => {
+                const vtable_index = self.frame.readByte();
+                self.stack.push(.makeObj(Obj.TraitObj.create(
+                    self,
+                    self.stack.pop().obj,
+                    &self.frame.module.vtables[vtable_index],
+                ).asObj()));
+            },
             .unbox => self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.Box).value,
             .union_lit => {
                 const index = self.frame.readByte();
                 const tag = self.frame.readByte();
-                self.stack.push(.makeObj(Obj.UnionInstance.create(self, &self.frame.module.unions[index], tag, self.stack.pop()).asObj()));
+                self.stack.push(.makeObj(Obj.UnionInstance.create(
+                    self,
+                    &self.frame.module.unions[index],
+                    tag,
+                    self.stack.pop(),
+                ).asObj()));
             },
             .union_lit_ext => {
                 const index = self.frame.readByte();
                 const module = self.frame.readByte();
                 const tag = self.frame.readByte();
-                self.stack.push(.makeObj(Obj.UnionInstance.create(self, &self.modules[module].unions[index], tag, self.stack.pop()).asObj()));
+                self.stack.push(.makeObj(Obj.UnionInstance.create(
+                    self,
+                    &self.modules[module].unions[index],
+                    tag,
+                    self.stack.pop(),
+                ).asObj()));
             },
             .wide => unreachable,
         }

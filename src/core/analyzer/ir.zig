@@ -50,6 +50,7 @@ pub const Instruction = struct {
         struct_decl: StructDecl,
         struct_literal: StructLiteral,
         trait_decl: TraitDecl,
+        trait_obj: TraitObj,
         trap: Trap,
         unary: Unary,
         unbox: Index,
@@ -165,7 +166,7 @@ pub const Instruction = struct {
         index: usize,
         kind: Kind,
 
-        pub const Kind = enum { field, function };
+        pub const Kind = enum { field, function, virtual };
     };
     pub const FnDecl = struct {
         sym_index: SymbolIndex,
@@ -261,8 +262,13 @@ pub const Instruction = struct {
         type_id: TypeId,
         functions: []const Index,
     };
+    pub const TraitObj = struct {
+        variable: Index,
+        vtable_index: usize,
+    };
     pub const Trait = struct {
         name: usize,
+        vtable_index: usize,
         funcs: []const Index,
     };
     pub const Trap = struct {
