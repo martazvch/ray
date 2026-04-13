@@ -160,8 +160,8 @@ Ray supports:
 - [tuples](#Tuples)
 - [maps](#Maps)
 - [structures](#Structures)
-- [enums](#Enumerations)
-- [inlined enums](#Inlined%20enums)
+- [unions](#Unions)
+- [inline unions](#Inline%20unions)
 - [error unions](#Error%20unions)
 - [functions](#Functions)
 
@@ -289,7 +289,7 @@ In practise the syntax 2 is the preferred way.
 
 ### Arrays
 
-An array is an mutable homogeneous sequence of data, meaning that all the values share the same type. To declare an array literal you must surround values with `[]` and seperate them with commas. Type will be infered from the values so you don't have to write it. If multiple types are found among the values, an [inlined enum](#Inlined%20enums).
+An array is an mutable homogeneous sequence of data, meaning that all the values share the same type. To declare an array literal you must surround values with `[]` and seperate them with commas. Type will be infered from the values so you don't have to write it. If multiple types are found among the values, an [inline unions](#Inline%20unions).
 
 ```zig
 var data = [1, 2, 3] // type is: [int]
@@ -617,7 +617,7 @@ Default values must be compile-time constants.
 When providing a default value, you can omit the type as it is infered from the value
 
 ```rust
-fn greet(name = "world") -> str {
+fn greet(name="world") -> str {
     return "Hello {name}!"
 }
 ```
@@ -627,7 +627,7 @@ fn greet(name = "world") -> str {
 Functions are first class objects, meaning that you can pass them around as any other type.
 
 ```rust
-fn greet(name = "world") {}
+fn greet(name="world") {}
 
 let g = greet
 g("Tom") // "Hello Tom!"
@@ -846,7 +846,7 @@ struct Config {
 
 If a field has a default value, it becomes optional during initialization.
 
-#### initialization
+#### Initialization
 
 Ray supports structure literals:
 
@@ -905,7 +905,7 @@ Static functions are ideal for constructors or utility functions.
 
 #### The Self type
 
-Self refers to the containing structure's or enum's type.
+Self refers to the containing structure, enum, union or trait's type.
 
 It is used for:
 - Return types in factory or chaining methods
@@ -933,16 +933,20 @@ trait Debug {
     fn debug(self) -> str
 }
 
-struct Point { x, y: int }
+struct Point {
+    x, y: int
 
-impl Debug for Point {
-    fn debug(self) -> str {
-        return "Point({self.x}, {self.y})"
+    impl Debug {
+        fn debug(self) -> str {
+            return "Point({self.x}, {self.y})"
+        }
     }
 }
+
 ```
 
 Traits can be used as bounds, enabling polymorphic behavior.
+You can also define default values for the parameters when implementing trait functions.
 
 #### Dot syntax
 
@@ -1127,11 +1131,11 @@ fn register(entity: Entity|fn() -> Entity) {
 There is also a powerful syntax that allow you to open a *type scope* and direct pattern match on the type itself, specially usefull when matching `enums` in `inline union` for example:
 
 ```rust
-enum Shape2D = {
+union Shape2D = {
     square: int,
     triangle: (int, int),
 }
-enum Shape3D = {
+union Shape3D = {
     cube: int,
     cylinder: (int, int),
 }
@@ -1197,7 +1201,7 @@ Inline unions shine when you want to work with sum types in a quick way. There a
 For example:
 
 ```rust
-enum Size {
+union Size {
     pixels: int,
     relative: float,
     auto: bool,
@@ -1232,7 +1236,7 @@ A more complete example:
 struct Vec {
     x, y: float
 
-    enum Movement {
+    union Movement {
         int: int,
         float: float,
         vec: Vec,
@@ -1281,19 +1285,19 @@ What this shows:
 - The type of amount is inferred automatically as Vec|int.
 - Inline unions shine in small sum-type situations where enums would only add ceremony.
 
-### Enumerations
+### Unions
 
-Enums in Ray represent tagged algebraic variants. They allow you to model structured alternatives, optionally with payloads, and integrate tightly with Ray’s pattern matching system. Enums can also define methods, nested types, and support dot-syntax construction.
+Unions in Ray represent tagged algebraic variants. They allow you to model structured alternatives, optionally with payloads, and integrate tightly with Ray’s pattern matching system. Unions can also define methods, nested types, and support dot-syntax construction.
 
 #### Declaration
 
-A basic enum lists variants without payloads:
+A basic union without payloads:
 
 ```zig
-enum Direction { north, east, west, south }
+union Direction { north, east, west, south }
 ```
 
-#### Constructing enum values
+#### Constructing union values
 
 Full syntax:
 
@@ -1316,12 +1320,12 @@ fn go(dir: Direction) { ... }
 go(.south)
 ```
 
-#### Enums with payloads
+#### Unions with payloads
 
 Variants may carry data:
 
 ```rust
-enum Token {
+union Token {
     identifier: str,
     number: int,
     dot,
@@ -1365,7 +1369,7 @@ match tok {
 If a payload is a struct, Ray allows partial destructuring:
 
 ```rust
-enum Event {
+union Event {
     click: Point,
     key: KeyEvent,
 
@@ -1380,12 +1384,12 @@ match event {
 }
 ```
 
-#### Functions in enums
+#### Functions in unions
 
-Enums can define methods and static functions too:
+Unions can define methods and static functions too:
 
 ```rust
-enum Marker {
+union Marker {
     circle,
     cross,
 
@@ -1400,10 +1404,10 @@ enum Marker {
 
 #### Nested types and namespacing
 
-As structures, enums can contain enums, structs, traits, and helper functions:
+As structures, unions can contain enums, structs, traits, unions, and functions:
 
 ```rust
-enum Shape {
+union Shape {
     circle: float,
     rect: Rect,
 
@@ -1418,6 +1422,44 @@ enum Shape {
 }
 ```
 
+## Enumerations
+
+An enum is an ordered set of named integer constants. Unlike union-like variants, enum members cannot carry a payload.
+Each member is assigned an integer value starting from `0` and incrementing by `1`, but values can be explicitly overridden using `= <int>`, and holes between values are allowed:
+
+```rust
+enum Color {
+    red,       // 0
+    green = 5, // 5
+    blue,      // 6
+}
+```
+
+An enum body can contain any declaration (functions, structs, unions, and more) making it a proper namespace:
+```rust
+enum Direction {
+    north, south, east, west,
+
+    fn opposite(self) Self { ... }
+
+    struct Offset { x, y: int }
+}
+```
+
+### Enum arrays
+You can declare an enum-indexed array using the syntax `[Enum elem_type] arr`, where the enum acts as the index type. The array has exactly as many slots as there are enum members:
+```
+intensities: [Color int] = [
+    .red = 255,
+    .green = 128,
+    .blue = 64
+]
+assert(intensities[.red] == 255)
+assert(intensities[.green] == 128)
+assert(intensities[.blue] == 64)
+```
+
+This guarantees exhaustive coverage of all enum values at compile time.
 
 ## Errors
 
@@ -1425,12 +1467,12 @@ In Ray, an error can be any structure / enum as long as it implements the `Error
 Ray uses typed error unions and treats errors as *first-class values*. Any structure, enum, or inline declaration can act as an error type as long as it implements the `Error` [trait](#Traits).
 
 ```rust
-enum ConfigErr {
+union ConfigErr {
     invalidPath: str,
     accessDenied: int,
-}
 
-impl Error for ConfigErr {}
+    impl Error {}
+}
 ```
 
 Ray provides a convenience `error` keyword:
@@ -1444,7 +1486,7 @@ error ParserErr {
 ```
 
 This expands to:
-- an enum declaration
+- a union declaration
 - automatic implementation of the Error trait
 
 It is ideal for tightly scoped or inline error definitions:
@@ -1458,9 +1500,8 @@ fn parseConfig(path: str) Config!error{ invalidPath: str, accessDenied: int } { 
 > ```rust
 > struct ConfigErr {
 >     path: str,
+>     impl Error {}
 > }
-> 
-> impl Error for ConfigErr {}
 > ```
 
 ### Mixing errors
@@ -1639,6 +1680,8 @@ Traits instead provide explicit, compile-time contracts with a lightweight synta
 
 ### Definition
 
+A trait is a way to express a behavior that multiple type can implement, allowing polymorphism.
+They don't have attached fields and their functions can't have default value parameters.
 A trait is defined using the `trait` keyword:
 
 ```rust
@@ -1647,13 +1690,10 @@ trait Display {
 }
 ```
 
-They can contain fields (with default values) and default fonction implementations:
+They can define default fonction implementations:
 
 ```rust
 trait Drawable {
-    color = "red",
-    opacity = 1.,
-
     fn area(self) -> float
 
     fn describe(self) -> str {
@@ -1663,50 +1703,51 @@ trait Drawable {
 }
 ```
 
+### Implementation
+
+You use the impl blocks to attach behavior to an existing type:
+
+```rust
+struct Vec {
+    impl Display {
+        fn toString(self) -> str {
+            return "(" + self.x + ", " + self.y + ")"
+        }
+    }
+}
+```
+
 If the structure implementing the trait already has functions or fields named as in the trait, it will require to specify the trait name to access them, given that the access priority is given to the structure itself:
 
 ```rust
 struct Rect {
     color: str,
-}
 
-// No need to redefined anything as everything in the trait has default values/implementation
-impl Drawable for Rect {}
+    fn area(self) -> float { ... }
 
-let rect = Rect{ color: "green" }
-assert(rect.color == "green")
-assert(rect.Drawable.color == "red")
-```
-
-### Implementation
-
-Trait implementations are always external.
-You use the impl block to attach behavior to an existing type:
-
-```rust
-impl Display for Vec {
-    fn toString(self) -> str {
-        return "(" + self.x + ", " + self.y + ")"
+    impl Drawable {
+        fn area(self) -> float { ... }
     }
 }
-```
 
-This means:
-- types do not “own” their trait implementations,
-- implementations can be placed anywhere in the module hierarchy,
-- you can add a trait to a type even if you didn’t define the type yourself.
+let rect = Rect{ color: "green" }
+rect.area() // calls the function defined on the structure
+rect.Drawable.area() // calls the trait implementation
+```
 
 ### Type constraints
 
-Ray allows using traits as type constraints directly in place of concrete types.
-This provides a lightweight form of bounded polymorphism without requiring fully generic types.
+Ray allows using traits as any other type, like:
 
-This feature is expressed using the `impl TraitName` syntax, it means *any value that implements this trait*.
-You can use it everywhere:
-- structures' fields
-- function return type
-- enums' payload
-- ...
+```
+trait Foo {}
+
+fn bar(arg: Foo) -> Foo { ... }
+```
+
+There are several rules to have in mind:
+- When doing so, you can't use default value parameters when calling a function on this type as we can only refer to trait definition
+- other ?
 
 ## Clone on write (COW)
 

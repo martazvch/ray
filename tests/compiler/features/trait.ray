@@ -4,10 +4,10 @@ trait Foo {
     }
     fn speakNoBody()
 
-    fn withDefault(a=1) -> bool {
+    fn withDefault(a: int) -> bool {
         return a == 1
     }
-    fn withDefaultNoBody(a=1) -> bool
+    fn withDefaultNoBody(a: int) -> bool
 
     fn method0(self) { print "method0" }
 
@@ -19,6 +19,9 @@ trait Foo {
 struct Bar {
     impl Foo {
         fn speakNoBody() { print "bye" }
+        fn withDefault(a=9) -> bool {
+            return a == 9
+        }
         fn withDefaultNoBody(a=2) -> bool { return a == 2 }
     }
 }
@@ -26,7 +29,7 @@ struct Bar {
 struct Baz {
     impl Foo {
         fn speakNoBody() { print "bye" }
-        fn withDefaultNoBody(a=2) -> bool { return a == 2 }
+        fn withDefaultNoBody(a=5) -> bool { return a == 5 }
     }
 }
 
@@ -39,7 +42,7 @@ fn main() {
     print Bar.withDefault()
     print Baz.withDefault(4)
     print Bar.withDefaultNoBody()
-    print Baz.withDefaultNoBody(1)
+    print Baz.withDefaultNoBody(5)
 
     let bar = Bar{}
     bar.method1()

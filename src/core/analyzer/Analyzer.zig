@@ -51,6 +51,7 @@ pub const Context = struct {
     in_call: bool,
     in_for: bool,
     in_trap: bool,
+    in_trait: bool,
 
     pub const empty: Context = .{
         .decl_type = null,
@@ -59,6 +60,7 @@ pub const Context = struct {
         .in_call = false,
         .in_for = false,
         .in_trap = false,
+        .in_trait = false,
     };
 
     const ContextSnapshot = struct {
@@ -713,11 +715,7 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
         const param_name = self.interner.intern(self.ast.toSource(p.name));
 
         if (i == 0 and param_name == self.cached_names.self) {
-            // if (ctx.self_type == null) {
-            //     return self.err(.self_outside_decl, span);
-            // }
             const self_type = ctx.self_type orelse return self.err(.self_outside_decl, span);
-            // const self_type = self.ti.intern(.{ .self = .{ .trait_bound = undefined } });
 
             is_method = true;
             _ = try self.declareVariable(param_name, self_type, .{ .captured = p.meta.captured }, .zero);
@@ -738,6 +736,10 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
         var param_type = try self.checkAndGetType(p.typ, ctx);
 
         if (p.value) |val| {
+            if (ctx.in_trait) {
+                return self.err(.trait_default_value, span);
+            }
+
             const value_res, const constant = try self.defaultValue(param_type, val, .parameter, ctx);
 
             const_index = constant;
@@ -989,6 +991,8 @@ fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult 
 
     ctx.self_type = interned;
     defer ctx.self_type = null;
+    ctx.in_trait = true;
+    defer ctx.in_trait = false;
 
     const sym = self.scope.declareSymbol(self.allocator, name, .trait);
     sym.type = interned;
