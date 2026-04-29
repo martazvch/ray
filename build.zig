@@ -181,16 +181,16 @@ pub fn build(b: *std.Build) !void {
             .link_libc = true,
         }),
     });
-    c_embed_test_exe.addCSourceFiles(.{
+    c_embed_test_exe.root_module.addCSourceFiles(.{
         .root = b.path("tests/embed/c"),
         .files = &.{ "main.c", "reader.c", "tester.c" },
         .flags = &.{ "-Wall", "-Wextra", "-std=c99" },
     });
-    c_embed_test_exe.addIncludePath(b.path("tests/embed/c"));
-    c_embed_test_exe.addIncludePath(b.path("src/embed"));
-    c_embed_test_exe.linkLibrary(embed_c_lib);
+    c_embed_test_exe.root_module.addIncludePath(b.path("tests/embed/c"));
+    c_embed_test_exe.root_module.addIncludePath(b.path("src/embed"));
+    c_embed_test_exe.root_module.linkLibrary(embed_c_lib);
     const lib_dir = b.getInstallPath(.lib, "");
-    c_embed_test_exe.addRPath(.{ .cwd_relative = lib_dir });
+    c_embed_test_exe.root_module.addRPath(.{ .cwd_relative = lib_dir });
 
     const install_c_tester = b.addInstallArtifact(c_embed_test_exe, .{});
     install_c_tester.step.dependOn(&install_embed_c_lib.step);
@@ -219,12 +219,12 @@ fn buildC(
             .link_libc = true,
         }),
     });
-    cmodule_lib.addCSourceFiles(.{
+    cmodule_lib.root_module.addCSourceFiles(.{
         .root = b.path("tests/data/cmodule/"),
         .files = &.{file_name},
         .flags = &.{ "-Wall", "-Wextra", "-std=c99" },
     });
-    cmodule_lib.addIncludePath(b.path("tests/embed/c"));
+    cmodule_lib.root_module.addIncludePath(b.path("tests/embed/c"));
     const install_c_module = b.addInstallArtifact(cmodule_lib, .{
         .dest_dir = .{ .override = .{ .custom = "../tests/data/cmodule" } },
     });

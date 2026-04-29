@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
 
 const options = @import("options");
@@ -29,6 +30,7 @@ const Error = error{ExitOnPrint};
 /// Runs the pipeline
 // TODO: could only need full path
 pub fn run(
+    io: Io,
     allocator: Allocator,
     state: *State,
     is_sub: bool,
@@ -37,9 +39,9 @@ pub fn run(
     source: [:0]const u8,
 ) !*Obj.Function {
     // Initiliaze the path builder
-    state.path_builder.append(allocator, std.fs.cwd().realpathAlloc(allocator, ".") catch oom());
+    state.path_builder.append(allocator, std.Io.Dir.cwd().realPathFileAlloc(io, ".", allocator) catch oom());
 
-    const ast = try parse(allocator, state, file_name, source);
+    const ast = try parse(io, allocator, state, file_name, source);
 
     // Extension could be either .ray or .rayn so we split dynamically
     var it = std.mem.splitScalar(u8, file_name, '.');
@@ -50,19 +52,19 @@ pub fn run(
         state.interner.intern(mod_name),
     );
 
-    var analyzer: Analyzer = .init(allocator, state);
+    var analyzer: Analyzer = .init(io, allocator, state);
     analyzer.analyze(&ast, mod_name, mod_index, !is_sub and !state.config.embedded);
 
     // Analyzed Ast printer
     if (analyzer.warns.items.len > 0) {
-        try reportAll(AnalyzerMsg, analyzer.warns.items, !options.test_mode, file_name, source);
+        try reportAll(io, AnalyzerMsg, analyzer.warns.items, !options.test_mode, file_name, source);
     }
     if (analyzer.errs.items.len > 0) {
-        try reportAll(AnalyzerMsg, analyzer.errs.items, !options.test_mode, file_name, source);
+        try reportAll(io, AnalyzerMsg, analyzer.errs.items, !options.test_mode, file_name, source);
         return error.ExitOnPrint;
     }
     if (state.config.print_ir) {
-        try printIr(allocator, state, file_name, &analyzer);
+        try printIr(io, allocator, state, file_name, &analyzer);
         if (options.test_mode and !is_sub) return error.ExitOnPrint;
     }
 
@@ -70,7 +72,7 @@ pub fn run(
     state.modules.ensureCompileSizes(allocator, mod_index, state);
 
     // Compiler
-    var compiler = CompilationUnit.init(allocator, state, mod_index, state.config.print_bytecode);
+    var compiler = CompilationUnit.init(io, allocator, state, mod_index, state.config.print_bytecode);
 
     const entry_point = try compiler.compile(
         analyzer.irb.instructions.items(.data),
@@ -85,13 +87,13 @@ pub fn run(
         entry_point;
 }
 
-pub fn runFrontend(allocator: Allocator, state: *State, is_sub: bool, file_name: []const u8, source: [:0]const u8) !struct {
+pub fn runFrontend(io: Io, allocator: Allocator, state: *State, is_sub: bool, file_name: []const u8, source: [:0]const u8) !struct {
     []const LexicalScope.Scope,
     []const LexicalScope.Symbol,
     Irb,
 } {
     // Initiliaze the path builder
-    state.path_builder.append(allocator, std.fs.cwd().realpathAlloc(allocator, ".") catch oom());
+    state.path_builder.append(allocator, std.Io.Dir.cwd().realPathFileAlloc(io, ".", allocator) catch oom());
 
     var it = std.mem.splitScalar(u8, file_name, '.');
     const mod_name = it.next().?;
@@ -101,21 +103,21 @@ pub fn runFrontend(allocator: Allocator, state: *State, is_sub: bool, file_name:
         state.interner.intern(mod_name),
     );
 
-    const ast = try parse(allocator, state, file_name, source);
+    const ast = try parse(io, allocator, state, file_name, source);
 
-    var analyzer: Analyzer = .init(allocator, state);
+    var analyzer: Analyzer = .init(io, allocator, state);
     _ = analyzer.analyze(&ast, file_name, mod_index, !is_sub);
 
     // Analyzed Ast printer
     if (analyzer.warns.items.len > 0) {
-        try reportAll(AnalyzerMsg, analyzer.warns.items, !options.test_mode, file_name, source);
+        try reportAll(io, AnalyzerMsg, analyzer.warns.items, !options.test_mode, file_name, source);
     }
     if (analyzer.errs.items.len > 0) {
-        try reportAll(AnalyzerMsg, analyzer.errs.items, !options.test_mode, file_name, source);
+        try reportAll(io, AnalyzerMsg, analyzer.errs.items, !options.test_mode, file_name, source);
         return error.ExitOnPrint;
     }
     if (state.config.print_ir) {
-        try printIr(allocator, state, file_name, &analyzer);
+        try printIr(io, allocator, state, file_name, &analyzer);
         if (options.test_mode and !is_sub) return error.ExitOnPrint;
     }
 
@@ -143,13 +145,13 @@ pub fn runFrontend(allocator: Allocator, state: *State, is_sub: bool, file_name:
     };
 }
 
-pub fn parse(allocator: Allocator, state: *State, file_name: []const u8, source: [:0]const u8) !Ast {
+pub fn parse(io: Io, allocator: Allocator, state: *State, file_name: []const u8, source: [:0]const u8) !Ast {
     var lexer = Lexer.init(allocator);
     lexer.lex(source);
     defer lexer.deinit();
 
     if (lexer.errs.items.len > 0) {
-        try reportAll(LexerMsg, lexer.errs.items, !options.test_mode, file_name, source);
+        try reportAll(io, LexerMsg, lexer.errs.items, !options.test_mode, file_name, source);
         return error.ExitOnPrint;
     }
 
@@ -162,10 +164,10 @@ pub fn parse(allocator: Allocator, state: *State, file_name: []const u8, source:
     walker.walk();
 
     if (parser.errs.items.len > 0) {
-        try reportAll(ParserMsg, parser.errs.items, !options.test_mode, file_name, source);
+        try reportAll(io, ParserMsg, parser.errs.items, !options.test_mode, file_name, source);
         return error.ExitOnPrint;
     } else if (state.config.print_ast) {
-        try printAst(allocator, &ast);
+        try printAst(allocator, io, &ast);
         if (options.test_mode) return error.ExitOnPrint;
     }
 
@@ -173,7 +175,7 @@ pub fn parse(allocator: Allocator, state: *State, file_name: []const u8, source:
 }
 
 /// Runs another pipeline to compile another module. they don't share lexical scope and constants
-pub fn runSubPipeline(allocator: Allocator, state: *State, file_name: []const u8, path: []const u8, source: [:0]const u8) void {
+pub fn runSubPipeline(io: Io, allocator: Allocator, state: *State, file_name: []const u8, path: []const u8, source: [:0]const u8) void {
     const prev_scope = state.lex_scope;
     state.lex_scope = .empty;
     state.lex_scope.initGlobalScope(allocator, state);
@@ -181,7 +183,7 @@ pub fn runSubPipeline(allocator: Allocator, state: *State, file_name: []const u8
     const prev_constants = state.const_interner;
     state.const_interner = .init(allocator);
 
-    _ = run(allocator, state, true, file_name, path, source) catch {
+    _ = run(io, allocator, state, true, file_name, path, source) catch {
         std.process.exit(1);
     };
 
@@ -189,9 +191,9 @@ pub fn runSubPipeline(allocator: Allocator, state: *State, file_name: []const u8
     state.const_interner = prev_constants;
 }
 
-fn printAst(allocator: Allocator, ast: *const Ast) !void {
+fn printAst(allocator: Allocator, io: Io, ast: *const Ast) !void {
     var buf: [2048]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&buf);
+    var stdout_writer = std.Io.File.stdout().writer(io, &buf);
     const stdout = &stdout_writer.interface;
     defer stdout.flush() catch unreachable;
 
@@ -199,9 +201,9 @@ fn printAst(allocator: Allocator, ast: *const Ast) !void {
     try stdout.writeAll(try renderer.render());
 }
 
-fn printIr(allocator: Allocator, state: *const State, file_name: []const u8, analyzer: *const Analyzer) !void {
+fn printIr(io: Io, allocator: Allocator, state: *const State, file_name: []const u8, analyzer: *const Analyzer) !void {
     var buf: [2048]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&buf);
+    var stdout_writer = std.Io.File.stdout().writer(io, &buf);
     const stdout = &stdout_writer.interface;
     defer stdout.flush() catch unreachable;
 

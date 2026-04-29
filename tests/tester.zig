@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const print = std.debug.print;
@@ -41,25 +42,26 @@ const Args = struct {
     help: Arg(bool) = .{ .desc = "Prints this help and exit", .short = 'h' },
 };
 
-pub fn main() !u8 {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+pub fn main(init: std.process.Init) !u8 {
+    var dbg_alloc = std.heap.DebugAllocator(.{}){};
     defer {
-        const status = gpa.deinit();
+        const status = dbg_alloc.deinit();
         std.debug.assert(status == .ok);
     }
-    const allocator = gpa.allocator();
+    const allocator = dbg_alloc.allocator();
 
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    const args = try init.minimal.args.toSlice(arena.allocator());
+    defer arena.deinit();
 
     var diag: clarg.Diag = undefined;
     const parsed = clarg.parse(Args, args, &diag, .{}) catch |e| {
-        try diag.reportToFile(.stderr());
+        try diag.reportToFile(init.io, .stderr());
         return e;
     };
 
     if (parsed.help) {
-        try clarg.helpToFile(Args, .stderr());
+        try clarg.helpToFile(Args, init.io, .stderr());
         return 0;
     }
 
@@ -70,7 +72,7 @@ pub fn main() !u8 {
         .show_got = parsed.got,
     };
 
-    const tester_dir = try std.fs.selfExeDirPathAlloc(allocator);
+    const tester_dir = try std.process.executableDirPathAlloc(init.io, allocator);
     defer allocator.free(tester_dir);
 
     const exe_path = try std.fs.path.join(allocator, &[_][]const u8{
@@ -78,7 +80,7 @@ pub fn main() !u8 {
     });
     defer allocator.free(exe_path);
 
-    var tester = Tester.init(allocator, exe_path, config);
+    var tester = Tester.init(init.io, allocator, exe_path, config);
     defer tester.deinit();
     const success = try tester.run();
 
@@ -107,6 +109,7 @@ const Diagnostic = struct {
 };
 
 const Tester = struct {
+    io: Io,
     allocator: Allocator,
     diags: ArrayList(Diagnostic),
     exe_path: []const u8,
@@ -114,8 +117,9 @@ const Tester = struct {
 
     const Self = @This();
 
-    pub fn init(allocator: Allocator, exe_path: []const u8, config: Config) Self {
+    pub fn init(io: Io, allocator: Allocator, exe_path: []const u8, config: Config) Self {
         return .{
+            .io = io,
             .allocator = allocator,
             .diags = .empty,
             .exe_path = exe_path,
@@ -191,15 +195,15 @@ const Tester = struct {
         const path = try std.fs.path.join(self.allocator, &.{ "tests", "standalones" });
         defer self.allocator.free(path);
 
-        var cwd = try std.fs.cwd().openDir(path, .{ .iterate = true });
-        defer cwd.close();
+        var cwd = try std.Io.Dir.cwd().openDir(self.io, path, .{ .iterate = true });
+        defer cwd.close(self.io);
 
         var walker = try cwd.walk(self.allocator);
         defer walker.deinit();
         var specific_tested = false;
         var err = false;
 
-        while (try walker.next()) |entry| {
+        while (try walker.next(self.io)) |entry| {
             if (entry.kind != .directory) continue;
 
             // If specific file asked
@@ -209,11 +213,11 @@ const Tester = struct {
                 }
                 specific_tested = true;
             }
-            cwd = try cwd.openDir(entry.path, .{});
-            defer cwd = cwd.openDir("..", .{}) catch unreachable;
+            cwd = try cwd.openDir(self.io, entry.path, .{});
+            defer cwd = cwd.openDir(self.io, "..", .{}) catch unreachable;
 
             var buf: [1024]u8 = undefined;
-            self.testFile(&cwd, .standalone, try std.fmt.bufPrint(&buf, "{s}.ray", .{entry.basename}), "features") catch {
+            self.testFile(cwd, .standalone, try std.fmt.bufPrint(&buf, "{s}.ray", .{entry.basename}), "features") catch {
                 err = true;
                 continue;
             };
@@ -237,16 +241,16 @@ const Tester = struct {
             const path = try std.fs.path.join(self.allocator, &.{ "tests", @tagName(stage), category });
             defer self.allocator.free(path);
 
-            var cwd = try std.fs.cwd().openDir(path, .{ .iterate = true });
-            defer cwd.close();
+            var cwd = try std.Io.Dir.cwd().openDir(self.io, path, .{ .iterate = true });
+            defer cwd.close(self.io);
 
             var walker = try cwd.walk(self.allocator);
             defer walker.deinit();
             var specific_tested = false;
 
-            while (try walker.next()) |entry| {
+            while (try walker.next(self.io)) |entry| {
                 // File ending with .ray and not a child of current directory
-                if (std.mem.endsWith(u8, entry.basename, ".ray") and entry.dir.fd == cwd.fd) {
+                if (std.mem.endsWith(u8, entry.basename, ".ray") and entry.dir.handle == cwd.handle) {
                     // If specific file asked
                     if (self.config.file) |f| {
                         // Check without extension
@@ -255,7 +259,7 @@ const Tester = struct {
                         }
                         specific_tested = true;
                     }
-                    self.testFile(&cwd, stage, entry.basename, category) catch continue;
+                    self.testFile(cwd, stage, entry.basename, category) catch continue;
                 }
             }
 
@@ -265,7 +269,7 @@ const Tester = struct {
         }
     }
 
-    fn testFile(self: *Self, dir: *std.fs.Dir, stage: Stage, file_name: []const u8, category: []const u8) !void {
+    fn testFile(self: *Self, dir: std.Io.Dir, stage: Stage, file_name: []const u8, category: []const u8) !void {
         var no_ext = std.mem.splitScalar(u8, file_name, '.');
         const name = no_ext.next().?;
         var output_file = self.allocator.alloc(u8, name.len + 4) catch oom();
@@ -282,12 +286,8 @@ const Tester = struct {
         else
             &[_][]const u8{ self.exe_path, file_name, stage.toOpt(), path_opt };
 
-        var buf: [std.fs.max_path_bytes]u8 = undefined;
-        const path = try std.os.getFdPath(dir.fd, &buf);
-
-        const res = std.process.Child.run(.{
-            .allocator = self.allocator,
-            .cwd = path,
+        const res = std.process.run(self.allocator, self.io, .{
+            .cwd = .{ .dir = dir },
             .argv = argv,
         }) catch |e| {
             print("Error launching ray process: {t}, with args:\n", .{e});
@@ -306,27 +306,21 @@ const Tester = struct {
         const got = self.cleanText(if (eql(u8, category, "features")) res.stdout else res.stderr) catch oom();
         defer self.allocator.free(got);
 
-        const file = dir.openFile(output_file, .{ .mode = .read_only }) catch |err| {
+        const expect = dir.readFileAlloc(self.io, output_file, self.allocator, .unlimited) catch |err| {
             print("Error: {t}, unable to open file at: {s}\n", .{ err, output_file });
             std.process.exit(0);
         };
-        defer file.close();
-
-        // The file has a new line inserted by default
-        const size = try file.getEndPos();
-        const expect: []u8 = self.allocator.alloc(u8, size) catch oom();
         defer self.allocator.free(expect);
 
-        _ = try file.readAll(expect);
         const clean_expect = self.cleanText(expect) catch oom();
         defer self.allocator.free(clean_expect);
 
-        std.testing.expect(eql(u8, std.mem.trimRight(u8, got, "\n"), std.mem.trimRight(u8, clean_expect, "\n"))) catch |e| {
+        std.testing.expect(eql(u8, std.mem.trimEnd(u8, got, "\n"), std.mem.trimEnd(u8, clean_expect, "\n"))) catch |e| {
             self.diags.append(self.allocator, .{
                 .category = category,
                 .file_name = self.allocator.dupe(u8, file_name) catch oom(),
                 .diff = self.colorizedDiff(clean_expect, got) catch oom(),
-                .got = self.allocator.dupe(u8, std.mem.trimRight(u8, got, "\n")) catch oom(),
+                .got = self.allocator.dupe(u8, std.mem.trimEnd(u8, got, "\n")) catch oom(),
             }) catch oom();
             return e;
         };
@@ -338,11 +332,11 @@ const Tester = struct {
 
         while (lines.next()) |line| {
             // Skip comments
-            if (std.mem.startsWith(u8, std.mem.trimLeft(u8, line, " "), "//")) continue;
+            if (std.mem.startsWith(u8, std.mem.trimStart(u8, line, " "), "//")) continue;
 
             // If after removing the \r there is only spaces, we skip it
-            const trimmed = std.mem.trimRight(u8, line, "\r");
-            if (std.mem.trimRight(u8, trimmed, " ").len == 0) continue;
+            const trimmed = std.mem.trimEnd(u8, line, "\r");
+            if (std.mem.trimEnd(u8, trimmed, " ").len == 0) continue;
 
             try res.appendSlice(self.allocator, trimmed);
             try res.append(self.allocator, '\n');

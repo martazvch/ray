@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const print = std.debug.print;
 const assert = std.debug.assert;
@@ -61,6 +62,7 @@ const corner_to_end = boxChar(.BottomLeft) ++ boxChar(.Horitzontal) ** 2;
 
 /// Reports all the reports of type *Report*
 pub fn reportAll(
+    io: Io,
     Report: type,
     reports: []const GenReport(Report),
     verbose: bool,
@@ -78,7 +80,7 @@ pub fn reportAll(
     };
 
     var stderr_buf: [2048]u8 = undefined;
-    var stderr_writer = std.fs.File.stderr().writer(&stderr_buf);
+    var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buf);
     const stderr = &stderr_writer.interface;
 
     if (verbose) {

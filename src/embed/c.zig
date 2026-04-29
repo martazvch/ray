@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
 
 const core = @import("core");
@@ -14,6 +15,8 @@ const oom = @import("misc").oom;
 
 var arena: std.heap.ArenaAllocator = .init(std.heap.smp_allocator);
 var allocator = arena.allocator();
+var threaded_io: Io.Threaded = .init_single_threaded;
+var c_print_fn: *const fn ([*c]const u8) callconv(.c) void = undefined;
 
 pub const Error = error{ CompileErr, RuntimeErr };
 
@@ -28,10 +31,8 @@ const ConfigC = extern struct {
     printFn: ?*const fn ([*c]const u8) callconv(.c) void = null,
 };
 
-var c_print_fn: ?*const fn ([*c]const u8) callconv(.c) void = null;
-
-fn cPrintWrapper(text: []const u8) void {
-    const f = c_print_fn.?;
+fn cPrintWrapper(_: Io, text: []const u8) void {
+    const f = c_print_fn;
     // `text` is not null-terminated, so copy it to a stack buffer
     var buf: [4096]u8 = undefined;
     const len = @min(text.len, buf.len - 1);
@@ -41,7 +42,7 @@ fn cPrintWrapper(text: []const u8) void {
 }
 
 pub export fn rayNewVm(config: ConfigC) *cVm {
-    const print_fn: *const fn ([]const u8) void = if (config.printFn) |f| blk: {
+    const print_fn: *const fn (Io, []const u8) void = if (config.printFn) |f| blk: {
         c_print_fn = f;
         break :blk cPrintWrapper;
     } else State.defaultPrint;
@@ -59,7 +60,7 @@ pub export fn rayNewVm(config: ConfigC) *cVm {
     });
 
     var heap_vm = allocator.create(Vm) catch oom();
-    heap_vm.init(allocator, heap_state);
+    heap_vm.init(threaded_io.io(), allocator, heap_state);
 
     return @ptrCast(heap_vm);
 }
@@ -79,12 +80,12 @@ pub export fn rayRegisterFn(opaque_vm: *cVm, func: ffi.FnProto) void {
 pub export fn rayInitGlobalScope(opaque_vm: *cVm) void {
     const vm: *Vm = @ptrCast(@alignCast(opaque_vm));
     vm.state.initGlobalScope(allocator);
-    vm.init(allocator, vm.state);
+    vm.init(threaded_io.io(), allocator, vm.state);
 }
 
 pub export fn rayRun(opaque_vm: *cVm, code: [*c]const u8) c_int {
     const vm: *Vm = @ptrCast(@alignCast(opaque_vm));
-    const entry_point = Pipeline.run(allocator, vm.state, false, "host", ".", std.mem.span(code)) catch |e| switch (e) {
+    const entry_point = Pipeline.run(threaded_io.io(), allocator, vm.state, false, "host", ".", std.mem.span(code)) catch |e| switch (e) {
         error.ExitOnPrint => return 0,
         else => return @intFromError(error.CompileErr),
     };

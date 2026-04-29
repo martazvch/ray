@@ -40,6 +40,7 @@ const Error = error{UnsupportedOS};
 ///
 /// **Caller owns memory of result**
 pub fn fetchImportedFile(
+    io: std.Io,
     allocator: Allocator,
     ast: *const Ast,
     path_chunks: []const Ast.TokenIndex,
@@ -49,20 +50,20 @@ pub fn fetchImportedFile(
     if (ast.token_tags[path_chunks[0]] == .dot) {
         var buf_path: [std.fs.max_path_bytes]u8 = undefined;
         const buf_written = sb.render(&buf_path);
-        const cwd = std.fs.openDirAbsolute(buf_written, .{}) catch unreachable;
+        const cwd = std.Io.Dir.openDirAbsolute(io, buf_written, .{}) catch unreachable;
 
         // TODO: could it be only a dot? And thus it would break at the [1..]
-        return fetchFrom(allocator, cwd, ast, path_chunks[1..], sb);
+        return fetchFrom(io, allocator, cwd, ast, path_chunks[1..], sb);
     }
 
     // TODO: error
     if (path) |p| {
         const cwd = cwd: {
             if (std.fs.path.isAbsolute(p)) {
-                break :cwd std.fs.openDirAbsolute(p, .{}) catch unreachable;
+                break :cwd std.Io.Dir.openDirAbsolute(io, p, .{}) catch unreachable;
             } else {
-                var cwd = std.fs.cwd();
-                break :cwd cwd.openDir(p, .{}) catch unreachable;
+                var cwd = std.Io.Dir.cwd();
+                break :cwd cwd.openDir(io, p, .{}) catch unreachable;
             }
         };
 
@@ -70,13 +71,20 @@ pub fn fetchImportedFile(
         sb.append(allocator, p);
         defer _ = sb.pop();
 
-        return fetchFrom(allocator, cwd, ast, path_chunks, sb);
+        return fetchFrom(io, allocator, cwd, ast, path_chunks, sb);
     }
 
     @panic("Absolute imports not yet implemented");
 }
 
-fn fetchFrom(allocator: Allocator, init_dir: std.fs.Dir, ast: *const Ast, path_chunks: []const Ast.TokenIndex, sb: *Sb) Result {
+fn fetchFrom(
+    io: std.Io,
+    allocator: Allocator,
+    init_dir: std.Io.Dir,
+    ast: *const Ast,
+    path_chunks: []const Ast.TokenIndex,
+    sb: *Sb,
+) Result {
     var cwd = init_dir;
 
     for (path_chunks, 0..) |part, i| {
@@ -89,11 +97,11 @@ fn fetchFrom(allocator: Allocator, init_dir: std.fs.Dir, ast: *const Ast, path_c
                 defer _ = sb.pop();
                 const file_name = std.fmt.allocPrint(allocator, "{s}.{s}", .{ name, "ray" }) catch oom();
 
-                if (cwd.access(file_name, .{})) {
+                if (cwd.access(io, file_name, .{})) {
                     return .{ .rayfile = .{
                         .name = file_name,
                         .path = sb.renderAlloc(allocator),
-                        .content = readFile(allocator, &cwd, file_name),
+                        .content = readFile(io, allocator, &cwd, file_name),
                     } };
                 } else |_| {}
             }
@@ -102,7 +110,7 @@ fn fetchFrom(allocator: Allocator, init_dir: std.fs.Dir, ast: *const Ast, path_c
             {
                 const file_name = std.fmt.allocPrint(allocator, "{s}.{s}", .{ name, "rayn" }) catch oom();
 
-                if (cwd.access(file_name, .{})) {
+                if (cwd.access(io, file_name, .{})) {
                     const lib = dynLib(allocator, name, sb) catch |e| switch (e) {
                         error.UnsupportedOS => return .unsupported_os,
                         else => return .{ .missing_dynlib_file = part },
@@ -113,14 +121,14 @@ fn fetchFrom(allocator: Allocator, init_dir: std.fs.Dir, ast: *const Ast, path_c
                     return .{ .dynlib = .{
                         .name = file_name,
                         .path = sb.renderAlloc(allocator),
-                        .rayn_content = readFile(allocator, &cwd, file_name),
+                        .rayn_content = readFile(io, allocator, &cwd, file_name),
                         .lib = lib,
                         .token = part,
                     } };
                 } else |_| {}
             }
         } else {
-            cwd = cwd.openDir(name, .{}) catch return .{ .unknown_mod = part };
+            cwd = cwd.openDir(io, name, .{}) catch return .{ .unknown_mod = part };
             sb.append(allocator, name);
         }
     }
@@ -128,8 +136,8 @@ fn fetchFrom(allocator: Allocator, init_dir: std.fs.Dir, ast: *const Ast, path_c
     return .{ .missing_file = path_chunks[path_chunks.len - 1] };
 }
 
-fn readFile(allocator: Allocator, cwd: *std.fs.Dir, file_name: []const u8) [:0]const u8 {
-    return cwd.readFileAllocOptions(allocator, file_name, 100_000, null, .of(u8), 0) catch unreachable;
+fn readFile(io: std.Io, allocator: Allocator, cwd: *std.Io.Dir, file_name: []const u8) [:0]const u8 {
+    return cwd.readFileAllocOptions(io, file_name, allocator, .unlimited, .of(u8), 0) catch unreachable;
 }
 
 fn dynLib(allocator: Allocator, file_name: []const u8, sb: *Sb) !std.DynLib {

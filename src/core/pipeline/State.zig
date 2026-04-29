@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
 
 const type_mod = @import("../analyzer/types.zig");
@@ -46,15 +47,15 @@ pub const Config = struct {
     dbg_infos: bool = false,
     path: ?[]const u8 = null,
 
-    printFn: *const fn ([]const u8) void = defaultPrint,
+    printFn: *const fn (Io, []const u8) void = defaultPrint,
     // errorFn: *const fn ([]const u8) void = defaultErr,
 };
 
-pub fn defaultPrint(text: []const u8) void {
+pub fn defaultPrint(io: Io, text: []const u8) void {
     errdefer @panic("failed to write to stdout");
 
     var buf: [1024]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&buf);
+    var stdout_writer = std.Io.File.stdout().writer(io, &buf);
     const stdout = &stdout_writer.interface;
 
     try stdout.print("{s}\n", .{text});

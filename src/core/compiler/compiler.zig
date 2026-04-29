@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 const ArrayList = std.ArrayList;
 const MultiArrayList = std.MultiArrayList;
 const Allocator = std.mem.Allocator;
@@ -26,6 +27,7 @@ const GenReport = misc.reporter.GenReport;
 const oom = misc.oom;
 
 pub const CompilationUnit = struct {
+    io: Io,
     allocator: Allocator,
     state: *State,
     mod_index: ModIndex,
@@ -43,11 +45,12 @@ pub const CompilationUnit = struct {
     c_fns: []const *Obj.ForeignFn,
 
     const Self = @This();
-    const Error = error{ Err, TooManyConst } || std.posix.WriteError;
+    const Error = error{ Err, TooManyConst } || std.Io.Writer.Error;
     const CompilerReport = GenReport(CompilerMsg);
 
-    pub fn init(allocator: Allocator, state: *State, mod_index: ModIndex, render: bool) Self {
+    pub fn init(io: Io, allocator: Allocator, state: *State, mod_index: ModIndex, render: bool) Self {
         return .{
+            .io = io,
             .allocator = allocator,
             .state = state,
             .mod_index = mod_index,
@@ -76,7 +79,7 @@ pub const CompilationUnit = struct {
 
         if (self.render) {
             var buf: [256]u8 = undefined;
-            var stdout = std.fs.File.stdout().writer(&buf);
+            var stdout = std.Io.File.stdout().writer(self.io, &buf);
             const mod_name = self.state.interner.getKey(self.state.modules.getFromIndex(self.mod_index).name).?;
             stdout.interface.print("//---- {s} ----\n\n", .{mod_name}) catch oom();
             stdout.interface.flush() catch oom();
@@ -303,7 +306,7 @@ const Compiler = struct {
             dis.disChunk(&alloc_writer.writer, self.function.name);
 
             var buf: [1024]u8 = undefined;
-            var stdout_writer = std.fs.File.stdout().writer(&buf);
+            var stdout_writer = std.Io.File.stdout().writer(self.manager.io, &buf);
             const stdout = &stdout_writer.interface;
 
             stdout.print("{s}\n", .{alloc_writer.writer.buffered()}) catch oom();

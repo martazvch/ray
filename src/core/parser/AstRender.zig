@@ -2,17 +2,18 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const assert = std.debug.assert;
+const oom = @import("misc").oom;
 
 const Ast = @import("Ast.zig");
 
 allocator: Allocator = undefined,
 ast: *const Ast,
-output: std.ArrayList(u8),
-writer: std.ArrayList(u8).Writer,
+wa: std.Io.Writer.Allocating,
+writer: *std.Io.Writer,
 indent_level: usize,
 
 const Self = @This();
-const Error = std.ArrayList(u8).Writer.Error;
+const Error = std.Io.Writer.Error;
 const spaces: []const u8 = " " ** 1024;
 const INDENT_SIZE = 4;
 
@@ -20,14 +21,15 @@ pub fn init(allocator: Allocator, ast: *const Ast) Self {
     return .{
         .allocator = allocator,
         .ast = ast,
-        .output = .empty,
         .indent_level = 1,
+        .wa = std.Io.Writer.Allocating.init(allocator),
         .writer = undefined,
     };
 }
 
 pub fn render(self: *Self) Error![]const u8 {
-    self.writer = self.output.writer(self.allocator);
+    self.writer = &self.wa.writer;
+
     try self.writer.writeAll("{\n");
 
     for (self.ast.nodes, 0..) |*node, i| {
@@ -37,7 +39,7 @@ pub fn render(self: *Self) Error![]const u8 {
     self.indent_level -= 1;
     try self.writer.writeAll("}\n");
 
-    return self.output.items;
+    return self.wa.toOwnedSlice() catch oom();
 }
 
 fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
@@ -295,59 +297,59 @@ fn renderNameTypeValue(self: *Self, decl: *const Ast.VarDecl, comma: bool) !void
 
 fn renderType(self: *Self, typ: ?*Ast.Type) Error![]const u8 {
     const ty = typ orelse return "";
-
-    var buf: std.ArrayList(u8) = .empty;
+    var wa = std.Io.Writer.Allocating.init(self.allocator);
+    const w = &wa.writer;
 
     switch (ty.*) {
         .array => |t| {
-            try buf.appendSlice(self.allocator, "[]");
-            try buf.appendSlice(self.allocator, try self.renderType(t.child));
+            try w.writeAll("[]");
+            try w.writeAll(try self.renderType(t.child));
         },
         .error_union => |t| {
-            try buf.appendSlice(self.allocator, try self.renderType(t.ok));
-            try buf.appendSlice(self.allocator, "|");
+            try w.writeAll(try self.renderType(t.ok));
+            try w.writeAll("|");
             for (t.errs, 0..) |err, i| {
-                try buf.appendSlice(self.allocator, self.ast.toSource(err));
-                if (i < t.errs.len - 1) try buf.appendSlice(self.allocator, "|");
+                try w.writeAll(self.ast.toSource(err));
+                if (i < t.errs.len - 1) try w.writeAll("|");
             }
         },
         .fields => |fields| {
             for (fields, 0..) |f, i| {
-                try buf.appendSlice(self.allocator, self.ast.toSource(f));
+                try w.writeAll(self.ast.toSource(f));
                 if (i < fields.len - 1) {
-                    try buf.appendSlice(self.allocator, ".");
+                    try w.writeAll(".");
                 }
             }
         },
         .function => |t| {
-            try buf.appendSlice(self.allocator, "fn(");
+            try w.writeAll("fn(");
 
             if (t.params.len != 0) {
                 for (t.params, 0..) |p, i| {
-                    try buf.appendSlice(self.allocator, try self.renderType(p));
+                    try w.writeAll(try self.renderType(p));
                     if (i != t.params.len - 1) {
-                        try buf.appendSlice(self.allocator, ", ");
+                        try w.writeAll(", ");
                     }
                 }
             }
 
-            try buf.appendSlice(self.allocator, ") -> ");
+            try w.writeAll(") -> ");
             if (t.return_type) |ret| {
-                try buf.appendSlice(self.allocator, try self.renderType(ret));
-            } else try buf.appendSlice(self.allocator, "void");
+                try w.writeAll(try self.renderType(ret));
+            } else try w.writeAll("void");
         },
-        .optional => |t| try buf.print(self.allocator, "?{s}", .{try self.renderType(t.child)}),
-        .scalar => |t| try buf.appendSlice(self.allocator, self.ast.toSource(t)),
+        .optional => |t| try w.print("?{s}", .{try self.renderType(t.child)}),
+        .scalar => |t| try w.writeAll(self.ast.toSource(t)),
         .@"union" => |types| {
             for (types, 0..) |t, i| {
-                try buf.appendSlice(self.allocator, try self.renderType(t));
-                if (i < types.len - 1) try buf.appendSlice(self.allocator, "|");
+                try w.writeAll(try self.renderType(t));
+                if (i < types.len - 1) try w.writeAll("|");
             }
         },
-        .self => try buf.appendSlice(self.allocator, "Self"),
+        .self => try w.writeAll("Self"),
     }
 
-    return try buf.toOwnedSlice(self.allocator);
+    return w.buffered();
 }
 
 fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
@@ -703,5 +705,5 @@ fn finishPush(self: *Self, comma: bool) !void {
 
 fn indent(self: *Self) !void {
     assert(self.indent_level * 2 < 1024);
-    try self.output.appendSlice(self.allocator, spaces[0 .. self.indent_level * INDENT_SIZE]);
+    try self.writer.writeAll(spaces[0 .. self.indent_level * INDENT_SIZE]);
 }

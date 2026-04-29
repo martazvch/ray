@@ -24,14 +24,14 @@ allocator: Allocator,
 interner: *const Interner,
 instrs: []const Instruction.Data,
 indent_level: u8,
-tree: ArrayList(u8),
-writer: std.ArrayList(u8).Writer,
+wa: std.Io.Writer.Allocating,
+writer: *std.Io.Writer,
 constants: []const Constant,
 
 const indent_size: u8 = 4;
 const spaces: [1024]u8 = [_]u8{' '} ** 1024;
 
-const Error = Allocator.Error || std.fmt.BufPrintError;
+const Error = std.Io.Writer.Error;
 const Self = @This();
 
 pub fn init(allocator: Allocator, instrs: []const Instruction.Data, constants: []const Constant, interner: *const Interner) Self {
@@ -39,7 +39,7 @@ pub fn init(allocator: Allocator, instrs: []const Instruction.Data, constants: [
         .allocator = allocator,
         .interner = interner,
         .instrs = instrs,
-        .tree = .empty,
+        .wa = std.Io.Writer.Allocating.init(allocator),
         .writer = undefined,
         .indent_level = 0,
         .constants = constants,
@@ -47,11 +47,12 @@ pub fn init(allocator: Allocator, instrs: []const Instruction.Data, constants: [
 }
 
 fn indent(self: *Self) void {
-    self.tree.appendSlice(self.allocator, Self.spaces[0 .. self.indent_level * Self.indent_size]) catch oom();
+    self.writer.writeAll(Self.spaces[0 .. self.indent_level * Self.indent_size]) catch oom();
 }
 
 pub fn renderIr(self: *Self, file_name: []const u8, roots: []const usize) Error![]const u8 {
-    self.writer = self.tree.writer(self.allocator);
+    self.writer = &self.wa.writer;
+
     try self.writer.print("//-- {s} --\n", .{file_name});
 
     for (roots) |root| {
@@ -60,7 +61,7 @@ pub fn renderIr(self: *Self, file_name: []const u8, roots: []const usize) Error!
 
     try self.writer.writeAll("\n");
 
-    return self.tree.items;
+    return self.wa.toOwnedSlice() catch oom();
 }
 
 fn parseInstr(self: *Self, instr: ir.Index) void {
@@ -665,12 +666,12 @@ fn whileInstr(self: *Self, data: Instruction.While) void {
 
 fn indentAndAppendSlice(self: *Self, text: []const u8) void {
     self.indent();
-    self.tree.appendSlice(self.allocator, text) catch oom();
-    self.tree.appendSlice(self.allocator, "\n") catch oom();
+    self.writer.writeAll(text) catch oom();
+    self.writer.writeAll("\n") catch oom();
 }
 
 fn indentAndPrintSlice(self: *Self, comptime fmt: []const u8, args: anytype) void {
     self.indent();
     self.writer.print(fmt, args) catch oom();
-    self.tree.appendSlice(self.allocator, "\n") catch oom();
+    self.writer.writeAll("\n") catch oom();
 }

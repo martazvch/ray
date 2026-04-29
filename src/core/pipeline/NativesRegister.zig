@@ -111,7 +111,7 @@ const Registered = struct {
 };
 // We can use pointers here because we refer to comptime declarations in Module
 // TODO: no check on already defined with same name?
-pub fn registerZigFn(self: *Self, allocator: Allocator, func: *const zffi.FnMeta, interner: *Interner, ti: *TypeInterner) Registered {
+pub fn registerZigFn(self: *Self, allocator: Allocator, comptime func: *const zffi.FnMeta, interner: *Interner, ti: *TypeInterner) Registered {
     const fn_type = self.fnZigToRay(allocator, func, interner, ti);
     self.zig_fns_meta.put(allocator, interner.intern(func.name), fn_type) catch oom();
     const native = Obj.ZigFn.create(allocator, func.name, func.function);
@@ -121,7 +121,7 @@ pub fn registerZigFn(self: *Self, allocator: Allocator, func: *const zffi.FnMeta
     return .{ .index = self.zig_fns.items.len - 1, .type = fn_type };
 }
 
-fn fnZigToRay(self: *Self, allocator: Allocator, func: *const zffi.FnMeta, interner: *Interner, ti: *TypeInterner) *const Type {
+fn fnZigToRay(self: *Self, allocator: Allocator, comptime func: *const zffi.FnMeta, interner: *Interner, ti: *TypeInterner) *const Type {
     var params: Type.Function.ParamsMap = .empty;
 
     // We don't take into account param *Vm and if it's in second place, it means 'self' is in first and we skip it too

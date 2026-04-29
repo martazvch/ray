@@ -32,7 +32,7 @@ const Args = struct {
 
 var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
     const allocator, const is_debug = gpa: {
         break :gpa switch (builtin.mode) {
             .Debug, .ReleaseSafe => .{ debug_allocator.allocator(), true },
@@ -43,17 +43,16 @@ pub fn main() !void {
         std.debug.assert(debug_allocator.deinit() == .ok);
     };
 
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    const args = try init.minimal.args.toSlice(init.arena.allocator());
 
     var diag: clarg.Diag = undefined;
     const parsed = clarg.parse(Args, args, &diag, .{}) catch |e| {
-        try diag.reportToFile(.stderr());
+        try diag.reportToFile(init.io, .stderr());
         return e;
     };
 
     if (parsed.help) {
-        return clarg.helpToFile(Args, .stderr());
+        return clarg.helpToFile(Args, init.io, .stderr());
     }
 
     const config: State.Config = .{
@@ -66,11 +65,11 @@ pub fn main() !void {
     };
 
     if (parsed.compile) |cmd| {
-        try compile.run(allocator, cmd);
+        try compile.run(init.io, allocator, cmd);
     } else if (parsed.file) |f| {
-        try ray.run(allocator, f, config);
+        try ray.run(init.io, allocator, f, config);
     } else {
-        try Repl.run(allocator, config);
+        try Repl.run(init.io, allocator, config);
     }
 }
 

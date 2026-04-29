@@ -120,6 +120,7 @@ pub const InstrInfos = struct {
 const Result = Error!InstrInfos;
 pub const AnalyzerReport = GenReport(AnalyzerMsg);
 
+io: std.Io,
 allocator: Allocator,
 state: *State,
 interner: *Interner,
@@ -138,8 +139,9 @@ mod_name: InternerIdx,
 mod_index: ModIndex,
 cached_names: struct { empty: usize, main: usize, std: usize, self: usize, Self: usize, init: usize },
 
-pub fn init(allocator: Allocator, state: *State) Self {
+pub fn init(io: std.Io, allocator: Allocator, state: *State) Self {
     return .{
+        .io = io,
         .allocator = allocator,
         .state = state,
         .interner = &state.interner,
@@ -1132,6 +1134,7 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
     defer self.path.shrink(self.allocator, old_path_length);
 
     var result = Importer.fetchImportedFile(
+        self.io,
         self.allocator,
         self.ast,
         node.names,
@@ -1152,7 +1155,7 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
             defer self.state.dynlib = prev_dynlib;
 
             if (!self.state.modules.has(interned)) {
-                Pipeline.runSubPipeline(self.allocator, self.state, dynlib.name, dynlib.path, dynlib.rayn_content);
+                Pipeline.runSubPipeline(self.io, self.allocator, self.state, dynlib.name, dynlib.path, dynlib.rayn_content);
             }
 
             break :path interned;
@@ -1161,7 +1164,7 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
             const interned = self.interner.intern(f.path);
 
             if (!self.state.modules.has(interned)) {
-                Pipeline.runSubPipeline(self.allocator, self.state, f.name, f.path, f.content);
+                Pipeline.runSubPipeline(self.io, self.allocator, self.state, f.name, f.path, f.content);
             }
             break :path interned;
         },

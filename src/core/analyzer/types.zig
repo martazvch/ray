@@ -399,67 +399,67 @@ pub const Type = union(enum) {
     }
 
     pub fn toString(self: *const Type, allocator: Allocator, interner: *const Interner, mod_name: InternerIdx) []const u8 {
-        var res: std.ArrayList(u8) = .empty;
-        var writer = res.writer(allocator);
+        var wa = std.Io.Writer.Allocating.init(allocator);
+        const w = &wa.writer;
 
         switch (self.*) {
             .never, .int, .float, .bool, .str, .null, .void, .range => return @tagName(self.*),
             .array => |ty| {
-                writer.writeAll("[") catch oom();
-                writer.writeAll(ty.child.toString(allocator, interner, mod_name)) catch oom();
-                writer.writeAll("]") catch oom();
+                w.writeAll("[") catch oom();
+                w.writeAll(ty.child.toString(allocator, interner, mod_name)) catch oom();
+                w.writeAll("]") catch oom();
             },
             .@"enum" => |ty| {
                 // If symbol is defnined in current mod/file, don't repeat the module
                 if (ty.loc) |loc| {
-                    locToString(&writer, loc, interner, mod_name);
+                    locToString(w, loc, interner, mod_name);
                 } else {
-                    writer.writeAll("enum {") catch oom();
+                    w.writeAll("enum {") catch oom();
                     for (ty.tags.keys(), 0..) |k, i| {
                         const last = i < ty.tags.count() - 1;
-                        writer.print("{s}{s}", .{ interner.getKey(k).?, if (last) "" else ", " }) catch oom();
+                        w.print("{s}{s}", .{ interner.getKey(k).?, if (last) "" else ", " }) catch oom();
                     }
-                    writer.writeAll("}") catch oom();
+                    w.writeAll("}") catch oom();
                 }
             },
             .error_union => |ty| {
                 errdefer oom();
-                try writer.writeAll(ty.ok.toString(allocator, interner, mod_name));
-                try writer.writeAll("!");
-                try writer.writeAll(ty.err.toString(allocator, interner, mod_name));
+                try w.writeAll(ty.ok.toString(allocator, interner, mod_name));
+                try w.writeAll("!");
+                try w.writeAll(ty.err.toString(allocator, interner, mod_name));
             },
             .function => |ty| {
-                writer.writeAll("fn(") catch oom();
+                w.writeAll("fn(") catch oom();
                 for (ty.params.values(), 0..) |p, i| {
-                    writer.writeAll(p.type.toString(allocator, interner, mod_name)) catch oom();
-                    if (i != ty.params.count() - 1) writer.writeAll(", ") catch oom();
+                    w.writeAll(p.type.toString(allocator, interner, mod_name)) catch oom();
+                    if (i != ty.params.count() - 1) w.writeAll(", ") catch oom();
                 }
-                writer.writeAll(") -> ") catch oom();
-                writer.writeAll(ty.return_type.toString(allocator, interner, mod_name)) catch oom();
+                w.writeAll(") -> ") catch oom();
+                w.writeAll(ty.return_type.toString(allocator, interner, mod_name)) catch oom();
             },
             .module => |interned| {
                 const name = interner.getKey(interned).?;
-                writer.print("module: {s}", .{name}) catch oom();
+                w.print("module: {s}", .{name}) catch oom();
             },
             .optional => |opt| {
-                writer.print("?{s}", .{opt.toString(allocator, interner, mod_name)}) catch oom();
+                w.print("?{s}", .{opt.toString(allocator, interner, mod_name)}) catch oom();
             },
-            .structure => |ty| locToString(&writer, ty.loc, interner, mod_name),
-            .trait => |ty| locToString(&writer, ty.loc, interner, mod_name),
-            .trait_obj => |ty| locToString(&writer, ty.trait, interner, mod_name),
-            .@"union" => |*ty| locToString(&writer, ty.loc, interner, mod_name),
+            .structure => |ty| locToString(w, ty.loc, interner, mod_name),
+            .trait => |ty| locToString(w, ty.loc, interner, mod_name),
+            .trait_obj => |ty| locToString(w, ty.trait, interner, mod_name),
+            .@"union" => |*ty| locToString(w, ty.loc, interner, mod_name),
             .inline_union => |u| {
                 for (u.types, 0..) |ty, i| {
-                    writer.writeAll(ty.toString(allocator, interner, mod_name)) catch oom();
-                    if (i < u.types.len - 1) writer.writeAll("|") catch oom();
+                    w.writeAll(ty.toString(allocator, interner, mod_name)) catch oom();
+                    if (i < u.types.len - 1) w.writeAll("|") catch oom();
                 }
             },
         }
 
-        return res.toOwnedSlice(allocator) catch oom();
+        return w.buffered();
     }
 
-    pub fn locToString(writer: *std.ArrayList(u8).Writer, loc: Loc, interner: *const Interner, mod_name: InternerIdx) void {
+    pub fn locToString(writer: *std.Io.Writer, loc: Loc, interner: *const Interner, mod_name: InternerIdx) void {
         errdefer oom();
 
         if (loc.container == mod_name) {
@@ -496,24 +496,13 @@ pub const TypeInterner = struct {
     }
 
     pub fn CreateCache(comptime types: []const Type) type {
-        var fields: []const std.builtin.Type.StructField = &.{};
+        var fields_names: [types.len][]const u8 = undefined;
 
-        inline for (types) |ty| {
-            fields = fields ++ .{std.builtin.Type.StructField{
-                .name = @tagName(ty),
-                .type = *const Type,
-                .default_value_ptr = null,
-                .is_comptime = false,
-                .alignment = 1,
-            }};
+        inline for (types, 0..) |ty, i| {
+            fields_names[i] = @tagName(ty);
         }
 
-        return @Type(.{ .@"struct" = .{
-            .layout = .auto,
-            .fields = fields,
-            .decls = &.{},
-            .is_tuple = false,
-        } });
+        return @Struct(.auto, null, &fields_names, &@splat(*const Type), &@splat(.{}));
     }
 
     pub fn cacheFrequentTypes(self: *TypeInterner) void {

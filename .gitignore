@@ -8,4 +8,5 @@ test.ray
 tester
 tester.exe
 *.dylib
+zig-pkg
 

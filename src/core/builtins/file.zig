@@ -4,6 +4,10 @@ const Value = @import("../runtime/values.zig").Value;
 const Obj = @import("../runtime/Obj.zig");
 const Vm = @import("../runtime/Vm.zig");
 
+// TODO: should centralize the Io implementation
+var threaded: std.Io.Threaded = .init_single_threaded;
+const io = threaded.io();
+
 // TODO: handle errors
 
 pub const module: zffi.Module = .{
@@ -17,7 +21,7 @@ pub const module: zffi.Module = .{
 };
 
 const File = struct {
-    fd: std.fs.File,
+    fd: std.Io.File,
 
     const Self = @This();
 
@@ -30,12 +34,12 @@ const File = struct {
     };
 
     fn readAll(self: *Self, vm: *Vm) []const u8 {
-        var reader = self.fd.reader(&.{});
+        var reader = self.fd.reader(io, &.{});
         const interface = &reader.interface;
 
         return interface.readAlloc(
             vm.gc_alloc,
-            (self.fd.stat() catch unreachable).size,
+            (self.fd.stat(io) catch unreachable).size,
         ) catch unreachable;
     }
 
@@ -48,7 +52,7 @@ const File = struct {
 fn open(vm: *Vm, path: []const u8) *File {
     const self = vm.gc_alloc.create(File) catch unreachable;
     self.* = .{
-        .fd = std.fs.cwd().openFile(path, .{}) catch unreachable,
+        .fd = std.Io.Dir.cwd().openFile(io, path, .{}) catch unreachable,
     };
 
     const obj = Obj.NativeObj.create(vm.gc_alloc, "File", self, File.zig_struct.deinit_fn);

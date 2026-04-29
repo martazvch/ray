@@ -19,35 +19,26 @@ pub const All = union(enum) {
 };
 
 pub fn Union(types: []const std.meta.FieldEnum(All)) type {
-    var fields: [types.len]std.builtin.Type.UnionField = undefined;
-    var enum_fields: [types.len]std.builtin.Type.EnumField = undefined;
+    var enum_field_values: [types.len]usize = undefined;
+
+    var fields_names: [types.len][]const u8 = undefined;
+    var fields_types: [types.len]type = undefined;
 
     inline for (types, 0..) |t, i| {
         const name = @tagName(t);
         const T = @FieldType(All, name);
-
-        fields[i] = .{
-            .alignment = @alignOf(T),
-            .name = name,
-            .type = T,
-        };
-        enum_fields[i] = .{
-            .name = name,
-            .value = i,
-        };
+        fields_names[i] = name;
+        fields_types[i] = T;
+        enum_field_values[i] = i;
     }
 
-    return @Type(.{ .@"union" = .{
-        .layout = .auto,
-        .tag_type = @Type(.{ .@"enum" = .{
-            .tag_type = usize,
-            .decls = &.{},
-            .fields = &enum_fields,
-            .is_exhaustive = true,
-        } }),
-        .decls = &.{},
-        .fields = &fields,
-    } });
+    return @Union(
+        .auto,
+        @Enum(usize, .exhaustive, &fields_names, &enum_field_values),
+        &fields_names,
+        &fields_types,
+        &@splat(.{}),
+    );
 }
 
 pub const Module = struct {
@@ -235,24 +226,14 @@ pub fn ArgsTuple(comptime FnType: type) struct { type, usize } {
         args_type[i] = arg.type.?;
     }
 
-    var fields: [fn_infos.params.len]std.builtin.Type.StructField = undefined;
+    var field_types: [fn_infos.params.len]type = undefined;
+
     for (args_type, 0..) |T, i| {
-        fields[i] = .{
-            .name = std.fmt.comptimePrint("{}", .{i}),
-            .type = T,
-            .default_value_ptr = null,
-            .is_comptime = false,
-            .alignment = @alignOf(T),
-        };
+        field_types[i] = T;
     }
 
     return .{
-        @Type(.{ .@"struct" = .{
-            .is_tuple = true,
-            .decls = &.{},
-            .fields = &fields,
-            .layout = .auto,
-        } }),
+        @Tuple(&field_types),
         vm_index,
     };
 }

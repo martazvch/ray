@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const eql = std.mem.eql;
@@ -23,9 +24,10 @@ const State = enum {
     res,
 };
 
-pub fn read(allocator: Allocator, cwd: *std.fs.Dir, file_name: []const u8) Error!Cases {
-    var file = cwd.openFile(file_name, .{}) catch return error.MissingFile;
-    const content = file.readToEndAlloc(allocator, 100_000) catch return error.FileTooLong;
+pub fn read(io: Io, allocator: Allocator, cwd: *std.Io.Dir, file_name: []const u8) Error!Cases {
+    const content = cwd.readFileAlloc(io, file_name, allocator, .unlimited) catch return error.MissingFile;
+    defer allocator.free(content);
+
     var it = std.mem.splitScalar(u8, content, '\n');
 
     var state: State = .none;
@@ -37,7 +39,7 @@ pub fn read(allocator: Allocator, cwd: *std.fs.Dir, file_name: []const u8) Error
     errdefer unreachable;
 
     while (it.next()) |raw_line| {
-        const line = std.mem.trimRight(u8, raw_line, "\r");
+        const line = std.mem.trimEnd(u8, raw_line, "\r");
 
         switch (state) {
             .none => if (startsWith(u8, line, "# case")) {

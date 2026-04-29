@@ -6,13 +6,13 @@ fn isLess(_: *ray.Vm, a: i64, b: i64) bool {
     return a < b;
 }
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
     var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
     defer {
         std.debug.assert(debug_allocator.deinit() == .ok);
     }
 
-    var vm = ray.create(debug_allocator.allocator());
+    var vm = ray.create(init.io, debug_allocator.allocator());
     defer vm.deinit();
 
     vm.init(
@@ -33,5 +33,5 @@ test {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    try Tester.testDir(arena.allocator(), "../cases");
+    try Tester.testDir(std.testing.io, arena.allocator(), "../cases");
 }

@@ -36,14 +36,13 @@ pub fn popMany(self: *Self, count: usize) void {
 }
 
 pub fn render(self: *const Self, buf: []u8) []const u8 {
-    var fbs = std.io.fixedBufferStream(buf);
-    const writer = fbs.writer();
+    var w = std.Io.Writer.fixed(buf);
 
     for (self.string.items) |s| {
-        writer.writeAll(s) catch oom();
+        w.writeAll(s) catch oom();
     }
 
-    return fbs.getWritten();
+    return w.buffered();
 }
 
 /// Caller owns the memory
@@ -58,15 +57,14 @@ pub fn renderAlloc(self: *const Self, allocator: Allocator) []const u8 {
 }
 
 pub fn renderWithSep(self: *const Self, buf: []u8, sep: []const u8) []const u8 {
-    var fbs = std.io.fixedBufferStream(buf);
-    const writer = fbs.writer();
+    var w = std.Io.Writer.fixed(buf);
 
     for (self.string.items, 0..) |s, i| {
-        if (i != 0) writer.writeAll(sep) catch oom();
-        writer.writeAll(s) catch oom();
+        if (i != 0) w.writeAll(sep) catch oom();
+        w.writeAll(s) catch oom();
     }
 
-    return fbs.getWritten();
+    return w.buffered();
 }
 
 pub fn renderWithSepAlloc(self: *const Self, allocator: Allocator, sep: []const u8) []const u8 {

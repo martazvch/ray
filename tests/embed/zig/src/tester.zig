@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const ray = @import("ray");
 const Reader = @import("reader.zig");
@@ -19,7 +20,7 @@ fn logError(file_name: []const u8, part_id: usize, comptime fmt: []const u8, arg
 
 var output: ?[]const u8 = null;
 
-pub fn printFn(text: []const u8) void {
+pub fn printFn(_: Io, text: []const u8) void {
     output = text;
 }
 
@@ -27,8 +28,8 @@ fn isLess(_: *ray.Vm, a: i64, b: i64) bool {
     return a < b;
 }
 
-pub fn testDir(allocator: Allocator, path: []const u8) !void {
-    var vm = ray.create(allocator);
+pub fn testDir(io: Io, allocator: Allocator, path: []const u8) !void {
+    var vm = ray.create(io, allocator);
     defer vm.deinit();
 
     vm.init(
@@ -43,14 +44,14 @@ pub fn testDir(allocator: Allocator, path: []const u8) !void {
     }));
     vm.initGlobalScope();
 
-    var cwd = std.fs.cwd();
-    var test_dir = try cwd.openDir(path, .{ .iterate = true });
+    var cwd = std.Io.Dir.cwd();
+    var test_dir = try cwd.openDir(io, path, .{ .iterate = true });
     var walker = try test_dir.walk(allocator);
     defer walker.deinit();
 
-    while (try walker.next()) |entry| {
+    while (try walker.next(io)) |entry| {
         if (entry.kind != .file) continue;
-        const cases = try Reader.read(allocator, &test_dir, entry.basename);
+        const cases = try Reader.read(io, allocator, &test_dir, entry.basename);
 
         for (cases.items) |case| {
             for (case.items, 0..) |part, i| {

@@ -1,20 +1,23 @@
 const std = @import("std");
+const Io = std.Io;
 const posix = std.posix;
 const Terminal = @import("Terminal.zig");
 
 const Self = @This();
 
+io: Io,
 original_termios: posix.termios,
-stdin: std.fs.File,
+stdin: std.Io.File,
 
-pub fn init() Terminal.Error!Self {
-    const stdin = std.fs.File.stdin();
+pub fn init(io: Io) Terminal.Error!Self {
+    const stdin = std.Io.File.stdin();
 
     const original_termios = posix.tcgetattr(stdin.handle) catch {
         return error.InitFail;
     };
 
     return .{
+        .io = io,
         .original_termios = original_termios,
         .stdin = stdin,
     };
@@ -57,7 +60,7 @@ pub fn disableRawMode(ctx: *anyopaque) void {
 
 fn readByte(self: *const Self) Terminal.Error!u8 {
     var buf: [1]u8 = undefined;
-    const n = self.stdin.read(&buf) catch {
+    const n = self.stdin.readPositionalAll(self.io, &buf, 0) catch {
         return error.ReadInputError;
     };
     if (n == 0) return error.ReadInputError;

@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
@@ -19,6 +20,7 @@ const Ast = @import("../core/parser/Ast.zig");
 const Pipeline = @import("../core/pipeline/pipeline.zig");
 const State = @import("../core/pipeline/State.zig");
 
+io: Io,
 allocator: Allocator,
 indent_level: usize,
 writer: *std.Io.Writer,
@@ -94,8 +96,9 @@ pub const Args = struct {
     pub const description: []const u8 = "Compiles to a native executable";
 };
 
-pub fn run(allocator: Allocator, args: clarg.ParsedArgs(Args)) !void {
+pub fn run(io: Io, allocator: Allocator, args: clarg.ParsedArgs(Args)) !void {
     var transpiler: Self = .{
+        .io = io,
         .allocator = allocator,
         .writer = undefined,
         .ast = undefined,
@@ -104,11 +107,11 @@ pub fn run(allocator: Allocator, args: clarg.ParsedArgs(Args)) !void {
         .constants = .empty,
         .indent_level = 0,
     };
-    try transpiler.runPipeline(args);
+    try transpiler.runPipeline(io, args);
 }
 
-pub fn runPipeline(self: *Self, args: clarg.ParsedArgs(Args)) !void {
-    if (args.help) return clarg.helpToFile(Args, .stderr());
+pub fn runPipeline(self: *Self, io: Io, args: clarg.ParsedArgs(Args)) !void {
+    if (args.help) return clarg.helpToFile(Args, io, .stderr());
 
     const file_path = args.file orelse {
         std.debug.print("Error: Expected a file to compile.\n", .{});
@@ -121,14 +124,14 @@ pub fn runPipeline(self: *Self, args: clarg.ParsedArgs(Args)) !void {
 
     var state: State = .new(arena_alloc, .{});
 
-    const file_content = std.fs.cwd().readFileAllocOptions(self.allocator, file_path, 100_000, null, .of(u8), 0) catch |err| {
+    const file_content = std.Io.Dir.cwd().readFileAllocOptions(io, file_path, self.allocator, .unlimited, .of(u8), 0) catch |err| {
         // TODO: Ray error
         std.debug.print("Error: {}, unable to open file at: {s}\n", .{ err, file_path });
         std.process.exit(0);
     };
     defer self.allocator.free(file_content);
 
-    const scopes, const symbols, const irb = Pipeline.runFrontend(arena_alloc, &state, false, file_path, file_content) catch |e| switch (e) {
+    const scopes, const symbols, const irb = Pipeline.runFrontend(io, arena_alloc, &state, false, file_path, file_content) catch |e| switch (e) {
         error.ExitOnPrint => return,
         else => return e,
     };
@@ -143,8 +146,7 @@ pub fn runPipeline(self: *Self, args: clarg.ParsedArgs(Args)) !void {
     try self.compile(&state.interner, out_file);
     std.log.debug("Transpiled:\n{s}", .{self.writer.buffered()});
 
-    const process = try std.process.Child.run(.{
-        .allocator = self.allocator,
+    const process = try std.process.run(self.allocator, io, .{
         .argv = &.{
             "zig",
             "build-exe",
@@ -170,10 +172,10 @@ fn compile(self: *Self, interner: *const misc.Interner, output: []const u8) !voi
         self.appendSlice("\n", .none);
     }
 
-    const file = try std.fs.cwd().createFile(output, .{});
-    defer file.close();
+    const file = try std.Io.Dir.cwd().createFile(self.io, output, .{});
+    defer file.close(self.io);
 
-    try file.writeAll(self.writer.buffered());
+    try file.writeStreamingAll(self.io, self.writer.buffered());
 }
 
 fn transpileInstr(self: *Self, instr: usize, interner: *const misc.Interner) !void {

@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const Writer = std.Io.Writer;
 
@@ -14,6 +15,7 @@ const Obj = @import("Obj.zig");
 const Value = @import("values.zig").Value;
 const State = @import("../pipeline/State.zig");
 
+io: Io,
 gc: Gc,
 stack: Stack,
 frame: *CallFrame,
@@ -40,7 +42,8 @@ const Error = error{
     RangeIndexDecrease,
 } || Allocator.Error;
 
-pub fn init(self: *Self, allocator: Allocator, state: *State) void {
+pub fn init(self: *Self, io: Io, allocator: Allocator, state: *State) void {
+    self.io = io;
     self.arena_comptime = .init(allocator);
     self.allocator = self.arena_comptime.allocator();
 
@@ -90,7 +93,7 @@ fn freeObjects(self: *Self) void {
 /// Returns the error gave in `kind` parameter and prints backtrace
 fn err(self: *Self, kind: Error) Error {
     var buf: [1024]u8 = undefined;
-    var stderr_writer = std.fs.File.stderr().writer(&buf);
+    var stderr_writer = std.Io.File.stderr().writer(self.io, &buf);
     const stderr = &stderr_writer.interface;
     defer stderr.flush() catch oom();
 
@@ -602,10 +605,10 @@ fn execute(self: *Self) !void {
                 self.stack.top -= count;
             },
             .print => {
-                var wa = std.io.Writer.Allocating.init(self.allocator);
+                var wa = std.Io.Writer.Allocating.init(self.allocator);
                 var writer = &wa.writer;
                 self.stack.pop().print(writer);
-                self.state.config.printFn(writer.buffered());
+                self.state.config.printFn(self.io, writer.buffered());
             },
             .push_false => self.stack.push(Value.false_),
             .push_null => self.stack.push(Value.null_),
