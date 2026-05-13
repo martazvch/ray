@@ -657,7 +657,7 @@ fn endExternFnDecl(
 
     const name_sentinel = self.alloc.dupeZ(u8, name_text) catch oom();
     defer self.alloc.free(name_sentinel);
-    const func = lib.lookup(self.alloc, ffi.Fn, name_sentinel) orelse return self.err(
+    const func = lib.lookup(ffi.Fn, name_sentinel) orelse return self.err(
         .{ .extern_fn_not_in_lib = .{ .name = name_text } },
         span,
     );
@@ -1144,7 +1144,7 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
     const path = path: switch (result) {
         .dynlib => |*dynlib| {
             const interned = self.interner.intern(dynlib.path);
-            const handcheck = dynlib.lib.lookup(self.alloc, ffi.Handcheck, "handcheck") orelse return self.err(
+            const handcheck = dynlib.lib.lookup(ffi.Handcheck, "handcheck") orelse return self.err(
                 .{ .dynlib_not_module = .{ .name = self.ast.toSource(dynlib.token) } },
                 self.ast.getSpan(dynlib.token),
             );

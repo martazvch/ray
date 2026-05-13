@@ -30,7 +30,7 @@ pub fn open(alloc: Allocator, path: []const u8, name: []const u8) Error!Self {
     const full_path = std.fmt.allocPrint(alloc, "{s}{s}{s}", .{
         path,
         std.Io.Dir.path.sep_str,
-        name,
+        try libName(alloc, name),
     }) catch oom();
 
     const lib_handle = switch (os) {
@@ -62,15 +62,9 @@ fn libName(alloc: Allocator, name: []const u8) Error![]const u8 {
     };
 }
 
-pub fn lookup(self: *Self, alloc: Allocator, T: type, name: []const u8) ?T {
+pub fn lookup(self: *Self, T: type, name: [:0]const u8) ?T {
     return switch (os) {
-        .windows => win: {
-            const name_sentinel = alloc.dupeZ(u8, name) catch oom();
-            defer alloc.free(name_sentinel);
-
-            const proc = GetProcAddress(self.lib, name_sentinel.ptr) orelse return null;
-            break :win @ptrCast(proc);
-        },
+        .windows => @ptrCast(GetProcAddress(self.lib, name.ptr) orelse return null),
         else => self.lib.lookup(T, name),
     };
 }
