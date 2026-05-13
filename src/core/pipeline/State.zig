@@ -15,6 +15,7 @@ const ConstIdx = ConstInterner.ConstIdx;
 const Constant = ConstInterner.Constant;
 const zffi = @import("../ffi/zffi.zig");
 const ffi = @import("../ffi/ffi.zig");
+const NativeLib = @import("../analyzer/NativeLib.zig");
 
 const misc = @import("misc");
 const Interner = misc.Interner;
@@ -34,7 +35,7 @@ array_fns: ObjFns,
 string_fns: ObjFns,
 /// Associated dynamic library to this module. When importing a native module, we open
 /// a subpipeline with the associated library to fetch symbols
-dynlib: ?*std.DynLib,
+dynlib: ?*NativeLib,
 
 const Self = @This();
 

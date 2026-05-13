@@ -1,6 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
+const NativeLib = @import("NativeLib.zig");
 
 const Ast = @import("../parser/Ast.zig");
 
@@ -19,7 +20,7 @@ pub const Result = union(enum) {
         name: []const u8,
         path: []const u8,
         rayn_content: [:0]const u8,
-        lib: std.DynLib,
+        lib: NativeLib,
         token: usize,
     },
     missing_file: usize,
@@ -41,7 +42,7 @@ const Error = error{UnsupportedOS};
 /// **Caller owns memory of result**
 pub fn fetchImportedFile(
     io: std.Io,
-    allocator: Allocator,
+    alloc: Allocator,
     ast: *const Ast,
     path_chunks: []const Ast.TokenIndex,
     path: ?[]const u8,
@@ -53,7 +54,7 @@ pub fn fetchImportedFile(
         const cwd = std.Io.Dir.openDirAbsolute(io, buf_written, .{}) catch unreachable;
 
         // TODO: could it be only a dot? And thus it would break at the [1..]
-        return fetchFrom(io, allocator, cwd, ast, path_chunks[1..], sb);
+        return fetchFrom(io, alloc, cwd, ast, path_chunks[1..], sb);
     }
 
     // TODO: error
@@ -68,10 +69,10 @@ pub fn fetchImportedFile(
         };
 
         // TODO: won't work with absolute path
-        sb.append(allocator, p);
+        sb.append(alloc, p);
         defer _ = sb.pop();
 
-        return fetchFrom(io, allocator, cwd, ast, path_chunks, sb);
+        return fetchFrom(io, alloc, cwd, ast, path_chunks, sb);
     }
 
     @panic("Absolute imports not yet implemented");
@@ -79,7 +80,7 @@ pub fn fetchImportedFile(
 
 fn fetchFrom(
     io: std.Io,
-    allocator: Allocator,
+    alloc: Allocator,
     init_dir: std.Io.Dir,
     ast: *const Ast,
     path_chunks: []const Ast.TokenIndex,
@@ -93,35 +94,39 @@ fn fetchFrom(
         if (i == path_chunks.len - 1) {
             // Ray module
             {
-                sb.append(allocator, name);
+                sb.append(alloc, name);
                 defer _ = sb.pop();
-                const file_name = std.fmt.allocPrint(allocator, "{s}.{s}", .{ name, "ray" }) catch oom();
+                const file_name = std.fmt.allocPrint(alloc, "{s}.{s}", .{ name, "ray" }) catch oom();
 
                 if (cwd.access(io, file_name, .{})) {
                     return .{ .rayfile = .{
                         .name = file_name,
-                        .path = sb.renderAlloc(allocator),
-                        .content = readFile(io, allocator, &cwd, file_name),
+                        .path = sb.renderAlloc(alloc),
+                        .content = readFile(io, alloc, &cwd, file_name),
                     } };
                 } else |_| {}
             }
 
             // Native module
             {
-                const file_name = std.fmt.allocPrint(allocator, "{s}.{s}", .{ name, "rayn" }) catch oom();
+                const file_name = std.fmt.allocPrint(alloc, "{s}.{s}", .{ name, "rayn" }) catch oom();
 
                 if (cwd.access(io, file_name, .{})) {
-                    const lib = dynLib(allocator, name, sb) catch |e| switch (e) {
+                    const lib = NativeLib.open(
+                        alloc,
+                        sb.renderWithSepAlloc(alloc, std.Io.Dir.path.sep_str),
+                        name,
+                    ) catch |e| switch (e) {
                         error.UnsupportedOS => return .unsupported_os,
-                        else => return .{ .missing_dynlib_file = part },
+                        error.LoadFailed => return .{ .missing_dynlib_file = part },
                     };
 
                     // We add the name after fetching the lib to avoid duplicate name
-                    sb.append(allocator, name);
+                    sb.append(alloc, name);
                     return .{ .dynlib = .{
                         .name = file_name,
-                        .path = sb.renderAlloc(allocator),
-                        .rayn_content = readFile(io, allocator, &cwd, file_name),
+                        .path = sb.renderAlloc(alloc),
+                        .rayn_content = readFile(io, alloc, &cwd, file_name),
                         .lib = lib,
                         .token = part,
                     } };
@@ -129,30 +134,13 @@ fn fetchFrom(
             }
         } else {
             cwd = cwd.openDir(io, name, .{}) catch return .{ .unknown_mod = part };
-            sb.append(allocator, name);
+            sb.append(alloc, name);
         }
     }
 
     return .{ .missing_file = path_chunks[path_chunks.len - 1] };
 }
 
-fn readFile(io: std.Io, allocator: Allocator, cwd: *std.Io.Dir, file_name: []const u8) [:0]const u8 {
-    return cwd.readFileAllocOptions(io, file_name, allocator, .unlimited, .of(u8), 0) catch unreachable;
-}
-
-fn dynLib(allocator: Allocator, file_name: []const u8, sb: *Sb) !std.DynLib {
-    const dynlib_name = try libName(allocator, file_name);
-    sb.append(allocator, dynlib_name);
-    defer _ = sb.pop();
-
-    return std.DynLib.open(sb.renderWithSepAlloc(allocator, std.fs.path.sep_str));
-}
-
-fn libName(allocator: Allocator, name: []const u8) Error![]const u8 {
-    return switch (builtin.os.tag) {
-        .linux => std.fmt.allocPrint(allocator, "lib{s}.so", .{name}) catch oom(),
-        .macos => std.fmt.allocPrint(allocator, "lib{s}.dylib", .{name}) catch oom(),
-        .windows => std.fmt.allocPrint(allocator, "{s}.dll", .{name}) catch oom(),
-        else => error.UnsupportedOS,
-    };
+fn readFile(io: std.Io, alloc: Allocator, cwd: *std.Io.Dir, file_name: []const u8) [:0]const u8 {
+    return cwd.readFileAllocOptions(io, file_name, alloc, .unlimited, .of(u8), 0) catch unreachable;
 }

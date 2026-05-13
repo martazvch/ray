@@ -31,7 +31,7 @@ const Error = error{ExitOnPrint};
 // TODO: could only need full path
 pub fn run(
     io: Io,
-    allocator: Allocator,
+    alloc: Allocator,
     state: *State,
     is_sub: bool,
     file_name: []const u8,
@@ -39,20 +39,20 @@ pub fn run(
     source: [:0]const u8,
 ) !*Obj.Function {
     // Initiliaze the path builder
-    state.path_builder.append(allocator, std.Io.Dir.cwd().realPathFileAlloc(io, ".", allocator) catch oom());
+    state.path_builder.append(alloc, std.Io.Dir.cwd().realPathFileAlloc(io, ".", alloc) catch oom());
 
-    const ast = try parse(io, allocator, state, file_name, source);
+    const ast = try parse(io, alloc, state, file_name, source);
 
     // Extension could be either .ray or .rayn so we split dynamically
     var it = std.mem.splitScalar(u8, file_name, '.');
     const mod_name = it.next().?;
     const mod_index = state.modules.open(
-        allocator,
+        alloc,
         state.interner.intern(path),
         state.interner.intern(mod_name),
     );
 
-    var analyzer: Analyzer = .init(io, allocator, state);
+    var analyzer: Analyzer = .init(io, alloc, state);
     analyzer.analyze(&ast, mod_name, mod_index, !is_sub and !state.config.embedded);
 
     // Analyzed Ast printer
@@ -64,15 +64,15 @@ pub fn run(
         return error.ExitOnPrint;
     }
     if (state.config.print_ir) {
-        try printIr(io, allocator, state, file_name, &analyzer);
+        try printIr(io, alloc, state, file_name, &analyzer);
         if (options.test_mode and !is_sub) return error.ExitOnPrint;
     }
 
-    state.updateModWithScope(allocator, mod_index);
-    state.modules.ensureCompileSizes(allocator, mod_index, state);
+    state.updateModWithScope(alloc, mod_index);
+    state.modules.ensureCompileSizes(alloc, mod_index, state);
 
     // Compiler
-    var compiler = CompilationUnit.init(io, allocator, state, mod_index, state.config.print_bytecode);
+    var compiler = CompilationUnit.init(io, alloc, state, mod_index, state.config.print_bytecode);
 
     const entry_point = try compiler.compile(
         analyzer.irb.instructions.items(.data),
@@ -87,25 +87,25 @@ pub fn run(
         entry_point;
 }
 
-pub fn runFrontend(io: Io, allocator: Allocator, state: *State, is_sub: bool, file_name: []const u8, source: [:0]const u8) !struct {
+pub fn runFrontend(io: Io, alloc: Allocator, state: *State, is_sub: bool, file_name: []const u8, source: [:0]const u8) !struct {
     []const LexicalScope.Scope,
     []const LexicalScope.Symbol,
     Irb,
 } {
     // Initiliaze the path builder
-    state.path_builder.append(allocator, std.Io.Dir.cwd().realPathFileAlloc(io, ".", allocator) catch oom());
+    state.path_builder.append(alloc, std.Io.Dir.cwd().realPathFileAlloc(io, ".", alloc) catch oom());
 
     var it = std.mem.splitScalar(u8, file_name, '.');
     const mod_name = it.next().?;
     const mod_index = state.modules.open(
-        allocator,
+        alloc,
         state.interner.intern(file_name),
         state.interner.intern(mod_name),
     );
 
-    const ast = try parse(io, allocator, state, file_name, source);
+    const ast = try parse(io, alloc, state, file_name, source);
 
-    var analyzer: Analyzer = .init(io, allocator, state);
+    var analyzer: Analyzer = .init(io, alloc, state);
     _ = analyzer.analyze(&ast, file_name, mod_index, !is_sub);
 
     // Analyzed Ast printer
@@ -117,11 +117,11 @@ pub fn runFrontend(io: Io, allocator: Allocator, state: *State, is_sub: bool, fi
         return error.ExitOnPrint;
     }
     if (state.config.print_ir) {
-        try printIr(io, allocator, state, file_name, &analyzer);
+        try printIr(io, alloc, state, file_name, &analyzer);
         if (options.test_mode and !is_sub) return error.ExitOnPrint;
     }
 
-    var scopes = std.ArrayList(LexicalScope.Scope).initCapacity(allocator, analyzer.scope.saved.items.len) catch oom();
+    var scopes = std.ArrayList(LexicalScope.Scope).initCapacity(alloc, analyzer.scope.saved.items.len) catch oom();
 
     for (analyzer.scope.saved.items, 0..) |scope, i| {
         // TODO: error
@@ -132,21 +132,21 @@ pub fn runFrontend(io: Io, allocator: Allocator, state: *State, is_sub: bool, fi
         scopes.appendAssumeCapacity(scope.scope);
     }
 
-    var symbols = std.ArrayList(LexicalScope.Symbol).initCapacity(allocator, analyzer.scope.saved_syms.items.len) catch oom();
+    var symbols = std.ArrayList(LexicalScope.Symbol).initCapacity(alloc, analyzer.scope.saved_syms.items.len) catch oom();
 
     for (analyzer.scope.saved_syms.items) |symbol| {
         symbols.appendAssumeCapacity(symbol.*);
     }
 
     return .{
-        scopes.toOwnedSlice(allocator) catch oom(),
-        symbols.toOwnedSlice(allocator) catch oom(),
+        scopes.toOwnedSlice(alloc) catch oom(),
+        symbols.toOwnedSlice(alloc) catch oom(),
         analyzer.irb,
     };
 }
 
-pub fn parse(io: Io, allocator: Allocator, state: *State, file_name: []const u8, source: [:0]const u8) !Ast {
-    var lexer = Lexer.init(allocator);
+pub fn parse(io: Io, alloc: Allocator, state: *State, file_name: []const u8, source: [:0]const u8) !Ast {
+    var lexer = Lexer.init(alloc);
     lexer.lex(source);
     defer lexer.deinit();
 
@@ -157,17 +157,17 @@ pub fn parse(io: Io, allocator: Allocator, state: *State, file_name: []const u8,
 
     // Parser
     const token_slice = lexer.tokens.toOwnedSlice();
-    var parser: Parser = .init(allocator);
+    var parser: Parser = .init(alloc);
     var ast = parser.parse(source, token_slice.items(.tag), token_slice.items(.span));
 
-    var walker: Walker = .init(allocator, &state.interner, &ast);
+    var walker: Walker = .init(alloc, &state.interner, &ast);
     walker.walk();
 
     if (parser.errs.items.len > 0) {
         try reportAll(io, ParserMsg, parser.errs.items, !options.test_mode, file_name, source);
         return error.ExitOnPrint;
     } else if (state.config.print_ast) {
-        try printAst(allocator, io, &ast);
+        try printAst(alloc, io, &ast);
         if (options.test_mode) return error.ExitOnPrint;
     }
 
@@ -175,15 +175,15 @@ pub fn parse(io: Io, allocator: Allocator, state: *State, file_name: []const u8,
 }
 
 /// Runs another pipeline to compile another module. they don't share lexical scope and constants
-pub fn runSubPipeline(io: Io, allocator: Allocator, state: *State, file_name: []const u8, path: []const u8, source: [:0]const u8) void {
+pub fn runSubPipeline(io: Io, alloc: Allocator, state: *State, file_name: []const u8, path: []const u8, source: [:0]const u8) void {
     const prev_scope = state.lex_scope;
     state.lex_scope = .empty;
-    state.lex_scope.initGlobalScope(allocator, state);
+    state.lex_scope.initGlobalScope(alloc, state);
 
     const prev_constants = state.const_interner;
-    state.const_interner = .init(allocator);
+    state.const_interner = .init(alloc);
 
-    _ = run(io, allocator, state, true, file_name, path, source) catch {
+    _ = run(io, alloc, state, true, file_name, path, source) catch {
         std.process.exit(1);
     };
 
@@ -191,24 +191,24 @@ pub fn runSubPipeline(io: Io, allocator: Allocator, state: *State, file_name: []
     state.const_interner = prev_constants;
 }
 
-fn printAst(allocator: Allocator, io: Io, ast: *const Ast) !void {
+fn printAst(alloc: Allocator, io: Io, ast: *const Ast) !void {
     var buf: [2048]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &buf);
     const stdout = &stdout_writer.interface;
     defer stdout.flush() catch unreachable;
 
-    var renderer: AstRender = .init(allocator, ast);
+    var renderer: AstRender = .init(alloc, ast);
     try stdout.writeAll(try renderer.render());
 }
 
-fn printIr(io: Io, allocator: Allocator, state: *const State, file_name: []const u8, analyzer: *const Analyzer) !void {
+fn printIr(io: Io, alloc: Allocator, state: *const State, file_name: []const u8, analyzer: *const Analyzer) !void {
     var buf: [2048]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &buf);
     const stdout = &stdout_writer.interface;
     defer stdout.flush() catch unreachable;
 
     var ir_renderer = IrRenderer.init(
-        allocator,
+        alloc,
         analyzer.irb.instructions.items(.data),
         state.const_interner.constants.items,
         &state.interner,

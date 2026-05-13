@@ -83,14 +83,14 @@ pub const Enum = struct {
         while (it.next()) |entry| {
             if (!entry.value_ptr.*) {
                 if (missing.items.len > 0) {
-                    missing.appendSlice(ana.allocator, ", ") catch oom();
+                    missing.appendSlice(ana.alloc, ", ") catch oom();
                 }
-                missing.appendSlice(ana.allocator, ana.interner.getKey(entry.key_ptr.*).?) catch oom();
+                missing.appendSlice(ana.alloc, ana.interner.getKey(entry.key_ptr.*).?) catch oom();
             }
         }
 
         if (missing.items.len > 0) return ana.err(
-            .{ .match_non_exhaustive = .{ .missing = missing.toOwnedSlice(ana.allocator) catch oom() } },
+            .{ .match_non_exhaustive = .{ .missing = missing.toOwnedSlice(ana.alloc) catch oom() } },
             span,
         );
     }
@@ -126,8 +126,8 @@ pub fn Num(T: type) type {
             };
         }
 
-        pub fn deinit(self: *Self, allocator: Allocator) void {
-            self.ranges.deinit(allocator);
+        pub fn deinit(self: *Self, alloc: Allocator) void {
+            self.ranges.deinit(alloc);
         }
 
         fn arm(self_opaque: *anyopaque, ana: *Analyzer, value_arm: *const Ast.Match.ValueArm, expect: ExprResKind, ctx: *Context) Matcher.ArmRes {
@@ -224,7 +224,7 @@ pub fn Num(T: type) type {
         }
 
         fn checkRange(self: *Self, ana: *Analyzer, range: RangeType, span: Span) Error!void {
-            self.covered.checkRange(ana.allocator, range) catch |err| switch (err) {
+            self.covered.checkRange(ana.alloc, range) catch |err| switch (err) {
                 error.partial => ana.warn(.match_partial_overlap, span),
                 error.unreached => return ana.err(.match_unreachable_arm, span),
             };
@@ -356,8 +356,8 @@ pub const String = struct {
         };
     }
 
-    pub fn deinit(self: *Self, allocator: Allocator) void {
-        self.set.deinit(allocator);
+    pub fn deinit(self: *Self, alloc: Allocator) void {
+        self.set.deinit(alloc);
     }
 
     fn arm(self_opaque: *anyopaque, ana: *Analyzer, value_arm: *const Ast.Match.ValueArm, expect: ExprResKind, ctx: *Context) Matcher.ArmRes {
@@ -373,7 +373,7 @@ pub const String = struct {
                 if (self.covered.has(constant)) {
                     return ana.err(.match_duplicate_arm, span);
                 }
-                self.covered.add(ana.allocator, constant) catch oom();
+                self.covered.add(ana.alloc, constant) catch oom();
 
                 break :b res;
             },
@@ -438,7 +438,7 @@ pub const Union = struct {
         const is_ident = value_instr == .identifier;
 
         return .{
-            .proto = ty.proto(ana.allocator),
+            .proto = ty.proto(ana.alloc),
             .alias = alias,
             .in_trap = in_trap,
             .value = value,
@@ -460,7 +460,7 @@ pub const Union = struct {
     pub fn arm(self: *Self, ana: *Analyzer, type_arm: Ast.Match.TypeArm, expect: ExprResKind, ctx: *Context) ArmTypeRes {
         const arm_type = try ana.checkAndGetType(type_arm.type, ctx);
 
-        const gop = self.proto.getOrPut(ana.allocator, arm_type) catch oom();
+        const gop = self.proto.getOrPut(ana.alloc, arm_type) catch oom();
         if (!gop.found_existing) return ana.err(
             .{ .type_not_in_union = .{
                 .expect = ana.typeName(self.value_base_type),
@@ -523,14 +523,14 @@ pub const Union = struct {
         while (it.next()) |entry| {
             if (!entry.value_ptr.*) {
                 if (missing.items.len > 0) {
-                    missing.appendSlice(ana.allocator, ", ") catch oom();
+                    missing.appendSlice(ana.alloc, ", ") catch oom();
                 }
-                missing.appendSlice(ana.allocator, ana.typeName(entry.key_ptr.*)) catch oom();
+                missing.appendSlice(ana.alloc, ana.typeName(entry.key_ptr.*)) catch oom();
             }
         }
 
         if (missing.items.len > 0) return ana.err(
-            .{ .match_non_exhaustive = .{ .missing = missing.toOwnedSlice(ana.allocator) catch oom() } },
+            .{ .match_non_exhaustive = .{ .missing = missing.toOwnedSlice(ana.alloc) catch oom() } },
             span,
         );
     }

@@ -121,7 +121,7 @@ const Result = Error!InstrInfos;
 pub const AnalyzerReport = GenReport(AnalyzerMsg);
 
 io: std.Io,
-allocator: Allocator,
+alloc: Allocator,
 state: *State,
 interner: *Interner,
 path: *Sb,
@@ -139,10 +139,10 @@ mod_name: InternerIdx,
 mod_index: ModIndex,
 cached_names: struct { empty: usize, main: usize, std: usize, self: usize, Self: usize, init: usize },
 
-pub fn init(io: std.Io, allocator: Allocator, state: *State) Self {
+pub fn init(io: std.Io, alloc: Allocator, state: *State) Self {
     return .{
         .io = io,
-        .allocator = allocator,
+        .alloc = alloc,
         .state = state,
         .interner = &state.interner,
         .path = &state.path_builder,
@@ -152,7 +152,7 @@ pub fn init(io: std.Io, allocator: Allocator, state: *State) Self {
         .ast = undefined,
         .errs = .empty,
         .warns = .empty,
-        .irb = .init(allocator),
+        .irb = .init(alloc),
         .main = null,
 
         .mod_name = undefined,
@@ -169,12 +169,12 @@ pub fn init(io: std.Io, allocator: Allocator, state: *State) Self {
 }
 
 pub fn err(self: *Self, kind: AnalyzerMsg, span: Span) Error {
-    self.errs.append(self.allocator, AnalyzerReport.err(kind, span.start, span.end)) catch oom();
+    self.errs.append(self.alloc, AnalyzerReport.err(kind, span.start, span.end)) catch oom();
     return error.Err;
 }
 
 pub fn warn(self: *Self, kind: AnalyzerMsg, span: Span) void {
-    self.warns.append(self.allocator, AnalyzerReport.warn(kind, span.start, span.end)) catch oom();
+    self.warns.append(self.alloc, AnalyzerReport.warn(kind, span.start, span.end)) catch oom();
 }
 
 pub fn analyze(self: *Self, ast: *const Ast, mod_name: []const u8, mod_index: ModIndex, expect_main: bool) void {
@@ -183,7 +183,7 @@ pub fn analyze(self: *Self, ast: *const Ast, mod_name: []const u8, mod_index: Mo
 
     self.mod_index = mod_index;
     self.mod_name = self.interner.intern(mod_name);
-    self.containers.append(self.allocator, mod_name);
+    self.containers.append(self.alloc, mod_name);
 
     for (ast.nodes) |*node| {
         // If we don't expect a main, we're either embedded or in REPL, we can execute
@@ -309,10 +309,10 @@ fn containerFnDecls(
     funcs: *type_mod.MapNameSym,
     ctx: *Context,
 ) Error![]const InstrIndex {
-    funcs.ensureTotalCapacity(self.allocator, @intCast(decls.len)) catch oom();
+    funcs.ensureTotalCapacity(self.alloc, @intCast(decls.len)) catch oom();
 
     var func_instrs: ArrayList(InstrIndex) = .empty;
-    func_instrs.ensureTotalCapacity(self.allocator, decls.len) catch oom();
+    func_instrs.ensureTotalCapacity(self.alloc, decls.len) catch oom();
 
     for (decls) |*f| {
         const fn_name = self.interner.intern(self.ast.toSource(f.name));
@@ -321,7 +321,7 @@ fn containerFnDecls(
         funcs.putAssumeCapacity(fn_name, fn_res.sym);
     }
 
-    return func_instrs.toOwnedSlice(self.allocator) catch oom();
+    return func_instrs.toOwnedSlice(self.alloc) catch oom();
 }
 
 /// Analyzes trait implementations in a container (enum, structure, ..)
@@ -332,8 +332,8 @@ fn containerTraitImpls(
     traits: *type_mod.TraitMap,
     ctx: *Context,
 ) Error![]const Instr.Trait {
-    traits.ensureTotalCapacity(self.allocator, @intCast(decls.len)) catch oom();
-    var trait_res = ArrayList(Instr.Trait).initCapacity(self.allocator, decls.len) catch oom();
+    traits.ensureTotalCapacity(self.alloc, @intCast(decls.len)) catch oom();
+    var trait_res = ArrayList(Instr.Trait).initCapacity(self.alloc, decls.len) catch oom();
 
     for (decls) |*t| {
         const trait_name_str = self.ast.toSource(t.name);
@@ -357,10 +357,10 @@ fn containerTraitImpls(
 
         var trait_impl = trait_gop.value_ptr;
         trait_impl.* = .{ .vtable_index = self.scope.newVTable(), .symbols = .empty };
-        trait_impl.symbols.ensureTotalCapacity(self.allocator, @intCast(trait_def.functions.count())) catch oom();
+        trait_impl.symbols.ensureTotalCapacity(self.alloc, @intCast(trait_def.functions.count())) catch oom();
 
-        var proto = trait_def.proto(self.allocator);
-        var func_instrs = ArrayList(InstrIndex).initCapacity(self.allocator, trait_def.functions.count()) catch oom();
+        var proto = trait_def.proto(self.alloc);
+        var func_instrs = ArrayList(InstrIndex).initCapacity(self.alloc, trait_def.functions.count()) catch oom();
 
         for (t.functions) |*f| {
             const fn_name_str = self.ast.toSource(f.name);
@@ -410,11 +410,11 @@ fn containerTraitImpls(
         trait_res.appendAssumeCapacity(.{
             .name = trait_name,
             .vtable_index = trait_impl.vtable_index,
-            .funcs = func_instrs.toOwnedSlice(self.allocator) catch oom(),
+            .funcs = func_instrs.toOwnedSlice(self.alloc) catch oom(),
         });
     }
 
-    return trait_res.toOwnedSlice(self.allocator) catch oom();
+    return trait_res.toOwnedSlice(self.alloc) catch oom();
 }
 
 fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
@@ -470,7 +470,7 @@ fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
     defer snapshot.restore();
 
     var buf: [1024]u8 = undefined;
-    const container_name = self.interner.internKeepRef(self.allocator, self.containers.renderWithSep(&buf, "."));
+    const container_name = self.interner.internKeepRef(self.alloc, self.containers.renderWithSep(&buf, "."));
 
     // TODO: anonymus enum
     const name_tk = node.name orelse @panic("anonymus enums aren't supported yet");
@@ -479,7 +479,7 @@ fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
     const interned = self.ti.newEnum(.{ .name = name, .container = container_name });
     const ty = &interned.@"enum";
 
-    const sym = self.scope.declareSymbol(self.allocator, name, .@"enum");
+    const sym = self.scope.declareSymbol(self.alloc, name, .@"enum");
     sym.type = interned;
 
     ctx.self_type = interned;
@@ -504,13 +504,13 @@ fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
 }
 
 fn enumTags(self: *Self, tags: []const Ast.EnumDecl.Tag, ty: *Type.Enum, ctx: *Context) Error![]const []const u8 {
-    ty.tags.ensureTotalCapacity(self.allocator, @intCast(tags.len)) catch oom();
-    var names = ArrayList([]const u8).initCapacity(self.allocator, @intCast(tags.len)) catch oom();
+    ty.tags.ensureTotalCapacity(self.alloc, @intCast(tags.len)) catch oom();
+    var names = ArrayList([]const u8).initCapacity(self.alloc, @intCast(tags.len)) catch oom();
 
     for (tags) |tag| {
         const tag_name = self.ast.toSource(tag.name);
         const tag_value = try self.enumTag(tag, ctx);
-        const gop = ty.tags.getOrPut(self.allocator, self.interner.intern(tag_name)) catch oom();
+        const gop = ty.tags.getOrPut(self.alloc, self.interner.intern(tag_name)) catch oom();
 
         if (gop.found_existing) {
             return self.err(
@@ -519,10 +519,10 @@ fn enumTags(self: *Self, tags: []const Ast.EnumDecl.Tag, ty: *Type.Enum, ctx: *C
             );
         }
         gop.value_ptr.* = if (tag_value) |val| val.instr else null;
-        names.appendAssumeCapacity(self.allocator.dupe(u8, self.ast.toSource(tag.name)) catch oom());
+        names.appendAssumeCapacity(self.alloc.dupe(u8, self.ast.toSource(tag.name)) catch oom());
     }
 
-    return names.toOwnedSlice(self.allocator) catch oom();
+    return names.toOwnedSlice(self.alloc) catch oom();
 }
 
 fn enumTag(self: *Self, tag: Ast.EnumDecl.Tag, ctx: *Context) Error!?InstrInfos {
@@ -546,14 +546,14 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
     const name = try self.internIfNotInCurrentScope(node.name);
 
     var buf: [1024]u8 = undefined;
-    const container_name = self.interner.internKeepRef(self.allocator, self.containers.renderWithSep(&buf, "."));
+    const container_name = self.interner.internKeepRef(self.alloc, self.containers.renderWithSep(&buf, "."));
 
     // Forward declaration in outer scope for recursion
-    const sym = self.scope.declareSymbol(self.allocator, name, .function);
+    const sym = self.scope.declareSymbol(self.alloc, name, .function);
 
-    self.scope.open(self.allocator, null, .{ .barrier = true });
+    self.scope.open(self.alloc, null, .{ .barrier = true });
 
-    self.containers.append(self.allocator, self.ast.toSource(node.name));
+    self.containers.append(self.alloc, self.ast.toSource(node.name));
     defer _ = self.containers.pop();
     const loc: Type.Loc = .{ .name = name, .container = container_name };
 
@@ -655,16 +655,16 @@ fn endExternFnDecl(
         span,
     );
 
-    const name_sentinel = self.allocator.dupeZ(u8, name_text) catch oom();
-    defer self.allocator.free(name_sentinel);
-    const func = lib.lookup(ffi.Fn, name_sentinel) orelse return self.err(
+    const name_sentinel = self.alloc.dupeZ(u8, name_text) catch oom();
+    defer self.alloc.free(name_sentinel);
+    const func = lib.lookup(self.alloc, ffi.Fn, name_sentinel) orelse return self.err(
         .{ .extern_fn_not_in_lib = .{ .name = name_text } },
         span,
     );
     const returns = !return_ty.is(.void);
-    const obj_func = CFn.create(self.allocator, name_text, func, returns);
+    const obj_func = CFn.create(self.alloc, name_text, func, returns);
 
-    mod.foreign_funcs.append(self.allocator, obj_func) catch oom();
+    mod.foreign_funcs.append(self.alloc, obj_func) catch oom();
 
     return .{
         .instr = self.irb.addInstr(
@@ -685,7 +685,7 @@ fn endExternFnDecl(
 
 fn loadFunctionCaptures(self: *Self, captures_meta: *const Ast.FnDecl.Meta.Captures) Error![]const Instr.FnDecl.Capture {
     var captures: ArrayList(Instr.FnDecl.Capture) = .empty;
-    captures.ensureTotalCapacity(self.allocator, captures_meta.count()) catch oom();
+    captures.ensureTotalCapacity(self.alloc, captures_meta.count()) catch oom();
 
     var it = captures_meta.iterator();
     while (it.next()) |capt| {
@@ -696,7 +696,7 @@ fn loadFunctionCaptures(self: *Self, captures_meta: *const Ast.FnDecl.Meta.Captu
         captures.appendAssumeCapacity(.{ .index = capt_infos.index, .local = capt_infos.is_local });
     }
 
-    return captures.toOwnedSlice(self.allocator) catch oom();
+    return captures.toOwnedSlice(self.alloc) catch oom();
 }
 
 const Params = struct {
@@ -707,7 +707,7 @@ const Params = struct {
 
 fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
     var decls: AutoArrayHashMapUnmanaged(InternerIdx, Type.Function.Parameter) = .empty;
-    decls.ensureTotalCapacity(self.allocator, params.len) catch oom();
+    decls.ensureTotalCapacity(self.alloc, params.len) catch oom();
 
     var is_method = false;
     var defaults: ArrayList(InstrIndex) = .empty;
@@ -746,7 +746,7 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
 
             const_index = constant;
             param_type = value_res.type;
-            defaults.append(self.allocator, value_res.instr) catch oom();
+            defaults.append(self.alloc, value_res.instr) catch oom();
         }
 
         if (param_type.is(.void)) return self.err(.void_param, span);
@@ -760,7 +760,7 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
         });
     }
 
-    return .{ .decls = decls, .defaults = defaults.toOwnedSlice(self.allocator) catch oom(), .is_method = is_method };
+    return .{ .decls = decls, .defaults = defaults.toOwnedSlice(self.alloc) catch oom(), .is_method = is_method };
 }
 
 /// Analyses function's body returning all of the instructions and a flag indicating if the function returns
@@ -774,7 +774,7 @@ fn fnBody(self: *Self, fn_body: ?Ast.Block, fn_type: *const Type.Function, name_
     const len = nodes.len;
 
     var instrs: ArrayList(InstrIndex) = .empty;
-    instrs.ensureTotalCapacity(self.allocator, nodes.len) catch oom();
+    instrs.ensureTotalCapacity(self.alloc, nodes.len) catch oom();
 
     for (nodes, 0..) |*n, i| {
         const last = i == len - 1;
@@ -805,7 +805,7 @@ fn fnBody(self: *Self, fn_body: ?Ast.Block, fn_type: *const Type.Function, name_
         return self.err(.{ .fn_expect_value = .{ .expect = self.typeName(fn_type.return_type) } }, span);
     }
 
-    return .{ instrs.toOwnedSlice(self.allocator) catch oom(), returns };
+    return .{ instrs.toOwnedSlice(self.alloc) catch oom(), returns };
 }
 
 /// Kind has to be either `param` or `field`
@@ -895,14 +895,14 @@ fn varDecl(self: *Self, node: *const Ast.VarDecl, ctx: *Context) StmtResult {
 
 fn multiVarDecl(self: *Self, node: *const Ast.MultiVarDecl, ctx: *Context) StmtResult {
     var decls: ArrayList(InstrIndex) = .empty;
-    decls.ensureTotalCapacity(self.allocator, node.decls.len) catch oom();
+    decls.ensureTotalCapacity(self.alloc, node.decls.len) catch oom();
 
     for (node.decls) |*n| {
         decls.appendAssumeCapacity(try self.varDecl(n, ctx));
     }
 
     return self.irb.addInstr(
-        .{ .multiple_var_decl = .{ .decls = decls.toOwnedSlice(self.allocator) catch oom() } },
+        .{ .multiple_var_decl = .{ .decls = decls.toOwnedSlice(self.alloc) catch oom() } },
         self.ast.getSpan(node).start,
     );
 }
@@ -912,7 +912,7 @@ fn structDecl(self: *Self, node: *const Ast.StructDecl, ctx: *Context) StmtResul
     const name = try self.internIfNotInCurrentScope(node.name);
 
     var buf: [1024]u8 = undefined;
-    const container_name = self.interner.internKeepRef(self.allocator, self.containers.renderWithSep(&buf, "."));
+    const container_name = self.interner.internKeepRef(self.alloc, self.containers.renderWithSep(&buf, "."));
 
     const interned = self.ti.newStruct(.{ .name = name, .container = container_name });
     const ty = &interned.structure;
@@ -920,7 +920,7 @@ fn structDecl(self: *Self, node: *const Ast.StructDecl, ctx: *Context) StmtResul
     ctx.self_type = interned;
     defer ctx.self_type = null;
 
-    const sym = self.scope.declareSymbol(self.allocator, name, .structure);
+    const sym = self.scope.declareSymbol(self.alloc, name, .structure);
     sym.type = interned;
 
     try self.openContainer(node.name);
@@ -946,7 +946,7 @@ fn structDecl(self: *Self, node: *const Ast.StructDecl, ctx: *Context) StmtResul
 
 fn structureFields(self: *Self, fields: []const Ast.VarDecl, ty: *Type.Structure, ctx: *Context) Error![]const InstrIndex {
     var default_fields: ArrayList(InstrIndex) = .empty;
-    ty.fields.ensureTotalCapacity(self.allocator, fields.len) catch oom();
+    ty.fields.ensureTotalCapacity(self.alloc, fields.len) catch oom();
 
     for (fields) |*f| {
         const span = self.ast.getSpan(f.name);
@@ -969,13 +969,13 @@ fn structureFields(self: *Self, fields: []const Ast.VarDecl, ty: *Type.Structure
             if (struct_field.type.is(.void)) struct_field.type = value_res.type;
 
             struct_field.default = constant;
-            default_fields.append(self.allocator, value_res.instr) catch oom();
+            default_fields.append(self.alloc, value_res.instr) catch oom();
         }
 
         ty.fields.putAssumeCapacity(field_name, struct_field);
     }
 
-    return default_fields.toOwnedSlice(self.allocator) catch oom();
+    return default_fields.toOwnedSlice(self.alloc) catch oom();
 }
 
 fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult {
@@ -983,7 +983,7 @@ fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult 
     const name = try self.internIfNotInCurrentScope(node.name);
 
     var buf: [1024]u8 = undefined;
-    const container_name = self.interner.internKeepRef(self.allocator, self.containers.renderWithSep(&buf, "."));
+    const container_name = self.interner.internKeepRef(self.alloc, self.containers.renderWithSep(&buf, "."));
 
     const interned = self.ti.intern(.{ .trait = .{
         .loc = .{ .name = name, .container = container_name },
@@ -996,16 +996,16 @@ fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult 
     ctx.in_trait = true;
     defer ctx.in_trait = false;
 
-    const sym = self.scope.declareSymbol(self.allocator, name, .trait);
+    const sym = self.scope.declareSymbol(self.alloc, name, .trait);
     sym.type = interned;
 
     try self.openContainer(node.name);
     defer self.closeContainer();
 
-    ty.functions.ensureUnusedCapacity(self.allocator, @intCast(node.functions.len)) catch oom();
+    ty.functions.ensureUnusedCapacity(self.alloc, @intCast(node.functions.len)) catch oom();
 
     var func_instrs: ArrayList(InstrIndex) = .empty;
-    func_instrs.ensureUnusedCapacity(self.allocator, node.functions.len) catch oom();
+    func_instrs.ensureUnusedCapacity(self.alloc, node.functions.len) catch oom();
 
     for (node.functions) |*f| {
         const fn_name = self.interner.intern(self.ast.toSource(f.name));
@@ -1019,7 +1019,7 @@ fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult 
             self.ast.getSpan(f.name),
         );
 
-        self.scope.open(self.allocator, null, .{ .barrier = true });
+        self.scope.open(self.alloc, null, .{ .barrier = true });
         defer _ = self.scope.close();
         const param_res = try self.fnParams(f.params, ctx);
 
@@ -1046,7 +1046,7 @@ fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult 
             .name = name,
             .sym_index = sym.index,
             .type_id = self.ti.typeId(sym.type),
-            .functions = func_instrs.toOwnedSlice(self.allocator) catch oom(),
+            .functions = func_instrs.toOwnedSlice(self.alloc) catch oom(),
         } },
         span.start,
     );
@@ -1057,7 +1057,7 @@ fn unionDecl(self: *Self, node: *const Ast.UnionDecl, ctx: *Context) StmtResult 
     defer snapshot.restore();
 
     var buf: [1024]u8 = undefined;
-    const container_name = self.interner.internKeepRef(self.allocator, self.containers.renderWithSep(&buf, "."));
+    const container_name = self.interner.internKeepRef(self.alloc, self.containers.renderWithSep(&buf, "."));
 
     // TODO: anonymus union
     const name_tk = node.name orelse @panic("anonymus enums aren't supported yet");
@@ -1066,7 +1066,7 @@ fn unionDecl(self: *Self, node: *const Ast.UnionDecl, ctx: *Context) StmtResult 
     const interned = self.ti.newUnion(.{ .name = name, .container = container_name }, node.is_err);
     const ty = &interned.@"union";
 
-    const sym = self.scope.declareSymbol(self.allocator, name, .@"union");
+    const sym = self.scope.declareSymbol(self.alloc, name, .@"union");
     sym.type = interned;
 
     ctx.self_type = interned;
@@ -1092,12 +1092,12 @@ fn unionDecl(self: *Self, node: *const Ast.UnionDecl, ctx: *Context) StmtResult 
 }
 
 fn unionTags(self: *Self, tags: []const Ast.UnionDecl.Tag, ty: *Type.Union, ctx: *Context) Error![]const []const u8 {
-    ty.tags.ensureTotalCapacity(self.allocator, @intCast(tags.len)) catch oom();
-    var names = ArrayList([]const u8).initCapacity(self.allocator, @intCast(tags.len)) catch oom();
+    ty.tags.ensureTotalCapacity(self.alloc, @intCast(tags.len)) catch oom();
+    var names = ArrayList([]const u8).initCapacity(self.alloc, @intCast(tags.len)) catch oom();
 
     for (tags) |tag| {
         const tag_res = try self.unionTag(tag, ctx);
-        const gop = ty.tags.getOrPut(self.allocator, tag_res.name) catch oom();
+        const gop = ty.tags.getOrPut(self.alloc, tag_res.name) catch oom();
 
         if (gop.found_existing) {
             return self.err(
@@ -1107,10 +1107,10 @@ fn unionTags(self: *Self, tags: []const Ast.UnionDecl.Tag, ty: *Type.Union, ctx:
         } else {
             gop.value_ptr.* = tag_res.ty;
         }
-        names.appendAssumeCapacity(self.allocator.dupe(u8, self.ast.toSource(tag.name)) catch oom());
+        names.appendAssumeCapacity(self.alloc.dupe(u8, self.ast.toSource(tag.name)) catch oom());
     }
 
-    return names.toOwnedSlice(self.allocator) catch oom();
+    return names.toOwnedSlice(self.alloc) catch oom();
 }
 
 fn unionTag(self: *Self, tag: Ast.UnionDecl.Tag, ctx: *const Context) Error!struct { name: InternerIdx, ty: *const Type } {
@@ -1131,11 +1131,11 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
     }
 
     const old_path_length = self.path.len();
-    defer self.path.shrink(self.allocator, old_path_length);
+    defer self.path.shrink(self.alloc, old_path_length);
 
     var result = Importer.fetchImportedFile(
         self.io,
-        self.allocator,
+        self.alloc,
         self.ast,
         node.names,
         self.state.config.path,
@@ -1144,7 +1144,7 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
     const path = path: switch (result) {
         .dynlib => |*dynlib| {
             const interned = self.interner.intern(dynlib.path);
-            const handcheck = dynlib.lib.lookup(ffi.Handcheck, "handcheck") orelse return self.err(
+            const handcheck = dynlib.lib.lookup(self.alloc, ffi.Handcheck, "handcheck") orelse return self.err(
                 .{ .dynlib_not_module = .{ .name = self.ast.toSource(dynlib.token) } },
                 self.ast.getSpan(dynlib.token),
             );
@@ -1155,7 +1155,7 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
             defer self.state.dynlib = prev_dynlib;
 
             if (!self.state.modules.has(interned)) {
-                Pipeline.runSubPipeline(self.io, self.allocator, self.state, dynlib.name, dynlib.path, dynlib.rayn_content);
+                Pipeline.runSubPipeline(self.io, self.alloc, self.state, dynlib.name, dynlib.path, dynlib.rayn_content);
             }
 
             break :path interned;
@@ -1164,7 +1164,7 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
             const interned = self.interner.intern(f.path);
 
             if (!self.state.modules.has(interned)) {
-                Pipeline.runSubPipeline(self.io, self.allocator, self.state, f.name, f.path, f.content);
+                Pipeline.runSubPipeline(self.io, self.alloc, self.state, f.name, f.path, f.content);
             }
             break :path interned;
         },
@@ -1207,10 +1207,10 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
 
             const item_token = if (item.alias) |alias| alias else item.item;
             const item_interned = self.interner.intern(self.ast.toSource(item_token));
-            self.scope.declareExternSymbol(self.allocator, item_interned, mod_index, sym);
+            self.scope.declareExternSymbol(self.alloc, item_interned, mod_index, sym);
         }
     } else {
-        self.scope.declareModule(self.allocator, module_name, self.ti.intern(.{ .module = path }));
+        self.scope.declareModule(self.alloc, module_name, self.ti.intern(.{ .module = path }));
     }
 }
 
@@ -1304,13 +1304,13 @@ fn checkNotVoid(self: *Self, ty: *const Type, span: Span) Error!void {
 
 fn array(self: *Self, expr: *const Ast.Array, ctx: *Context) Result {
     var pure = true;
-    var values = ArrayList(InstrIndex).initCapacity(self.allocator, expr.values.len) catch oom();
+    var values = ArrayList(InstrIndex).initCapacity(self.alloc, expr.values.len) catch oom();
     var types: Set(*const Type) = .empty;
 
     for (expr.values) |val| {
         const val_res = try self.analyzeExpr(val, .value, ctx);
         var val_instr = val_res.instr;
-        types.add(self.allocator, val_res.type) catch oom();
+        types.add(self.alloc, val_res.type) catch oom();
 
         self.checkWrap(&val_instr, val_res.ti.heap);
         pure = pure and val_res.ti.comp_time;
@@ -1323,7 +1323,7 @@ fn array(self: *Self, expr: *const Ast.Array, ctx: *Context) Result {
         .ti = .{ .comp_time = pure },
         .instr = self.irb.addInstr(
             .{ .array = .{
-                .values = values.toOwnedSlice(self.allocator) catch oom(),
+                .values = values.toOwnedSlice(self.alloc) catch oom(),
                 .type_id = self.ti.typeId(ty),
             } },
             self.ast.getSpan(expr).start,
@@ -1333,10 +1333,10 @@ fn array(self: *Self, expr: *const Ast.Array, ctx: *Context) Result {
 
 /// `pop_offset` is used to pop that amount less variables at scope closure
 fn block(self: *Self, expr: *const Ast.Block, pop_offset: usize, opts: LexScope.Scope.Options, ctx: *Context) Result {
-    self.scope.open(self.allocator, self.internLabel(expr.label), opts);
+    self.scope.open(self.alloc, self.internLabel(expr.label), opts);
 
     var instrs: ArrayList(InstrIndex) = .empty;
-    instrs.ensureTotalCapacity(self.allocator, expr.nodes.len) catch oom();
+    instrs.ensureTotalCapacity(self.alloc, expr.nodes.len) catch oom();
 
     var pure = false;
     var cf: InstrInfos.ControlFlow = .none;
@@ -1386,7 +1386,7 @@ fn block(self: *Self, expr: *const Ast.Block, pop_offset: usize, opts: LexScope.
         .cf = if (cf == .@"return") .@"return" else .none,
         .instr = self.irb.addInstr(
             .{ .block = .{
-                .instrs = instrs.toOwnedSlice(self.allocator) catch oom(),
+                .instrs = instrs.toOwnedSlice(self.alloc) catch oom(),
                 .pop_count = @intCast(pop_count - pop_offset),
                 .is_expr = !final.is(.void) and !final.is(.never),
             } },
@@ -1624,7 +1624,7 @@ fn breakExpr(self: *Self, expr: *const Ast.Break, ctx: *Context) Result {
         } },
         span.start,
     );
-    scope.breaks.append(self.allocator, ty) catch oom();
+    scope.breaks.append(self.alloc, ty) catch oom();
 
     // Break always return void because its value escapes scope
     return .{
@@ -1636,9 +1636,9 @@ fn breakExpr(self: *Self, expr: *const Ast.Break, ctx: *Context) Result {
 
 fn closure(self: *Self, expr: *const Ast.FnDecl, ctx: *Context) Result {
     // TODO: create an anonymus name generator mechanism
-    var sym = self.scope.declareSymbol(self.allocator, self.interner.intern("azert"), .function);
+    var sym = self.scope.declareSymbol(self.alloc, self.interner.intern("azert"), .function);
 
-    self.scope.open(self.allocator, null, .{ .barrier = true });
+    self.scope.open(self.alloc, null, .{ .barrier = true });
     defer _ = self.scope.close();
 
     const captures = try self.loadFunctionCaptures(&expr.meta.captures);
@@ -1917,7 +1917,7 @@ fn runtimeObjFnAccess(self: *Self, kind: Instr.ObjFn.Kind, instr: InstrIndex, fn
 
 fn runtimeFnToType(self: *Self, func: type_mod.ObjFnTypeInfo, current_generic: *const Type) *const Type {
     var params: Type.Function.ParamsMap = .empty;
-    params.ensureTotalCapacity(self.allocator, func.params.len + 1) catch oom();
+    params.ensureTotalCapacity(self.alloc, func.params.len + 1) catch oom();
     params.putAssumeCapacity(
         self.interner.intern("self"),
         .{ .name = self.interner.intern("self"), .type = current_generic, .default = null, .captured = false },
@@ -2091,7 +2091,7 @@ fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_idx: InternerIdx) 
 }
 
 fn boundMethod(self: *Self, func_type: *const Type, field_index: usize, structure: InstrIndex, span: Span) Result {
-    const bounded_type = func_type.function.toBoundMethod(self.allocator);
+    const bounded_type = func_type.function.toBoundMethod(self.alloc);
     const ty = self.ti.intern(.{ .function = bounded_type });
 
     return .{
@@ -2135,13 +2135,13 @@ fn fnArgsList(
     err_span: Span,
     ctx: *Context,
 ) Error![]const Instr.Arg {
-    var proto = ty.proto(self.allocator);
+    var proto = ty.proto(self.alloc);
     const param_count = proto.count();
     const params = ty.params.values()[@intFromBool(ty.kind == .method)..];
 
     if (args.len > param_count) return self.err(.{ .too_many_fn_args = .{ .expect = param_count, .found = args.len } }, err_span);
 
-    var instrs = self.allocator.alloc(Instr.Arg, params.len) catch oom();
+    var instrs = self.alloc.alloc(Instr.Arg, params.len) catch oom();
     var proto_values = proto.values();
 
     for (proto_values, 0..) |val, i| {
@@ -2604,26 +2604,26 @@ pub fn string(self: *Self, expr: Ast.String) Result {
 
             // Safe access here because lexer checked if the string and termianted
             switch (no_quotes[i]) {
-                'n' => final.append(self.allocator, '\n') catch oom(),
-                't' => final.append(self.allocator, '\t') catch oom(),
-                '"' => final.append(self.allocator, '"') catch oom(),
-                'r' => final.append(self.allocator, '\r') catch oom(),
-                '\\' => final.append(self.allocator, '\\') catch oom(),
+                'n' => final.append(self.alloc, '\n') catch oom(),
+                't' => final.append(self.alloc, '\t') catch oom(),
+                '"' => final.append(self.alloc, '"') catch oom(),
+                'r' => final.append(self.alloc, '\r') catch oom(),
+                '\\' => final.append(self.alloc, '\\') catch oom(),
                 else => return self.err(
                     .{ .unknow_char_escape = .{ .found = no_quotes[i .. i + 1] } },
                     span,
                 ),
             }
-        } else final.append(self.allocator, c) catch oom();
+        } else final.append(self.alloc, c) catch oom();
     }
 
-    const value = self.interner.intern(final.toOwnedSlice(self.allocator) catch oom());
+    const value = self.interner.intern(final.toOwnedSlice(self.alloc) catch oom());
 
     return .{
         .type = self.ti.cache.str,
         .ti = .{ .comp_time = true },
         .instr = self.irb.addInstr(.{
-            .constant = .{ .index = self.state.addConstant(self.allocator, .{ .string = value }) },
+            .constant = .{ .index = self.state.addConstant(self.alloc, .{ .string = value }) },
         }, span.start),
     };
 }
@@ -2640,7 +2640,7 @@ fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Resul
             self.ast.getSpan(tk),
         );
 
-        self.scope.open(self.allocator, null, .{});
+        self.scope.open(self.alloc, null, .{});
         alias = try self.declareVariable(
             self.interner.intern(self.ast.toSource(tk)),
             value.type,
@@ -2673,7 +2673,7 @@ pub fn matchValue(
             break :ana .{ .bool, matcher.matcher() };
         },
         .@"enum" => |t| {
-            var matcher = matchers.Enum.init(t.proto(self.allocator));
+            var matcher = matchers.Enum.init(t.proto(self.alloc));
             break :ana .{ .@"enum", matcher.matcher() };
         },
         .float => {
@@ -2689,7 +2689,7 @@ pub fn matchValue(
             break :ana .{ .string, matcher.matcher() };
         },
         .@"union" => |t| {
-            var matcher = matchers.Enum.init(t.proto(self.allocator));
+            var matcher = matchers.Enum.init(t.proto(self.alloc));
             break :ana .{ .@"enum", matcher.matcher() };
         },
         .inline_union => return self.err(
@@ -2729,13 +2729,13 @@ fn matchValueArms(
     ctx: *Context,
 ) Error!Matcher.MatchArms {
     var types: Set(*const Type) = .empty;
-    defer types.deinit(self.allocator);
+    defer types.deinit(self.alloc);
 
     const len = expr.arms.len + @intFromBool(expr.wildcard != null);
-    var arms_instr = ArrayList(Instr.Match.Arm).initCapacity(self.allocator, len) catch oom();
+    var arms_instr = ArrayList(Instr.Match.Arm).initCapacity(self.alloc, len) catch oom();
 
-    var arms_return = ArrayList(bool).initCapacity(self.allocator, len) catch oom();
-    defer arms_return.deinit(self.allocator);
+    var arms_return = ArrayList(bool).initCapacity(self.alloc, len) catch oom();
+    defer arms_return.deinit(self.alloc);
 
     const assigne_ty = ctx.setAndGetPrevious(.decl_type, ty);
     defer ctx.decl_type = assigne_ty;
@@ -2748,7 +2748,7 @@ fn matchValueArms(
             _ = try self.performTypeCoercion(decl_ty, body_res.type, false, self.ast.getSpan(arm.body));
         }
 
-        types.add(self.allocator, body_res.type) catch oom();
+        types.add(self.alloc, body_res.type) catch oom();
         arms_return.appendAssumeCapacity(!body_res.type.is(.void));
         arms_instr.appendAssumeCapacity(.{ .expr = arm_res.instr, .body = body_res.instr });
     }
@@ -2761,7 +2761,7 @@ fn matchValueArms(
 
     return .{
         .ty = return_ty,
-        .arms = arms_instr.toOwnedSlice(self.allocator) catch oom(),
+        .arms = arms_instr.toOwnedSlice(self.alloc) catch oom(),
         .wildcard = wildcard,
     };
 }
@@ -2787,10 +2787,10 @@ fn matchType(
 
     var types: Set(*const Type) = .empty;
     const len = expr.arms.len + @intFromBool(expr.wildcard != null);
-    var arms = ArrayList(Instr.MatchType.Arm).initCapacity(self.allocator, len) catch oom();
+    var arms = ArrayList(Instr.MatchType.Arm).initCapacity(self.alloc, len) catch oom();
 
-    var arms_return = ArrayList(bool).initCapacity(self.allocator, len) catch oom();
-    defer arms_return.deinit(self.allocator);
+    var arms_return = ArrayList(bool).initCapacity(self.alloc, len) catch oom();
+    defer arms_return.deinit(self.alloc);
 
     for (expr.arms) |arm| {
         const arm_type, const body_res = try matcher.arm(self, arm, expect, ctx);
@@ -2809,7 +2809,7 @@ fn matchType(
                 else => .obj,
             },
         });
-        types.add(self.allocator, body_res.type) catch oom();
+        types.add(self.alloc, body_res.type) catch oom();
         arms_return.appendAssumeCapacity(!body_res.type.is(.void));
     }
 
@@ -2823,7 +2823,7 @@ fn matchType(
         .instr = self.irb.addInstr(
             .{ .match_type = .{
                 .expr = value.instr,
-                .arms = arms.toOwnedSlice(self.allocator) catch oom(),
+                .arms = arms.toOwnedSlice(self.alloc) catch oom(),
                 .wildcard = wildcard,
                 .is_expr = expect.expects(),
             } },
@@ -2856,7 +2856,7 @@ fn matchWildcard(
     );
 
     const res = try matcher.wildcard(self, wild_expr, expect, ctx);
-    types.add(self.allocator, res.type) catch oom();
+    types.add(self.alloc, res.type) catch oom();
     returns.appendAssumeCapacity(!res.type.is(.void));
     return res.instr;
 }
@@ -2996,10 +2996,10 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
 
     const struct_type = struct_res.type.as(.structure) orelse return self.err(.non_struct_struct_literal, span);
 
-    var proto = struct_type.proto(self.allocator);
-    defer proto.deinit(self.allocator);
+    var proto = struct_type.proto(self.alloc);
+    defer proto.deinit(self.alloc);
 
-    var values = self.allocator.alloc(Instr.Arg, struct_type.fields.count()) catch oom();
+    var values = self.alloc.alloc(Instr.Arg, struct_type.fields.count()) catch oom();
 
     for (struct_type.fields.values(), 0..) |f, i| {
         if (f.default) |def| {
@@ -3136,7 +3136,7 @@ fn trapMatch(self: *Self, expr: *Expr, err_type: Type.ErrorUnion, expect: ExprRe
     const binding_span = self.ast.getSpan(match_expr.identifier);
 
     // If it's a `trap match`, we open another scope to discard the error at the end
-    self.scope.open(self.allocator, null, .{ .exp_val = true });
+    self.scope.open(self.alloc, null, .{ .exp_val = true });
     defer _ = self.scope.close();
 
     _ = try self.declareVariable(err_name, err_type.err, .{}, binding_span);
@@ -3207,14 +3207,14 @@ pub fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) E
             const ok = try self.checkAndGetType(err_union.ok, ctx);
 
             const err_type = err: {
-                var errs = ArrayList(*const Type).initCapacity(self.allocator, err_union.errs.len) catch oom();
+                var errs = ArrayList(*const Type).initCapacity(self.alloc, err_union.errs.len) catch oom();
                 for (err_union.errs) |e| {
                     errs.appendAssumeCapacity(try self.checkAndGetType(&.{ .scalar = e }, ctx));
                 }
 
                 if (err_union.errs.len > 1) {
                     break :err self.ti.intern(.{ .inline_union = .{
-                        .types = errs.toOwnedSlice(self.allocator) catch oom(),
+                        .types = errs.toOwnedSlice(self.alloc) catch oom(),
                     } });
                 } else {
                     break :err errs.items[0];
@@ -3258,7 +3258,7 @@ pub fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) E
             var params: AutoArrayHashMapUnmanaged(InternerIdx, Type.Function.Parameter) = .{};
             for (func.params, 0..) |p, i| {
                 const p_type = try self.checkAndGetType(p, ctx);
-                params.put(self.allocator, i, .{ .name = null, .type = p_type, .default = null, .captured = false }) catch oom();
+                params.put(self.alloc, i, .{ .name = null, .type = p_type, .default = null, .captured = false }) catch oom();
             }
 
             return self.ti.intern(.{ .function = .{
@@ -3290,16 +3290,16 @@ pub fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) E
             return found_type;
         },
         .@"union" => |u| {
-            var types = ArrayList(*const Type).initCapacity(self.allocator, u.len) catch oom();
+            var types = ArrayList(*const Type).initCapacity(self.alloc, u.len) catch oom();
 
-            types.ensureTotalCapacity(self.allocator, u.len) catch oom();
+            types.ensureTotalCapacity(self.alloc, u.len) catch oom();
             for (u) |child| {
                 const child_type = try self.checkAndGetType(child, ctx);
 
                 // Flattens unions
                 switch (child_type.*) {
                     .inline_union => |child_union| {
-                        types.ensureUnusedCapacity(self.allocator, child_union.types.len) catch oom();
+                        types.ensureUnusedCapacity(self.alloc, child_union.types.len) catch oom();
 
                         for (child_union.types) |child_ty| {
                             types.appendAssumeCapacity(child_ty);
@@ -3309,7 +3309,7 @@ pub fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) E
                 }
             }
 
-            return self.ti.intern(.{ .inline_union = .{ .types = types.toOwnedSlice(self.allocator) catch oom() } });
+            return self.ti.intern(.{ .inline_union = .{ .types = types.toOwnedSlice(self.alloc) catch oom() } });
         },
         .self => if (ctx.self_type) |struct_type| struct_type else self.err(.self_outside_decl, self.ast.getSpan(t)),
     };
@@ -3317,7 +3317,7 @@ pub fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) E
 
 /// Given a slice a types, creates an union or return a scalar type if slice length is one
 fn mergeTypes(self: *Self, types: []const *const Type) *const Type {
-    var set = Set(*const Type).fromSlice(self.allocator, types) catch oom();
+    var set = Set(*const Type).fromSlice(self.alloc, types) catch oom();
 
     // Void can be in union, it just means a path, branch or value didn't produce anything
     _ = set.remove(self.ti.getCached(.void));
@@ -3437,7 +3437,7 @@ fn checkFunctionEq(self: *Self, decl: *const Type, value: *const Type, allow_new
     // Here, we want `bound` to be an anonymus function, it loses all declaration infos because it's a runtime value
     // TODO: put outside to centralize all the void decl -> infer from value mechanism
     if (decl.is(.void)) return if (value.function.loc != null)
-        self.ti.intern(.{ .function = value.function.toAnon(self.allocator) })
+        self.ti.intern(.{ .function = value.function.toAnon(self.alloc) })
     else
         value;
 
@@ -3561,7 +3561,7 @@ fn checkArrayOfUnion(self: *Self, decl: *const Type.InlineUnion, value: *const T
 }
 
 pub fn typeName(self: *const Self, ty: *const Type) []const u8 {
-    return ty.toString(self.allocator, self.interner, self.mod_name);
+    return ty.toString(self.alloc, self.interner, self.mod_name);
 }
 
 const VarConf = struct {
@@ -3573,7 +3573,7 @@ const VarConf = struct {
 };
 fn declareVariable(self: *Self, name: InternerIdx, ty: *const Type, conf: VarConf, span: Span) Error!usize {
     return self.scope.declareVar(
-        self.allocator,
+        self.alloc,
         name,
         ty,
         conf.captured,
@@ -3585,12 +3585,12 @@ fn declareVariable(self: *Self, name: InternerIdx, ty: *const Type, conf: VarCon
 }
 
 fn forwardDeclareVariable(self: *Self, name: InternerIdx, ty: *const Type, captured: bool, span: Span) Error!void {
-    return self.scope.declareVarInFutureScope(self.allocator, name, ty, captured) catch self.err(.too_many_locals, span);
+    return self.scope.declareVarInFutureScope(self.alloc, name, ty, captured) catch self.err(.too_many_locals, span);
 }
 
 fn openContainer(self: *Self, name: Ast.TokenIndex) Error!void {
-    self.scope.open(self.allocator, null, .{ .barrier = true });
-    self.containers.append(self.allocator, self.ast.toSource(name));
+    self.scope.open(self.alloc, null, .{ .barrier = true });
+    self.containers.append(self.alloc, self.ast.toSource(name));
 }
 
 fn closeContainer(self: *Self) void {
@@ -3620,7 +3620,7 @@ pub fn tryGetConstant(self: *Self, index: ir.Index) ?Instr.Data {
 
 fn addConstant(self: *Self, constant: Constant, offset: usize) InstrIndex {
     return self.irb.addInstr(
-        .{ .constant = .{ .index = self.state.addConstant(self.allocator, constant) } },
+        .{ .constant = .{ .index = self.state.addConstant(self.alloc, constant) } },
         offset,
     );
 }

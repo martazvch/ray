@@ -2,10 +2,11 @@ const std = @import("std");
 const win = std.os.windows;
 const Terminal = @import("Terminal.zig");
 
-const DWORD = u32;
-const WORD = u16;
-const WCHAR = u16;
-const BOOL = i32;
+const DWORD = win.DWORD;
+const WORD = win.WORD;
+const WCHAR = win.WCHAR;
+const BOOL = win.BOOL;
+const UINT = win.UINT;
 const HANDLE = win.HANDLE;
 
 const ENABLE_LINE_INPUT = 0x0002;
@@ -32,8 +33,14 @@ const CTRL_PRESSED = LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED;
 
 const SHIFT_PRESSED: u32 = 0x0010;
 
-extern "kernel32" fn ReadConsoleInputW(hConsoleInput: HANDLE, lpBuffer: *INPUT_RECORD, nLength: DWORD, lpNumberOfEventsRead: *DWORD) BOOL;
+extern "kernel32" fn ReadConsoleInputW(HANDLE, *INPUT_RECORD, DWORD, *DWORD) BOOL;
+extern "kernel32" fn GetConsoleOutputCP() UINT;
+extern "kernel32" fn SetConsoleOutputCP(UINT) void;
+extern "kernel32" fn GetStdHandle(DWORD) ?HANDLE;
+extern "kernel32" fn GetConsoleMode(HANDLE, *DWORD) BOOL;
+extern "kernel32" fn SetConsoleMode(HANDLE, DWORD) BOOL;
 
+const STD_INPUT_HANDLE = std.math.maxInt(DWORD) - 10 + 1;
 const CP_UTF8 = 65001;
 
 const KEY_EVENT_RECORD = extern struct {
@@ -65,8 +72,8 @@ cursor_pos: usize,
 
 pub fn init() Terminal.Error!Self {
     // Set console output to UTF-8
-    const prev_cp = win.kernel32.GetConsoleOutputCP();
-    _ = win.kernel32.SetConsoleOutputCP(CP_UTF8);
+    const prev_cp = GetConsoleOutputCP();
+    _ = SetConsoleOutputCP(CP_UTF8);
 
     return .{
         .prev_cp = prev_cp,
@@ -79,16 +86,16 @@ pub fn init() Terminal.Error!Self {
 pub fn enableRawMode(ctx: *anyopaque) Terminal.Error!void {
     const self: *Self = @ptrCast(@alignCast(ctx));
 
-    self.input_handle = win.kernel32.GetStdHandle(win.STD_INPUT_HANDLE) orelse {
+    self.input_handle = GetStdHandle(STD_INPUT_HANDLE) orelse {
         return error.InitFail;
     };
 
-    if (win.kernel32.GetConsoleMode(self.input_handle, &self.original_mode) == 0) {
+    if (!GetConsoleMode(self.input_handle, &self.original_mode).toBool()) {
         return error.InitFail;
     }
 
     const raw_mode = self.original_mode & ~@as(DWORD, ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT);
-    if (win.kernel32.SetConsoleMode(self.input_handle, raw_mode) == 0) {
+    if (!SetConsoleMode(self.input_handle, raw_mode).toBool()) {
         return error.RawModeFail;
     }
 }
@@ -96,22 +103,22 @@ pub fn enableRawMode(ctx: *anyopaque) Terminal.Error!void {
 pub fn disableRawMode(ctx: *anyopaque) void {
     const self: *const Self = @ptrCast(@alignCast(ctx));
 
-    _ = win.kernel32.SetConsoleOutputCP(self.prev_cp);
-    _ = win.kernel32.SetConsoleMode(self.input_handle, self.original_mode);
+    _ = SetConsoleOutputCP(self.prev_cp);
+    _ = SetConsoleMode(self.input_handle, self.original_mode);
 }
 
 fn getEvent(self: *const Self) Terminal.Error!KEY_EVENT_RECORD {
     var record: INPUT_RECORD = undefined;
     var read_count: DWORD = 0;
 
-    if (ReadConsoleInputW(self.input_handle, &record, 1, &read_count) == 0) {
+    if (!ReadConsoleInputW(self.input_handle, &record, 1, &read_count).toBool()) {
         return error.ReadInputError;
     }
 
     if (record.EventType != KEY_EVENT) return error.NotAnEvent;
 
     const key = record.Event.KeyEvent;
-    if (key.bKeyDown == 0) return error.NotAnEvent;
+    if (!key.bKeyDown.toBool()) return error.NotAnEvent;
 
     return key;
 }

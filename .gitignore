@@ -8,5 +8,7 @@ test.ray
 tester
 tester.exe
 *.dylib
+*.pdb
+*.dll
 zig-pkg
 

@@ -60,6 +60,9 @@ const warning_msg = generateMsg("Warning:", .Yellow);
 const corner_to_hint = boxChar(.BottomLeft) ++ boxChar(.Horitzontal) ** 4;
 const corner_to_end = boxChar(.BottomLeft) ++ boxChar(.Horitzontal) ** 2;
 
+extern "kernel32" fn GetConsoleOutputCP() std.os.windows.UINT;
+extern "kernel32" fn SetConsoleOutputCP(std.os.windows.UINT) void;
+
 /// Reports all the reports of type *Report*
 pub fn reportAll(
     io: Io,
@@ -70,13 +73,13 @@ pub fn reportAll(
     source: [:0]const u8,
 ) !void {
     const prev_cp = if (builtin.os.tag == .windows) cp: {
-        const prev = std.os.windows.kernel32.GetConsoleOutputCP();
-        _ = std.os.windows.kernel32.SetConsoleOutputCP(65001);
+        const prev = GetConsoleOutputCP();
+        _ = SetConsoleOutputCP(65001);
         break :cp prev;
     } else 0;
 
     defer if (builtin.os.tag == .windows) {
-        _ = std.os.windows.kernel32.SetConsoleOutputCP(prev_cp);
+        _ = SetConsoleOutputCP(prev_cp);
     };
 
     var stderr_buf: [2048]u8 = undefined;
