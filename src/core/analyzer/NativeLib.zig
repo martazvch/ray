@@ -57,7 +57,7 @@ fn libName(alloc: Allocator, name: []const u8) Error![]const u8 {
     return switch (os) {
         .linux => std.fmt.allocPrint(alloc, "lib{s}.so", .{name}) catch oom(),
         .macos => std.fmt.allocPrint(alloc, "lib{s}.dylib", .{name}) catch oom(),
-        .windows => std.fmt.allocPrit(alloc, "{s}.dll", .{name}) catch oom(),
+        .windows => std.fmt.allocPrint(alloc, "{s}.dll", .{name}) catch oom(),
         else => error.UnsupportedOS,
     };
 }
