@@ -1,8 +1,20 @@
+error Err {e}
+
 fn nonFailable() -> int {
     return 5
+}
+
+fn voidFailable() -> void!Err {
+    return
+}
+
+fn voidOptional() -> ?void {
+    return
 }
 
 fn main() {
     print nonFailable() !! 85
     print nonFailable() ?? 85
+    print voidFailable() !! 3
+    print voidOptional() ?? 3
 }

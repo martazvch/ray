@@ -22,6 +22,14 @@ fn failable3() -> int!File {
     fail 1
 }
 
+fn failable4() -> void!int {
+    return
+}
+
+fn failable5() -> Foo!void {
+    return
+}
+
 fail File.notFound
 
 fn main() {

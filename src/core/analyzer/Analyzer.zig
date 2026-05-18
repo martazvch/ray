@@ -1480,18 +1480,20 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
                 break :instr .{ if (expr.op == .@"and") .@"and" else .@"or", lhs.instr, rhs.instr, self.ti.getCached(.bool) };
             },
             .bang_bang => {
-                if (!lhs.type.is(.error_union)) return self.err(
+                const err_ty = lhs.type.as(.error_union) orelse return self.err(
                     .{ .fallback_err_on_non_err = .{ .found = self.typeName(lhs_type) } },
                     lhs_span,
                 );
+                if (err_ty.ok.is(.void)) return self.err(.void_value, lhs_span);
 
                 break :instr .{ .bang_bang, lhs.instr, rhs.instr, self.mergeTypes(&.{ lhs.type, rhs.type }) };
             },
             .question_mark_question_mark => {
-                if (!lhs.type.is(.optional)) return self.err(
+                const opt_ty = lhs.type.as(.optional) orelse return self.err(
                     .{ .fallback_opt_on_non_opt = .{ .found = self.typeName(lhs_type) } },
                     lhs_span,
                 );
+                if (opt_ty.is(.void)) return self.err(.void_value, lhs_span);
 
                 break :instr .{ .question_mark_question_mark, lhs.instr, rhs.instr, self.mergeTypes(&.{ lhs.type, rhs.type }) };
             },
@@ -3084,7 +3086,8 @@ fn ternary(self: *Self, expr: *const Ast.Ternary, ctx: *Context) Result {
 }
 
 fn trap(self: *Self, expr: Ast.Trap, expect: ExprResKind, ctx: *Context) Result {
-    const lhs = try self.analyzeExpr(expr.lhs, .value, ctx);
+    // We use `maybe` to produce a more explicit error if this is not an error union
+    const lhs = try self.analyzeExpr(expr.lhs, .maybe, ctx);
     const err_type = lhs.type.as(.error_union) orelse return self.err(
         .{ .trap_on_non_error = .{ .found = self.typeName(lhs.type) } },
         self.ast.getSpan(expr.lhs),
@@ -3206,10 +3209,21 @@ pub fn checkAndGetType(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) E
         .error_union => |err_union| {
             const ok = try self.checkAndGetType(err_union.ok, ctx);
 
+            if (ok.isErr()) return self.err(
+                .{ .err_union_err_lhs = .{ .found = self.typeName(ok) } },
+                self.ast.getSpan(err_union.ok.*),
+            );
+
             const err_type = err: {
                 var errs = ArrayList(*const Type).initCapacity(self.alloc, err_union.errs.len) catch oom();
                 for (err_union.errs) |e| {
-                    errs.appendAssumeCapacity(try self.checkAndGetType(&.{ .scalar = e }, ctx));
+                    const err_ty = try self.checkAndGetType(&.{ .scalar = e }, ctx);
+
+                    if (!err_ty.isErr()) return self.err(
+                        .{ .err_union_non_err_rhs = .{ .found = self.typeName(err_ty) } },
+                        self.ast.getSpan(e),
+                    );
+                    errs.appendAssumeCapacity(err_ty);
                 }
 
                 if (err_union.errs.len > 1) {

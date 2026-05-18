@@ -1,4 +1,6 @@
 error_with_return, File
 error_not_in_union, Foo, File
 fail_no_err, int
+err_union_non_err_rhs, int
+err_union_err_lhs, Foo
 fail_outside_fn

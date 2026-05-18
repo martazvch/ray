@@ -121,7 +121,7 @@ pub const ParserMsg = union(enum) {
             .too_many_fn_args => |e| writer.print("functions can't have more than 255 {s}", .{e.what}),
             .trait_impl_trait => writer.writeAll("traits can't implement other traits"),
             .trap_no_block_after_binding => writer.writeAll("expect a block after error binding"),
-            .trap_no_ident_or_match => writer.writeAll("expect an identifier or a match to "),
+            .trap_no_ident_or_match => writer.writeAll("expect an identifier or 'match' keyword after trapping an error"),
             .typed_self => writer.writeAll("can't specify a type for 'self', it's a keyword whose type is known by the compiler"),
             .unclosed_brace => writer.writeAll("unclosed brace"),
             .unclosed_paren => writer.writeAll("unclosed parenthesis"),
@@ -278,8 +278,8 @@ pub const ParserMsg = union(enum) {
                 \\  no binding and block: trap _ { ... }
                 \\  trap match:           trap match <error_binding> { ... }
                 \\
-                \\All error bindings must be identifiers
-                \\If you just want to provdie a fallback value when using an error union, use '!!'
+                \\  All error bindings must be identifiers
+                \\  If you just want to provdie a fallback value when using an error union, use '!!'
             ),
             .typed_self => writer.writeAll("remove the type, the compiler infers the type for 'self' on its own"),
             .unclosed_brace => writer.writeAll("close the opening brace"),
