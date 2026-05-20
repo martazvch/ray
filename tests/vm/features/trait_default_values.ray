@@ -1,0 +1,47 @@
+trait Foo {
+    fn speak(self, a: int)
+    fn speak2(self, a: int) {
+        print a == 1
+    }
+}
+
+struct Bar {
+    impl Foo {
+        fn speak(self, a=1) {
+            print "Bar " + str(a)
+        }
+        fn speak2(self, a=1) {
+            print a == 1
+        }
+    }
+}
+
+struct Baz {
+    impl Foo {
+        fn speak(self, a=2) {
+            print "Baz " + str(a)
+        }
+        fn speak2(self, a=2) {
+            print a == 2
+        }
+    }
+}
+
+fn main() {
+    let bar = Bar{}
+    bar.speak()
+    bar.speak(6)
+    bar.speak(a: 8)
+    bar.speak2()
+    bar.speak2(6)
+    bar.speak2(a: 8)
+
+    let baz = Baz{}
+    baz.speak()
+    baz.speak(12)
+    baz.speak(a: 15)
+    baz.speak2()
+    baz.speak2(12)
+    baz.speak2(a: 15)
+}
+

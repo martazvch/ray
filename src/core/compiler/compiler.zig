@@ -28,7 +28,7 @@ const oom = misc.oom;
 
 pub const CompilationUnit = struct {
     io: Io,
-    allocator: Allocator,
+    alloc: Allocator,
     state: *State,
     mod_index: ModIndex,
     compiler: Compiler,
@@ -48,10 +48,10 @@ pub const CompilationUnit = struct {
     const Error = error{ Err, TooManyConst } || std.Io.Writer.Error;
     const CompilerReport = GenReport(CompilerMsg);
 
-    pub fn init(io: Io, allocator: Allocator, state: *State, mod_index: ModIndex, render: bool) Self {
+    pub fn init(io: Io, alloc: Allocator, state: *State, mod_index: ModIndex, render: bool) Self {
         return .{
             .io = io,
-            .allocator = allocator,
+            .alloc = alloc,
             .state = state,
             .mod_index = mod_index,
             .compiler = undefined,
@@ -126,8 +126,8 @@ const Compiler = struct {
 
         pub const empty: BlockStack = .{ .stack = .empty };
 
-        pub fn open(self: *BlockStack, allocator: Allocator) void {
-            self.stack.append(allocator, .{ .jumps = .empty }) catch oom();
+        pub fn open(self: *BlockStack, alloc: Allocator) void {
+            self.stack.append(alloc, .{ .jumps = .empty }) catch oom();
         }
 
         pub fn close(self: *BlockStack) Block {
@@ -135,8 +135,8 @@ const Compiler = struct {
         }
 
         /// Adds a jump in the block at `depth`. `depth` is generated from bottom to top in *Analyzer*
-        pub fn add(self: *BlockStack, allocator: Allocator, kind: Jump.Kind, instr: usize, depth: usize) void {
-            self.stack.items[self.stack.items.len - 1 - depth].jumps.append(allocator, .{ .kind = kind, .instr = instr }) catch oom();
+        pub fn add(self: *BlockStack, alloc: Allocator, kind: Jump.Kind, instr: usize, depth: usize) void {
+            self.stack.items[self.stack.items.len - 1 - depth].jumps.append(alloc, .{ .kind = kind, .instr = instr }) catch oom();
         }
     };
     const Error = CompilationUnit.Error;
@@ -160,7 +160,7 @@ const Compiler = struct {
         return .{
             .manager = manager,
             .function = Obj.Function.create(
-                manager.allocator,
+                manager.alloc,
                 name,
                 type_id,
                 module_index,
@@ -185,12 +185,12 @@ const Compiler = struct {
 
     /// Writes an OpCode to the current chunk
     fn writeOp(self: *Self, op: OpCode) void {
-        self.function.chunk.writeOp(self.manager.allocator, op, self.manager.line);
+        self.function.chunk.writeOp(self.manager.alloc, op, self.manager.line);
     }
 
     /// Writes a byte to the current chunk
     fn writeByte(self: *Self, byte: u8) void {
-        self.function.chunk.writeByte(self.manager.allocator, byte, self.manager.line);
+        self.function.chunk.writeByte(self.manager.alloc, byte, self.manager.line);
     }
 
     /// Writes an OpCode and a byte to the current chunk
@@ -242,9 +242,9 @@ const Compiler = struct {
 
     fn emitJump(self: *Self, kind: OpCode) usize {
         const chunk = &self.function.chunk;
-        chunk.writeOp(self.manager.allocator, kind, self.manager.line);
-        chunk.writeByte(self.manager.allocator, 0xff, self.manager.line);
-        chunk.writeByte(self.manager.allocator, 0xff, self.manager.line);
+        chunk.writeOp(self.manager.alloc, kind, self.manager.line);
+        chunk.writeByte(self.manager.alloc, 0xff, self.manager.line);
+        chunk.writeByte(self.manager.alloc, 0xff, self.manager.line);
 
         return chunk.code.items.len - 2;
     }
@@ -294,7 +294,7 @@ const Compiler = struct {
 
     pub fn end(self: *Self) Error!*Obj.Function {
         if (self.manager.render) {
-            var alloc_writer: std.Io.Writer.Allocating = .init(self.manager.allocator);
+            var alloc_writer: std.Io.Writer.Allocating = .init(self.manager.alloc);
             defer alloc_writer.deinit();
 
             var dis = Disassembler.init(
@@ -541,7 +541,7 @@ const Compiler = struct {
     }
 
     fn block(self: *Self, data: *const Instruction.Block) Error!void {
-        self.block_stack.open(self.manager.allocator);
+        self.block_stack.open(self.manager.alloc);
 
         for (data.instrs) |instr| {
             try self.compileInstr(instr);
@@ -567,7 +567,7 @@ const Compiler = struct {
         }
 
         self.writePops(data.pop_count);
-        self.block_stack.add(self.manager.allocator, .@"break", self.emitJump(.jump), data.depth);
+        self.block_stack.add(self.manager.alloc, .@"break", self.emitJump(.jump), data.depth);
     }
 
     fn call(self: *Self, data: *const Instruction.Call) Error!void {
@@ -609,7 +609,8 @@ const Compiler = struct {
         try self.compileInstr(callee.structure);
         try self.compileArgs(data.args);
         self.writeOpAndByte(.call_virtual, @intCast(callee.index));
-        self.writeByte(@intCast(data.args.len));
+        // We add one because we invoke the virtual on the trait object so as `callSymbol`, we add 1
+        self.writeByte(@intCast(data.args.len + 1));
     }
 
     // TODO: protect casts
@@ -695,7 +696,8 @@ const Compiler = struct {
         for (decls) |decl| {
             const mod = self.manager.state.modules.getFromIndex(self.manager.mod_index);
             const vtable = &mod.vtables[decl.vtable_index];
-            vtable.functions = self.manager.allocator.alloc(*Obj.Function, decl.funcs.len) catch oom();
+            vtable.name = self.manager.alloc.dupe(u8, self.manager.state.interner.getKey(decl.name).?) catch oom();
+            vtable.functions = self.manager.alloc.alloc(*Obj.Function, decl.funcs.len) catch oom();
 
             for (decl.funcs, 0..) |func, i| {
                 const fn_data = self.manager.instr_data[func].fn_decl;
@@ -733,21 +735,21 @@ const Compiler = struct {
         const idx = index.toInt();
         const cte = self.manager.constants[idx];
 
-        const gop = self.manager.compiled_constants.getOrPut(self.manager.allocator, idx) catch oom();
+        const gop = self.manager.compiled_constants.getOrPut(self.manager.alloc, idx) catch oom();
         if (!gop.found_existing) {
             const value = switch (cte) {
                 .bool => |c| Value.makeBool(c),
                 .int => |val| Value.makeInt(val),
                 .float => |val| Value.makeFloat(val),
                 .enum_lit => |val| Value.makeObj(Obj.EnumInstance.createComptime(
-                    self.manager.allocator,
+                    self.manager.alloc,
                     self.manager.state.modules.getSymbol(self.manager.mod_index, val.sym.symbol_index, .@"enum"),
                     @intCast(val.tag_index),
                     .null_,
                 ).asObj()),
                 .null => Value.null_,
                 .string => |val| Value.makeObj(Obj.String.comptimeCopy(
-                    self.manager.allocator,
+                    self.manager.alloc,
                     &self.manager.state.strings,
                     self.manager.state.interner.getKey(val).?,
                 ).asObj()),
@@ -783,12 +785,12 @@ const Compiler = struct {
 
     fn continueInstr(self: *Self, data: Instruction.Continue) Error!void {
         self.writePops(data.pop_count);
-        self.block_stack.add(self.manager.allocator, .@"continue", self.emitJump(.loop), data.depth);
+        self.block_stack.add(self.manager.alloc, .@"continue", self.emitJump(.loop), data.depth);
     }
 
     fn enumDecl(self: *Self, data: *const Instruction.EnumDecl) Error!void {
         self.manager.state.modules.addSymbol(self.manager.mod_index, data.sym_index, Module.Enum{
-            .name = self.manager.allocator.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
+            .name = self.manager.alloc.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
             .tags = data.tags,
             .type_id = data.type_id,
         });
@@ -811,7 +813,7 @@ const Compiler = struct {
             .str => .iter_new_str,
         });
 
-        self.block_stack.open(self.manager.allocator);
+        self.block_stack.open(self.manager.alloc);
         const loop_start = self.function.chunk.code.items.len;
 
         self.writeOp(if (data.use_index) .iter_next_index else .iter_next);
@@ -929,7 +931,7 @@ const Compiler = struct {
             try self.compileInstr(data.expr);
         }
 
-        var exit_jumps = ArrayList(usize).initCapacity(self.manager.allocator, data.arms.len) catch oom();
+        var exit_jumps = ArrayList(usize).initCapacity(self.manager.alloc, data.arms.len) catch oom();
 
         for (data.arms) |arm| {
             self.writeOp(.dup);
@@ -1001,7 +1003,7 @@ const Compiler = struct {
     fn matchType(self: *Self, data: Instruction.MatchType) Error!void {
         try self.compileInstr(data.expr);
 
-        var exit_jumps = ArrayList(usize).initCapacity(self.manager.allocator, data.arms.len) catch oom();
+        var exit_jumps = ArrayList(usize).initCapacity(self.manager.alloc, data.arms.len) catch oom();
 
         for (data.arms) |arm| {
             self.writeOp(.dup);
@@ -1067,7 +1069,7 @@ const Compiler = struct {
 
     fn structDecl(self: *Self, data: *const Instruction.StructDecl) Error!void {
         self.manager.state.modules.addSymbol(self.manager.mod_index, data.sym_index, Module.Structure{
-            .name = self.manager.allocator.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
+            .name = self.manager.alloc.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
             .type_id = data.type_id,
             .field_count = data.fields_count,
         });
@@ -1125,7 +1127,7 @@ const Compiler = struct {
 
     fn unionDecl(self: *Self, data: *const Instruction.UnionDecl) Error!void {
         self.manager.state.modules.addSymbol(self.manager.mod_index, data.sym_index, Module.Union{
-            .name = self.manager.allocator.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
+            .name = self.manager.alloc.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
             .tags = data.tags,
             .type_id = data.type_id,
             .is_err = data.is_err,
@@ -1173,7 +1175,7 @@ const Compiler = struct {
     fn whileInstr(self: *Self, data: Instruction.While) Error!void {
         const is_null_pat = self.manager.instr_data[data.cond] == .pat_nullable;
 
-        self.block_stack.open(self.manager.allocator);
+        self.block_stack.open(self.manager.alloc);
         const loop_start = self.function.chunk.code.items.len;
 
         try self.compileInstr(data.cond);

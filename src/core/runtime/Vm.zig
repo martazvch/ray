@@ -152,7 +152,7 @@ fn execute(self: *Self) !void {
         if (comptime options.print_stack) {
             // TODO: return an internal error?
             var buf: [1024]u8 = undefined;
-            var stdout_writer = std.fs.File.stdout().writer(&buf);
+            var stdout_writer = std.Io.File.stdout().writer(self.io, &buf);
             const stdout = &stdout_writer.interface;
             defer stdout.flush() catch oom();
 
@@ -161,7 +161,7 @@ fn execute(self: *Self) !void {
 
         if (comptime options.print_instr) {
             var buf: [1024]u8 = undefined;
-            var stdout_writer = std.fs.File.stdout().writer(&buf);
+            var stdout_writer = std.Io.File.stdout().writer(self.io, &buf);
             const stdout = &stdout_writer.interface;
             defer stdout.flush() catch oom();
 

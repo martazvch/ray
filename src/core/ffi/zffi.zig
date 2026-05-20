@@ -165,7 +165,10 @@ pub fn makeNative(func: anytype) Fn {
                 .float => |v| createUnionIfField(U, "float", v),
                 .obj => |v| createUnionIfField(U, "str", v.as(Obj.String).chars),
                 else => unreachable,
-            } orelse unreachable;
+            } orelse {
+                std.log.debug("Found '{t}' kind", .{value});
+                unreachable;
+            };
         }
 
         fn createUnionIfField(U: type, comptime name: []const u8, value: anytype) ?U {

@@ -1,25 +1,25 @@
 trait Foo {
-    fn speak(self)
+    fn speak(self, a: int)
 }
 
 struct Bar {
     impl Foo {
-        fn speak(self) {
-            print "Bar"
+        fn speak(self, a: int) {
+            print "Bar " + str(a)
         }
     }
 }
 
 struct Baz {
     impl Foo {
-        fn speak(self) {
-            print "Baz"
+        fn speak(self, a: int) {
+            print "Baz " + str(a)
         }
     }
 }
 
 fn f(value: Foo) {
-    value.speak()
+    value.speak(2)
 }
 
 fn main() {

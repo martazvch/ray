@@ -1,0 +1,38 @@
+trait Foo {
+    fn speak() {
+        print "hello"
+    }
+
+    fn method0(self) { print "method0" }
+
+    fn method1(self) {
+        self.method0()
+    }
+}
+
+struct Bar {
+    impl Foo {}
+}
+
+struct Baz {
+    impl Foo {
+        fn speak() {
+            print "bye"
+        }
+        fn method0(self) {
+            print "modified method"
+        }
+    }
+}
+
+fn main() {
+    Bar.speak()
+    Baz.speak()
+
+    let bar = Bar{}
+    bar.method1()
+
+    let baz = Baz{}
+    baz.method1()
+}
+

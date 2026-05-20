@@ -824,6 +824,8 @@ fn defaultValue(self: *Self, decl_type: *const Type, val: *const Expr, kind: any
 
 fn print(self: *Self, expr: *const Expr, ctx: *Context) StmtResult {
     const res = try self.analyzeExpr(expr, .any, ctx);
+    // HACK: gonna be deleted when we'll have a real `print` function
+    if (res.type.is(.optional)) @panic("have to unwrap optional first");
     return self.irb.wrapInstr(.print, res.instr);
 }
 

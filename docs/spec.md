@@ -1681,12 +1681,16 @@ Traits instead provide explicit, compile-time contracts with a lightweight synta
 ### Definition
 
 A trait is a way to express a behavior that multiple type can implement, allowing polymorphism.
-They don't have attached fields and their functions can't have default value parameters.
+They don't have attached fields and their functions can't have default value parameters (but implementations can).
+Functions can either be `static` or `methods` when declared using `self` as first parameter.
+You can use any variable as a `trait object` if it implements the asked trait.
+
 A trait is defined using the `trait` keyword:
 
 ```rust
 trait Display {
-    fn toString(self) -> str
+    fn staticFn() -> bool
+    fn method(self, a: int) -> str
 }
 ```
 
@@ -1694,28 +1698,71 @@ They can define default fonction implementations:
 
 ```rust
 trait Drawable {
-    fn area(self) -> float
+    fn introduce() { print "I'm the drawable trait" }
 
     fn describe(self) -> str {
-        // default implementation uses fields + other methods
-        return "{self.color} shape with opacity {self.opacity}"
+        return "I'm the default implementation"
     }
 }
 ```
 
 ### Implementation
 
-You use the impl blocks to attach behavior to an existing type:
+When implementing a `trait` you have to define all the functions that have no default implementation.
+You can also override default functions implementations.
+You can define default values for functions' parameters.
+You can access current structure through `self`.
+
+You use the `impl` blocks to implement a trait to an existing type:
 
 ```rust
 struct Vec {
+    x, y: int,
+
     impl Display {
-        fn toString(self) -> str {
-            return "(" + self.x + ", " + self.y + ")"
+        fn staticFn() { return true }
+
+        fn method(self, a=4) -> str {
+            return "value: " + str(a + self.x + self.y)
         }
     }
 }
 ```
+
+### Trait objects
+
+Trait objects enable dynamic dispatch, allowing values of different concrete types to be used interchangeably through a common interface at runtime.
+Only methods defined in `trait`'s definition are available through trait objects.
+
+```rust
+trait Foo {
+    fn speak(self, a: int)
+    fn speak2(self, a: int) {
+        print a == 1
+    }
+}
+
+struct Bar {
+    impl Foo {
+        fn speak(self, a=1) {
+            print "Bar " + str(a)
+        }
+        fn speak2(self, a=1) {
+            print a == 1
+        }
+    }
+}
+
+fn acceptTraitObj(value: Foo) {
+    value.speak(2)
+}
+```
+
+> [!WARNING]
+> Default method implementations defined in a trait are not available through a trait object. Each concrete type must explicitly implement every method.
+> Relying on defaults with trait objects will result in a compilation error if the method isn't re-implemented on the concrete type.
+
+### Name conflict
 
 If the structure implementing the trait already has functions or fields named as in the trait, it will require to specify the trait name to access them, given that the access priority is given to the structure itself:
 
@@ -1734,20 +1781,6 @@ let rect = Rect{ color: "green" }
 rect.area() // calls the function defined on the structure
 rect.Drawable.area() // calls the trait implementation
 ```
-
-### Type constraints
-
-Ray allows using traits as any other type, like:
-
-```
-trait Foo {}
-
-fn bar(arg: Foo) -> Foo { ... }
-```
-
-There are several rules to have in mind:
-- When doing so, you can't use default value parameters when calling a function on this type as we can only refer to trait definition
-- other ?
 
 ## Clone on write (COW)
 

@@ -50,6 +50,7 @@ pub const Module = struct {
     };
 
     pub const VTable = struct {
+        name: []const u8,
         functions: []*Obj.Function,
     };
 

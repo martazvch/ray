@@ -925,16 +925,7 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
         .native_zfn => try writer.print("<native zig fn {s}>", .{self.as(ZigFn).name}),
         .native_obj => try writer.print("<native object {s}>", .{self.as(NativeObj).name}),
         .string => try writer.print("{s}", .{self.as(String).chars}),
-        .trait_obj => {
-            const trait_obj = self.as(TraitObj);
-            const name = switch (trait_obj.obj.kind) {
-                .enum_instance => trait_obj.obj.as(EnumInstance).parent.name,
-                .instance => trait_obj.obj.as(Instance).parent.name,
-                .union_instance => trait_obj.obj.as(UnionInstance).parent.name,
-                else => unreachable,
-            };
-            try writer.print("{s}", .{name});
-        },
+        .trait_obj => try writer.print("<trait obj {s}>", .{self.as(TraitObj).vtable.name}),
         .union_instance, .@"error" => {
             const instance = self.as(UnionInstance);
             try writer.print("<{s} {s}.{s}>", .{
@@ -962,16 +953,7 @@ pub fn log(self: *Obj) void {
         .native_zfn => std.debug.print("<native zig fn {s}>", .{self.as(ZigFn).name}),
         .native_obj => unreachable,
         .string => std.debug.print("{s}", .{self.as(String).chars}),
-        .trait_obj => {
-            const trait_obj = self.as(TraitObj);
-            const name = switch (trait_obj.obj.kind) {
-                .enum_instance => trait_obj.obj.as(EnumInstance).parent.name,
-                .instance => trait_obj.obj.as(Instance).parent.name,
-                .union_instance => trait_obj.obj.as(UnionInstance).parent.name,
-                else => unreachable,
-            };
-            std.debug.print("{s}", .{name});
-        },
+        .trait_obj => std.debug.print("<trait obj {s}>", .{self.as(TraitObj).vtable.name}),
         .union_instance => std.debug.print("<enum instance {s}>", .{self.as(EnumInstance).parent.name}),
     }
 }

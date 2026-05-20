@@ -1,0 +1,28 @@
+trait Foo {
+    fn method(self)
+}
+
+struct Bar {
+    value=6,
+
+    impl Foo {
+        fn method(self) { print self.value }
+    }
+}
+
+struct Baz {
+    value: bool,
+
+    impl Foo {
+        fn method(self) { print self.value }
+    }
+}
+
+fn main() {
+    let bar = Bar{}
+    bar.method()
+
+    let baz = Baz{value: true}
+    baz.method()
+}
+

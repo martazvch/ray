@@ -1,0 +1,40 @@
+trait Foo {
+    fn speak()
+    fn speakArg(a: int) -> bool
+    fn method(self)
+    fn methodArg(self, s: str)
+}
+
+struct Bar {
+    impl Foo {
+        fn speak() { print "bye" }
+        fn speakArg(a: int) -> bool { return a == 1 }
+        fn method(self) { print "Bar meth" }
+        fn methodArg(self, s: str) { print s }
+    }
+}
+
+struct Baz {
+    impl Foo {
+        fn speak() { print "adios" }
+        fn speakArg(a: int) -> bool { return a == 3 }
+        fn method(self) { print "Baz meth" }
+        fn methodArg(self, s: str) { print s * 2 }
+    }
+}
+
+fn main() {
+    Bar.speak()
+    Baz.speak()
+    print Bar.speakArg(1)
+    print Baz.speakArg(2)
+
+    let bar = Bar{}
+    bar.method()
+    bar.methodArg("done")
+
+    let baz = Baz{}
+    baz.method()
+    baz.methodArg("ah")
+}
+

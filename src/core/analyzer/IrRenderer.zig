@@ -265,6 +265,8 @@ fn call(self: *Self, data: *const Instruction.Call) void {
                     .zig, .zig_method => self.indentAndPrintSlice("[Invoke Zig symbol {}]", .{f.index}),
                     else => self.indentAndPrintSlice("[Invoke symbol {}]", .{f.index}),
                 }
+            } else if (f.kind == .virtual) {
+                self.indentAndPrintSlice("[Invoke virtual {}]", .{f.index});
             }
         },
         .load_symbol => |sym| {
@@ -275,13 +277,11 @@ fn call(self: *Self, data: *const Instruction.Call) void {
                     .zig, .zig_method => self.indentAndPrintSlice("[Call Zig symbol {} module {}]", .{ sym.symbol_index, mod.toInt() }),
                     else => self.indentAndPrintSlice("[Call symbol {} module {}]", .{ sym.symbol_index, mod.toInt() }),
                 }
-            } else {
-                switch (data.kind) {
-                    .foreign => self.indentAndPrintSlice("[Call foreign symbol {}]", .{sym.symbol_index}),
-                    .foreign_glob => self.indentAndPrintSlice("[Call global foreign symbol {}]", .{sym.symbol_index}),
-                    .zig, .zig_method => self.indentAndPrintSlice("[Call Zig symbol {}]", .{sym.symbol_index}),
-                    else => self.indentAndPrintSlice("[Call symbol {}]", .{sym.symbol_index}),
-                }
+            } else switch (data.kind) {
+                .foreign => self.indentAndPrintSlice("[Call foreign symbol {}]", .{sym.symbol_index}),
+                .foreign_glob => self.indentAndPrintSlice("[Call global foreign symbol {}]", .{sym.symbol_index}),
+                .zig, .zig_method => self.indentAndPrintSlice("[Call Zig symbol {}]", .{sym.symbol_index}),
+                else => self.indentAndPrintSlice("[Call symbol {}]", .{sym.symbol_index}),
             }
         },
         .load_builtin, .identifier => {
