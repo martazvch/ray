@@ -12,7 +12,7 @@ pub const module: zffi.Module = .{
         .init("open", open, "", &.{.{ .name = "path" }}),
     },
     .structures = &.{
-        File,
+        .init(File, "File"),
     },
 };
 
@@ -21,12 +21,12 @@ const File = struct {
 
     const Self = @This();
 
-    pub const zig_struct: zffi.StructMeta = .{
-        .name = "File",
-        .functions = &.{
-            .init("readAll", readAll, "", &.{}),
-        },
-        .deinit_fn = deinit,
+    pub const functions: []const zffi.FnMeta = &.{
+        .init("readAll", readAll, "", &.{}),
+    };
+
+    pub const fields: []const zffi.StructMeta.Field = &.{
+        .{ .name = "path", .desc = "" },
     };
 
     fn readAll(self: *Self, vm: *Vm) []const u8 {
@@ -51,7 +51,7 @@ fn open(vm: *Vm, path: []const u8) *File {
         .fd = std.Io.Dir.cwd().openFile(vm.io, path, .{}) catch unreachable,
     };
 
-    const obj = Obj.NativeObj.create(vm.gc_alloc, "File", self, File.zig_struct.deinit_fn);
+    const obj = Obj.NativeObj.create(vm, "File", self, File.deinit);
 
     return @ptrCast(@alignCast(&obj.child));
 }

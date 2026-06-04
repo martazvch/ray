@@ -792,10 +792,10 @@ pub const NativeObj = struct {
 
     const Self = @This();
 
-    pub fn create(allocator: Allocator, name: []const u8, child: *anyopaque, deinit_fn: zffi.DeinitFn) *Self {
+    pub fn create(vm: *Vm, name: []const u8, child: *anyopaque, deinit_fn: zffi.DeinitFn) *Self {
         // Fields first for GC because other wise allocating fields after creation
         // of the instance may trigger GC in between
-        const obj = Obj.allocateComptime(allocator, Self, undefined);
+        const obj = Obj.allocate(vm, Self, undefined);
         obj.name = name;
         obj.child = child;
         obj.deinit_fn = deinit_fn;

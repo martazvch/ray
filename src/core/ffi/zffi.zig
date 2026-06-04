@@ -45,7 +45,26 @@ pub const Module = struct {
     name: ?[]const u8 = null,
     is_module: bool = true,
     functions: []const FnMeta = &.{},
-    structures: []const type = &.{},
+    structures: []const StructMeta = &.{},
+    traits: []const TraitMeta = &.{},
+};
+
+fn checkNonEmptyName(comptime name: []const u8) void {
+    if (name.len == 0) {
+        @compileError("Name can't be empty");
+    }
+}
+
+const MemberKind = enum {
+    fields,
+    functions,
+
+    pub fn Type(self: MemberKind) type {
+        return switch (self) {
+            .fields => []const StructMeta.Field,
+            .functions => []const FnMeta,
+        };
+    }
 };
 
 pub const FnMeta = struct {
@@ -55,16 +74,13 @@ pub const FnMeta = struct {
     info: std.builtin.Type.Fn,
     function: Fn,
 
-    // NOTE: it is not possible in Zig 0.15.2 to reflect on parameters name, we have to provide them
     pub const Param = struct {
         name: [:0]const u8,
         desc: []const u8 = "",
     };
 
     pub fn init(name: []const u8, func: anytype, desc: []const u8, params: []const Param) FnMeta {
-        if (name.len == 0) {
-            @compileError("Function's name can't be empty");
-        }
+        checkNonEmptyName(name);
 
         const info = @typeInfo(@TypeOf(func));
         if (info != .@"fn") {
@@ -84,27 +100,70 @@ pub const FnMeta = struct {
 pub const Fn = *const fn (*Vm, []const Value) ?Value;
 pub const DeinitFn = *const fn (*anyopaque, *Vm) void;
 
+fn getMember(T: type, comptime kind: MemberKind) kind.Type() {
+    const info = @typeInfo(T);
+    if (info != .@"struct") {
+        @compileError("Trying to declare a non-structure, found: " ++ @typeName(T));
+    }
+
+    const tag = @tagName(kind);
+    const Member = kind.Type();
+
+    comptime var member: ?Member = null;
+
+    inline for (info.@"struct".decls) |decl| {
+        if (comptime std.mem.eql(u8, decl.name, tag)) {
+            const field = @field(T, decl.name);
+
+            if (@TypeOf(field) != Member) {
+                @compileError("Expect member '" ++ tag ++ "' to be of type: " ++ @typeName(Member));
+            }
+
+            member = field;
+        }
+    }
+
+    return member orelse {
+        @compileError("Structure must define a '" ++ tag ++ "' member to register them");
+    };
+}
+
 pub const StructMeta = struct {
     name: []const u8,
-    fields: []const Field = &.{},
-    functions: []const FnMeta = &.{},
-    deinit_fn: DeinitFn,
+    type_name: []const u8,
+    fields: []const Field,
+    functions: []const FnMeta,
 
     pub const Field = struct {
         name: []const u8,
         desc: []const u8,
-        offset: usize,
     };
 
-    pub fn getFunctions(self: *const StructMeta) []const Fn {
-        comptime var funcs: [self.functions.len]Fn = undefined;
+    pub fn init(T: type, name: []const u8) StructMeta {
+        checkNonEmptyName(name);
 
-        inline for (self.functions, 0..) |func, i| {
-            funcs[i] = func.function;
-        }
+        return .{
+            .name = name,
+            .type_name = @typeName(T),
+            .fields = getMember(T, .fields),
+            .functions = getMember(T, .functions),
+        };
+    }
+};
 
-        const copy = funcs;
-        return &copy;
+pub const TraitMeta = struct {
+    name: []const u8,
+    type_name: []const u8,
+    functions: []const FnMeta,
+
+    pub fn init(T: type, name: []const u8) TraitMeta {
+        checkNonEmptyName(name);
+
+        return .{
+            .name = name,
+            .type_name = @typeName(T),
+            .functions = getMember(T, .functions),
+        };
     }
 };
 
