@@ -1,0 +1,88 @@
+[Trait declaration Foo]
+[Structure declaration Bar]
+    - traits
+        Foo, vtable 0:
+        [Function declaration speak]
+            [Print]
+                [Field access 0]
+                    [Variable index: 0, scope: local]
+            [Print]
+                [Binop type: add_str]
+                    [Constant index 3]
+                        [String Bar ]
+                    [Zig fn call]
+                        [Builtin symbol: 2]
+                        - args
+                        [Variable index: 1, scope: local]
+[Structure declaration Baz]
+[Function declaration f]
+    [Field access 0]
+        [Variable index: 0, scope: local]
+    [Invoke virtual 0]
+        - args
+        [Constant index 4]
+            [Int 1]
+[Function declaration gen, returns]
+    [Return]
+        [Trait object]
+            - variable
+            [Structure literal]
+                - structure
+                [Load symbol 0]
+                - args
+                [Constant index 1]
+                    [Bool false]
+            - vtable
+            0
+[Function declaration main]
+    [Field access 0]
+        [Call symbol 3]
+    [Invoke virtual 0]
+        - args
+        [Constant index 5]
+            [Int 5]
+    [Variable declaration index: 0, scope: local]
+        [Trait object]
+            - variable
+            [Structure literal]
+                - structure
+                [Load symbol 0]
+                - args
+                [Constant index 0]
+                    [Bool true]
+            - vtable
+            0
+    [Field access 0]
+        [Variable index: 0, scope: local]
+    [Invoke virtual 0]
+        - args
+        [Constant index 6]
+            [Int 3]
+    [Variable declaration index: 1, scope: local]
+        [Structure literal]
+            - structure
+            [Load symbol 1]
+            - args
+            [Call symbol 3]
+    [Field access 0]
+        [Field access 0]
+            [Variable index: 1, scope: local]
+    [Invoke virtual 0]
+        - args
+        [Constant index 7]
+            [Int 56]
+    [Structure literal]
+        - structure
+        [Load symbol 1]
+        - args
+        [Trait object]
+            - variable
+            [Structure literal]
+                - structure
+                [Load symbol 0]
+                - args
+                [Constant index 1]
+                    [Bool false]
+            - vtable
+            0
+    [Assignment index: 1, scope: local, cow]

@@ -15,8 +15,13 @@ const oom = misc.oom;
 
 pub const MapNameType = ArrayMap(InternerIdx, *const Type);
 pub const MapNameSym = Map(InternerIdx, LexScope.Symbol);
+pub const ArrayMapNameSym = ArrayMap(InternerIdx, LexScope.Symbol);
 
-pub const TraitImpl = struct { vtable_index: usize, symbols: MapNameSym };
+pub const TraitImpl = struct {
+    vtable_index: usize,
+    trait: *const Type,
+    funcs: ArrayMapNameSym,
+};
 pub const TraitMap = ArrayMap(InternerIdx, TraitImpl);
 
 pub const Type = union(enum) {
@@ -37,7 +42,6 @@ pub const Type = union(enum) {
     optional: *const Type,
     structure: Structure,
     trait: Trait,
-    trait_obj: TraitObj,
     @"union": Union,
 
     pub const Array = struct {
@@ -243,15 +247,6 @@ pub const Type = union(enum) {
         }
     };
 
-    pub const TraitObj = struct {
-        funcs: *const MapNameSym,
-        vtable_index: usize,
-        /// Used for interning
-        trait: Loc,
-        /// Used for interning
-        structure: Loc,
-    };
-
     pub const Union = struct {
         loc: Loc,
         tags: Tags,
@@ -369,11 +364,6 @@ pub const Type = union(enum) {
             .range => |r| r.hash(allocator, hasher),
             .structure => |ty| hashLoc(hasher, ty.loc),
             .trait => |ty| hashLoc(hasher, ty.loc),
-            .trait_obj => |ty| {
-                hashLoc(hasher, ty.trait);
-                hashLoc(hasher, ty.structure);
-                hasher.update(asBytes(&ty.vtable_index));
-            },
             .@"union" => |*ty| {
                 hasher.update(asBytes(&ty.is_err));
                 hashLoc(hasher, ty.loc);
@@ -446,7 +436,6 @@ pub const Type = union(enum) {
             },
             .structure => |ty| locToString(w, ty.loc, interner, mod_name),
             .trait => |ty| locToString(w, ty.loc, interner, mod_name),
-            .trait_obj => |ty| locToString(w, ty.trait, interner, mod_name),
             .@"union" => |*ty| locToString(w, ty.loc, interner, mod_name),
             .inline_union => |u| {
                 for (u.types, 0..) |ty, i| {

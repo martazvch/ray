@@ -297,10 +297,11 @@ fn execute(self: *Self) !void {
             .call_virtual => {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const trait_obj = self.stack.peek(arity).obj.as(Obj.TraitObj);
-
                 // -1 because we act on first argument, arity points to before call frame
-                self.stack.peekRef(arity - 1).obj = trait_obj.data;
+                const first_arg_index = arity - 1;
+                const trait_obj = self.stack.peek(first_arg_index).obj.as(Obj.TraitObj);
+
+                self.stack.peekRef(first_arg_index).obj = trait_obj.data;
                 self.frame = try self.frame_stack.newKeepMod();
                 self.frame.call(trait_obj.vtable.functions[index], &self.stack, arity, self.modules);
             },
@@ -694,9 +695,13 @@ fn execute(self: *Self) !void {
             },
             .trait_obj => {
                 const vtable_index = self.frame.readByte();
+                const tmp = self.stack.pop().obj;
+                self.gc.pushTmpRoot(tmp);
+                defer self.gc.popTmpRoot();
+
                 self.stack.push(.makeObj(Obj.TraitObj.create(
                     self,
-                    self.stack.pop().obj,
+                    tmp,
                     &self.frame.module.vtables[vtable_index],
                 ).asObj()));
             },

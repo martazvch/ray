@@ -24,6 +24,8 @@
                         - args
                         [Variable index: 1, scope: local]
 [Function declaration f]
+    [Field access 0]
+        [Variable index: 0, scope: local]
     [Invoke virtual 0]
         - args
         [Constant index 5]

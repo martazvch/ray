@@ -260,7 +260,7 @@ fn assignment(self: *Self, node: *const Ast.Assignment, ctx: *Context) StmtResul
     defer ctx.decl_type = prev_decl;
 
     var value_res = try self.analyzeExpr(node.value, .value, ctx);
-    _ = try self.performTypeCoercion(assigne.type, value_res.type, false, self.ast.getSpan(node.value));
+    _ = try self.performTypeCoercion(assigne.type, &value_res, false, self.ast.getSpan(node.value));
 
     self.checkWrap(&value_res.instr, value_res.ti.heap);
 
@@ -356,8 +356,8 @@ fn containerTraitImpls(
         );
 
         var trait_impl = trait_gop.value_ptr;
-        trait_impl.* = .{ .vtable_index = self.scope.newVTable(), .symbols = .empty };
-        trait_impl.symbols.ensureTotalCapacity(self.alloc, @intCast(trait_def.functions.count())) catch oom();
+        trait_impl.* = .{ .vtable_index = self.scope.newVTable(), .trait = sym.type, .funcs = .empty };
+        trait_impl.funcs.ensureTotalCapacity(self.alloc, @intCast(trait_def.functions.count())) catch oom();
 
         var proto = trait_def.proto(self.alloc);
         var func_instrs = ArrayList(InstrIndex).initCapacity(self.alloc, trait_def.functions.count()) catch oom();
@@ -379,7 +379,7 @@ fn containerTraitImpls(
             fn_res.sym.type = try self.checkFunctionEq(fn_decl.ty, fn_res.sym.type, true, self.ast.getSpan(f.name));
 
             func_instrs.appendAssumeCapacity(fn_res.instr);
-            trait_impl.symbols.putAssumeCapacity(fn_name, fn_res.sym);
+            trait_impl.funcs.putAssumeCapacity(fn_name, fn_res.sym);
             gop.value_ptr.done = true;
         }
 
@@ -389,13 +389,13 @@ fn containerTraitImpls(
 
             // Already compiled once
             if (entry.value_ptr.func.compiled) |compiled| {
-                trait_impl.symbols.putAssumeCapacity(entry.key_ptr.*, compiled);
+                trait_impl.funcs.putAssumeCapacity(entry.key_ptr.*, compiled);
             }
             // Compile for first time
             else if (entry.value_ptr.func.ast) |def| {
                 const fn_res = try self.fnDeclaration(def, ctx);
                 func_instrs.appendAssumeCapacity(fn_res.instr);
-                trait_impl.symbols.putAssumeCapacity(entry.key_ptr.*, fn_res.sym);
+                trait_impl.funcs.putAssumeCapacity(entry.key_ptr.*, fn_res.sym);
             }
             // Missing
             else return self.err(
@@ -811,7 +811,7 @@ fn fnBody(self: *Self, fn_body: ?Ast.Block, fn_type: *const Type.Function, name_
 /// Kind has to be either `param` or `field`
 fn defaultValue(self: *Self, decl_type: *const Type, val: *const Expr, kind: anytype, ctx: *Context) Error!struct { InstrInfos, ?ConstIdx } {
     var value_res = try self.analyzeExpr(val, .value, ctx);
-    value_res.type = try self.performTypeCoercion(decl_type, value_res.type, false, self.ast.getSpan(val));
+    value_res.type = try self.performTypeCoercion(decl_type, &value_res, false, self.ast.getSpan(val));
 
     if (!value_res.ti.comp_time) {
         return self.err(.{ .non_comptime_default = .new(kind) }, self.ast.getSpan(val));
@@ -866,7 +866,7 @@ fn varDecl(self: *Self, node: *const Ast.VarDecl, ctx: *Context) StmtResult {
 
     const value_res = if (node.value) |value| v: {
         var value_res = try self.expectAssignableValue(value, ctx);
-        checked_type = try self.performTypeCoercion(checked_type, value_res.type, false, self.ast.getSpan(value));
+        checked_type = try self.performTypeCoercion(checked_type, &value_res, false, self.ast.getSpan(value));
         self.checkWrap(&value_res.instr, value_res.ti.heap);
 
         break :v value_res;
@@ -1785,7 +1785,7 @@ fn fail(self: *Self, expr: Ast.Fail, ctx: *Context) Result {
         span,
     );
 
-    value_res.type = try self.performTypeCoercion(ty, value_res.type, true, self.ast.getSpan(expr.expr));
+    value_res.type = try self.performTypeCoercion(ty, &value_res, true, self.ast.getSpan(expr.expr));
 
     return .{
         .type = value_res.type,
@@ -1811,7 +1811,6 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
         .module => |ty| return self.moduleAccess(expr.field, ty),
         .str => return self.runtimeObjFnAccess(.string, struct_res.instr, expr.field, struct_res.type),
         .structure => |*ty| try self.structureAccess(expr.field, ty, struct_res.ti.is_sym, ctx.in_call),
-        // Only reachable inside trait declaration
         .trait => try self.traitAccess(expr, struct_res.type, struct_res.ti.is_sym),
         .@"union" => |ty| b: {
             const res = try self.unionAccess(struct_res, ty, expr.field);
@@ -2023,7 +2022,7 @@ fn structureAccess(self: *Self, field_tk: Ast.TokenIndex, ty: *const Type.Struct
 
             // Traits
             for (ty.traits.values()) |trait| {
-                if (trait.symbols.get(field_name)) |f| {
+                if (trait.funcs.get(field_name)) |f| {
                     break :func f;
                 }
             }
@@ -2047,9 +2046,6 @@ fn structureAccess(self: *Self, field_tk: Ast.TokenIndex, ty: *const Type.Struct
     }
 }
 
-/// This function is called by `field` method but it is only triggered when analyzing trait's default
-/// body. It is used to check if the accesses on `self` refer to actual methods in trait.
-/// The result of this analyzis done by `traitDecl` won't be used, so returning a dummy index is ok
 fn traitAccess(self: *Self, expr: *const Ast.Field, ty: *const Type, is_sym: bool) Error!AccessResult {
     if (is_sym) return self.err(
         .{ .call_fn_on_trait = .{ .name = self.typeName(ty) } },
@@ -2068,7 +2064,11 @@ fn traitAccess(self: *Self, expr: *const Ast.Field, ty: *const Type, is_sym: boo
         self.ast.getSpan(expr.field),
     );
 
-    return .{ .type = func.ty, .kind = .virtual, .index = trait_ty.functions.getIndex(interned).? };
+    return .{
+        .type = func.ty,
+        .kind = .virtual,
+        .index = trait_ty.functions.getIndex(interned).?,
+    };
 }
 
 fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_idx: InternerIdx) Result {
@@ -2192,8 +2192,7 @@ fn fnArgsList(
         ctx.decl_type = param_info.type;
         var value = try self.analyzeExpr(arg.value, .value, ctx);
 
-        const inferred = try self.performTypeCoercion(param_info.type, value.type, false, span);
-        value.instr = try self.checkTraitObj(param_info.type, inferred, value.instr);
+        _ = try self.performTypeCoercion(param_info.type, &value, false, span);
 
         self.checkWrap(&value.instr, false);
         if (param_info.captured) value.instr = self.irb.wrapPreviousInstr(.box);
@@ -2210,21 +2209,6 @@ fn fnArgsList(
     }
 
     return if (err_count < self.errs.items.len) error.Err else instrs;
-}
-
-/// Checks if we must create a trait object, if not return instruction
-fn checkTraitObj(self: *Self, decl: *const Type, inferred: *const Type, instr: InstrIndex) Error!InstrIndex {
-    if (decl == inferred) return instr;
-    const trait_obj = inferred.as(.trait_obj) orelse return instr;
-
-    // It is a trait object, can only be created on a valid variable access
-    const data = self.irb.getInstr(instr);
-    // TODO: is it possible to not be?
-    if (data != .identifier) @panic("Must be a variable access");
-    return self.irb.addInstr(
-        .{ .trait_obj = .{ .variable = instr, .vtable_index = trait_obj.vtable_index } },
-        self.irb.instrOffset(instr),
-    );
 }
 
 const IdentRes = struct {
@@ -2745,11 +2729,11 @@ fn matchValueArms(
     defer ctx.decl_type = assigne_ty;
 
     for (expr.arms) |*arm| {
-        const arm_res, const body_res = try matcher.arm(self, arm, expect, ctx);
+        var arm_res, var body_res = try matcher.arm(self, arm, expect, ctx);
 
-        _ = try self.performTypeCoercion(ty, arm_res.type, false, self.ast.getSpan(arm.expr));
+        _ = try self.performTypeCoercion(ty, &arm_res, false, self.ast.getSpan(arm.expr));
         if (assigne_ty) |decl_ty| {
-            _ = try self.performTypeCoercion(decl_ty, body_res.type, false, self.ast.getSpan(arm.body));
+            _ = try self.performTypeCoercion(decl_ty, &body_res, false, self.ast.getSpan(arm.body));
         }
 
         types.add(self.alloc, body_res.type) catch oom();
@@ -2797,9 +2781,10 @@ fn matchType(
     defer arms_return.deinit(self.alloc);
 
     for (expr.arms) |arm| {
-        const arm_type, const body_res = try matcher.arm(self, arm, expect, ctx);
+        const arm_type, var body_res = try matcher.arm(self, arm, expect, ctx);
+
         if (ctx.decl_type) |t| {
-            _ = try self.performTypeCoercion(t, body_res.type, false, self.ast.getSpan(arm));
+            _ = try self.performTypeCoercion(t, &body_res, false, self.ast.getSpan(arm));
         }
 
         arms.appendAssumeCapacity(.{
@@ -2980,7 +2965,7 @@ fn returnExpr(self: *Self, expr: *const Ast.Return, ctx: *Context) Result {
 
     if (ty != value_res.type) {
         const err_span = if (expr.expr) |e| self.ast.getSpan(e) else span;
-        value_res.type = try self.performTypeCoercion(ty, value_res.type, true, err_span);
+        value_res.type = try self.performTypeCoercion(ty, &value_res, true, err_span);
     }
 
     return .{
@@ -3041,7 +3026,7 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
 
         comp_time = comp_time and res.ti.comp_time;
         const value_span = if (fv.value) |val| self.ast.getSpan(val) else field_span;
-        _ = try self.performTypeCoercion(f.type, res.type, false, value_span);
+        _ = try self.performTypeCoercion(f.type, &res, false, value_span);
 
         self.checkWrap(&res.instr, res.ti.heap);
         values[field_index] = .{ .instr = res.instr };
@@ -3348,11 +3333,13 @@ fn mergeTypes(self: *Self, types: []const *const Type) *const Type {
 
 /// Checks for `void` values, array inference, cast and function type generation
 /// The goal is to see if the two types are equivalent and if so, make the transformations needed
-fn performTypeCoercion(self: *Self, decl: *const Type, value: *const Type, decl_explicit_void: bool, span: Span) Error!*const Type {
+fn performTypeCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, decl_explicit_void: bool, span: Span) Error!*const Type {
+    const value = value_info.type;
+
     if (decl == value) return decl;
 
     if (decl.is(.error_union)) {
-        return self.performErrorCoercion(decl, value, span);
+        return self.performErrorCoercion(decl, value_info, span);
     }
 
     if (value.is(.null)) {
@@ -3367,7 +3354,10 @@ fn performTypeCoercion(self: *Self, decl: *const Type, value: *const Type, decl_
     if (value.is(.never)) return decl;
 
     if (decl.is(.optional)) {
-        _ = try self.performTypeCoercion(decl.optional, if (value.is(.optional)) value.optional else value, decl_explicit_void, span);
+        var new_info = value_info;
+        if (value.as(.optional)) |opt| new_info.type = opt;
+
+        _ = try self.performTypeCoercion(decl.optional, new_info, decl_explicit_void, span);
         return decl;
     }
 
@@ -3393,16 +3383,8 @@ fn performTypeCoercion(self: *Self, decl: *const Type, value: *const Type, decl_
             return self.checkFunctionEq(decl, value, false, span);
         }
         // Trait object
-        else if (decl.as(.trait)) |t| {
-            if (value.getTraitImpl(t.loc.name)) |*trait| {
-                // Safe unwrap because types with traits have loc
-                return self.ti.intern(.{ .trait_obj = .{
-                    .funcs = &trait.symbols,
-                    .vtable_index = trait.vtable_index,
-                    .trait = t.loc,
-                    .structure = value.getLoc().?,
-                } });
-            }
+        else if (decl.as(.trait)) |*t| {
+            return try self.checkTraitObj(t, value_info) orelse break :check;
         }
 
         // We check after the other because above checks need the information about a potential void declaration
@@ -3420,7 +3402,9 @@ fn performTypeCoercion(self: *Self, decl: *const Type, value: *const Type, decl_
     );
 }
 
-fn performErrorCoercion(self: *Self, decl: *const Type, value: *const Type, span: Span) Error!*const Type {
+fn performErrorCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, span: Span) Error!*const Type {
+    const value = value_info.type;
+
     const error_union = decl.error_union;
 
     if (value.isErr()) {
@@ -3438,7 +3422,7 @@ fn performErrorCoercion(self: *Self, decl: *const Type, value: *const Type, span
             .expect = self.typeName(error_union.err),
         } }, span);
     } else {
-        return self.performTypeCoercion(error_union.ok, value, false, span);
+        return self.performTypeCoercion(error_union.ok, value_info, false, span);
     }
 }
 
@@ -3574,6 +3558,25 @@ fn checkArrayOfUnion(self: *Self, decl: *const Type.InlineUnion, value: *const T
         if (self.ti.intern(.{ .array = .{ .child = ty } }) == value) return true;
     }
     return false;
+}
+
+/// Checks if we must create a trait object, if not return instruction
+fn checkTraitObj(self: *Self, trait: *const Type.Trait, value_info: *InstrInfos) Error!?*const Type {
+    const value = value_info.type;
+
+    if (value.getTraitImpl(trait.loc.name)) |*t| {
+        value_info.instr = self.irb.addInstr(
+            .{ .trait_obj = .{
+                .variable = value_info.instr,
+                .vtable_index = t.vtable_index,
+            } },
+            self.irb.instrOffset(value_info.instr),
+        );
+
+        return t.trait;
+    }
+
+    return null;
 }
 
 pub fn typeName(self: *const Self, ty: *const Type) []const u8 {

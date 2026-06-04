@@ -249,9 +249,9 @@ fn floatInstr(self: *Self, value: f64) void {
 fn call(self: *Self, data: *const Instruction.Call) void {
     switch (self.instrs[data.callee]) {
         .field => |f| {
-            if (f.kind == .function) {
-                self.parseInstr(data.callee);
+            self.parseInstr(data.callee);
 
+            if (f.kind == .function) {
                 if (data.ext_mod) |mod| {
                     switch (data.kind) {
                         .foreign => self.indentAndPrintSlice("[Invoke foreign symbol {} module {}]", .{ f.index, mod.toInt() }),

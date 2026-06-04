@@ -1,0 +1,38 @@
+trait Foo {
+    fn speak(self, a: int)
+}
+
+struct Bar {
+    value: bool,
+
+    impl Foo {
+        fn speak(self, a: int) {
+            print self.value
+            print "Bar " + str(a)
+        }
+    }
+}
+
+struct Baz {
+    field: Foo,
+}
+
+fn f(value: Foo) {
+    value.speak(1)
+}
+
+fn gen() -> Foo {
+    return Bar{value: false}
+}
+
+fn main() {
+    gen().speak(5)
+
+    let bar: Foo = Bar{value: true}
+    bar.speak(3)
+
+    var baz = Baz{field: gen()}
+    baz.field.speak(56)
+    baz = Baz{field: Bar{value: false}}
+}
+

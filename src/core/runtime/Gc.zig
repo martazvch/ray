@@ -151,6 +151,7 @@ fn blackenObject(self: *Self, obj: *Obj) Allocator.Error!void {
             try self.markArray(instance.fields);
         },
         .iterator => if (obj.as(Obj.Iterator).parent) |*p| try self.markValue(p),
+        .trait_obj => try self.markObject(obj.as(Obj.TraitObj).data),
         .native_zfn => unreachable,
         // TODO: see why we can't mark functions and structure unreachable
         // I think they should not be reachable because only allocated at comptime
