@@ -297,9 +297,12 @@ fn execute(self: *Self) !void {
             .call_virtual => {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
+                const trait_obj = self.stack.peek(arity).obj.as(Obj.TraitObj);
+
+                // -1 because we act on first argument, arity points to before call frame
+                self.stack.peekRef(arity - 1).obj = trait_obj.data;
                 self.frame = try self.frame_stack.newKeepMod();
-                const func = self.stack.peekRef(arity).obj.as(Obj.TraitObj).vtable.functions[index];
-                self.frame.call(func, &self.stack, arity, self.modules);
+                self.frame.call(trait_obj.vtable.functions[index], &self.stack, arity, self.modules);
             },
             .call_zig => {
                 const index = self.frame.readByte();

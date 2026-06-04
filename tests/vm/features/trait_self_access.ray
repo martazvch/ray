@@ -1,28 +1,43 @@
 trait Foo {
-    fn method(self)
+    fn speak(self, a: int)
+    fn speak2(self, a: int) {
+        print a == 1
+    }
 }
 
 struct Bar {
-    value=6,
+    value: bool,
 
     impl Foo {
-        fn method(self) { print self.value }
+        fn speak(self, a: int) {
+            print self.value
+            print "Bar " + str(a)
+        }
     }
 }
 
 struct Baz {
-    value: bool,
+    value=6,
 
     impl Foo {
-        fn method(self) { print self.value }
+        fn speak(self, a=2) {
+            print self.value
+            print "Baz " + str(a)
+        }
     }
 }
 
-fn main() {
-    let bar = Bar{}
-    bar.method()
+fn f(value: Foo) {
+    value.speak(2)
+}
 
-    let baz = Baz{value: true}
-    baz.method()
+fn main() {
+    let bar = Bar{value: true}
+    bar.speak(1)
+    f(bar)
+
+    let baz = Baz{}
+    baz.speak(8)
+    f(baz)
 }
 
