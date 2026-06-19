@@ -1129,7 +1129,10 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
     const name_token = if (node.alias) |alias| alias else node.names[node.names.len - 1];
     const module_name = self.interner.intern(self.ast.toSource(name_token));
 
-    if (self.scope.isModuleImported(module_name)) {
+    // Check for empty items because it would fail to compile:
+    //   use .math
+    //   use .math{Vec2}
+    if (self.scope.isModuleImported(module_name) and node.items == null) {
         return self.err(
             .{ .already_declared = .{ .name = self.ast.toSource(name_token) } },
             self.ast.getSpan(name_token),
