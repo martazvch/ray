@@ -197,8 +197,9 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .store_blk_val => self.simpleInstruction(writer, "store_blk_val", offset),
         .str_cat => self.simpleInstruction(writer, "str_cat", offset),
         .str_mul => self.simpleInstruction(writer, "str_mul", offset),
-        .struct_lit => self.structLiteral(writer, offset),
+        .struct_lit => self.structLiteral(writer, false, offset),
         .struct_lit_ext => self.structLiteralExt(writer, offset),
+        .struct_lit_zig => self.structLiteral(writer, true, offset),
         .sub_float => self.simpleInstruction(writer, "sub_float", offset),
         .sub_int => self.simpleInstruction(writer, "sub_int", offset),
         .swap_pop => self.simpleInstruction(writer, "swap_pop", offset),
@@ -461,11 +462,11 @@ fn enumLiteralExt(self: *Self, writer: *Writer, offset: usize) Writer.Error!usiz
     return offset + 4;
 }
 
-fn structLiteral(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
-    const text = "struct_lit";
+fn structLiteral(self: *Self, writer: *Writer, native: bool, offset: usize) Writer.Error!usize {
+    const text = if (native) "struct_lit_zig" else "struct_lit";
     const index = self.chunk.code.items[offset + 1];
     const arity = self.chunk.code.items[offset + 2];
-    const sym = self.module.structures[index];
+    const sym = if (native) self.zig_structs[index] else self.module.structures[index];
 
     if (self.render_mode == .@"test") {
         try writer.print("{s} index {}, arity {}, {s}\n", .{ text, index, arity, sym.name });

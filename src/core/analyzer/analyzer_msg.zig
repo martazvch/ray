@@ -17,6 +17,7 @@ pub const AnalyzerMsg = union(enum) {
     call_method_on_type: struct { name: []const u8 },
     call_static_on_instance: struct { name: []const u8 },
     call_fn_on_trait: struct { name: []const u8 },
+    cant_build_native_struct: struct { name: []const u8 },
     cant_continue_scope: struct { name: []const u8 },
     cant_infer_array_type,
     dead_code,
@@ -144,6 +145,7 @@ pub const AnalyzerMsg = union(enum) {
             .call_fn_on_trait => |e| writer.print("'{s}' is trait, can't call functions on it", .{e.name}),
             .call_method_on_type => |e| writer.print("method '{s}' called on a type", .{e.name}),
             .call_static_on_instance => |e| writer.print("static function '{s}' called on an instance", .{e.name}),
+            .cant_build_native_struct => |e| writer.print("can't use structure literal syntax on native structure '{s}'", .{e.name}),
             .cant_continue_scope => |e| writer.print("block '{s}' isn't continuable", .{e.name}),
             .cant_infer_array_type => writer.writeAll("can't infer array type with empty array and not declared type"),
             .dead_code => writer.writeAll("unreachable code"),
@@ -268,6 +270,7 @@ pub const AnalyzerMsg = union(enum) {
             .break_val_in_non_val_block => writer.writeAll("can't have this expression"),
             .call_fn_on_trait => writer.writeAll("this is a trait"),
             .call_method_on_type, .call_static_on_instance => writer.writeAll("wrong calling convention"),
+            .cant_build_native_struct => writer.writeAll("this structure"),
             .cant_continue_scope, .no_continuable_scope => writer.writeAll("invalid continue"),
             .cant_infer_array_type => writer.writeAll("empty arrays don't convey any type information"),
             .dynlib_missing_lib => writer.writeAll("can't find this dynamic library"),
@@ -376,6 +379,7 @@ pub const AnalyzerMsg = union(enum) {
             .call_method_on_type, .call_static_on_instance => writer.writeAll(
                 "static functions can only be called on types and methods can only be called on instances",
             ),
+            .cant_build_native_struct => writer.writeAll("only native Zig structures that define an 'init' function can use structure literal syntax"),
             .cant_continue_scope, .no_continuable_scope => writer.writeAll("'continue' can only be used with 'for' and 'while' statements"),
             .cant_infer_array_type => writer.writeAll(
                 \\can't extract any type information from an empty array '[]'. you must either declare a type in variable's
@@ -392,7 +396,7 @@ pub const AnalyzerMsg = union(enum) {
             .dynlib_not_module => writer.writeAll("a valid native Ray module has to define 'handcheck' function (see ray_ext.h)"),
             .dynlib_unsupported_os => writer.writeAll("Only Windows, Linux and MacOS are supported for native module dynamic loading"),
             .error_not_in_union => writer.writeAll("refer to function's declaration to see acceptable errors"),
-            .err_union_err_lhs, .err_union_non_err_rhs => writer.writeAll("error union syntaxe is: '<non-error-type>!<error-type>'"),
+            .err_union_err_lhs, .err_union_non_err_rhs => writer.writeAll("error union syntax is: '<non-error-type>!<error-type>'"),
             .error_with_return => writer.writeAll("'return' keyword is used to write into ok channel and 'fail' writes to the error one"),
             .expect_statement => writer.writeAll(
                 \\expressions are allowed inside declarations: functions' bodies, ...

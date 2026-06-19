@@ -4,7 +4,6 @@ const Value = @import("../runtime/values.zig").Value;
 const Obj = @import("../runtime/Obj.zig");
 const Vm = @import("../runtime/Vm.zig");
 
-// TODO: handle errors
 const Module = @This();
 
 pub const module: zffi.Module = .{
@@ -20,6 +19,7 @@ pub const module: zffi.Module = .{
     },
     .structures = &.{
         .init(Data, "Data"),
+        .init(DataNoInit, "DataNoInit"),
     },
 };
 
@@ -31,8 +31,13 @@ const Data = struct {
 
     const Self = @This();
 
-    // TODO: make helper functions so we don't even need to specify types
     pub const functions: []const zffi.FnMeta = &.{
+        .init(Self, "init", "", &.{
+            .{ .name = "value1" },
+            .{ .name = "value2" },
+            .{ .name = "value3" },
+            .{ .name = "name" },
+        }),
         .init(Self, "clone", "", &.{}),
         .init(Self, "newFromMethod", "", &.{
             .{ .name = "value1" },
@@ -58,6 +63,10 @@ const Data = struct {
 
     const accessors = zffi.makeAccessors(Self);
 
+    pub fn init(vm: *Vm, value1: i64, value2: f64, value3: bool, name: []const u8) *Self {
+        return new(vm, value1, value2, value3, name);
+    }
+
     pub fn deinit(self: *anyopaque, vm: *Vm) void {
         const s: *Self = @ptrCast(@alignCast(self));
         vm.gc_alloc.destroy(s);
@@ -68,15 +77,15 @@ const Data = struct {
     }
 
     // From method
-    pub fn clone(self: *Self, vm: *Vm) *Data {
-        const cloned = vm.gc_alloc.create(Data) catch unreachable;
+    pub fn clone(self: *Self, vm: *Vm) *Self {
+        const cloned = vm.gc_alloc.create(Self) catch unreachable;
         cloned.* = self.*;
 
-        return zffi.makeObj(Data, "Data", cloned, vm);
+        return zffi.makeObj(Self, "Data", cloned, vm);
     }
 
-    pub fn newFromMethod(_: *Self, vm: *Vm, value1: i64, value2: f64, value3: bool, name: []const u8) *Data {
-        const cloned = vm.gc_alloc.create(Data) catch unreachable;
+    pub fn newFromMethod(_: *Self, vm: *Vm, value1: i64, value2: f64, value3: bool, name: []const u8) *Self {
+        const cloned = vm.gc_alloc.create(Self) catch unreachable;
         cloned.* = .{
             .value1 = value1,
             .value2 = value2,
@@ -84,12 +93,12 @@ const Data = struct {
             .name = name,
         };
 
-        return zffi.makeObj(Data, "Data", cloned, vm);
+        return zffi.makeObj(Self, "Data", cloned, vm);
     }
 
     // From static functions
-    pub fn new(vm: *Vm, value1: i64, value2: f64, value3: bool, name: []const u8) *Data {
-        const self = vm.gc_alloc.create(Data) catch unreachable;
+    pub fn new(vm: *Vm, value1: i64, value2: f64, value3: bool, name: []const u8) *Self {
+        const self = vm.gc_alloc.create(Self) catch unreachable;
         self.* = .{
             .value1 = value1,
             .value2 = value2,
@@ -97,14 +106,14 @@ const Data = struct {
             .name = name,
         };
 
-        return zffi.makeObj(Data, "Data", self, vm);
+        return zffi.makeObj(Self, "Data", self, vm);
     }
 
-    pub fn newDefault(vm: *Vm) *Data {
-        const self = vm.gc_alloc.create(Data) catch unreachable;
+    pub fn newDefault(vm: *Vm) *Self {
+        const self = vm.gc_alloc.create(Self) catch unreachable;
         self.* = .{};
 
-        return zffi.makeObj(Data, "Data", self, vm);
+        return zffi.makeObj(Self, "Data", self, vm);
     }
 };
 
@@ -126,3 +135,23 @@ pub fn test_native_newDefault(vm: *Vm) *Data {
 
     return zffi.makeObj(Data, "Data", self, vm);
 }
+
+// No constructor
+pub const DataNoInit = struct {
+    const Self = @This();
+
+    pub const functions: []const zffi.FnMeta = &.{};
+
+    pub const fields: []const zffi.StructMeta.Field = &.{};
+
+    const accessors = zffi.makeAccessors(Self);
+
+    pub fn deinit(self: *anyopaque, vm: *Vm) void {
+        const s: *Self = @ptrCast(@alignCast(self));
+        vm.gc_alloc.destroy(s);
+    }
+
+    pub fn getField(self: *anyopaque, vm: *Vm, index: usize) Value {
+        return accessors[index].get(self, vm);
+    }
+};

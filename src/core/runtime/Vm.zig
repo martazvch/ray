@@ -688,6 +688,12 @@ fn execute(self: *Self) !void {
                 const instance = Obj.Instance.create(self, &self.modules[module].structures[index]);
                 structLit(instance, arity, &self.stack);
             },
+            .struct_lit_zig => {
+                const index = self.frame.readByte();
+                const arity = self.frame.readByte();
+                const instance = Obj.Instance.create(self, &self.glob_zig_structs[index]);
+                structLit(instance, arity, &self.stack);
+            },
             .sub_float => {
                 const rhs = self.stack.pop().float;
                 self.stack.peekRef(0).float -= rhs;

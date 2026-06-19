@@ -1086,15 +1086,15 @@ const Compiler = struct {
         try self.containerTraitDecls(data.traits);
     }
 
+    // TODO: protect cast
     fn structLiteral(self: *Self, data: *const Instruction.StructLiteral) Error!void {
-        if (self.at(data.structure) != .load_symbol) {
-            // TODO: change this
-            @panic("Impossible? Change Ir to only allow a symbol index + module");
-        }
-
         try self.compileArgs(data.values);
-        // TODO: protect cast
-        self.symbolAccess(.struct_lit, self.at(data.structure).load_symbol);
+
+        switch (self.at(data.structure)) {
+            .load_symbol => |sym| self.symbolAccess(.struct_lit, sym),
+            .load_builtin => |index| self.writeOpAndByte(.struct_lit_zig, @intCast(index)),
+            else => @panic("Impossible? Change Ir to only allow a symbol index + module"),
+        }
         self.writeByte(@intCast(data.values.len));
     }
 

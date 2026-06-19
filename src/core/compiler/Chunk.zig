@@ -155,6 +155,7 @@ pub const OpCode = enum(u8) {
     str_mul,
     struct_lit,
     struct_lit_ext,
+    struct_lit_zig,
     sub_float,
     sub_int,
     trait_obj,

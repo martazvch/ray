@@ -3030,7 +3030,24 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
     return .{
         .type = struct_res.type,
         .ti = .{ .comp_time = comp_time, .ext_mod = struct_res.ti.ext_mod },
-        .instr = self.irb.addInstr(
+        .instr = if (struct_type.native) nat: {
+            const init_fn = struct_type.functions.get(self.cached_names.init) orelse return self.err(
+                .{ .cant_build_native_struct = .{ .name = self.ast.toSource(expr.structure) } },
+                span,
+            );
+
+            break :nat self.irb.addInstr(
+                .{ .call = .{
+                    .callee = self.irb.addInstr(.{ .load_builtin = init_fn.index }, span.start),
+                    .args = values,
+                    .ext_mod = null,
+                    .kind = .zig,
+                } },
+                span.start,
+            );
+        }
+        // Ray structure
+        else self.irb.addInstr(
             .{ .struct_literal = .{ .structure = struct_res.instr, .values = values } },
             span.start,
         ),

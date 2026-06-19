@@ -497,11 +497,10 @@ pub const Instance = struct {
         // Fields first for GC because other wise allocating fields after creation
         // of the instance may trigger GC in between
         const alloc_fields = vm.gc_alloc.alloc(Value, parent.field_count) catch oom();
-        const obj = Obj.allocate(vm, Self, undefined);
+        const obj = Obj.allocate(vm, Self, parent.type_id);
 
         obj.parent = parent;
         obj.fields = alloc_fields;
-        obj.asObj().type_id = parent.type_id;
 
         if (options.log_gc) obj.asObj().log();
 
