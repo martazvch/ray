@@ -5,11 +5,12 @@ const Obj = @import("../runtime/Obj.zig");
 const Vm = @import("../runtime/Vm.zig");
 
 // TODO: handle errors
+const Module = @This();
 
 pub const module: zffi.Module = .{
     .is_module = false,
     .functions = &.{
-        .init("open", open, "", &.{.{ .name = "path" }}),
+        .init(Module, "open", "", &.{.{ .name = "path" }}),
     },
     .structures = &.{
         .init(File, "File"),
@@ -18,18 +19,22 @@ pub const module: zffi.Module = .{
 
 const File = struct {
     fd: std.Io.File,
+    path: []const u8,
 
     const Self = @This();
 
+    // TODO: make helper functions so we don't even need to specify types
     pub const functions: []const zffi.FnMeta = &.{
-        .init("readAll", readAll, "", &.{}),
+        .init(Self, "readAll", "", &.{}),
     };
 
     pub const fields: []const zffi.StructMeta.Field = &.{
-        .{ .name = "path", .desc = "" },
+        .init(Self, "path", ""),
     };
 
-    fn readAll(self: *Self, vm: *Vm) []const u8 {
+    const accessors = zffi.makeAccessors(Self);
+
+    pub fn readAll(self: *Self, vm: *Vm) []const u8 {
         var reader = self.fd.reader(vm.io, &.{});
         const interface = &reader.interface;
 
@@ -39,19 +44,23 @@ const File = struct {
         ) catch unreachable;
     }
 
-    fn deinit(self: *anyopaque, vm: *Vm) void {
+    pub fn deinit(self: *anyopaque, vm: *Vm) void {
         const s: *Self = @ptrCast(@alignCast(self));
+        s.fd.close(vm.io);
         vm.gc_alloc.destroy(s);
+    }
+
+    pub fn getField(self: *anyopaque, vm: *Vm, index: usize) Value {
+        return accessors[index].get(self, vm);
     }
 };
 
-fn open(vm: *Vm, path: []const u8) *File {
+pub fn open(vm: *Vm, path: []const u8) *File {
     const self = vm.gc_alloc.create(File) catch unreachable;
     self.* = .{
         .fd = std.Io.Dir.cwd().openFile(vm.io, path, .{}) catch unreachable,
+        .path = path,
     };
 
-    const obj = Obj.NativeObj.create(vm, "File", self, File.deinit);
-
-    return @ptrCast(@alignCast(&obj.child));
+    return zffi.makeObj(File, "File", self, vm);
 }

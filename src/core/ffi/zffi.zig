@@ -79,9 +79,10 @@ pub const FnMeta = struct {
         desc: []const u8 = "",
     };
 
-    pub fn init(name: []const u8, func: anytype, desc: []const u8, params: []const Param) FnMeta {
+    pub fn init(T: type, name: []const u8, desc: []const u8, params: []const Param) FnMeta {
         checkNonEmptyName(name);
 
+        const func = @field(T, name);
         const info = @typeInfo(@TypeOf(func));
         if (info != .@"fn") {
             @compileError("Trying to declare a non-function, found: " ++ @typeName(func));
@@ -98,7 +99,6 @@ pub const FnMeta = struct {
 };
 
 pub const Fn = *const fn (*Vm, []const Value) ?Value;
-pub const DeinitFn = *const fn (*anyopaque, *Vm) void;
 
 fn getMember(T: type, comptime kind: MemberKind) kind.Type() {
     const info = @typeInfo(T);
@@ -137,6 +137,15 @@ pub const StructMeta = struct {
     pub const Field = struct {
         name: []const u8,
         desc: []const u8,
+        type: type,
+
+        pub fn init(T: type, name: []const u8, desc: []const u8) Field {
+            return .{
+                .name = name,
+                .desc = desc,
+                .type = @FieldType(T, name),
+            };
+        }
     };
 
     pub fn init(T: type, name: []const u8) StructMeta {
@@ -150,6 +159,46 @@ pub const StructMeta = struct {
         };
     }
 };
+
+pub const VTable = struct {
+    get_field: *const fn (*anyopaque, *Vm, usize) Value,
+    deinit_fn: *const fn (*anyopaque, *Vm) void,
+
+    pub fn init(T: type) *const VTable {
+        return &.{
+            .get_field = @field(T, "getField"),
+            .deinit_fn = @field(T, "deinit"),
+        };
+    }
+};
+
+pub const FieldAccessor = struct {
+    get: *const fn (*anyopaque, *Vm) Value,
+};
+
+pub fn makeAccessors(T: type) []const FieldAccessor {
+    const fields = @field(T, "fields");
+    comptime var accessors: [fields.len]FieldAccessor = undefined;
+
+    inline for (fields, 0..) |field, i| {
+        accessors[i] = .{
+            .get = struct {
+                fn get(self: *anyopaque, vm: *Vm) Value {
+                    const s: *T = @ptrCast(@alignCast(self));
+                    return toValue(vm, @field(s, field.name), .{ .copy_str = true });
+                }
+            }.get,
+        };
+    }
+
+    const copy = accessors;
+    return &copy;
+}
+
+pub fn makeObj(T: type, name: []const u8, value: *anyopaque, vm: *Vm) *T {
+    const obj = Obj.NativeObj.create(vm, name, value, .init(T));
+    return @ptrCast(@alignCast(&obj.child));
+}
 
 pub const TraitMeta = struct {
     name: []const u8,
@@ -188,7 +237,7 @@ pub fn makeNative(func: anytype) Fn {
 
             if (@typeInfo(@TypeOf(func)).@"fn".return_type.? != void) {
                 const res = @call(.auto, func, args);
-                return toValue(vm, res);
+                return toValue(vm, res, .{});
             } else {
                 @call(.auto, func, args);
                 return null;
@@ -205,11 +254,8 @@ pub fn makeNative(func: anytype) Fn {
                     return switch (ptr.child) {
                         u8 => value.obj.as(Obj.String).chars,
                         anyopaque => @compileError("Can't use *anyopaque in functions"),
-                        else => {
-                            const obj = value.asObj() orelse unreachable;
-                            const native = obj.as(Obj.NativeObj);
-                            return @ptrCast(@alignCast(native.child));
-                        },
+                        // All other native zig structures are wrapped in NativeObj
+                        else => @ptrCast(@alignCast(value.asObj().?.as(Obj.NativeObj).child)),
                     };
                 },
                 else => @compileError("FFI: Unsupported type in auto conversion: " ++ @typeName(T)),
@@ -237,31 +283,46 @@ pub fn makeNative(func: anytype) Fn {
 
             return null;
         }
-
-        fn toValue(vm: *Vm, value: anytype) Value {
-            return switch (@typeInfo(@TypeOf(value))) {
-                .float => .{ .float = value },
-                .int => .{ .int = value },
-                .bool => .{ .bool = value },
-                .pointer => |ptr| return switch (ptr.child) {
-                    // TODO: check memory managment
-                    u8 => .makeObj(Obj.String.take(vm, value).asObj()),
-                    else => {
-                        const native = @as(
-                            *Obj.NativeObj,
-                            @alignCast(@fieldParentPtr(
-                                "child",
-                                @as(**anyopaque, @ptrCast(@alignCast(value))),
-                            )),
-                        );
-
-                        return .makeObj(native.asObj());
-                    },
-                },
-                else => @compileError("FFI: Unsupported type in auto conversion: " ++ @typeName(@TypeOf(value))),
-            };
-        }
     }.call;
+}
+
+const Config = struct {
+    /// When dealing with value on stack (through native function calls), we always want
+    /// `take` the value, meaning that if it already exists, we free the argument
+    /// and take the existing interned one
+    /// When dealing with native structure fields, we don't want to `take` it because it
+    /// would free the value owned by the native structure
+    copy_str: bool = false,
+};
+fn toValue(vm: *Vm, value: anytype, config: Config) Value {
+    return switch (@typeInfo(@TypeOf(value))) {
+        .float => .{ .float = value },
+        .int => .{ .int = value },
+        .bool => .{ .bool = value },
+        .pointer => |ptr| return switch (ptr.child) {
+            // TODO: check memory managment
+            u8 => {
+                const str = if (config.copy_str)
+                    Obj.String.takeCopy(vm, value)
+                else
+                    Obj.String.take(vm, value);
+
+                return .makeObj(str.asObj());
+            },
+            else => {
+                const native = @as(
+                    *Obj.NativeObj,
+                    @alignCast(@fieldParentPtr(
+                        "child",
+                        @as(**anyopaque, @ptrCast(@alignCast(value))),
+                    )),
+                );
+
+                return .makeObj(native.asObj());
+            },
+        },
+        else => @compileError("FFI: Unsupported type in auto conversion: " ++ @typeName(@TypeOf(value))),
+    };
 }
 
 pub fn ArgsTuple(comptime FnType: type) struct { type, usize } {

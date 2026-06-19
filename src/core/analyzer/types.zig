@@ -205,6 +205,7 @@ pub const Type = union(enum) {
         fields: FieldsMap,
         functions: MapNameSym,
         traits: TraitMap,
+        native: bool,
 
         pub const FieldsMap = ArrayMap(InternerIdx, Field);
         pub const Field = struct {
@@ -297,8 +298,8 @@ pub const Type = union(enum) {
     }
 
     pub fn isErr(self: *const Type) bool {
-        const e = self.as(.@"union") orelse return false;
-        return e.is_err;
+        const u = self.as(.@"union") orelse return false;
+        return u.is_err;
     }
 
     pub fn getTraitImpl(self: *const Type, name: InternerIdx) ?TraitImpl {
@@ -553,6 +554,7 @@ pub const TypeInterner = struct {
             .fields = .empty,
             .functions = .empty,
             .traits = .empty,
+            .native = false,
         } });
     }
 

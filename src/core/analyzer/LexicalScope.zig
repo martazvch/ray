@@ -414,6 +414,8 @@ pub fn getType(self: *Self, name: InternerIdx) ?*const Type {
         return builtin;
     } else if (self.getSymbol(name)) |sym| {
         return sym.type;
+    } else if (self.getBuiltinSymbol(name)) |sym| {
+        return sym.type;
     }
 
     return null;

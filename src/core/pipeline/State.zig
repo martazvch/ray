@@ -1,6 +1,7 @@
 const std = @import("std");
 const Io = std.Io;
 const Allocator = std.mem.Allocator;
+const options = @import("options");
 
 const type_mod = @import("../analyzer/types.zig");
 const TypeInterner = type_mod.TypeInterner;
@@ -92,7 +93,11 @@ pub fn new(allocator: Allocator, config: Config) Self {
 
     ctx.type_interner.cacheFrequentTypes();
     ctx.registerMod(allocator, @import("../builtins/builtins.zig"));
-    ctx.registerMod(allocator, @import("..//builtins/file.zig"));
+    ctx.registerMod(allocator, @import("../builtins/file.zig"));
+
+    if (options.test_mode) {
+        ctx.registerMod(allocator, @import("../builtins/test_natives.zig"));
+    }
 
     ctx.lex_scope.save = config.dbg_infos;
 

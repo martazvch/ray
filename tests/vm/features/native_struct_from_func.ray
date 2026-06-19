@@ -1,0 +1,33 @@
+// Field access
+fn printData(data: Data) {
+    print data.value1
+    print data.value2
+    print data.value3
+    print data.name
+    print "-------------"
+}
+
+fn main() {
+    // Static functions
+    var data = Data.newDefault()
+    printData(data)
+
+    data = Data.new(2, 11.22, false, "Tom")
+    printData(data)
+
+    // Methods
+    data = data.clone()
+    printData(data)
+
+    data = data.newFromMethod(9, 56.12, false, "Manon")
+    printData(data)
+
+    // Global function
+    data = test_native_new(68, 1.234, false, "Odile")
+    printData(data)
+
+    data = test_native_newDefault()
+    printData(data)
+}
+
+

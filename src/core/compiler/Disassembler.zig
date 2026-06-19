@@ -13,6 +13,7 @@ const Module = @import("../pipeline/ModuleManager.zig").Module;
 
 chunk: *const Chunk,
 zig_fns: []const *Obj.ZigFn,
+zig_structs: []const Module.Structure,
 c_fns: []const *Obj.ForeignFn,
 render_mode: RenderMode,
 module: *const Module,
@@ -27,12 +28,14 @@ pub fn init(
     chunk: *const Chunk,
     module: *const Module,
     zig_fns: []const *Obj.ZigFn,
+    zig_structs: []const Module.Structure,
     c_fns: []const *Obj.ForeignFn,
 ) Self {
     return .{
         .chunk = chunk,
         .render_mode = if (options.test_mode) .@"test" else .normal,
         .zig_fns = zig_fns,
+        .zig_structs = zig_structs,
         .c_fns = c_fns,
         .module = module,
         .wide = false,
@@ -118,6 +121,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .get_capt_local => self.indexInstruction(writer, "get_capt_local", offset),
         .get_field => self.getMember(writer, "get_field", offset),
         .get_field_cow => self.getMember(writer, "get_field_cow", offset),
+        .get_field_native => self.getMember(writer, "get_field_native", offset),
         .get_global => self.getGlobal(writer, false, offset),
         .get_global_cow => self.getGlobal(writer, true, offset),
         .get_local => self.indexInstruction(writer, "get_local", offset),

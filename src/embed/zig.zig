@@ -8,7 +8,7 @@ pub const Config = State.Config;
 const Pipeline = core.Pipeline;
 pub const Vm = core.Vm;
 const zffi = core.zffi;
-const RayFn = zffi.FnMeta;
+pub const RayFn = zffi.FnMeta;
 
 io: Io,
 arena: std.heap.ArenaAllocator,

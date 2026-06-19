@@ -42,6 +42,7 @@ pub const CompilationUnit = struct {
 
     // For disassembler
     zig_fns: []const *Obj.ZigFn,
+    zig_structs: []const Module.Structure,
     c_fns: []const *Obj.ForeignFn,
 
     const Self = @This();
@@ -59,6 +60,7 @@ pub const CompilationUnit = struct {
             .instr_data = undefined,
             .instr_lines = undefined,
             .zig_fns = state.native_reg.zig_fns.items,
+            .zig_structs = state.native_reg.zig_structs.items,
             .c_fns = state.native_reg.foreign_fns.items,
             .constants = state.const_interner.constants.items,
             .line = 0,
@@ -301,6 +303,7 @@ const Compiler = struct {
                 &self.function.chunk,
                 self.manager.state.modules.getFromIndex(self.manager.mod_index),
                 self.manager.zig_fns,
+                self.manager.zig_structs,
                 self.manager.c_fns,
             );
             dis.disChunk(&alloc_writer.writer, self.function.name);
@@ -800,7 +803,12 @@ const Compiler = struct {
     fn field(self: *Self, data: *const Instruction.Field) Error!void {
         try self.compileInstr(data.structure);
         self.writeOpAndByte(
-            if (self.state.cow) .get_field_cow else .get_field,
+            if (self.state.cow)
+                .get_field_cow
+            else if (data.kind == .field_native)
+                .get_field_native
+            else
+                .get_field,
             @intCast(data.index),
         );
     }

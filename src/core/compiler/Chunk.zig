@@ -77,6 +77,7 @@ pub const OpCode = enum(u8) {
     get_capt_local,
     get_field,
     get_field_cow,
+    get_field_native,
     get_global,
     get_global_cow,
     get_local,

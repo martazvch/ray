@@ -8,7 +8,7 @@ const MapNameType = @import("../analyzer/types.zig").MapNameType;
 const Type = @import("../analyzer/types.zig").Type;
 const TypeInterner = @import("../analyzer/types.zig").TypeInterner;
 
-const Value = @import("../runtime/values.zig").Value;
+const Module = @import("ModuleManager.zig").Module;
 const Obj = @import("../runtime/Obj.zig");
 const Vm = @import("../runtime/Vm.zig");
 
@@ -21,7 +21,7 @@ zig_fns: ArrayList(*Obj.ZigFn),
 /// Native Zig functions translated to Ray's type system for compilation
 zig_fns_meta: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
 /// Native structures used at runtime
-structs: ArrayList(struct { name: []const u8, func: Value }),
+zig_structs: ArrayList(Module.Structure),
 /// Native structures translated to Ray's type system for compilation
 structs_meta: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
 /// Native structures translated to Ray's type system used here for self references
@@ -37,27 +37,30 @@ const Self = @This();
 pub const empty: Self = .{
     .zig_fns = .empty,
     .zig_fns_meta = .empty,
-    .structs = .empty,
+    .zig_structs = .empty,
     .structs_meta = .empty,
     .scratch_structs = .empty,
     .foreign_fns = .empty,
     .foreign_fns_meta = .empty,
 };
 
-pub fn registerMod(self: *Self, alloc: Allocator, interner: *Interner, ti: *TypeInterner, Module: type) void {
-    if (!@hasDecl(Module, "module")) {
+pub fn registerMod(self: *Self, alloc: Allocator, interner: *Interner, ti: *TypeInterner, Mod: type) void {
+    if (!@hasDecl(Mod, "module")) {
         @compileError("Native Zig files must declare a module");
     }
 
-    const mod = @field(Module, "module");
+    const mod = @field(Mod, "module");
     if (@TypeOf(mod) != zffi.Module) {
         @compileError("Native Zig module's 'module' variable must be of type " ++ @typeName(zffi.Module));
     }
 
+    self.zig_structs.ensureUnusedCapacity(alloc, mod.structures.len) catch oom();
     inline for (mod.structures) |s| {
         self.registerStruct(alloc, s, interner, ti);
     }
 
+    self.zig_fns.ensureUnusedCapacity(alloc, mod.functions.len) catch oom();
+    self.zig_fns_meta.ensureUnusedCapacity(alloc, mod.functions.len) catch oom();
     inline for (mod.functions) |func| {
         _ = self.registerZigFn(alloc, &func, interner, ti);
     }
@@ -71,12 +74,16 @@ fn registerStruct(self: *Self, alloc: Allocator, comptime zstruct: zffi.StructMe
         .fields = .empty,
         .functions = .empty,
         .traits = .empty,
+        .native = true,
     };
     s.fields.ensureTotalCapacity(alloc, zstruct.fields.len) catch oom();
     s.functions.ensureTotalCapacity(alloc, zstruct.functions.len) catch oom();
 
     const ty = ti.intern(.{ .structure = s });
     self.scratch_structs.put(alloc, interner.intern(zstruct.type_name), ty) catch oom();
+
+    self.zig_fns.ensureUnusedCapacity(alloc, zstruct.functions.len) catch oom();
+    self.zig_fns_meta.ensureUnusedCapacity(alloc, zstruct.functions.len) catch oom();
 
     inline for (zstruct.functions) |*func| {
         const interned_name = interner.intern(func.name);
@@ -92,6 +99,24 @@ fn registerStruct(self: *Self, alloc: Allocator, comptime zstruct: zffi.StructMe
         );
     }
 
+    inline for (zstruct.fields) |field| {
+        const interned_name = interner.intern(field.name);
+        if (ty.structure.fields.contains(interned_name)) {
+            // TODO: error
+            @panic("Already declared field");
+        }
+        ty.structure.fields.putAssumeCapacity(interned_name, .{
+            .default = null,
+            .type = self.zigToRay(alloc, field.type, interner, ti),
+        });
+    }
+
+    self.zig_structs.appendAssumeCapacity(.{
+        .name = zstruct.name,
+        .type_id = ti.typeId(ty),
+        .field_count = zstruct.fields.len,
+    });
+
     // TODO: use assume capacity (check all the 'put')
     self.structs_meta.put(alloc, struct_name, ty) catch oom();
 }
@@ -104,10 +129,10 @@ const Registered = struct {
 // TODO: no check on already defined with same name?
 pub fn registerZigFn(self: *Self, alloc: Allocator, comptime func: *const zffi.FnMeta, interner: *Interner, ti: *TypeInterner) Registered {
     const fn_type = self.fnZigToRay(alloc, func, interner, ti);
-    self.zig_fns_meta.put(alloc, interner.intern(func.name), fn_type) catch oom();
+    self.zig_fns_meta.putAssumeCapacity(interner.intern(func.name), fn_type);
     const native = Obj.ZigFn.create(alloc, func.name, func.function);
 
-    self.zig_fns.append(alloc, native) catch oom();
+    self.zig_fns.appendAssumeCapacity(native);
 
     return .{ .index = self.zig_fns.items.len - 1, .type = fn_type };
 }
@@ -140,14 +165,14 @@ fn fnZigToRay(self: *Self, alloc: Allocator, comptime func: *const zffi.FnMeta, 
     return ti.intern(.{ .function = ty });
 }
 
-fn zigToRay(self: *Self, alloc: Allocator, ty: type, interner: *Interner, ti: *TypeInterner) *const Type {
-    return switch (ty) {
+fn zigToRay(self: *Self, alloc: Allocator, T: type, interner: *Interner, ti: *TypeInterner) *const Type {
+    return switch (T) {
         bool => ti.getCached(.bool),
         i64 => ti.getCached(.int),
         f64 => ti.getCached(.float),
         void => ti.getCached(.void),
         []const u8 => ti.getCached(.str),
-        else => switch (@typeInfo(ty)) {
+        else => switch (@typeInfo(T)) {
             .@"union" => |u| {
                 var childs = ArrayList(*const Type).initCapacity(alloc, u.fields.len) catch oom();
                 inline for (u.fields) |f| {
@@ -157,7 +182,7 @@ fn zigToRay(self: *Self, alloc: Allocator, ty: type, interner: *Interner, ti: *T
             },
             .pointer => |ptr| self.zigToRay(alloc, ptr.child, interner, ti),
             .@"struct" => {
-                if (self.scratch_structs.get(interner.intern(@typeName(ty)))) |t| {
+                if (self.scratch_structs.get(interner.intern(@typeName(T)))) |t| {
                     return t;
                 }
 
@@ -165,7 +190,7 @@ fn zigToRay(self: *Self, alloc: Allocator, ty: type, interner: *Interner, ti: *T
                 // like a static function returning a type not declared in the structures of the module
                 unreachable;
             },
-            else => @compileError("Zig to Ray type conversion not supported for type: " ++ @typeName(ty)),
+            else => @compileError("Zig to Ray type conversion not supported for type: " ++ @typeName(T)),
         },
     };
 }

@@ -3,6 +3,7 @@ const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const ray = @import("ray");
 const Reader = @import("reader.zig");
+const Natives = @import("natives.zig");
 
 pub const Error = error{
     TestFailed,
@@ -24,10 +25,6 @@ pub fn printFn(_: Io, text: []const u8) void {
     output = text;
 }
 
-fn isLess(_: *ray.Vm, a: i64, b: i64) bool {
-    return a < b;
-}
-
 pub fn testDir(io: Io, allocator: Allocator, path: []const u8) !void {
     var vm = ray.create(io, allocator);
     defer vm.deinit();
@@ -38,10 +35,11 @@ pub fn testDir(io: Io, allocator: Allocator, path: []const u8) !void {
             .printFn = printFn,
         },
     );
-    vm.registerFn(.init("isLess", isLess, "", &.{
-        .{ .name = "a" },
-        .{ .name = "b" },
-    }));
+
+    inline for (Natives.functions) |f| {
+        vm.registerFn(f);
+    }
+
     vm.initGlobalScope();
 
     var cwd = std.Io.Dir.cwd();

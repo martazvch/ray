@@ -270,7 +270,7 @@ fn call(self: *Self, data: *const Instruction.Call) void {
             }
         },
         .load_symbol => |sym| {
-            if (data.ext_mod) |mod| {
+            if (sym.module_index) |mod| {
                 switch (data.kind) {
                     .foreign => self.indentAndPrintSlice("[Call foreign symbol {} module {}]", .{ sym.symbol_index, mod.toInt() }),
                     .foreign_glob => self.indentAndPrintSlice("[Call global foreign symbol {} module {}]", .{ sym.symbol_index, mod.toInt() }),
@@ -360,7 +360,10 @@ fn enumLiteral(self: *Self, data: Instruction.EnumLit) void {
 }
 
 fn getField(self: *Self, data: Instruction.Field, cow: bool) void {
-    self.indentAndPrintSlice("[Field access {}{s}]", .{ data.index, if (cow) ", cow" else "" });
+    self.indentAndPrintSlice(
+        "[Field access {}{s}]",
+        .{ data.index, if (cow) ", cow" else if (data.kind == .field_native) ", native" else "" },
+    );
     self.indent_level += 1;
     defer self.indent_level -= 1;
     self.parseInstr(data.structure);

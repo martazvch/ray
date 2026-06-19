@@ -1836,7 +1836,7 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
 
     const is_static = field_res.kind == .function and struct_res.ti.is_sym;
 
-    if (!is_static and field_res.kind != .field and !ctx.in_call) {
+    if (!is_static and field_res.kind != .field and field_res.kind != .field_native and !ctx.in_call) {
         return self.boundMethod(field_res.type, field_res.index, struct_res.instr, span);
     }
 
@@ -2012,13 +2012,23 @@ fn unionAccess(self: *Self, union_info: InstrInfos, ty: Type.Union, tag_tk: Ast.
     );
 }
 
-fn structureAccess(self: *Self, field_tk: Ast.TokenIndex, ty: *const Type.Structure, is_symbol: bool, in_call: bool) Error!AccessResult {
+fn structureAccess(
+    self: *Self,
+    field_tk: Ast.TokenIndex,
+    ty: *const Type.Structure,
+    is_symbol: bool,
+    in_call: bool,
+) Error!AccessResult {
     const text = self.ast.toSource(field_tk);
     const field_name = self.interner.intern(text);
 
     // Fields
     if (ty.fields.getPtr(field_name)) |f| {
-        return .{ .type = f.type, .kind = .field, .index = ty.fields.getIndex(field_name).? };
+        return .{
+            .type = f.type,
+            .kind = if (ty.native) .field_native else .field,
+            .index = ty.fields.getIndex(field_name).?,
+        };
     }
     // Functions
     else {

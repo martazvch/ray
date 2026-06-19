@@ -1,0 +1,8 @@
+fn main() {
+    let data = Data.new(2, 11.22, false, "Tom")
+    print data.value1
+    print data.value2
+    print data.value3
+    print data.name
+}
+

@@ -788,19 +788,23 @@ pub const NativeObj = struct {
     obj: Obj,
     name: []const u8,
     child: *anyopaque,
-    deinit_fn: zffi.DeinitFn,
+    vtable: *const zffi.VTable,
 
     const Self = @This();
 
-    pub fn create(vm: *Vm, name: []const u8, child: *anyopaque, deinit_fn: zffi.DeinitFn) *Self {
+    pub fn create(vm: *Vm, name: []const u8, child: *anyopaque, vtable: *const zffi.VTable) *Self {
         // Fields first for GC because other wise allocating fields after creation
         // of the instance may trigger GC in between
         const obj = Obj.allocate(vm, Self, undefined);
         obj.name = name;
         obj.child = child;
-        obj.deinit_fn = deinit_fn;
+        obj.vtable = vtable;
 
         return obj;
+    }
+
+    pub fn getField(self: *Self, vm: *Vm, index: usize) Value {
+        return self.vtable.get_field(self.child, vm, index);
     }
 
     pub fn asObj(self: *Self) *Obj {
@@ -808,7 +812,7 @@ pub const NativeObj = struct {
     }
 
     pub fn deinit(self: *Self, vm: *Vm) void {
-        self.deinit_fn(self.child, vm);
+        self.vtable.deinit_fn(self.child, vm);
         vm.gc_alloc.destroy(self);
     }
 };

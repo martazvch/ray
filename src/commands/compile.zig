@@ -247,7 +247,7 @@ fn transpileInstr(self: *Self, instr: usize, interner: *const misc.Interner) !vo
             const name = switch (n.kind) {
                 .field => interner.getKey(struct_type.fields.keys()[n.index]).?,
                 .function => interner.getKey(self.lex_scope.getSymbol(n.index).name).?,
-                .virtual => unreachable,
+                .virtual, .field_native => unreachable,
             };
 
             self.printSlice(".{s}", .{name}, .none);

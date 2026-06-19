@@ -28,6 +28,7 @@ strings: *std.AutoHashMapUnmanaged(usize, *Obj.String),
 objects: ?*Obj,
 modules: []Module,
 glob_zig_fns: []*Obj.ZigFn,
+glob_zig_structs: []const Module.Structure,
 glob_foreign_fns: []*Obj.ForeignFn,
 state: *State,
 
@@ -60,6 +61,7 @@ pub fn init(self: *Self, io: Io, allocator: Allocator, state: *State) void {
     self.objects = null;
     self.state = state;
     self.glob_zig_fns = state.native_reg.zig_fns.items;
+    self.glob_zig_structs = state.native_reg.zig_structs.items;
     self.glob_foreign_fns = state.native_reg.foreign_fns.items;
 
     self.arr_str_type_id = state.type_interner.typeId(
@@ -169,6 +171,7 @@ fn execute(self: *Self) !void {
                 &self.frame.function.chunk,
                 self.frame.module,
                 self.glob_zig_fns,
+                self.glob_zig_structs,
                 self.glob_foreign_fns,
             );
             const instr_nb = self.frame.instructionNb();
@@ -400,6 +403,10 @@ fn execute(self: *Self) !void {
                 const field = &self.stack.peekRef(0).obj.as(Obj.Instance).fields[field_idx];
                 field.obj = self.cow(field.obj);
                 self.stack.peekRef(0).* = field.*;
+            },
+            .get_field_native => {
+                const field_idx = self.frame.readByte();
+                self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.NativeObj).getField(self, field_idx);
             },
             .get_global => {
                 const idx = self.frame.readByte();

@@ -3,22 +3,24 @@ const zffi = @import("../ffi/zffi.zig");
 const Value = @import("../runtime/values.zig").Value;
 const Vm = @import("../runtime/Vm.zig");
 
+const Module = @This();
+
 pub const module: zffi.Module = .{
     .is_module = false,
     .functions = &.{
-        .init("int", int, "", &.{
+        .init(Module, "int", "", &.{
             .{ .name = "value" },
         }),
-        .init("float", float, "", &.{
+        .init(Module, "float", "", &.{
             .{ .name = "value" },
         }),
-        .init("str", str, "", &.{
+        .init(Module, "str", "", &.{
             .{ .name = "value" },
         }),
     },
 };
 
-fn int(_: *Vm, value: zffi.Union(&.{ .int, .float, .str })) zffi.Int {
+pub fn int(_: *Vm, value: zffi.Union(&.{ .int, .float, .str })) zffi.Int {
     return switch (value) {
         .int => |i| i,
         .float => |f| @intFromFloat(f),
@@ -26,7 +28,7 @@ fn int(_: *Vm, value: zffi.Union(&.{ .int, .float, .str })) zffi.Int {
     };
 }
 
-fn float(_: *Vm, value: zffi.Union(&.{ .int, .float, .str })) zffi.Float {
+pub fn float(_: *Vm, value: zffi.Union(&.{ .int, .float, .str })) zffi.Float {
     return switch (value) {
         .int => |i| @floatFromInt(i),
         .float => |f| f,
@@ -34,7 +36,7 @@ fn float(_: *Vm, value: zffi.Union(&.{ .int, .float, .str })) zffi.Float {
     };
 }
 
-fn str(vm: *Vm, value: zffi.Union(&.{ .int, .float })) zffi.Str {
+pub fn str(vm: *Vm, value: zffi.Union(&.{ .int, .float })) zffi.Str {
     errdefer unreachable;
 
     return switch (value) {

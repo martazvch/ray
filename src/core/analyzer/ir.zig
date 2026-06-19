@@ -166,7 +166,7 @@ pub const Instruction = struct {
         index: usize,
         kind: Kind,
 
-        pub const Kind = enum { field, function, virtual };
+        pub const Kind = enum { field, field_native, function, virtual };
     };
     pub const FnDecl = struct {
         sym_index: SymbolIndex,
