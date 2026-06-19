@@ -1,0 +1,17 @@
+[Trait declaration Bar]
+[Structure declaration Foo]
+    - traits
+        Bar, vtable 0:
+[Function declaration f]
+[Function declaration main]
+    [Variable declaration index: 0, scope: local]
+        [Structure literal]
+            - structure
+            [Load symbol 0]
+    [Call symbol 0]
+        - args
+        [Trait object]
+            - variable
+            [Variable index: 0, scope: local]
+            - vtable
+            0

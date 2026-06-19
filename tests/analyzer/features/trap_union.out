@@ -50,7 +50,7 @@
             - expression:
                 [Variable index: 0, scope: local]
             - arms:
-            [Types id: 15]
+            [Types id: 26]
                 [Match enum]
                 - expression:
                     [Variable index: 0, scope: local]
@@ -73,7 +73,7 @@
                     - body:
                         [Constant index 7]
                             [Int 100]
-            [Types id: 16]
+            [Types id: 27]
                 [Constant index 8]
                     [Int -999]
 

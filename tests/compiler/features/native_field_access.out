@@ -3,7 +3,7 @@ load_constant index 3, value 2
 load_constant index 4, value 11.22
 push_false
 load_constant index 5, value Tom
-call_zig index 7, arity 4, new
+call_zig index 8, arity 4, new
 get_local index 0
 get_field_native index 0
 print

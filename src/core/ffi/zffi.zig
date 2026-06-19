@@ -10,12 +10,14 @@ pub const Int = i64;
 pub const Float = f64;
 pub const Bool = bool;
 pub const Str = []const u8;
+pub const Enum = *Obj.EnumInstance;
 
 pub const All = union(enum) {
     bool: Bool,
     int: Int,
     float: Float,
     str: Str,
+    @"enum": Enum,
 };
 
 pub fn Union(types: []const std.meta.FieldEnum(All)) type {
@@ -250,13 +252,12 @@ pub fn makeNative(func: anytype) Fn {
                 .int => value.int,
                 .bool => value.bool,
                 .@"union" => handleUnion(T, value),
-                .pointer => |ptr| {
-                    return switch (ptr.child) {
-                        u8 => value.obj.as(Obj.String).chars,
-                        anyopaque => @compileError("Can't use *anyopaque in functions"),
-                        // All other native zig structures are wrapped in NativeObj
-                        else => @ptrCast(@alignCast(value.asObj().?.as(Obj.NativeObj).child)),
-                    };
+                .pointer => |ptr| return switch (ptr.child) {
+                    u8 => value.obj.as(Obj.String).chars,
+                    anyopaque => @compileError("Can't use *anyopaque in functions"),
+                    Obj.EnumInstance => value.asObj().?.as(Obj.EnumInstance),
+                    // All other native zig structures are wrapped in NativeObj
+                    else => @ptrCast(@alignCast(value.asObj().?.as(Obj.NativeObj).child)),
                 },
                 else => @compileError("FFI: Unsupported type in auto conversion: " ++ @typeName(T)),
             };
@@ -268,7 +269,12 @@ pub fn makeNative(func: anytype) Fn {
                 .bool => |v| createUnionIfField(U, "bool", v),
                 .int => |v| createUnionIfField(U, "int", v),
                 .float => |v| createUnionIfField(U, "float", v),
-                .obj => |v| createUnionIfField(U, "str", v.as(Obj.String).chars),
+                .obj => |v| switch (v.kind) {
+                    .string => createUnionIfField(U, "str", v.as(Obj.String).chars),
+                    .enum_instance => createUnionIfField(U, "enum", v.as(Obj.EnumInstance)),
+                    else => unreachable,
+                },
+
                 else => unreachable,
             } orelse {
                 std.log.debug("Found '{t}' kind", .{value});

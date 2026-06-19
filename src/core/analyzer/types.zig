@@ -469,8 +469,10 @@ pub const TypeInterner = struct {
     ids: Set(*const Type),
     cache: Cache,
 
-    const CacheList: []const Type = &.{ .float, .int, .bool, .str, .null, .void, .never };
-    pub const Cache = CreateCache(CacheList);
+    const scalar_list: []const Type = &.{ .float, .int, .bool, .str, .null, .void, .never };
+    const trait_list: []const []const u8 = &.{"IsEnum"};
+
+    pub const Cache = CreateCache();
 
     pub fn init(allocator: Allocator) TypeInterner {
         return .{
@@ -485,28 +487,35 @@ pub const TypeInterner = struct {
         self.arena.deinit();
     }
 
-    pub fn CreateCache(comptime types: []const Type) type {
-        var fields_names: [types.len][]const u8 = undefined;
+    pub fn CreateCache() type {
+        var fields_names: [scalar_list.len + trait_list.len][]const u8 = undefined;
 
-        inline for (types, 0..) |ty, i| {
+        var i: usize = 0;
+        inline for (scalar_list) |ty| {
             fields_names[i] = @tagName(ty);
+            i += 1;
+        }
+        inline for (trait_list) |name| {
+            fields_names[i] = name;
+            i += 1;
         }
 
         return @Struct(.auto, null, &fields_names, &@splat(*const Type), &@splat(.{}));
     }
 
-    pub fn cacheFrequentTypes(self: *TypeInterner) void {
-        const tags = std.meta.fields(Type);
-        inline for (@typeInfo(Cache).@"struct".fields) |f| {
-            inline for (tags) |tag| {
-                if (comptime std.mem.eql(u8, f.name, tag.name)) {
-                    @field(self.cache, f.name) = self.intern(@unionInit(Type, tag.name, {}));
-                }
-            }
+    pub fn cacheFrequentTypes(self: *TypeInterner, interner: *Interner) void {
+        inline for (scalar_list) |ty| {
+            @field(self.cache, @tagName(ty)) = self.intern(ty);
+        }
+        inline for (trait_list) |name| {
+            @field(self.cache, name) = self.intern(.{ .trait = .{
+                .loc = .{ .name = interner.intern(name), .container = interner.intern("compiler") },
+                .functions = .empty,
+            } });
         }
     }
 
-    pub fn getCached(self: *const TypeInterner, comptime ty: Type) *const Type {
+    pub fn getCached(self: *const TypeInterner, comptime ty: std.meta.FieldEnum(Cache)) *const Type {
         if (!@hasField(Cache, @tagName(ty))) {
             @compileError("Trying to get a non-cached type in interner");
         }
@@ -594,10 +603,14 @@ pub const ObjFnType = enum {
 
 test "inline union" {
     const expect = std.testing.expect;
+    const alloc = std.testing.allocator;
 
-    var ti: TypeInterner = .init(std.testing.allocator);
+    var interner: Interner = .init(alloc);
+    defer interner.deinit(alloc);
+
+    var ti: TypeInterner = .init(alloc);
     defer ti.deinit();
-    ti.cacheFrequentTypes();
+    ti.cacheFrequentTypes(&interner);
 
     const union1 = &[_]*const Type{ ti.intern(.int), ti.intern(.bool) };
     const union2 = &[_]*const Type{ ti.intern(.bool), ti.intern(.int) };

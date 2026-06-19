@@ -1,0 +1,13 @@
+trait Bar {}
+
+struct Foo {
+    impl Bar {}
+}
+
+fn f(value: int|float|Bar) {}
+
+fn main() {
+    let foo = Foo{}
+    f(foo)
+}
+

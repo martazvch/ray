@@ -91,7 +91,7 @@ pub fn new(allocator: Allocator, config: Config) Self {
         .dynlib = null,
     };
 
-    ctx.type_interner.cacheFrequentTypes();
+    ctx.type_interner.cacheFrequentTypes(&ctx.interner);
     ctx.registerMod(allocator, @import("../builtins/builtins.zig"));
     ctx.registerMod(allocator, @import("../builtins/file.zig"));
 

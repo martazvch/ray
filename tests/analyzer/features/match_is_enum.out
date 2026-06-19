@@ -17,7 +17,7 @@
     - expression:
         [Variable index: 0, scope: local]
     - arms:
-    [Types id: 15]
+    [Types id: 26]
         [Match enum]
         - expression:
             [Variable index: 0, scope: local]

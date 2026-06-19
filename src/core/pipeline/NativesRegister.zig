@@ -180,7 +180,10 @@ fn zigToRay(self: *Self, alloc: Allocator, T: type, interner: *Interner, ti: *Ty
                 }
                 return ti.intern(.{ .inline_union = .{ .types = childs.toOwnedSlice(alloc) catch oom() } });
             },
-            .pointer => |ptr| self.zigToRay(alloc, ptr.child, interner, ti),
+            .pointer => |ptr| switch (ptr.child) {
+                Obj.EnumInstance => ti.getCached(.IsEnum),
+                else => self.zigToRay(alloc, ptr.child, interner, ti),
+            },
             .@"struct" => {
                 if (self.scratch_structs.get(interner.intern(@typeName(T)))) |t| {
                     return t;

@@ -1,6 +1,6 @@
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
-        [Call Zig symbol 7]
+        [Call Zig symbol 8]
             - args
             [Constant index 3]
                 [Int 2]

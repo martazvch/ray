@@ -20,11 +20,12 @@ pub const module: zffi.Module = .{
     },
 };
 
-pub fn int(_: *Vm, value: zffi.Union(&.{ .int, .float, .str })) zffi.Int {
+pub fn int(_: *Vm, value: zffi.Union(&.{ .int, .float, .str, .@"enum" })) zffi.Int {
     return switch (value) {
         .int => |i| i,
         .float => |f| @intFromFloat(f),
         .str => |s| std.fmt.parseInt(zffi.Int, s, 10) catch unreachable,
+        .@"enum" => |e| e.tag_id,
     };
 }
 

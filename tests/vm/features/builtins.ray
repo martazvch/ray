@@ -1,9 +1,13 @@
+enum Foo {
+    a=1,
+    b=4,
+}
+
 fn main() {
-    var a: int = int(5.6)
-    print a
-    a = int(8)
-    print a
+    print int(5.6) 
+    print int(8) 
     print int("67")
+    print int(Foo.b)
 
     var b: float = float(6)
     print b

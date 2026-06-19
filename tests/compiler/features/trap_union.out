@@ -32,7 +32,7 @@ call index 0, arity 1, failable
 jump_no_err 5 -> 73
 get_local index 0
 dup
-is_type index 15
+is_type index 26
 jump_false 13 -> 58
 pop
 get_local index 0
@@ -61,7 +61,7 @@ swap_pop
 jump 55 -> 72
 pop
 dup
-is_type index 16
+is_type index 27
 jump_false 62 -> 71
 pop
 load_constant index 8, value -999

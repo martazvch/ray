@@ -137,7 +137,15 @@ main: ?usize,
 
 mod_name: InternerIdx,
 mod_index: ModIndex,
-cached_names: struct { empty: usize, main: usize, std: usize, self: usize, Self: usize, init: usize },
+cached_names: struct {
+    empty: usize,
+    main: usize,
+    std: usize,
+    self: usize,
+    Self: usize,
+    init: usize,
+    IsEnum: usize,
+},
 
 pub fn init(io: std.Io, alloc: Allocator, state: *State) Self {
     return .{
@@ -157,6 +165,7 @@ pub fn init(io: std.Io, alloc: Allocator, state: *State) Self {
 
         .mod_name = undefined,
         .mod_index = undefined,
+        // TODO: do this with reflection
         .cached_names = .{
             .empty = state.interner.intern(""),
             .main = state.interner.intern("main"),
@@ -164,6 +173,7 @@ pub fn init(io: std.Io, alloc: Allocator, state: *State) Self {
             .self = state.interner.intern("self"),
             .Self = state.interner.intern("Self"),
             .init = state.interner.intern("init"),
+            .IsEnum = state.interner.intern("IsEnum"),
         },
     };
 }
@@ -3365,12 +3375,13 @@ fn performTypeCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, 
 
     check: {
         if (decl.is(.inline_union)) {
-            return checkUnionType(decl, value) catch |e| return switch (e) {
+            return self.checkUnionType(decl, value, value_info) catch |e| return switch (e) {
                 error.Mismatch => break :check,
                 error.NotInUnion => self.err(
                     .{ .type_not_in_union = .{ .expect = self.typeName(decl), .found = self.typeName(value) } },
                     span,
                 ),
+                else => |narrowed| narrowed,
             };
         }
         // Array
@@ -3386,7 +3397,7 @@ fn performTypeCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, 
         }
         // Trait object
         else if (decl.as(.trait)) |*t| {
-            return try self.checkTraitObj(t, value_info) orelse break :check;
+            return try self.checkTraitObj(decl, t, value_info) orelse break :check;
         }
 
         // We check after the other because above checks need the information about a potential void declaration
@@ -3494,7 +3505,12 @@ fn checkFunctionEq(self: *Self, decl: *const Type, value: *const Type, allow_new
 
 /// Checks if two different types (with at least one of them being an unoion) fits in one or the other
 /// Assumes `decl` is an union
-fn checkUnionType(decl: *const Type, value: *const Type) error{ Mismatch, NotInUnion }!*const Type {
+fn checkUnionType(
+    self: *Self,
+    decl: *const Type,
+    value: *const Type,
+    value_info: *InstrInfos,
+) (Error || error{ Mismatch, NotInUnion })!*const Type {
     // TODO: put the check void on decl in the caller
     if (decl.is(.void)) {
         return value;
@@ -3502,6 +3518,12 @@ fn checkUnionType(decl: *const Type, value: *const Type) error{ Mismatch, NotInU
 
     // Only declaration is an union
     if (!value.is(.inline_union)) {
+        for (decl.inline_union.types) |ty| {
+            if (ty == value) return decl;
+
+            const trait = ty.as(.trait) orelse continue;
+            return try self.checkTraitObj(decl, &trait, value_info) orelse continue;
+        }
         if (decl.inline_union.contains(value)) {
             return decl;
         }
@@ -3563,7 +3585,7 @@ fn checkArrayOfUnion(self: *Self, decl: *const Type.InlineUnion, value: *const T
 }
 
 /// Checks if we must create a trait object, if not return instruction
-fn checkTraitObj(self: *Self, trait: *const Type.Trait, value_info: *InstrInfos) Error!?*const Type {
+fn checkTraitObj(self: *Self, decl: *const Type, trait: *const Type.Trait, value_info: *InstrInfos) Error!?*const Type {
     const value = value_info.type;
 
     if (value.getTraitImpl(trait.loc.name)) |*t| {
@@ -3578,7 +3600,22 @@ fn checkTraitObj(self: *Self, trait: *const Type.Trait, value_info: *InstrInfos)
         return t.trait;
     }
 
+    if (self.hasCompilerTrait(trait.loc.name, value)) {
+        return decl;
+    }
+
     return null;
+}
+
+fn hasCompilerTrait(self: *Self, trait_name: InternerIdx, value_type: *const Type) bool {
+    switch (value_type.*) {
+        .@"enum" => inline for (&.{self.cached_names.IsEnum}) |compiler_trait| {
+            if (compiler_trait == trait_name) return true;
+        },
+        else => unreachable,
+    }
+
+    return false;
 }
 
 pub fn typeName(self: *const Self, ty: *const Type) []const u8 {

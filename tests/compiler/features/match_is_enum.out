@@ -3,7 +3,7 @@ load_constant index 3, value <enum Foo.a>
 
 get_local index 0
 dup
-is_type index 15
+is_type index 26
 jump_false 7 -> 66
 pop
 get_local index 0
