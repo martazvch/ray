@@ -33,19 +33,21 @@ pub const Variable = struct {
 };
 
 pub const Break = *const Type;
-// Name used for transpiling
-pub const Symbol = struct { name: InternerIdx, type: *const Type, index: usize };
-pub const ExternSymbol = struct { module_index: ModIndex, symbol: Symbol };
+pub const Symbol = struct {
+    /// Used for transpiling
+    name: InternerIdx,
+    type: *const Type,
+    index: usize,
+    module_index: ?ModIndex = null,
+};
 
 pub const VariableMap = AutoArrayHashMapUnmanaged(InternerIdx, Variable);
 pub const SymbolArrMap = AutoArrayHashMapUnmanaged(InternerIdx, Symbol);
-pub const ExternMap = AutoHashMapUnmanaged(InternerIdx, ExternSymbol);
 
 scopes: ArrayList(Scope),
 current: *Scope,
 builtins: AutoHashMapUnmanaged(InternerIdx, *const Type),
 natives: AutoHashMapUnmanaged(InternerIdx, Symbol),
-c_natives: AutoHashMapUnmanaged(InternerIdx, Symbol),
 
 enum_count: usize,
 func_count: usize,
@@ -66,7 +68,6 @@ pub const empty: Self = .{
     .current = undefined,
     .builtins = .empty,
     .natives = .empty,
-    .c_natives = .empty,
 
     .enum_count = 0,
     .func_count = 0,
@@ -85,7 +86,6 @@ pub const Scope = struct {
     variables: VariableMap = .empty,
     forwarded: VariableMap = .empty,
     symbols: SymbolArrMap = .empty,
-    extern_symbols: ExternMap = .empty,
     /// First is the interned identifier and second is the interned module's path key of module interner
     modules: AutoHashMapUnmanaged(InternerIdx, *const Type) = .empty,
     breaks: ArrayList(Break) = .empty,
@@ -162,27 +162,28 @@ pub fn initGlobalScope(self: *Self, allocator: Allocator, state: *State) void {
     self.builtins.ensureUnusedCapacity(allocator, builtins.len) catch oom();
 
     inline for (builtins) |builtin| {
-        self.builtins.putAssumeCapacity(state.interner.intern(builtin.name), @field(state.type_interner.cache, builtin.name));
+        self.builtins.putAssumeCapacity(
+            state.interner.intern(builtin.name),
+            @field(state.type_interner.cache, builtin.name),
+        );
     }
 
-    self.natives.ensureTotalCapacity(allocator, @intCast(state.native_reg.zig_fns_meta.count())) catch oom();
-    var it = state.native_reg.zig_fns_meta.iterator();
-    while (it.next()) |entry| {
-        self.natives.putAssumeCapacity(entry.key_ptr.*, .{
-            .name = entry.key_ptr.*,
-            .index = self.natives.count(),
-            .type = entry.value_ptr.*,
-        });
-    }
+    for ([_]*const std.AutoArrayHashMapUnmanaged(InternerIdx, *const Type){
+        &state.native_reg.zig_fns_meta,
+        &state.native_reg.foreign_fns_meta,
+        &state.native_reg.structs_meta,
+    }) |reg| {
+        self.natives.ensureUnusedCapacity(allocator, @intCast(reg.count())) catch oom();
 
-    self.c_natives.ensureTotalCapacity(allocator, @intCast(state.native_reg.foreign_fns_meta.count())) catch oom();
-    it = state.native_reg.foreign_fns_meta.iterator();
-    while (it.next()) |entry| {
-        self.c_natives.putAssumeCapacity(entry.key_ptr.*, .{
-            .name = entry.key_ptr.*,
-            .index = self.c_natives.count(),
-            .type = entry.value_ptr.*,
-        });
+        var count: usize = 0;
+        var it = reg.iterator();
+        while (it.next()) |entry| : (count += 1) {
+            self.natives.putAssumeCapacity(entry.key_ptr.*, .{
+                .name = entry.key_ptr.*,
+                .index = count,
+                .type = entry.value_ptr.*,
+            });
+        }
     }
 }
 
@@ -329,33 +330,12 @@ pub fn getSymbolName(self: *const Self, sym_type: *const Type) ?InternerIdx {
     return null;
 }
 
-pub fn declareExternSymbol(
-    self: *Self,
-    allocator: Allocator,
-    name: InternerIdx,
-    module_index: ModIndex,
-    symbol: Symbol,
-) void {
-    self.current.extern_symbols.put(allocator, name, .{ .module_index = module_index, .symbol = symbol }) catch oom();
-}
-
-pub fn getExternSymbol(self: *const Self, name: InternerIdx) ?*ExternSymbol {
-    var it = self.iterator();
-    while (it.next()) |scope| {
-        if (scope.extern_symbols.getPtr(name)) |ext| {
-            return ext;
-        }
-    }
-
-    return null;
+pub fn declareExternSymbol(self: *Self, allocator: Allocator, name: InternerIdx, symbol: Symbol) void {
+    self.current.symbols.put(allocator, name, symbol) catch oom();
 }
 
 pub fn getBuiltinSymbol(self: *const Self, name: InternerIdx) ?*Symbol {
     return self.natives.getPtr(name);
-}
-
-pub fn getBuiltinSymbolC(self: *const Self, name: InternerIdx) ?*Symbol {
-    return self.c_natives.getPtr(name);
 }
 
 pub fn declareModule(self: *Self, allocator: Allocator, name: InternerIdx, ty: *const Type) void {

@@ -836,7 +836,11 @@ fn expectAssignableValue(self: *Self, expr: *const Ast.Expr, ctx: *Context) Resu
         .identifier => |e| b: {
             const value = self.resolveIdentifier(e, true, ctx) catch break :b null;
             if (value.kind == .symbol and value.type.* != .function) break :b null;
-            break :b .{ .type = value.type, .ti = .{ .heap = value.type.isHeap() }, .instr = value.instr };
+            break :b .{
+                .type = value.type,
+                .ti = .{ .heap = value.type.isHeap(), .ext_mod = value.module },
+                .instr = value.instr,
+            };
         },
         .field => |*e| b: {
             const field_res = try self.field(e, ctx);
@@ -1194,7 +1198,7 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
 
         for (items) |item| {
             const item_name = self.interner.intern(self.ast.toSource(item.item));
-            const sym = mod.sym_infos.get(item_name) orelse return self.err(
+            var sym = mod.sym_infos.get(item_name) orelse return self.err(
                 .{ .missing_symbol_in_module = .{
                     .module = self.ast.toSource(node.names[node.names.len - 1]),
                     .symbol = self.ast.toSource(item.item),
@@ -1207,9 +1211,10 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
                 @panic("Import not supported yet");
             }
 
+            sym.module_index = mod_index;
             const item_token = if (item.alias) |alias| alias else item.item;
             const item_interned = self.interner.intern(self.ast.toSource(item_token));
-            self.scope.declareExternSymbol(self.alloc, item_interned, mod_index, sym);
+            self.scope.declareExternSymbol(self.alloc, item_interned, sym);
         }
     } else {
         self.scope.declareModule(self.alloc, module_name, self.ti.intern(.{ .module = path }));
@@ -2252,18 +2257,10 @@ fn resolveIdentifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool,
     } else name;
 
     if (self.symbolIdentifier(sym_name, span)) |res| {
-        return .{ .type = res.sym.type, .kind = .symbol, .instr = res.instr };
-    }
-
-    if (self.externSymbolIdentifier(sym_name, span)) |res| {
-        return .{ .type = res.sym.type, .kind = .symbol, .instr = res.instr, .module = res.mod_index };
+        return .{ .type = res.sym.type, .kind = .symbol, .instr = res.instr, .module = res.sym.module_index };
     }
 
     if (self.builtinSymbol(sym_name, span)) |res| {
-        return .{ .type = res.sym.type, .kind = .symbol, .instr = res.instr };
-    }
-
-    if (self.builtinSymbolC(sym_name, span)) |res| {
         return .{ .type = res.sym.type, .kind = .symbol, .instr = res.instr };
     }
 
@@ -2300,8 +2297,9 @@ fn variableIdentifier(self: *Self, name: InternerIdx, span: Span) ?VariableInstr
         span.start,
     );
 
-    self.checkWrap(&instr, false);
-    if (variable.captured) instr = self.irb.wrapPreviousInstr(.unbox);
+    if (variable.captured) {
+        instr = self.irb.wrapPreviousInstr(.unbox);
+    }
 
     return .{ .variable = variable, .instr = instr };
 }
@@ -2314,22 +2312,7 @@ fn symbolIdentifier(self: *Self, name: InternerIdx, span: Span) ?struct { sym: *
     return .{
         .sym = sym,
         .instr = self.irb.addInstr(
-            .{ .load_symbol = .{ .module_index = null, .symbol_index = @intCast(sym.index) } },
-            span.start,
-        ),
-    };
-}
-
-/// Tries to find a symbol in scopes and returns it while emitting an instruction
-fn externSymbolIdentifier(self: *Self, name: InternerIdx, span: Span) ?struct { sym: *LexScope.Symbol, mod_index: ModIndex, instr: InstrIndex } {
-    const ext = self.scope.getExternSymbol(name) orelse return null;
-
-    // TODO: protect cast
-    return .{
-        .sym = &ext.symbol,
-        .mod_index = ext.module_index,
-        .instr = self.irb.addInstr(
-            .{ .load_symbol = .{ .module_index = ext.module_index, .symbol_index = @intCast(ext.symbol.index) } },
+            .{ .load_symbol = .{ .module_index = sym.module_index, .symbol_index = @intCast(sym.index) } },
             span.start,
         ),
     };
@@ -2338,17 +2321,6 @@ fn externSymbolIdentifier(self: *Self, name: InternerIdx, span: Span) ?struct { 
 /// Tries to find a symbol in scopes and returns it while emitting an instruction
 fn builtinSymbol(self: *Self, name: InternerIdx, span: Span) ?struct { sym: *LexScope.Symbol, instr: InstrIndex } {
     const sym = self.scope.getBuiltinSymbol(name) orelse return null;
-
-    // TODO: protect cast
-    return .{
-        .sym = sym,
-        .instr = self.irb.addInstr(.{ .load_builtin = @intCast(sym.index) }, span.start),
-    };
-}
-
-/// Tries to find a symbol in scopes and returns it while emitting an instruction
-fn builtinSymbolC(self: *Self, name: InternerIdx, span: Span) ?struct { sym: *LexScope.Symbol, instr: InstrIndex } {
-    const sym = self.scope.getBuiltinSymbolC(name) orelse return null;
 
     // TODO: protect cast
     return .{

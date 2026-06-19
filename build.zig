@@ -113,6 +113,7 @@ pub fn build(b: *std.Build) !void {
         .root_module = ray_mod,
     });
     exe_check.root_module.addImport("clarg", clarg.module("clarg"));
+    exe_check.root_module.addImport("misc", misc_mod);
     exe_check.root_module.addOptions("options", options);
 
     const check = b.step("check", "Check if foo compiles");
