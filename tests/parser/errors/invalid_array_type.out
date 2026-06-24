@@ -1,3 +1,4 @@
-expect_name, type
+missing_bracket_array_type
 expect_name, type
 missing_bracket_array_type
+missing_paren_array_type

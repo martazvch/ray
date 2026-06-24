@@ -1,3 +1,4 @@
 var invalid: [
 var invalid: []
 var invalid: [int
+var invalid: [](int|float

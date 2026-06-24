@@ -4,7 +4,7 @@ enum Foo {
     c,
 }
 
-fn matchAny(f: Foo|int|[float]|[str]) {
+fn matchAny(f: Foo|int|[]float|[]str) {
     match f is {
         Foo {
             .a => print "a"
@@ -12,13 +12,13 @@ fn matchAny(f: Foo|int|[float]|[str]) {
             .c => print "c"
         }
         int => print "int"
-        [float] => print "array float"
-        [str] => print "array str"
+        []float => print "array float"
+        []str => print "array str"
     }
 }
 
 fn main() {
-    var f: Foo|int|[str]|[float] = Foo.a
+    var f: Foo|int|[]str|[]float = Foo.a
     matchAny(f)
     f = .b
     matchAny(f)

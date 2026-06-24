@@ -398,9 +398,16 @@ pub const Type = union(enum) {
         switch (self.*) {
             .any, .never, .int, .float, .bool, .str, .null, .void, .range => return @tagName(self.*),
             .array => |ty| {
-                w.writeAll("[") catch oom();
-                w.writeAll(ty.child.toString(allocator, interner, mod_name)) catch oom();
-                w.writeAll("]") catch oom();
+                errdefer oom();
+
+                try w.writeAll("[]");
+                if (ty.child.is(.inline_union)) {
+                    try w.writeAll("(");
+                    try w.writeAll(ty.child.toString(allocator, interner, mod_name));
+                    try w.writeAll(")");
+                } else {
+                    try w.writeAll(ty.child.toString(allocator, interner, mod_name));
+                }
             },
             .@"enum" => |ty| {
                 // If symbol is defnined in current mod/file, don't repeat the module

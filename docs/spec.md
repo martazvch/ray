@@ -214,7 +214,7 @@ TODO: multiline strings
 
 ### Null
 
-The `null` value can only be used with optional types. They are defined with a `?` preceding the type like `?int` or `?[float]`.
+The `null` value can only be used with optional types. They are defined with a `?` preceding the type like `?int` or `?[]float`.
 It means that the variable of type `?T` holds either `null` or a value of type `T`.
 A variable of type `?T` will be initialized with `null` if no value is provided.
 
@@ -292,12 +292,12 @@ In practise the syntax 2 is the preferred way.
 An array is an mutable homogeneous sequence of data, meaning that all the values share the same type. To declare an array literal you must surround values with `[]` and seperate them with commas. Type will be infered from the values so you don't have to write it. If multiple types are found among the values, an [inline unions](#Inline%20unions).
 
 ```zig
-var data = [1, 2, 3] // type is: [int]
+var data = [1, 2, 3] // type is: []int
 var data = [
     1,
     "on",
     4,
-] // type is: [int|str]
+] // type is: []int|str
 ```
 
 Arrays support indexing with `[<index>]` syntax noth for access and assignemnt:
@@ -791,14 +791,14 @@ It's signature defines:
 - Return type `int!impl Error`: union of an error and an integers
 
 ```zig
-fn main(args: [str]) {}
+fn main(args: []str) {}
 ```
 
 If you're not using the argument or the return type, you can omit them. All the following are valid syntaxes:
 
 ```zig
 fn main() {}
-fn main(args: [str]) {}
+fn main(args: []str) {}
 fn main() -> int!Err {}
 ```
 
@@ -1021,13 +1021,18 @@ let v: int|float|bool = 42
 As always, the type will automatically be infered:
 
 ```rust
-let arr = [1, 4.5, false] // type is infered as: [int|float|bool]
+let arr = [1, 4.5, false] // type is infered as: [](int|float|bool)
 ```
 
 > [!NOTE]
 > Inline unions aren't order dependent.
 > There is absolutly no difference between `int|float` and `float|int`
 > Ray internally treats them as sets of types, not as ordered sequences.
+
+### Precedence
+
+The `|` operator has the highest precedence meaning that `[]int|float` is interpreted as 'array of int **or** float' and not 'array of int **or** array of float'.
+To specify an inline union as child type you can use parenthesis like: `[](int|float)`.
 
 ### Pattern matching
 
@@ -1312,7 +1317,7 @@ var dir: Direction = .south
 assert(dir == .south)
 
 // Here too
-var path: [Direction] = [.west, .west, .north]
+var path: []Direction = [.west, .west, .north]
 
 // Same for functions
 fn go(dir: Direction) { ... }
@@ -1447,9 +1452,9 @@ enum Direction {
 ```
 
 ### Enum arrays
-You can declare an enum-indexed array using the syntax `[Enum elem_type] arr`, where the enum acts as the index type. The array has exactly as many slots as there are enum members:
+You can declare an enum-indexed array using the syntax `[Enum]elem_type`, where the enum acts as the index type. The array has exactly as many slots as there are enum members:
 ```
-intensities: [Color int] = [
+intensities: [Color]int = [
     .red = 255,
     .green = 128,
     .blue = 64
@@ -1514,7 +1519,7 @@ error ParserErr { ... }
 error ConfigErr { ... } | ParserErr | FileErr
 
 fn openConfig(path: str) -> str!FileErr { ... }
-fn parseFields(content: str) -> [Config.Field]!ParserErr { ... }
+fn parseFields(content: str) -> []Config.Field!ParserErr { ... }
 
 fn parseConfig(path: str) Config!ConfigErr {
     let content = openConfig(path)!     // propagates FileErr

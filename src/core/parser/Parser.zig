@@ -680,6 +680,29 @@ fn expectTypeOrEmpty(self: *Self) Error!?*Ast.Type {
 
 /// Parses a type. It assumes you know that a type is expected at this place
 fn parseType(self: *Self) Error!*Ast.Type {
+    const ty = try self.parseUnionType();
+    if (!self.match(.bang)) return ty;
+
+    return self.parseErrorType(ty);
+}
+
+fn parseUnionType(self: *Self) Error!*Ast.Type {
+    const ty = try self.parseScalarType();
+    if (!self.check(.pipe)) return ty;
+
+    var types: ArrayList(*Ast.Type) = .empty;
+    types.append(self.allocator, ty) catch oom();
+
+    while (self.match(.pipe)) {
+        types.append(self.allocator, try self.parseType()) catch oom();
+    }
+
+    const u = self.allocator.create(Ast.Type) catch oom();
+    u.* = .{ .@"union" = types.toOwnedSlice(self.allocator) catch oom() };
+    return u;
+}
+
+fn parseScalarType(self: *Self) Error!*Ast.Type {
     const ty = self.allocator.create(Ast.Type) catch oom();
 
     if (self.match(.identifier)) {
@@ -707,8 +730,14 @@ fn parseType(self: *Self) Error!*Ast.Type {
     // Array
     else if (self.match(.left_bracket)) {
         const openning = self.token_idx - 1;
-        ty.* = .{ .array = .{ .openning = openning, .child = try self.parseType() } };
         try self.expect(.right_bracket, .missing_bracket_array_type);
+
+        if (self.match(.left_paren)) {
+            ty.* = .{ .array = .{ .openning = openning, .child = try self.parseType() } };
+            try self.expect(.right_paren, .missing_paren_array_type);
+        } else {
+            ty.* = .{ .array = .{ .openning = openning, .child = try self.parseScalarType() } };
+        }
     }
     // Function
     else if (self.match(.@"fn")) {
@@ -746,24 +775,6 @@ fn parseType(self: *Self) Error!*Ast.Type {
     // Unknown
     else {
         return self.errAtCurrent(.expectName("type"));
-    }
-
-    // Inline union
-    if (self.check(.pipe)) {
-        var types: ArrayList(*Ast.Type) = .empty;
-        types.append(self.allocator, ty) catch oom();
-
-        while (self.match(.pipe)) {
-            types.append(self.allocator, try self.parseType()) catch oom();
-        }
-
-        const u = self.allocator.create(Ast.Type) catch oom();
-        u.* = .{ .@"union" = types.toOwnedSlice(self.allocator) catch oom() };
-        return u;
-    }
-
-    if (self.match(.bang)) {
-        return self.parseErrorType(ty);
     }
 
     return ty;
