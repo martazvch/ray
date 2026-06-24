@@ -6,13 +6,13 @@
     - expression:
         [Variable index: 0, scope: local]
     - arms:
-    [Types id: 1]
+    [Type id]
         [Print]
             [Binop type: add_int]
                 [Variable index: 0, scope: local]
                 [Constant index 4]
                     [Int 1]
-    [Types id: 0]
+    [Type id]
         [Print]
             [Constant index 5]
                 [String float]
@@ -21,7 +21,7 @@
         - expression:
             [Variable index: 0, scope: local]
         - arms:
-        [Types id: 1]
+        [Type id]
             [Constant index 4]
                 [Int 1]
         - wildcard:
@@ -34,7 +34,7 @@
         - expression:
             [Variable index: 0, scope: local]
         - arms:
-        [Types id: 0]
+        [Type id]
             [Match float]
             - expression:
                 [Variable index: 0, scope: local]
@@ -62,7 +62,7 @@
                     [Print]
                         [Constant index 12]
                             [String non]
-            [Types id: 1]
+            [Type id]
                 [Print]
                     [Constant index 13]
                         [String int]

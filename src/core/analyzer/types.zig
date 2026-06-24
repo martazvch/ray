@@ -25,6 +25,7 @@ pub const TraitImpl = struct {
 pub const TraitMap = ArrayMap(InternerIdx, TraitImpl);
 
 pub const Type = union(enum) {
+    any,
     never,
     void,
     int,
@@ -119,7 +120,7 @@ pub const Type = union(enum) {
         return_type: *const Type,
         kind: Kind,
 
-        pub const Kind = enum { normal, method, bound, foreign, foreign_glob, zig, zig_method };
+        pub const Kind = enum { normal, method, bound, foreign, foreign_glob, intrinsic, zig, zig_method };
         pub const Parameter = struct { name: ?InternerIdx, type: *const Type, default: ?ConstIdx, captured: bool };
         pub const ParamsMap = ArrayMap(InternerIdx, Parameter);
         pub const Proto = ArrayMap(InternerIdx, struct { done: bool = false, default: ?ConstIdx = null });
@@ -331,7 +332,7 @@ pub const Type = union(enum) {
         hasher.update(asBytes(&@intFromEnum(self)));
 
         switch (self) {
-            .never, .void, .int, .float, .bool, .str, .null => {},
+            .any, .never, .void, .int, .float, .bool, .str, .null => {},
             .array => |ty| ty.child.hash(allocator, hasher),
             .@"enum" => |*ty| {
                 if (ty.loc) |loc| {
@@ -384,6 +385,7 @@ pub const Type = union(enum) {
             },
         }
     }
+
     pub fn hashLoc(hasher: anytype, loc: Loc) void {
         hasher.update(asBytes(&loc.name));
         hasher.update(asBytes(&loc.container));
@@ -394,7 +396,7 @@ pub const Type = union(enum) {
         const w = &wa.writer;
 
         switch (self.*) {
-            .never, .int, .float, .bool, .str, .null, .void, .range => return @tagName(self.*),
+            .any, .never, .int, .float, .bool, .str, .null, .void, .range => return @tagName(self.*),
             .array => |ty| {
                 w.writeAll("[") catch oom();
                 w.writeAll(ty.child.toString(allocator, interner, mod_name)) catch oom();
@@ -469,7 +471,7 @@ pub const TypeInterner = struct {
     ids: Set(*const Type),
     cache: Cache,
 
-    const scalar_list: []const Type = &.{ .float, .int, .bool, .str, .null, .void, .never };
+    const scalar_list: []const Type = &.{ .any, .float, .int, .bool, .str, .null, .void, .never };
     const trait_list: []const []const u8 = &.{"IsEnum"};
 
     pub const Cache = CreateCache();

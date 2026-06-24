@@ -21,7 +21,7 @@ get_local index 1
 incr_ref
 get_local index 1
 incr_ref
-array_new length 1, type_id 30
+array_new length 1, type_id x
 struct_lit index 2, arity 2, Structure
 
 get_local index 2

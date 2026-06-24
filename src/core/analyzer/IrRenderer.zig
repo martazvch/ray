@@ -493,7 +493,7 @@ fn matchType(self: *Self, data: Instruction.MatchType) void {
     self.indent_level -= 1;
     self.indentAndAppendSlice("- arms:");
     for (data.arms) |arm| {
-        self.indentAndPrintSlice("[Types id: {}]", .{arm.type_id});
+        self.indentAndAppendSlice("[Type id]");
         self.indent_level += 1;
         self.parseInstr(arm.body);
         self.indent_level -= 1;

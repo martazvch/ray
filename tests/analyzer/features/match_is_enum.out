@@ -17,7 +17,7 @@
     - expression:
         [Variable index: 0, scope: local]
     - arms:
-    [Types id: 26]
+    [Type id]
         [Match enum]
         - expression:
             [Variable index: 0, scope: local]
@@ -55,7 +55,7 @@
                 [Print]
                     [Constant index 8]
                         [String c]
-    [Types id: 1]
+    [Type id]
         [Print]
             [Constant index 9]
                 [String int]

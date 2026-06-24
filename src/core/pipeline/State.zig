@@ -94,6 +94,7 @@ pub fn new(allocator: Allocator, config: Config) Self {
     ctx.type_interner.cacheFrequentTypes(&ctx.interner);
     ctx.registerMod(allocator, @import("../builtins/builtins.zig"));
     ctx.registerMod(allocator, @import("../builtins/file.zig"));
+    ctx.registerIntrinsics(allocator, @import("../builtins/intrinsics.zig"));
 
     if (options.test_mode) {
         ctx.registerMod(allocator, @import("../builtins/test_natives.zig"));
@@ -120,6 +121,10 @@ pub fn initGlobalScope(self: *Self, allocator: Allocator) void {
 
 pub fn registerMod(self: *Self, allocator: Allocator, Module: type) void {
     self.native_reg.registerMod(allocator, &self.interner, &self.type_interner, Module);
+}
+
+pub fn registerIntrinsics(self: *Self, allocator: Allocator, Module: type) void {
+    self.native_reg.registerIntrinsics(allocator, &self.interner, &self.type_interner, Module);
 }
 
 pub fn registerFn(self: *Self, allocator: Allocator, func: zffi.FnMeta) void {

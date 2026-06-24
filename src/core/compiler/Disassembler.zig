@@ -143,7 +143,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .is_float => self.simpleInstruction(writer, "is_float", offset),
         .is_int => self.simpleInstruction(writer, "is_int", offset),
         .is_str => self.simpleInstruction(writer, "is_str", offset),
-        .is_type => self.indexInstruction(writer, "is_type", offset),
+        .is_type => self.isType(writer, offset),
         .iter_new_arr => self.simpleInstruction(writer, "iter_new_arr", offset),
         .iter_new_range => self.simpleInstruction(writer, "iter_new_range", offset),
         .iter_new_str => self.simpleInstruction(writer, "iter_new_str", offset),
@@ -260,12 +260,27 @@ fn indexExternInstruction(self: *Self, writer: *Writer, name: []const u8, offset
     return offset + 3;
 }
 
+fn isType(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
+    const text = "is_type";
+    const index = self.getIndex(offset);
+
+    if (self.render_mode == .@"test") {
+        // Not printing the type id value because it changes every time I add a builtin/std function or type
+        try writer.print("{s} x\n", .{text});
+    } else {
+        try writer.print("{s:<20} {:>4}\n", .{ text, index.value });
+    }
+
+    return offset + 1 + index.bytes;
+}
+
 fn arrayNew(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
     const len = self.getIndex(offset);
     const type_id = self.readShort(offset + len.bytes);
 
     if (self.render_mode == .@"test") {
-        try writer.print("array_new length {}, type_id {}\n", .{ len.value, type_id });
+        // Not printing the type id value because it changes every time I add a builtin/std function or type
+        try writer.print("array_new length {}, type_id x\n", .{len.value});
     } else {
         try writer.print("array_new length {:>4}, type_id {:>4}\n", .{ len.value, type_id });
     }

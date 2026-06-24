@@ -32,6 +32,10 @@ foreign_fns: ArrayList(*Obj.ForeignFn),
 /// Foreign functions translated to Ray's type system for compilation
 foreign_fns_meta: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
 
+/// Intrinsic functions called during Analyzis pass
+intrinsics: std.AutoHashMapUnmanaged(Interner.Index, zffi.IntrinsicFn),
+intrinsics_meta: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
+
 const Self = @This();
 
 pub const empty: Self = .{
@@ -42,6 +46,8 @@ pub const empty: Self = .{
     .scratch_structs = .empty,
     .foreign_fns = .empty,
     .foreign_fns_meta = .empty,
+    .intrinsics = .empty,
+    .intrinsics_meta = .empty,
 };
 
 pub fn registerMod(self: *Self, alloc: Allocator, interner: *Interner, ti: *TypeInterner, Mod: type) void {
@@ -165,8 +171,57 @@ fn fnZigToRay(self: *Self, alloc: Allocator, comptime func: *const zffi.FnMeta, 
     return ti.intern(.{ .function = ty });
 }
 
+pub fn registerIntrinsics(self: *Self, alloc: Allocator, interner: *Interner, ti: *TypeInterner, Mod: type) void {
+    const funcs = @field(Mod, "functions");
+    if (@TypeOf(funcs) != []const zffi.Intrinsic) {
+        @compileError("Intrinsic functions variable must be of type []const " ++ @typeName(zffi.Intrinsic));
+    }
+
+    self.intrinsics.ensureUnusedCapacity(alloc, funcs.len) catch oom();
+    self.intrinsics_meta.ensureUnusedCapacity(alloc, funcs.len) catch oom();
+
+    inline for (funcs) |*func| {
+        const fn_name = interner.intern(func.name);
+        const fn_type = self.fnIntrinsicToRay(alloc, func, interner, ti);
+        self.intrinsics.putAssumeCapacity(fn_name, func.func);
+        self.intrinsics_meta.putAssumeCapacity(fn_name, fn_type);
+    }
+}
+
+fn fnIntrinsicToRay(
+    self: *Self,
+    alloc: Allocator,
+    comptime func: *const zffi.Intrinsic,
+    interner: *Interner,
+    ti: *TypeInterner,
+) *const Type {
+    var params: Type.Function.ParamsMap = .empty;
+    params.ensureTotalCapacity(alloc, func.params.len) catch oom();
+
+    inline for (func.params) |p| {
+        const param_ty = self.zigToRay(alloc, p.type, interner, ti);
+
+        params.putAssumeCapacity(
+            interner.intern(p.name),
+            .{ .name = null, .type = param_ty, .default = null, .captured = false },
+        );
+    }
+
+    // TODO: handle container name properly
+    const ty: Type.Function = .{
+        .kind = .intrinsic,
+        .loc = .{ .name = interner.intern(func.name), .container = interner.intern("compiler") },
+        .return_type = self.zigToRay(alloc, func.return_type, interner, ti),
+        .params = params,
+    };
+
+    return ti.intern(.{ .function = ty });
+}
+
 fn zigToRay(self: *Self, alloc: Allocator, T: type, interner: *Interner, ti: *TypeInterner) *const Type {
     return switch (T) {
+        // `anyopaque` is used to represent `any` in Ray
+        anyopaque => ti.getCached(.any),
         bool => ti.getCached(.bool),
         i64 => ti.getCached(.int),
         f64 => ti.getCached(.float),

@@ -172,6 +172,7 @@ pub fn initGlobalScope(self: *Self, allocator: Allocator, state: *State) void {
         &state.native_reg.zig_fns_meta,
         &state.native_reg.foreign_fns_meta,
         &state.native_reg.structs_meta,
+        &state.native_reg.intrinsics_meta,
     }) |reg| {
         self.natives.ensureUnusedCapacity(allocator, @intCast(reg.count())) catch oom();
 

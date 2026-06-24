@@ -2138,27 +2138,32 @@ fn call(self: *Self, expr: *const Ast.FnCall, ctx: *Context) Result {
     const ctx_call = ctx.setAndGetPrevious(.in_call, true);
     const callee = try self.analyzeExpr(expr.callee, .any, ctx);
 
-    if (!callee.type.is(.function)) return self.err(.invalid_call_target, span);
+    const fn_type = callee.type.as(.function) orelse return self.err(.invalid_call_target, span);
 
     // Restore state before arguments analyzis
     ctx.in_call = ctx_call;
-    const args_res = try self.fnArgsList(expr.args, &callee.type.function, callee.ti.ext_mod, span, ctx);
+    const args_res = try self.fnArgsList(expr.args, &fn_type, callee.ti.ext_mod, span, ctx);
+
+    if (fn_type.kind == .intrinsic) {
+        return self.intrinsicCall(&fn_type, args_res.first, span);
+    }
 
     return .{
-        .type = callee.type.function.return_type,
+        .type = fn_type.return_type,
         .ti = .{ .ext_mod = callee.ti.ext_mod },
         .instr = self.irb.addInstr(
             .{ .call = .{
                 .callee = callee.instr,
-                .args = args_res,
+                .args = args_res.instrs,
                 .ext_mod = callee.ti.ext_mod,
-                .kind = callee.type.function.kind,
+                .kind = fn_type.kind,
             } },
             span.start,
         ),
     };
 }
 
+/// Returns all the arguments instructions and the first argument type (used by intrinsic calls)
 fn fnArgsList(
     self: *Self,
     args: []const Ast.FnCall.Arg,
@@ -2166,7 +2171,7 @@ fn fnArgsList(
     ext_mod: ?ModIndex,
     err_span: Span,
     ctx: *Context,
-) Error![]const Instr.Arg {
+) Error!struct { instrs: []const Instr.Arg, first: *const Type } {
     var proto = ty.proto(self.alloc);
     const param_count = proto.count();
     const params = ty.params.values()[@intFromBool(ty.kind == .method)..];
@@ -2182,6 +2187,7 @@ fn fnArgsList(
         }
     }
 
+    var first: *const Type = undefined;
     const prev_decl = ctx.setAndGetPrevious(.decl_type, null);
     defer ctx.decl_type = prev_decl;
 
@@ -2226,6 +2232,10 @@ fn fnArgsList(
         if (param_info.captured) value.instr = self.irb.wrapPreviousInstr(.box);
 
         instrs[index] = .{ .instr = value.instr };
+
+        if (i == 0) {
+            first = value.type;
+        }
     }
 
     // Check if any missing non-default parameter
@@ -2236,7 +2246,20 @@ fn fnArgsList(
         self.err(.{ .missing_function_param = .{ .name = self.interner.getKey(k).? } }, err_span) catch {};
     }
 
-    return if (err_count < self.errs.items.len) error.Err else instrs;
+    return if (err_count < self.errs.items.len)
+        error.Err
+    else
+        .{ .instrs = instrs, .first = first };
+}
+
+fn intrinsicCall(self: *Self, ty: *const Type.Function, first_param: *const Type, span: Span) Result {
+    // Unreachable because if function declared with `kind == .intrinsic` it has been registered
+    const intrinsic = self.state.native_reg.intrinsics.get(ty.loc.?.name) orelse unreachable;
+
+    return .{
+        .instr = intrinsic(self, first_param, span.start),
+        .type = ty.return_type,
+    };
 }
 
 const IdentRes = struct {
@@ -3349,6 +3372,7 @@ fn performTypeCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, 
     const value = value_info.type;
 
     if (decl == value) return decl;
+    if (decl.is(.any)) return decl;
 
     if (decl.is(.error_union)) {
         return self.performErrorCoercion(decl, value_info, span);
@@ -3676,7 +3700,7 @@ pub fn tryGetConstant(self: *Self, index: ir.Index) ?Instr.Data {
     };
 }
 
-fn addConstant(self: *Self, constant: Constant, offset: usize) InstrIndex {
+pub fn addConstant(self: *Self, constant: Constant, offset: usize) InstrIndex {
     return self.irb.addInstr(
         .{ .constant = .{ .index = self.state.addConstant(self.alloc, constant) } },
         offset,

@@ -1,4 +1,7 @@
 const std = @import("std");
+const Analyzer = @import("../analyzer/Analyzer.zig");
+const Type = @import("../analyzer/types.zig").Type;
+const InstrIndex = @import("../analyzer/ir.zig").Index;
 const Value = @import("../runtime/values.zig").Value;
 const Obj = @import("../runtime/Obj.zig");
 const Vm = @import("../runtime/Vm.zig");
@@ -101,6 +104,14 @@ pub const FnMeta = struct {
 };
 
 pub const Fn = *const fn (*Vm, []const Value) ?Value;
+pub const IntrinsicFn = *const fn (*Analyzer, *const Type, offset: usize) InstrIndex;
+
+pub const Intrinsic = struct {
+    name: []const u8,
+    func: IntrinsicFn,
+    params: []const struct { name: []const u8, type: type },
+    return_type: type,
+};
 
 fn getMember(T: type, comptime kind: MemberKind) kind.Type() {
     const info = @typeInfo(T);
