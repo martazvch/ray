@@ -393,6 +393,7 @@ pub fn getSpan(self: *const @This(), anynode: anytype) Span {
             self.token_spans[name]
         else
             self.token_spans[node.tk],
+        EnumDecl.Tag => self.getSpan(node.name),
         For => .{
             .start = self.token_spans[node.for_tk].start,
             .end = self.getSpan(node.body).end,

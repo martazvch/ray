@@ -501,13 +501,14 @@ fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
     try self.openContainer(name_tk);
     defer self.closeContainer();
 
-    const tags = try self.enumTags(node.tags, ty, ctx);
+    const tags_res = try self.enumTags(node.tags, ty, ctx);
     const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
 
     return self.irb.addInstr(
         .{ .enum_decl = .{
             .name = name,
-            .tags = tags,
+            .tags = tags_res.names,
+            .discriminants = tags_res.discriminants,
             .sym_index = sym.index,
             .type_id = self.ti.typeId(interned),
             .functions = funcs,
@@ -516,13 +517,39 @@ fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
     );
 }
 
-fn enumTags(self: *Self, tags: []const Ast.EnumDecl.Tag, ty: *Type.Enum, ctx: *Context) Error![]const []const u8 {
+const TagsRes = struct {
+    names: []const []const u8,
+    discriminants: []const i64,
+};
+fn enumTags(self: *Self, tags: []const Ast.EnumDecl.Tag, ty: *Type.Enum, ctx: *Context) Error!TagsRes {
     ty.tags.ensureTotalCapacity(self.alloc, @intCast(tags.len)) catch oom();
     var names = ArrayList([]const u8).initCapacity(self.alloc, @intCast(tags.len)) catch oom();
+    var discriminants: Set(i64) = .empty;
+    var prev_discriminant: i64 = 0;
 
-    for (tags) |tag| {
+    for (tags, 0..) |tag, i| {
         const tag_name = self.ast.toSource(tag.name);
-        const tag_value = try self.enumTag(tag, ctx);
+        const tag_res = try self.enumDescriminant(tag, ctx);
+
+        {
+            const cur_discriminant = disc: {
+                if (tag_res) |res| {
+                    break :disc res.value;
+                } else {
+                    break :disc if (i == 0) 0 else prev_discriminant + 1;
+                }
+            };
+
+            const gop = discriminants.getOrPut(self.alloc, cur_discriminant) catch oom();
+            if (gop.found_existing) return self.err(
+                .{ .enum_discr_duplicate = .{ .value = cur_discriminant } },
+                self.ast.getSpan(tag),
+            );
+            gop.key_ptr.* = cur_discriminant;
+
+            prev_discriminant = cur_discriminant;
+        }
+
         const gop = ty.tags.getOrPut(self.alloc, self.interner.intern(tag_name)) catch oom();
 
         if (gop.found_existing) {
@@ -531,23 +558,39 @@ fn enumTags(self: *Self, tags: []const Ast.EnumDecl.Tag, ty: *Type.Enum, ctx: *C
                 self.ast.getSpan(tag.name),
             );
         }
-        gop.value_ptr.* = if (tag_value) |val| val.instr else null;
+        gop.value_ptr.* = if (tag_res) |res| res.instr else null;
         names.appendAssumeCapacity(self.alloc.dupe(u8, self.ast.toSource(tag.name)) catch oom());
     }
 
-    return names.toOwnedSlice(self.alloc) catch oom();
+    return .{
+        .names = names.toOwnedSlice(self.alloc) catch oom(),
+        .discriminants = discriminants.toOwned(),
+    };
 }
 
-fn enumTag(self: *Self, tag: Ast.EnumDecl.Tag, ctx: *Context) Error!?InstrInfos {
+const Discriminant = struct {
+    instr: InstrIndex,
+    value: i64,
+};
+fn enumDescriminant(self: *Self, tag: Ast.EnumDecl.Tag, ctx: *Context) Error!?Discriminant {
     const tag_value = tag.value orelse return null;
+    const span = self.ast.getSpan(tag);
 
-    const value = try self.analyzeExpr(tag_value, .value, ctx);
+    const res = try self.analyzeExpr(tag_value, .value, ctx);
 
-    // TODO: error
-    if (!value.ti.comp_time) @panic("Must be comptime");
-    if (!value.type.is(.int)) @panic("Must be an int");
+    if (!res.ti.comp_time) return self.err(.enum_discr_not_comptime, span);
+    if (!res.type.is(.int)) return self.err(
+        .{ .enum_discr_not_int = .{ .found = self.typeName(res.type) } },
+        span,
+    );
 
-    return value;
+    // Safe because as it's comptime, it's a constant
+    const const_index = self.irb.getInstr(res.instr).constant.index;
+
+    return .{
+        .instr = res.instr,
+        .value = self.state.const_interner.get(const_index).int,
+    };
 }
 
 const FnDeclRes = struct { instr: usize, sym: LexScope.Symbol };
@@ -3579,7 +3622,7 @@ fn checkArrayType(self: *Self, decl: *const Type, value: *const Type) CoerceErro
             if (depth_value != depth_decl) break :check;
 
             if (!child_value.is(.void)) {
-                // Additional check for cases like: var a: []int|float = [1, 2, 3]
+                // Additional check for cases like: var a: [](int|float) = [1, 2, 3]
                 if (current_decl.as(.inline_union)) |*u| {
                     return if (self.checkArrayOfUnion(u, value)) decl else error.TypeMismatch;
                 }

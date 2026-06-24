@@ -1,0 +1,4 @@
+enum_discr_not_comptime
+enum_discr_not_int, bool
+enum_discr_duplicate, 0
+

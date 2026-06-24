@@ -64,6 +64,10 @@ pub fn add(self: *Self, allocator: Allocator, cte: Constant) ConstIdx {
     return .fromInt(self.hashes.count() - 1);
 }
 
+pub fn get(self: *Self, index: ConstIdx) Constant {
+    return self.constants.items[index.toInt()];
+}
+
 fn hash(data: Constant) u64 {
     var hasher = std.hash.Wyhash.init(0);
     const asBytes = std.mem.asBytes;

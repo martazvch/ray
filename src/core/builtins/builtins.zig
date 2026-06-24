@@ -25,7 +25,7 @@ pub fn int(_: *Vm, value: zffi.Union(&.{ .int, .float, .str, .@"enum" })) zffi.I
         .int => |i| i,
         .float => |f| @intFromFloat(f),
         .str => |s| std.fmt.parseInt(zffi.Int, s, 10) catch unreachable,
-        .@"enum" => |e| e.tag_id,
+        .@"enum" => |e| e.getDiscriminant(),
     };
 }
 

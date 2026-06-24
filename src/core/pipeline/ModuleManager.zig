@@ -33,6 +33,7 @@ pub const Module = struct {
     pub const Enum = struct {
         name: []const u8,
         tags: []const []const u8,
+        discriminants: []const i64,
         type_id: TypeId,
     };
 

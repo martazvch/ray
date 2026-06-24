@@ -103,7 +103,7 @@ pub fn reportAll(
 fn display(Report: type, report: *const GenReport(Report), writer: *Writer, file_name: []const u8, source: [:0]const u8) !void {
     // Prints the error part
     //  Error: <err-msg>
-    try writer.print("{s} ", .{report.level.get_level_msg()});
+    try writer.print("{s} ", .{report.level.getLevelMsg()});
     try report.getMsg(writer);
     _ = try writer.write("\n");
 
@@ -268,7 +268,7 @@ pub fn GenReport(comptime T: type) type {
             info,
             warning,
 
-            pub fn get_level_msg(self: Level) []const u8 {
+            pub fn getLevelMsg(self: Level) []const u8 {
                 return switch (self) {
                     .@"error" => err_msg,
                     .info => @panic("not implemented yet"),
@@ -323,7 +323,7 @@ pub fn GenReport(comptime T: type) type {
                         const subv = @field(field_info, subf.name);
 
                         switch (@TypeOf(subv)) {
-                            usize => try writer.print(", {}", .{subv}),
+                            usize, i64 => try writer.print(", {}", .{subv}),
                             else => try writer.print(", {s}", .{subv}),
                         }
                     }

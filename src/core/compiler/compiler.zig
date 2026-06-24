@@ -795,6 +795,7 @@ const Compiler = struct {
         self.manager.state.modules.addSymbol(self.manager.mod_index, data.sym_index, Module.Enum{
             .name = self.manager.alloc.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
             .tags = data.tags,
+            .discriminants = data.discriminants,
             .type_id = data.type_id,
         });
         try self.containerFnDecls(data.functions);

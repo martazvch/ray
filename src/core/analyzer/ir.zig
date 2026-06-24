@@ -152,6 +152,7 @@ pub const Instruction = struct {
     pub const EnumDecl = struct {
         name: usize,
         tags: []const []const u8,
+        discriminants: []const i64,
         sym_index: SymbolIndex,
         type_id: TypeId,
         functions: []const Index,

@@ -1,0 +1,16 @@
+enum Foo {
+    a,
+    b=4,
+    c,
+    d=-2,
+    e,
+}
+
+fn main() {
+    print(int(Foo.a))
+    print(int(Foo.b))
+    print(int(Foo.c))
+    print(int(Foo.d))
+    print(int(Foo.e))
+}
+

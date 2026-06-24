@@ -1,0 +1,20 @@
+fn getValue() -> int {
+    return 5
+}
+
+enum Foo {
+    a = getValue(),
+}
+
+enum Bar {
+    a = true,
+}
+
+enum Baz {
+    a,
+    b=5,
+    c=3,
+    d=0,
+}
+
+fn main() {}

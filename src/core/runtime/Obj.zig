@@ -566,6 +566,10 @@ pub const EnumInstance = struct {
         return &self.obj;
     }
 
+    pub fn getDiscriminant(self: *Self) i64 {
+        return self.parent.discriminants[self.tag_id];
+    }
+
     pub fn deinit(self: *Self, vm: *Vm) void {
         vm.gc_alloc.destroy(self);
     }
