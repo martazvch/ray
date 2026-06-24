@@ -19,30 +19,31 @@ const oom = misc.oom;
 /// Native Zig functions used at runtime
 zig_fns: ArrayList(*Obj.ZigFn),
 /// Native Zig functions translated to Ray's type system for compilation
-zig_fns_meta: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
+zig_fns_meta: Meta,
 /// Native structures used at runtime
 zig_structs: ArrayList(Module.Structure),
 /// Native structures translated to Ray's type system for compilation
-structs_meta: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
+zig_structs_meta: Meta,
 /// Native structures translated to Ray's type system used here for self references
-scratch_structs: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
+scratch_structs: Meta,
 
 /// Foreign functions used at runtime
 foreign_fns: ArrayList(*Obj.ForeignFn),
 /// Foreign functions translated to Ray's type system for compilation
-foreign_fns_meta: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
+foreign_fns_meta: Meta,
 
 /// Intrinsic functions called during Analyzis pass
 intrinsics: std.AutoHashMapUnmanaged(Interner.Index, zffi.IntrinsicFn),
-intrinsics_meta: std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type),
+intrinsics_meta: Meta,
 
 const Self = @This();
+pub const Meta = std.AutoArrayHashMapUnmanaged(Interner.Index, *const Type);
 
 pub const empty: Self = .{
     .zig_fns = .empty,
     .zig_fns_meta = .empty,
     .zig_structs = .empty,
-    .structs_meta = .empty,
+    .zig_structs_meta = .empty,
     .scratch_structs = .empty,
     .foreign_fns = .empty,
     .foreign_fns_meta = .empty,
@@ -61,6 +62,7 @@ pub fn registerMod(self: *Self, alloc: Allocator, interner: *Interner, ti: *Type
     }
 
     self.zig_structs.ensureUnusedCapacity(alloc, mod.structures.len) catch oom();
+    self.zig_structs_meta.ensureUnusedCapacity(alloc, mod.structures.len) catch oom();
     inline for (mod.structures) |s| {
         self.registerStruct(alloc, s, interner, ti);
     }
@@ -72,6 +74,7 @@ pub fn registerMod(self: *Self, alloc: Allocator, interner: *Interner, ti: *Type
     }
 }
 
+// TODO: Errors
 fn registerStruct(self: *Self, alloc: Allocator, comptime zstruct: zffi.StructMeta, interner: *Interner, ti: *TypeInterner) void {
     // TODO: handle container name properly
     const struct_name = interner.intern(zstruct.name);
@@ -94,7 +97,6 @@ fn registerStruct(self: *Self, alloc: Allocator, comptime zstruct: zffi.StructMe
     inline for (zstruct.functions) |*func| {
         const interned_name = interner.intern(func.name);
         if (ty.structure.functions.contains(interned_name)) {
-            // TODO: error
             @panic("Already declared function");
         }
 
@@ -108,7 +110,6 @@ fn registerStruct(self: *Self, alloc: Allocator, comptime zstruct: zffi.StructMe
     inline for (zstruct.fields) |field| {
         const interned_name = interner.intern(field.name);
         if (ty.structure.fields.contains(interned_name)) {
-            // TODO: error
             @panic("Already declared field");
         }
         ty.structure.fields.putAssumeCapacity(interned_name, .{
@@ -123,8 +124,11 @@ fn registerStruct(self: *Self, alloc: Allocator, comptime zstruct: zffi.StructMe
         .field_count = zstruct.fields.len,
     });
 
-    // TODO: use assume capacity (check all the 'put')
-    self.structs_meta.put(alloc, struct_name, ty) catch oom();
+    const gop = self.zig_structs_meta.getOrPutAssumeCapacity(struct_name);
+    if (gop.found_existing) {
+        @panic("Already declared with same name");
+    }
+    gop.value_ptr.* = ty;
 }
 
 const Registered = struct {
@@ -132,32 +136,37 @@ const Registered = struct {
     type: *const Type,
 };
 // We can use pointers here because we refer to comptime declarations in Module
-// TODO: no check on already defined with same name?
 pub fn registerZigFn(self: *Self, alloc: Allocator, comptime func: *const zffi.FnMeta, interner: *Interner, ti: *TypeInterner) Registered {
     const fn_type = self.fnZigToRay(alloc, func, interner, ti);
-    self.zig_fns_meta.putAssumeCapacity(interner.intern(func.name), fn_type);
-    const native = Obj.ZigFn.create(alloc, func.name, func.function);
+    const gop = self.zig_fns_meta.getOrPutAssumeCapacity(interner.intern(func.name));
 
-    self.zig_fns.appendAssumeCapacity(native);
+    // TODO: Error
+    if (gop.found_existing) {
+        @panic("Already defined one with same name");
+    }
+    gop.value_ptr.* = fn_type;
+
+    self.zig_fns.appendAssumeCapacity(.create(alloc, func.name, func.function));
 
     return .{ .index = self.zig_fns.items.len - 1, .type = fn_type };
 }
 
+// TODO: Errors
 fn fnZigToRay(self: *Self, alloc: Allocator, comptime func: *const zffi.FnMeta, interner: *Interner, ti: *TypeInterner) *const Type {
     var params: Type.Function.ParamsMap = .empty;
 
     // We don't take into account param *Vm and if it's in second place, it means 'self' is in first and we skip it too
-    const offset: usize = if (func.info.params.len > 1 and func.info.params[1].type.? == *Vm) 2 else 1;
-
+    const offset = if (func.info.params.len > 1 and func.info.params[1].type.? == *Vm) 2 else 1;
     params.ensureTotalCapacity(alloc, func.info.params.len - offset) catch oom();
 
     inline for (func.info.params[offset..], 0..) |*p, i| {
         const param_ty = self.zigToRay(alloc, p.type.?, interner, ti);
 
-        params.putAssumeCapacity(
-            interner.intern(func.params[i].name),
-            .{ .name = null, .type = param_ty, .default = null, .captured = false },
-        );
+        const gop = params.getOrPutAssumeCapacity(interner.intern(func.params[i].name));
+        if (gop.found_existing) {
+            @panic("Already declared param with same name");
+        }
+        gop.value_ptr.* = .{ .name = null, .type = param_ty, .default = null, .captured = false };
     }
 
     // TODO: handle container name properly
@@ -171,6 +180,7 @@ fn fnZigToRay(self: *Self, alloc: Allocator, comptime func: *const zffi.FnMeta, 
     return ti.intern(.{ .function = ty });
 }
 
+// TODO: Errors
 pub fn registerIntrinsics(self: *Self, alloc: Allocator, interner: *Interner, ti: *TypeInterner, Mod: type) void {
     const funcs = @field(Mod, "functions");
     if (@TypeOf(funcs) != []const zffi.Intrinsic) {
@@ -182,12 +192,19 @@ pub fn registerIntrinsics(self: *Self, alloc: Allocator, interner: *Interner, ti
 
     inline for (funcs) |*func| {
         const fn_name = interner.intern(func.name);
+
+        const gop = self.intrinsics_meta.getOrPutAssumeCapacity(fn_name);
+        if (gop.found_existing) {
+            @panic("Already decalred with same name");
+        }
+
         const fn_type = self.fnIntrinsicToRay(alloc, func, interner, ti);
         self.intrinsics.putAssumeCapacity(fn_name, func.func);
-        self.intrinsics_meta.putAssumeCapacity(fn_name, fn_type);
+        gop.value_ptr.* = fn_type;
     }
 }
 
+// TODO: Errors
 fn fnIntrinsicToRay(
     self: *Self,
     alloc: Allocator,
@@ -201,10 +218,11 @@ fn fnIntrinsicToRay(
     inline for (func.params) |p| {
         const param_ty = self.zigToRay(alloc, p.type, interner, ti);
 
-        params.putAssumeCapacity(
-            interner.intern(p.name),
-            .{ .name = null, .type = param_ty, .default = null, .captured = false },
-        );
+        const gop = params.getOrPutAssumeCapacity(interner.intern(p.name));
+        if (gop.found_existing) {
+            @panic("Already declared parameter");
+        }
+        gop.value_ptr.* = .{ .name = null, .type = param_ty, .default = null, .captured = false };
     }
 
     // TODO: handle container name properly

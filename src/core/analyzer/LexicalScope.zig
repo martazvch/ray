@@ -9,6 +9,7 @@ const InstrIndex = @import("ir.zig").Index;
 const Span = @import("../parser/Lexer.zig").Span;
 const State = @import("../pipeline/State.zig");
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
+const Meta = @import("../pipeline/NativesRegister.zig").Meta;
 
 const misc = @import("misc");
 const InternerIdx = misc.Interner.Index;
@@ -168,10 +169,10 @@ pub fn initGlobalScope(self: *Self, allocator: Allocator, state: *State) void {
         );
     }
 
-    for ([_]*const std.AutoArrayHashMapUnmanaged(InternerIdx, *const Type){
+    for ([_]*const Meta{
         &state.native_reg.zig_fns_meta,
         &state.native_reg.foreign_fns_meta,
-        &state.native_reg.structs_meta,
+        &state.native_reg.zig_structs_meta,
         &state.native_reg.intrinsics_meta,
     }) |reg| {
         self.natives.ensureUnusedCapacity(allocator, @intCast(reg.count())) catch oom();
