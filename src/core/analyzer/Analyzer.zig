@@ -3383,10 +3383,6 @@ fn performTypeCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, 
             .{ .type_not_in_union = .{ .expect = self.typeName(decl), .found = self.typeName(value) } },
             span,
         ),
-        error.NullAssignToNonOpt => self.err(
-            .{ .null_assign_to_non_optional = .{ .expect = self.typeName(decl) } },
-            span,
-        ),
         error.ErrorNotInUnion => self.err(
             .{ .error_not_in_union = .{ .found = self.typeName(value), .expect = self.typeName(decl.error_union.err) } },
             span,
@@ -3398,7 +3394,6 @@ fn performTypeCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, 
 const CoerceError = error{
     TypeMismatch,
     NotInUnion,
-    NullAssignToNonOpt,
     ErrorNotInUnion,
     CantInferArrayType,
 };
