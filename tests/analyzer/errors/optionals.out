@@ -7,5 +7,5 @@ non_null_comp_optional, int
 non_bool_cond, if, ?bool
 invalid_unary, ?bool
 
-null_assign_to_non_optional, float
+type_mismatch, float, null
 invalid_arithmetic, ?float

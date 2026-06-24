@@ -386,7 +386,10 @@ fn containerTraitImpls(
             // Unreachable because found in proto
             const fn_decl = trait_def.functions.get(fn_name) orelse unreachable;
 
-            fn_res.sym.type = try self.checkFunctionEq(fn_decl.ty, fn_res.sym.type, true, self.ast.getSpan(f.name));
+            fn_res.sym.type = self.checkFunctionEq(fn_decl.ty, fn_res.sym.type, true) catch return self.err(
+                .{ .type_mismatch = .{ .expect = self.typeName(fn_decl.ty), .found = self.typeName(fn_res.sym.type) } },
+                self.ast.getSpan(f.name),
+            );
 
             func_instrs.appendAssumeCapacity(fn_res.instr);
             trait_impl.funcs.putAssumeCapacity(fn_name, fn_res.sym);
@@ -3371,57 +3374,73 @@ fn mergeTypes(self: *Self, types: []const *const Type) *const Type {
 fn performTypeCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, decl_explicit_void: bool, span: Span) Error!*const Type {
     const value = value_info.type;
 
+    return self.checkTypeCoercion(decl, value_info, decl_explicit_void, span) catch |e| switch (e) {
+        error.TypeMismatch => self.err(
+            .{ .type_mismatch = .{ .expect = self.typeName(decl), .found = self.typeName(value) } },
+            span,
+        ),
+        error.NotInUnion => self.err(
+            .{ .type_not_in_union = .{ .expect = self.typeName(decl), .found = self.typeName(value) } },
+            span,
+        ),
+        error.NullAssignToNonOpt => self.err(
+            .{ .null_assign_to_non_optional = .{ .expect = self.typeName(decl) } },
+            span,
+        ),
+        error.ErrorNotInUnion => self.err(
+            .{ .error_not_in_union = .{ .found = self.typeName(value), .expect = self.typeName(decl.error_union.err) } },
+            span,
+        ),
+        error.CantInferArrayType => self.err(.cant_infer_array_type, span),
+    };
+}
+
+const CoerceError = error{
+    TypeMismatch,
+    NotInUnion,
+    NullAssignToNonOpt,
+    ErrorNotInUnion,
+    CantInferArrayType,
+};
+fn checkTypeCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, decl_explicit_void: bool, span: Span) CoerceError!*const Type {
+    const value = value_info.type;
+
     if (decl == value) return decl;
     if (decl.is(.any)) return decl;
-
-    if (decl.is(.error_union)) {
-        return self.performErrorCoercion(decl, value_info, span);
-    }
-
-    if (value.is(.null)) {
-        return if (decl.is(.optional))
-            decl
-        else
-            self.err(.{ .null_assign_to_non_optional = .{ .expect = self.typeName(decl) } }, span);
-    }
 
     // If this is 'never', it means we ended with a control flow in which all branches returned
     // In that case, the type has already been tested against function's type
     if (value.is(.never)) return decl;
 
-    if (decl.is(.optional)) {
-        var new_info = value_info;
-        if (value.as(.optional)) |opt| new_info.type = opt;
-
-        _ = try self.performTypeCoercion(decl.optional, new_info, decl_explicit_void, span);
-        return decl;
-    }
-
     check: {
-        if (decl.is(.inline_union)) {
-            return self.checkUnionType(decl, value, value_info) catch |e| return switch (e) {
-                error.Mismatch => break :check,
-                error.NotInUnion => self.err(
-                    .{ .type_not_in_union = .{ .expect = self.typeName(decl), .found = self.typeName(value) } },
-                    span,
-                ),
-                else => |narrowed| narrowed,
-            };
+        if (decl.is(.error_union)) {
+            return self.performErrorCoercion(decl, value_info, span);
+        }
+        // Inline union
+        else if (decl.is(.inline_union)) {
+            return self.checkUnionType(decl, value, value_info, span);
+        }
+        // Optional
+        else if (decl.is(.optional)) {
+            if (value.is(.null)) return decl;
+
+            var new_info = value_info;
+            if (value.as(.optional)) |opt| new_info.type = opt;
+
+            _ = try self.checkTypeCoercion(decl.optional, new_info, decl_explicit_void, span);
+            return decl;
         }
         // Array
         else if (value.is(.array)) {
-            return self.checkArrayType(decl, value, span) catch |e| switch (e) {
-                error.mismatch => break :check,
-                else => |narrowed| return narrowed,
-            };
+            return self.checkArrayType(decl, value);
         }
         // Function
         else if (value.is(.function)) {
-            return self.checkFunctionEq(decl, value, false, span);
+            return self.checkFunctionEq(decl, value, false);
         }
         // Trait object
         else if (decl.as(.trait)) |*t| {
-            return try self.checkTraitObj(decl, t, value_info) orelse break :check;
+            return self.checkTraitObj(decl, t, value_info) orelse break :check;
         }
 
         // We check after the other because above checks need the information about a potential void declaration
@@ -3433,13 +3452,10 @@ fn performTypeCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, 
         }
     }
 
-    return self.err(
-        .{ .type_mismatch = .{ .expect = self.typeName(decl), .found = self.typeName(value) } },
-        span,
-    );
+    return error.TypeMismatch;
 }
 
-fn performErrorCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, span: Span) Error!*const Type {
+fn performErrorCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, span: Span) CoerceError!*const Type {
     const value = value_info.type;
 
     const error_union = decl.error_union;
@@ -3454,12 +3470,9 @@ fn performErrorCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos,
             else => |*t| if (t == value) return decl,
         }
 
-        return self.err(.{ .error_not_in_union = .{
-            .found = self.typeName(value),
-            .expect = self.typeName(error_union.err),
-        } }, span);
+        return error.ErrorNotInUnion;
     } else {
-        return self.performTypeCoercion(error_union.ok, value_info, false, span);
+        return self.checkTypeCoercion(error_union.ok, value_info, false, span);
     }
 }
 
@@ -3468,7 +3481,7 @@ fn performErrorCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos,
 /// `allow_new_default` allow the `value` function to define other values for default parameters
 /// it is useful to allow user to define new default
 /// Assumes that types are functions
-fn checkFunctionEq(self: *Self, decl: *const Type, value: *const Type, allow_new_default: bool, span: Span) Error!*const Type {
+fn checkFunctionEq(self: *Self, decl: *const Type, value: *const Type, allow_new_default: bool) CoerceError!*const Type {
     // Functions function's return types like: 'fn add() -> fn(int) -> int' don't have a declaration
     // There is also the case when assigning to a variable and infering type like: var bound = foo.method
     // Here, we want `bound` to be an anonymus function, it loses all declaration infos because it's a runtime value
@@ -3521,10 +3534,7 @@ fn checkFunctionEq(self: *Self, decl: *const Type, value: *const Type, allow_new
         return value;
     }
 
-    return self.err(
-        .{ .type_mismatch = .{ .expect = self.typeName(decl), .found = self.typeName(value) } },
-        span,
-    );
+    return error.TypeMismatch;
 }
 
 /// Checks if two different types (with at least one of them being an unoion) fits in one or the other
@@ -3534,27 +3544,16 @@ fn checkUnionType(
     decl: *const Type,
     value: *const Type,
     value_info: *InstrInfos,
-) (Error || error{ Mismatch, NotInUnion })!*const Type {
-    // TODO: put the check void on decl in the caller
-    if (decl.is(.void)) {
-        return value;
-    }
-
+    span: Span,
+) CoerceError!*const Type {
     // Only declaration is an union
     if (!value.is(.inline_union)) {
         for (decl.inline_union.types) |ty| {
             if (ty == value) return decl;
 
-            const trait = ty.as(.trait) orelse continue;
-            return try self.checkTraitObj(decl, &trait, value_info) orelse continue;
-        }
-        if (decl.inline_union.contains(value)) {
+            _ = self.checkTypeCoercion(ty, value_info, false, span) catch continue;
             return decl;
         }
-    }
-    // Value is an union but not declaration
-    else if (!decl.is(.inline_union)) {
-        return error.Mismatch;
     }
     // Both are unions
     else if (decl.inline_union.containsSubset(&value.inline_union)) {
@@ -3566,7 +3565,7 @@ fn checkUnionType(
 
 /// Try to infer array value type from variable's declared type
 /// Assumes `value` is an array
-fn checkArrayType(self: *Self, decl: *const Type, value: *const Type, span: Span) (Error || error{mismatch})!*const Type {
+fn checkArrayType(self: *Self, decl: *const Type, value: *const Type) CoerceError!*const Type {
     const depth_value, const child_value = value.array.depthAndChild();
 
     check: {
@@ -3574,7 +3573,7 @@ fn checkArrayType(self: *Self, decl: *const Type, value: *const Type, span: Span
             // Empty array like: []
             if (child_value.is(.void)) {
                 // No type declared and empty array like: var a = [], else infer from declaration
-                return self.err(.cant_infer_array_type, span);
+                return error.CantInferArrayType;
             }
         } else {
             if (!decl.is(.array)) break :check;
@@ -3587,7 +3586,7 @@ fn checkArrayType(self: *Self, decl: *const Type, value: *const Type, span: Span
             if (!child_value.is(.void)) {
                 // Additional check for cases like: var a: []int|float = [1, 2, 3]
                 if (current_decl.as(.inline_union)) |*u| {
-                    return if (self.checkArrayOfUnion(u, value)) decl else error.mismatch;
+                    return if (self.checkArrayOfUnion(u, value)) decl else error.TypeMismatch;
                 }
                 if (child_value != current_decl) break :check;
             }
@@ -3598,7 +3597,7 @@ fn checkArrayType(self: *Self, decl: *const Type, value: *const Type, span: Span
         return value;
     }
 
-    return error.mismatch;
+    return error.TypeMismatch;
 }
 
 fn checkArrayOfUnion(self: *Self, decl: *const Type.InlineUnion, value: *const Type) bool {
@@ -3609,7 +3608,7 @@ fn checkArrayOfUnion(self: *Self, decl: *const Type.InlineUnion, value: *const T
 }
 
 /// Checks if we must create a trait object, if not return instruction
-fn checkTraitObj(self: *Self, decl: *const Type, trait: *const Type.Trait, value_info: *InstrInfos) Error!?*const Type {
+fn checkTraitObj(self: *Self, decl: *const Type, trait: *const Type.Trait, value_info: *InstrInfos) ?*const Type {
     const value = value_info.type;
 
     if (value.getTraitImpl(trait.loc.name)) |*t| {
