@@ -3649,6 +3649,12 @@ fn checkArrayOfUnion(self: *Self, decl: *const Type.InlineUnion, value: *const T
 fn checkTraitObj(self: *Self, decl: *const Type, trait: *const Type.Trait, value_info: *InstrInfos) ?*const Type {
     const value = value_info.type;
 
+    if (value.is(.inline_union)) {
+        // Should be implemented as a switch on type_id with instruction emitted for
+        // each branch with vtable index, acting like an if statement
+        @panic("Inline union trait object coercion not yet implemented");
+    }
+
     if (value.getTraitImpl(trait.loc.name)) |*t| {
         value_info.instr = self.irb.addInstr(
             .{ .trait_obj = .{
@@ -3673,7 +3679,7 @@ fn hasCompilerTrait(self: *Self, trait_name: InternerIdx, value_type: *const Typ
         .@"enum" => inline for (&.{self.cached_names.IsEnum}) |compiler_trait| {
             if (compiler_trait == trait_name) return true;
         },
-        else => unreachable,
+        else => {},
     }
 
     return false;
