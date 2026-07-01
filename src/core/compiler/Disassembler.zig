@@ -207,6 +207,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .unbox => self.simpleInstruction(writer, "unbox", offset),
         .union_lit => self.unionLiteral(writer, offset),
         .union_lit_ext => self.unionLiteralExt(writer, offset),
+        .union_unwrap => self.indexInstruction(writer, "union_unwrap", offset),
         .wide => unreachable,
     } catch oom();
 }

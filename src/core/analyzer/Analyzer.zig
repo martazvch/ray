@@ -1679,6 +1679,7 @@ fn breakExpr(self: *Self, expr: *const Ast.Break, ctx: *Context) Result {
         }
 
         const res = try self.analyzeExpr(e, if (scope_exp_val) .value else .none, ctx);
+
         break :brk .{ res.type, res.instr };
     };
 
@@ -2038,10 +2039,19 @@ fn unionAccess(self: *Self, union_info: InstrInfos, ty: Type.Union, tag_tk: Ast.
     const tag_name = self.interner.intern(text);
 
     if (ty.tags.getIndex(tag_name)) |index| {
-        // Can't access a tag on an instance
-        // TODO: no, create an union unwrap
         if (!union_info.ti.is_sym) {
-            return self.err(.{ .instance_tag_access = .{ .kind = "union" } }, span);
+            return .{
+                .tag = .{
+                    .type = ty.tags.get(tag_name).?,
+                    .instr = self.irb.addInstr(
+                        .{ .union_unwrap = .{
+                            .@"union" = union_info.instr,
+                            .tag_index = index,
+                        } },
+                        self.ast.getSpan(tag_tk).start,
+                    ),
+                },
+            };
         }
 
         return .{
@@ -2439,20 +2449,15 @@ fn ifExpr(self: *Self, expr: *const Ast.If, expect: ExprResKind, ctx: *Context) 
     // Analyze then branch
     var then_res = try self.analyzeNode(&expr.then, expect, ctx);
     self.checkWrap(&then_res.instr, then_res.ti.heap);
-
     pure = pure and then_res.ti.comp_time;
 
-    var else_cf: ?InstrInfos.ControlFlow = null;
-    var else_ty: ?*const Type = null;
-    var else_instr: ?InstrIndex = null;
+    var else_res: ?InstrInfos = null;
 
     if (expr.@"else") |*n| {
-        const else_res = try self.analyzeNode(n, expect, ctx);
-        else_instr = if (else_res.ti.heap) self.irb.wrapInstr(.incr_rc, else_res.instr) else else_res.instr;
-
-        pure = pure and else_res.ti.comp_time;
-        else_cf = else_res.cf;
-        else_ty = else_res.type;
+        var else_res_tmp = try self.analyzeNode(n, expect, ctx);
+        self.checkWrap(&else_res_tmp.instr, else_res_tmp.ti.heap);
+        pure = pure and else_res_tmp.ti.comp_time;
+        else_res = else_res_tmp;
     } else if (expect == .value) {
         return self.err(
             .{ .missing_else_clause = .{ .if_type = self.typeName(then_res.type) } },
@@ -2460,14 +2465,18 @@ fn ifExpr(self: *Self, expr: *const Ast.If, expect: ExprResKind, ctx: *Context) 
         );
     }
 
-    const branch_res = try self.checkIfBranches(then_res.type, then_res.cf, else_ty, else_cf, expr, expect);
+    const branch_res = try self.checkIfBranches(&then_res, &else_res, expr, expect);
 
     return .{
         .type = branch_res,
         .ti = .{ .comp_time = pure },
         .cf = if (branch_res.is(.never)) .@"return" else .none,
         .instr = self.irb.addInstr(
-            .{ .@"if" = .{ .cond = cond_res.instr, .then = then_res.instr, .@"else" = else_instr } },
+            .{ .@"if" = .{
+                .cond = cond_res.instr,
+                .then = then_res.instr,
+                .@"else" = if (else_res) |r| r.instr else null,
+            } },
             span.start,
         ),
     };
@@ -2475,29 +2484,36 @@ fn ifExpr(self: *Self, expr: *const Ast.If, expect: ExprResKind, ctx: *Context) 
 
 fn checkIfBranches(
     self: *Self,
-    then_ty: *const Type,
-    then_cf: InstrInfos.ControlFlow,
-    else_ty: ?*const Type,
-    else_cf: ?InstrInfos.ControlFlow,
+    then_info: *InstrInfos,
+    else_info_opt: *?InstrInfos,
     expr: *const Ast.If,
     expect: ExprResKind,
 ) Error!*const Type {
-    const then_res = try self.checkBranch(then_ty, then_cf, expect, self.ast.getSpan(expr.then));
+    const then_res = try self.checkBranch(then_info, expect, self.ast.getSpan(expr.then));
 
-    const else_type = else_ty orelse return then_res;
-    const else_res = try self.checkBranch(else_type, else_cf.?, expect, self.ast.getSpan(expr.@"else".?));
+    // const else_info = else_info_opt.* orelse return then_res;
+    const else_info = if (else_info_opt.*) |*i| i else return then_res;
+    const else_res = try self.checkBranch(else_info, expect, self.ast.getSpan(expr.@"else".?));
 
     // No need to get cast information as 'break' and 'return' already handles it
-    if (then_cf.exitScope() and else_cf.?.exitScope()) return self.ti.getCached(.never);
+    if (then_info.cf.exitScope() and else_info.cf.exitScope()) return self.ti.getCached(.never);
 
     return self.mergeTypes(&.{ then_res, else_res });
 }
 
-fn checkBranch(self: *Self, ty: *const Type, cf: InstrInfos.ControlFlow, expect: ExprResKind, span: Span) Error!*const Type {
-    if (cf.exitScope()) return self.ti.getCached(.void);
-    if (expect == .value and ty.is(.void)) return self.err(.void_value, span);
+fn checkBranch(
+    self: *Self,
+    info: *InstrInfos,
+    expect: ExprResKind,
+    span: Span,
+) Error!*const Type {
+    if (info.cf.exitScope()) {
+        return self.ti.getCached(.void);
+    }
 
-    return ty;
+    if (expect == .value and info.type.is(.void)) return self.err(.void_value, span);
+
+    return info.type;
 }
 
 fn in(self: *Self, expr: Ast.Binop, ctx: *Context) Result {

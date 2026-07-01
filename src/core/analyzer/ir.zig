@@ -56,6 +56,7 @@ pub const Instruction = struct {
         unbox: Index,
         union_decl: UnionDecl,
         union_lit: UnionLit,
+        union_unwrap: UnionUnwrap,
         var_decl: VarDecl,
         @"while": While,
 
@@ -298,6 +299,10 @@ pub const Instruction = struct {
         sym: LoadSymbol,
         tag_index: usize,
         payload: ?Index,
+    };
+    pub const UnionUnwrap = struct {
+        @"union": usize,
+        tag_index: usize,
     };
     pub const VarDecl = struct {
         box: bool,

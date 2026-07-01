@@ -161,6 +161,7 @@ pub const OpCode = enum(u8) {
     trait_obj,
     union_lit,
     union_lit_ext,
+    union_unwrap,
     swap_pop,
     unbox,
     wide,

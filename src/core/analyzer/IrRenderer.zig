@@ -78,7 +78,6 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .@"continue" => |data| self.continueInstr(data),
         .discard => |index| self.indexInstr("Discard", index),
         .enum_decl => |*data| self.enumDecl(data),
-        // .enum_lit => |data| self.enumLiteral(data),
         .fail => |data| self.returnInstr("Fail", data),
         .field => |data| self.getField(data, false),
         .fn_decl => |*data| self.fnDeclaration(data),
@@ -109,6 +108,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .unbox => |index| self.indexInstr("Unbox", index),
         .union_decl => |*data| self.unionDecl(data),
         .union_lit => |*data| self.unionLit(data),
+        .union_unwrap => |data| self.unionUnwrap(data),
         .var_decl => |*data| self.varDecl(data),
         .@"while" => |data| self.whileInstr(data),
 
@@ -642,6 +642,16 @@ fn unionLit(self: *Self, data: *const Instruction.UnionLit) void {
         self.indentAndAppendSlice("- payload");
         self.parseInstr(payload);
     }
+}
+
+fn unionUnwrap(self: *Self, data: Instruction.UnionUnwrap) void {
+    self.indentAndAppendSlice("[Union unwrap]");
+    self.indent_level += 1;
+    defer self.indent_level -= 1;
+    self.indentAndAppendSlice("- union");
+    self.parseInstr(data.@"union");
+    self.indentAndAppendSlice("- tag");
+    self.indentAndPrintSlice("{}", .{data.tag_index});
 }
 
 fn varDecl(self: *Self, data: *const Instruction.VarDecl) void {

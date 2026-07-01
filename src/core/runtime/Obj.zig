@@ -589,19 +589,7 @@ pub const UnionInstance = struct {
         obj.parent = parent;
         obj.tag_id = tag_id;
         obj.payload = payload;
-        obj.obj.kind = if (parent.is_err) .@"error" else .enum_instance;
-        obj.obj.type_id = parent.type_id;
-
-        return obj;
-    }
-
-    /// Creates a compile time constant that is a naked enum field
-    pub fn createComptime(allocator: Allocator, parent: *const Module.Union, tag_id: u8, payload: Value) *Self {
-        const obj = Obj.allocateComptime(allocator, Self, parent.type_id);
-        obj.parent = parent;
-        obj.tag_id = tag_id;
-        obj.payload = payload;
-        obj.obj.kind = if (parent.is_err) .@"error" else .enum_instance;
+        obj.obj.kind = if (parent.is_err) .@"error" else .union_instance;
         obj.obj.type_id = parent.type_id;
 
         return obj;
@@ -936,7 +924,7 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
         .union_instance, .@"error" => {
             const instance = self.as(UnionInstance);
             try writer.print("<{s} {s}.{s}>", .{
-                if (instance.parent.is_err) "error" else "enum",
+                if (instance.parent.is_err) "error" else "union",
                 instance.parent.name,
                 instance.parent.tags[instance.tag_id],
             });

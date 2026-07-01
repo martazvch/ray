@@ -401,6 +401,7 @@ const Compiler = struct {
             .unbox => |index| self.wrappedInstr(.unbox, index),
             .union_decl => |*data| self.unionDecl(data),
             .union_lit => |data| self.unionLit(data),
+            .union_unwrap => |data| self.unionUnwrap(data),
             .var_decl => |*data| self.varDecl(data),
             .@"while" => |data| self.whileInstr(data),
 
@@ -1159,6 +1160,16 @@ const Compiler = struct {
 
         self.symbolAccess(.union_lit, data.sym);
         self.writeByte(@intCast(data.tag_index));
+    }
+
+    fn unionUnwrap(self: *Self, data: Instruction.UnionUnwrap) Error!void {
+        // TODO: Error
+        if (data.tag_index >= std.math.maxInt(u8)) {
+            @panic("Union is to big, not implemented yet");
+        }
+
+        try self.compileInstr(data.@"union");
+        self.writeOpAndByte(.union_unwrap, @intCast(data.tag_index));
     }
 
     fn varDecl(self: *Self, data: *const Instruction.VarDecl) Error!void {

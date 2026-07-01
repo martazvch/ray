@@ -9,7 +9,6 @@ union Baz { c, d }
 fn main() {
     var bar = Bar.a
     bar = Bar.not_a_field
-    bar.a
 
     bar = Baz.c
 

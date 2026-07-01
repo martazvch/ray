@@ -1,0 +1,13 @@
+[Union declaration Foo]
+[Function declaration main]
+    [Variable declaration index: 0, scope: local]
+        [Union literal]
+            - union
+            [Load symbol 0]
+            - tag
+            2
+    [Union unwrap]
+        - union
+        [Variable index: 0, scope: local]
+        - tag
+        0

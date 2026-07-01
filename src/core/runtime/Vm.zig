@@ -41,6 +41,7 @@ const Error = error{
     OutOfBound,
     ModuloWith0,
     RangeIndexDecrease,
+    UnionUnwrap,
 } || Allocator.Error;
 
 pub fn init(self: *Self, io: Io, allocator: Allocator, state: *State) void {
@@ -105,6 +106,7 @@ fn err(self: *Self, kind: Error) Error {
         error.RangeIndexDecrease => "using a decreasing range for collection indexing",
         error.StackOverflow => "stack overflow",
         error.OutOfMemory => "no more memory available",
+        error.UnionUnwrap => "trying to unwrap wrong tag from union value",
     };
     stderr.print("Runtime error: {s}\n", .{msg}) catch oom();
 
@@ -739,6 +741,12 @@ fn execute(self: *Self) !void {
                     tag,
                     self.stack.pop(),
                 ).asObj()));
+            },
+            .union_unwrap => {
+                const index = self.frame.readByte();
+                const u = self.stack.pop().obj.as(Obj.UnionInstance);
+                if (index != u.tag_id) return self.err(error.UnionUnwrap);
+                self.stack.push(u.payload);
             },
             .wide => unreachable,
         }
