@@ -1929,7 +1929,7 @@ fn enumAccess(self: *Self, enum_info: InstrInfos, ty: Type.Enum, tag_tk: Ast.Tok
     if (ty.tags.getIndex(tag_name)) |index| {
         // Can't access a tag on an instance
         if (!enum_info.ti.is_sym) {
-            return self.err(.{ .instance_tag_access = .{ .kind = "enum" } }, span);
+            return self.err(.instance_tag_access, span);
         }
 
         return .{

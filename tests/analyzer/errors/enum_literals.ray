@@ -4,4 +4,7 @@ fn main() {
     var bar: int = .baz
 
     var marker: Marker = .triangle
+
+    var marker: Marker = .circle
+    print marker.cross
 }
