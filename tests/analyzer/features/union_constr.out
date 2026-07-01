@@ -1,3 +1,7 @@
+[Enum declaration Dir]
+    - tags
+    north
+    south
 [Union declaration Foo]
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
@@ -25,4 +29,18 @@
         [Load symbol 0]
         - tag
         2
+    [Assignment index: 0, scope: local, cow]
+    [Union constructor]
+        [Union literal]
+            - union
+            [Load symbol 0]
+            - tag
+            3
+        - arg
+        [Constant index 5]
+            [Enum create]
+                - enum
+                [Load symbol 0]
+                - tag
+                1
     [Assignment index: 0, scope: local, cow]

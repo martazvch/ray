@@ -1,7 +1,16 @@
+enum Dir { north, south }
+
+union Bar {
+    aa: str,
+    bb: []bool,
+}
+
 union Foo {
     a: int,
     b: float,
     c,
+    d: Dir,
+    e: Bar,
 }
 
 fn main() {
@@ -13,6 +22,9 @@ fn main() {
     print foo.b
     foo = Foo.c
     print foo
+    foo = Foo.d(Dir.south)
+    print foo
+    print foo.d
 
     foo = .a(5)
     print foo
@@ -22,5 +34,11 @@ fn main() {
     print foo.b
     foo = .c
     print foo
+    foo = .d(.south)
+    print foo
+    print foo.d
+
+    foo = .e(.bb([true, false]))
+    print foo.e.bb
 }
 

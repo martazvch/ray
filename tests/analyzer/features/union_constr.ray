@@ -1,12 +1,16 @@
+enum Dir { north, south }
+
 union Foo {
     a: int,
     b: float,
     c,
+    d: Dir,
 }
 
 fn main() {
     var foo = Foo.a(5)
     foo = .b(1.2)
     foo = .c
+    foo = .d(.south)
 }
 

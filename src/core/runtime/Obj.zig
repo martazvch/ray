@@ -585,6 +585,9 @@ pub const UnionInstance = struct {
 
     /// Creates a compile time constant that is a naked enum field
     pub fn create(vm: *Vm, parent: *const Module.Union, tag_id: u8, payload: Value) *Self {
+        vm.gc.pushTmpBuf(&.{payload});
+        defer vm.gc.popTmpBuf();
+
         const obj = Obj.allocate(vm, Self, parent.type_id);
         obj.parent = parent;
         obj.tag_id = tag_id;
@@ -949,6 +952,6 @@ pub fn log(self: *Obj) void {
         .native_obj => unreachable,
         .string => std.debug.print("{s}", .{self.as(String).chars}),
         .trait_obj => std.debug.print("<trait obj {s}>", .{self.as(TraitObj).vtable.name}),
-        .union_instance => std.debug.print("<enum instance {s}>", .{self.as(EnumInstance).parent.name}),
+        .union_instance => std.debug.print("<union instance {s}>", .{self.as(EnumInstance).parent.name}),
     }
 }

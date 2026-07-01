@@ -3294,6 +3294,9 @@ fn unionConstr(self: *Self, expr: *const Ast.FnCall, info: InstrInfos, ctx: *Con
         return self.err(.union_constr_named_arg, arg_span);
     }
 
+    const prev_decl = ctx.setAndGetPrevious(.decl_type, tag_ty);
+    defer ctx.decl_type = prev_decl;
+
     var arg_res = try self.analyzeExpr(arg.value, .value, ctx);
     _ = try self.performTypeCoercion(tag_ty, &arg_res, false, arg_span);
 

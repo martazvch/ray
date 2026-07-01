@@ -44,7 +44,7 @@ fn main() {
     }
 
     if let s = shape {
-        match s is {
+        match s {
             Shape2D {
                 .square(side) => ...
                 ...
@@ -72,7 +72,7 @@ The primary use case is as an embeddable scripting language with first-class C a
 - Error unions — `T!ErrorType` baked into the type system, not bolted on
 - Nullable types — `?T` with explicit fallback handling, no null surprises
 - Traits and structs — composition over inheritance, methods where they make sense
-- Pattern matching — `when` for type-based dispatch, `match` for value matching
+- Pattern matching — `match` for value and type matching
 - Macros — AST-level metaprogramming, no preprocessor
 - Zig and C interop — embed Ray or call into native code with minimal friction
 
