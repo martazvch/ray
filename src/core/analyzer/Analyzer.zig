@@ -1785,7 +1785,6 @@ pub fn implicitSelector(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result 
             .{ .union_lit = .{
                 .sym = .{ .module_index = null, .symbol_index = @intCast(sym.sym.index) },
                 .tag_index = @intCast(tag_res.index),
-                .payload = null,
             } },
             span.start,
         ),
@@ -2062,7 +2061,6 @@ fn unionAccess(self: *Self, union_info: InstrInfos, ty: Type.Union, tag_tk: Ast.
                     .{ .union_lit = .{
                         .sym = self.irb.data(union_info.instr).load_symbol,
                         .tag_index = index,
-                        .payload = null,
                     } },
                     self.ast.getSpan(tag_tk).start,
                 ),
@@ -2193,6 +2191,10 @@ fn call(self: *Self, expr: *const Ast.FnCall, ctx: *Context) Result {
 
     const ctx_call = ctx.setAndGetPrevious(.in_call, true);
     const callee = try self.analyzeExpr(expr.callee, .any, ctx);
+
+    if (callee.type.is(.@"union")) {
+        return self.unionConstr(expr, callee, ctx);
+    }
 
     const fn_type = callee.type.as(.function) orelse return self.err(.invalid_call_target, span);
 
@@ -3257,6 +3259,48 @@ fn unary(self: *Self, expr: *const Ast.Unary, ctx: *Context) Result {
                 .typ = if (ty.is(.int)) .int else .float,
                 .instr = rhs.instr,
             } },
+            span.start,
+        ),
+    };
+}
+
+fn unionConstr(self: *Self, expr: *const Ast.FnCall, info: InstrInfos, ctx: *Context) Result {
+    const span = self.ast.getSpan(expr);
+
+    if (expr.args.len > 1) return self.err(
+        .{ .union_constr_expect_one_arg = .{ .got = expr.args.len } },
+        span,
+    );
+
+    const instr = self.irb.getInstr(info.instr);
+    std.debug.assert(instr == .union_lit);
+
+    const tag_ty = info.type.@"union".tags.values()[instr.union_lit.tag_index];
+
+    if (expr.args.len == 0) {
+        if (tag_ty.is(.void)) {
+            self.warn(.union_constr_useless_paren, span);
+            // If there is no argument, we can return the union literal as is
+            return info;
+        } else {
+            return self.err(.{ .union_constr_expect_one_arg = .{ .got = expr.args.len } }, span);
+        }
+    }
+
+    const arg = expr.args[0];
+    const arg_span = self.ast.getSpan(arg.value);
+
+    if (arg.name != null) {
+        return self.err(.union_constr_named_arg, arg_span);
+    }
+
+    var arg_res = try self.analyzeExpr(arg.value, .value, ctx);
+    _ = try self.performTypeCoercion(tag_ty, &arg_res, false, arg_span);
+
+    return .{
+        .type = info.type,
+        .instr = self.irb.addInstr(
+            .{ .union_constr = .{ .union_lit = instr.union_lit, .arg = arg_res.instr } },
             span.start,
         ),
     };

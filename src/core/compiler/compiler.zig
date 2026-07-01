@@ -399,8 +399,9 @@ const Compiler = struct {
             .trap => |data| self.trap(data),
             .unary => |*data| self.unary(data),
             .unbox => |index| self.wrappedInstr(.unbox, index),
+            .union_constr => |data| self.unionLit(data.union_lit, data.arg),
             .union_decl => |*data| self.unionDecl(data),
-            .union_lit => |data| self.unionLit(data),
+            .union_lit => |data| self.unionLit(data, null),
             .union_unwrap => |data| self.unionUnwrap(data),
             .var_decl => |*data| self.varDecl(data),
             .@"while" => |data| self.whileInstr(data),
@@ -1145,15 +1146,16 @@ const Compiler = struct {
         try self.containerFnDecls(data.functions);
     }
 
-    fn unionLit(self: *Self, data: Instruction.UnionLit) Error!void {
+    fn unionLit(self: *Self, data: Instruction.UnionLit, arg: ?usize) Error!void {
         // TODO: Error
         if (data.tag_index >= std.math.maxInt(u8)) {
             @panic("Union is to big, not implemented yet");
         }
 
-        if (data.payload) |payload| {
-            _ = payload;
-            @panic("Add support for payload");
+        // Naked union literals don't have any payload
+        // PERF: add a `naked_union_lit`?
+        if (arg) |instr| {
+            try self.compileInstr(instr);
         } else {
             self.writeOp(.push_null);
         }

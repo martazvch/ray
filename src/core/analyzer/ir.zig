@@ -54,6 +54,7 @@ pub const Instruction = struct {
         trap: Trap,
         unary: Unary,
         unbox: Index,
+        union_constr: UnionConstr,
         union_decl: UnionDecl,
         union_lit: UnionLit,
         union_unwrap: UnionUnwrap,
@@ -295,10 +296,13 @@ pub const Instruction = struct {
         functions: []const Index,
         is_err: bool,
     };
+    pub const UnionConstr = struct {
+        union_lit: UnionLit,
+        arg: Index,
+    };
     pub const UnionLit = struct {
         sym: LoadSymbol,
         tag_index: usize,
-        payload: ?Index,
     };
     pub const UnionUnwrap = struct {
         @"union": usize,

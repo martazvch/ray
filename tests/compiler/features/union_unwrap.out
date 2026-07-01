@@ -1,9 +1,0 @@
--- main --
-push_null
-union_lit index 0, tag 2, Foo
-get_local index 0
-union_unwrap index 0
-ret_naked
-
--- global scope --
-call index 0, arity 0, main

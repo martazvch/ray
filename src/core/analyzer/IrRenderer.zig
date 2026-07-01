@@ -106,8 +106,9 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .trap => |data| self.trap(data),
         .unary => |*data| self.unary(data),
         .unbox => |index| self.indexInstr("Unbox", index),
+        .union_constr => |data| self.unionConstr(data),
         .union_decl => |*data| self.unionDecl(data),
-        .union_lit => |*data| self.unionLit(data),
+        .union_lit => |data| self.unionLit(data),
         .union_unwrap => |data| self.unionUnwrap(data),
         .var_decl => |*data| self.varDecl(data),
         .@"while" => |data| self.whileInstr(data),
@@ -619,6 +620,15 @@ fn unary(self: *Self, data: *const Instruction.Unary) void {
     self.parseInstr(data.instr);
 }
 
+fn unionConstr(self: *Self, data: Instruction.UnionConstr) void {
+    self.indentAndAppendSlice("[Union constructor]");
+    self.indent_level += 1;
+    defer self.indent_level -= 1;
+    self.unionLit(data.union_lit);
+    self.indentAndAppendSlice("- arg");
+    self.parseInstr(data.arg);
+}
+
 fn unionDecl(self: *Self, data: *const Instruction.UnionDecl) void {
     self.indentAndPrintSlice("[Union declaration {s}]", .{self.interner.getKey(data.name).?});
     self.indent_level += 1;
@@ -630,7 +640,7 @@ fn unionDecl(self: *Self, data: *const Instruction.UnionDecl) void {
     // self.traitImpls(data.traits);
 }
 
-fn unionLit(self: *Self, data: *const Instruction.UnionLit) void {
+fn unionLit(self: *Self, data: Instruction.UnionLit) void {
     self.indentAndAppendSlice("[Union literal]");
     self.indent_level += 1;
     defer self.indent_level -= 1;
@@ -638,10 +648,6 @@ fn unionLit(self: *Self, data: *const Instruction.UnionLit) void {
     self.loadSymbol(&data.sym);
     self.indentAndAppendSlice("- tag");
     self.indentAndPrintSlice("{}", .{data.tag_index});
-    if (data.payload) |payload| {
-        self.indentAndAppendSlice("- payload");
-        self.parseInstr(payload);
-    }
 }
 
 fn unionUnwrap(self: *Self, data: Instruction.UnionUnwrap) void {

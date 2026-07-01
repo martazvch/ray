@@ -1,0 +1,13 @@
+-- main --
+load_constant index 3, value 5
+union_lit index 0, tag 0, Foo
+load_constant index 4, value 1.2
+union_lit index 0, tag 1, Foo
+set_local index 0
+push_null
+union_lit index 0, tag 2, Foo
+set_local index 0
+ret_naked
+
+-- global scope --
+call index 0, arity 0, main

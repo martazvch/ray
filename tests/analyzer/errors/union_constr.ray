@@ -1,0 +1,11 @@
+union Foo {
+    a: int,
+    b: float,
+    c,
+}
+
+fn main() {
+    var foo = Foo.a(5, 2)
+    var foo = Foo.a()
+    var foo = Foo.a(a: 9)
+}

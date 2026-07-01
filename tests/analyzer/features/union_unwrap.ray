@@ -1,8 +1,0 @@
-union Foo {
-    a, b, c,
-}
-
-fn main() {
-    let foo = Foo.c
-    foo.a
-}

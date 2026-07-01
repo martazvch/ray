@@ -1,0 +1,28 @@
+[Union declaration Foo]
+[Function declaration main]
+    [Variable declaration index: 0, scope: local]
+        [Union constructor]
+            [Union literal]
+                - union
+                [Load symbol 0]
+                - tag
+                0
+            - arg
+            [Constant index 3]
+                [Int 5]
+    [Union constructor]
+        [Union literal]
+            - union
+            [Load symbol 0]
+            - tag
+            1
+        - arg
+        [Constant index 4]
+            [Float 1.2]
+    [Assignment index: 0, scope: local, cow]
+    [Union literal]
+        - union
+        [Load symbol 0]
+        - tag
+        2
+    [Assignment index: 0, scope: local, cow]
