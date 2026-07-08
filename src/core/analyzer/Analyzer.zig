@@ -2129,6 +2129,7 @@ fn structureAccess(
 }
 
 fn traitAccess(self: *Self, expr: *const Ast.Field, ty: *const Type, is_sym: bool) Error!AccessResult {
+    // Can only call functions on trait implementation, not on the type directly
     if (is_sym) return self.err(
         .{ .call_fn_on_trait = .{ .name = self.typeName(ty) } },
         self.ast.getSpan(expr.structure),
@@ -2143,6 +2144,13 @@ fn traitAccess(self: *Self, expr: *const Ast.Field, ty: *const Type, is_sym: boo
             .func = fn_name,
             .trait = self.interner.getKey(trait_ty.loc.name).?,
         } },
+        self.ast.getSpan(expr.field),
+    );
+
+    // Here, we are not a symbol, so a trait object. Calling a non-method on a trait object
+    // means that we call a static function on an instance
+    if (func.ty.function.kind != .method) return self.err(
+        .{ .call_static_fn_on_trait_obj = .{ .fn_name = fn_name } },
         self.ast.getSpan(expr.field),
     );
 

@@ -1,0 +1,19 @@
+trait Foo {
+    fn speak() { print "Foo" }
+}
+
+struct Bar {
+    impl Foo {
+        fn speak() { print "bar" }
+    }
+}
+
+fn callTraitObj(to: Foo) {
+    to.speak()
+}
+
+fn main() {
+    let bar = Bar{}
+    callTraitObj(bar)
+}
+

@@ -17,6 +17,7 @@ pub const AnalyzerMsg = union(enum) {
     call_method_on_type: struct { name: []const u8 },
     call_static_on_instance: struct { name: []const u8 },
     call_fn_on_trait: struct { name: []const u8 },
+    call_static_fn_on_trait_obj: struct { fn_name: []const u8 },
     cant_build_native_struct: struct { name: []const u8 },
     cant_continue_scope: struct { name: []const u8 },
     cant_infer_array_type,
@@ -148,6 +149,7 @@ pub const AnalyzerMsg = union(enum) {
             .block_all_path_dont_return => writer.writeAll("all paths of block expression don't return a value"),
             .break_val_in_non_val_block => writer.writeAll("can't return a value from this scope"),
             .call_fn_on_trait => |e| writer.print("'{s}' is trait, can't call functions on it", .{e.name}),
+            .call_static_fn_on_trait_obj => |e| writer.print("can't call static function '{s}' on an instance", .{e.fn_name}),
             .call_method_on_type => |e| writer.print("method '{s}' called on a type", .{e.name}),
             .call_static_on_instance => |e| writer.print("static function '{s}' called on an instance", .{e.name}),
             .cant_build_native_struct => |e| writer.print("can't use structure literal syntax on native structure '{s}'", .{e.name}),
@@ -280,6 +282,7 @@ pub const AnalyzerMsg = union(enum) {
             .block_all_path_dont_return => writer.writeAll("this block"),
             .break_val_in_non_val_block => writer.writeAll("can't have this expression"),
             .call_fn_on_trait => writer.writeAll("this is a trait"),
+            .call_static_fn_on_trait_obj => writer.writeAll("this is an instance"),
             .call_method_on_type, .call_static_on_instance => writer.writeAll("wrong calling convention"),
             .cant_build_native_struct => writer.writeAll("this structure"),
             .cant_continue_scope, .no_continuable_scope => writer.writeAll("invalid continue"),
@@ -376,17 +379,19 @@ pub const AnalyzerMsg = union(enum) {
             => writer.writeAll("you can use another name, use symbol like _ or open a local scope with '{}'"),
             .already_impl_trait => writer.writeAll("a type can only implement a trait once"),
             .assign_to_struct_fn => writer.writeAll("it is not allowed to modify structures' functions at runtime"),
-            .assign_to_constant => writer.writeAll(
-                "variables declared with 'const' and function parameters are constant, their value can't be changed",
-            ),
+            .assign_to_constant => writer.writeAll("variables declared with 'const' and function parameters are constant, their value can't be changed"),
             .assign_type => writer.writeAll("types aren't assignable to variables"),
             .big_self_outside_decl => writer.writeAll("'Self' can only be used in declarations like enums or structures to refer to the current type"),
             .block_all_path_dont_return => writer.writeAll("when using a block as an expression, all paths must return a value"),
             .break_val_in_non_val_block => writer.writeAll(
-                \\you are either trying to return a value from a non expression block (like a 'while' body) or the block
-                \\isn't used in an expression
+                "you are either trying to return a value from a non expression block (like a 'while' body) or the block " ++
+                    "isn't used in an expression",
             ),
             .call_fn_on_trait => writer.writeAll("you can only call functions on types implementing traits, not trait themselves"),
+            .call_static_fn_on_trait_obj => writer.writeAll(
+                "traits' static functions can only be called on types implementing the trait or the trait itself " ++
+                    "if it has a default implementation",
+            ),
             .call_method_on_type, .call_static_on_instance => writer.writeAll(
                 "static functions can only be called on types and methods can only be called on instances",
             ),
@@ -419,7 +424,7 @@ pub const AnalyzerMsg = union(enum) {
             .expect_value_found_type => writer.writeAll("types can't be used as a runtime value"),
             .extern_fn_not_in_lib => writer.writeAll("incoherence between function's name declared in '.rayn' file and the dynamic library"),
             .extern_fn_not_in_rayn => writer.writeAll(
-                \\'extern' function can only be used in interface '.rayn' file to expose functions prototypes that we'll be dynamically loaded
+                "'extern' function can only be used in interface '.rayn' file to expose functions prototypes that we'll be dynamically loaded",
             ),
             .fallback_err_on_non_err => writer.writeAll(
                 \\fallback operator '!!' is meant to provide a value in case of an error union value is an error
