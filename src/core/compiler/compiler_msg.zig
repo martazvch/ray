@@ -9,14 +9,6 @@ pub const CompilerMsg = union(enum) {
         // };
     }
 
-    pub fn getHint(self: Self, writer: anytype) !void {
-        _ = self;
-        _ = writer;
-        // try switch (self) {
-        //     .implicit_cast => writer.print("expressions have different types", .{}),
-        // };
-    }
-
     pub fn getHelp(self: Self, writer: anytype) !void {
         _ = self;
         _ = writer;

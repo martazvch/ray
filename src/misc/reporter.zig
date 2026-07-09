@@ -7,58 +7,58 @@ const Writer = std.Io.Writer;
 const builtin = @import("builtin");
 
 const BoxChar = enum {
-    BottomLeft,
-    BottomRight,
-    Horitzontal,
-    LeftT,
-    UnderT,
-    UpperLeft,
-    UpperRight,
-    Vertical,
+    bottom_left,
+    bottom_right,
+    horitzontal,
+    left_t,
+    under_t,
+    upper_left,
+    upper_right,
+    vertical,
 };
 
 fn boxChar(kind: BoxChar) []const u8 {
     return switch (kind) {
-        .BottomLeft => "╰",
-        .BottomRight => "╯",
-        .Horitzontal => "─",
-        .LeftT => "├",
-        .UnderT => "┬",
-        .UpperLeft => "╭",
-        .UpperRight => "╮",
-        .Vertical => "│",
+        .bottom_left => "╰",
+        .bottom_right => "╯",
+        .horitzontal => "─",
+        .left_t => "├",
+        .under_t => "┬",
+        .upper_left => "╭",
+        .upper_right => "╮",
+        .vertical => "│",
     };
 }
 
 const Color = enum {
-    Blue,
-    Cyan,
-    Green,
-    NoColor,
-    Red,
-    Yellow,
+    blue,
+    cyan,
+    green,
+    no_color,
+    red,
+    yellow,
 };
 
 fn color(clr: Color) []const u8 {
     return switch (clr) {
-        .Blue => "\x1b[34m",
-        .Cyan => "\x1b[96m",
-        .Green => "\x1b[32m",
-        .NoColor => "\x1b[0m",
-        .Red => "\x1b[31m",
-        .Yellow => "\x1b[33m",
+        .blue => "\x1b[34m",
+        .cyan => "\x1b[96m",
+        .green => "\x1b[32m",
+        .no_color => "\x1b[0m",
+        .red => "\x1b[31m",
+        .yellow => "\x1b[33m",
     };
 }
 
 fn generateMsg(comptime msg: []const u8, comptime clr: Color) []const u8 {
-    return color(clr) ++ msg ++ color(.NoColor);
+    return color(clr) ++ msg ++ color(.no_color);
 }
 
-const err_msg = generateMsg("Error:", .Red);
-const help_msg = generateMsg("help:", .Green);
-const warning_msg = generateMsg("Warning:", .Yellow);
-const corner_to_hint = boxChar(.BottomLeft) ++ boxChar(.Horitzontal) ** 4;
-const corner_to_end = boxChar(.BottomLeft) ++ boxChar(.Horitzontal) ** 2;
+const err_msg = generateMsg("Error:", .red);
+const help_msg = generateMsg("help:", .green);
+const warning_msg = generateMsg("Warning:", .yellow);
+const corner_to_hint = boxChar(.bottom_left) ++ boxChar(.horitzontal) ** 4;
+const corner_to_end = boxChar(.bottom_left) ++ boxChar(.horitzontal) ** 2;
 
 extern "kernel32" fn GetConsoleOutputCP() std.os.windows.UINT;
 extern "kernel32" fn SetConsoleOutputCP(std.os.windows.UINT) void;
@@ -153,11 +153,11 @@ fn display(Report: type, report: *const GenReport(Report), writer: *Writer, file
             "{s}{s}{s}[{s}{s}{s}:{}:{}]\n",
             .{
                 left_padding,
-                boxChar(.UpperLeft),
-                boxChar(.Horitzontal),
-                color(.Blue),
+                boxChar(.upper_left),
+                boxChar(.horitzontal),
+                color(.blue),
                 file_name,
-                color(.NoColor),
+                color(.no_color),
                 line_count,
                 report.end - line_start + 1,
             },
@@ -165,83 +165,44 @@ fn display(Report: type, report: *const GenReport(Report), writer: *Writer, file
         // Prints previous line number, separation and line itself
         //  56 | var a = 3
         if (previous_line) |pl| {
-            try print_line(writer, line_count - 1, pl, line_digit_count);
+            try printLine(writer, line_count - 1, pl, line_digit_count);
         }
 
         // Prints current line number, separation and line
         //  57 | fn add(a, b c)
-        try print_line(writer, line_count, source[line_start..current], line_digit_count);
+        try printLine(writer, line_count, source[line_start..current], line_digit_count);
 
         // Underlines the problem
         // Takes padding into account + separator + space
         //  <space><space> |
-        try writer.print("{s}{s} ", .{ left_padding, boxChar(.Vertical) });
+        try writer.print("{s}{s} ", .{ left_padding, boxChar(.vertical) });
 
         // We get the length of the error code and the half to underline it
         var space_buf: [1024]u8 = [_]u8{' '} ** 1024;
         const start_space = report.start - line_start;
         const lexeme_len = @max(report.end - report.start, 1);
-        const half = @divFloor(lexeme_len, 2);
 
-        // Prints initial space
+        // Prints ^^^^
         _ = try writer.write(space_buf[0..start_space]);
-
-        // We write in yellow
-        _ = try writer.write(color(.Yellow));
-
-        // Prints ─┬─
-        for (0..lexeme_len) |i| {
-            if (i == half) {
-                _ = try writer.write(boxChar(.UnderT));
-            } else {
-                _ = try writer.write(boxChar(.Horitzontal));
-            }
+        _ = try writer.write(color(.yellow));
+        for (0..lexeme_len) |_| {
+            _ = try writer.write("^");
         }
         _ = try writer.write("\n");
-
-        // We switch back to no color
-        _ = try writer.write(color(.NoColor));
-
-        // Prints to indication (written state is the good one at this stage
-        // for the beginning of the sequence to print)
-        //  <space><space> | ╰─── <indication txt>
-        try writer.print("{s}{s} ", .{ left_padding, boxChar(.Vertical) });
-        _ = try writer.write(space_buf[0 .. start_space + half]);
-
-        _ = try writer.write(color(.Yellow));
-
-        try writer.print("{s} ", .{corner_to_hint});
-        _ = try report.getHint(writer);
-        _ = try writer.write("\n");
-        _ = try writer.write(color(.NoColor));
-
-        _ = try writer.write(left_padding);
-        try writer.print("{s}\n", .{corner_to_end});
+        _ = try writer.write(color(.no_color));
     }
 
-    var buf: [1024]u8 = undefined;
-    var fbw = std.Io.Writer.fixed(&buf);
-
-    try report.getHelp(&fbw);
-
-    if (fbw.buffered().len > 0) {
-        try writer.print("  {s} {s}\n", .{ help_msg, fbw.buffered() });
-    }
-
-    _ = try writer.write("\n");
+    //  help: <help-msg>
+    try writer.print(" {s} ", .{help_msg});
+    try report.getHelp(writer);
+    _ = try writer.write("\n\n");
 }
 
-// Limitation of Zig, can only use comptime known strings for formatting...
-// TODO: dynamic formatting
-fn print_line(writer: *Writer, line_nb: usize, line: []const u8, digit_count: usize) !void {
-    try switch (digit_count) {
-        1 => writer.print(" {:>1} {s} {s}\n", .{ line_nb, boxChar(.Vertical), line }),
-        2 => writer.print(" {:>2} {s} {s}\n", .{ line_nb, boxChar(.Vertical), line }),
-        3 => writer.print(" {:>3} {s} {s}\n", .{ line_nb, boxChar(.Vertical), line }),
-        4 => writer.print(" {:>4} {s} {s}\n", .{ line_nb, boxChar(.Vertical), line }),
-        5 => writer.print(" {:>5} {s} {s}\n", .{ line_nb, boxChar(.Vertical), line }),
-        else => unreachable,
-    };
+fn printLine(writer: *Writer, line_nb: usize, line: []const u8, padding: usize) !void {
+    try writer.print(
+        " {[line_nb]:>[padding]} {[box_char]s} {[line]s}\n",
+        .{ .line_nb = line_nb, .padding = padding, .box_char = boxChar(.vertical), .line = line },
+    );
 }
 
 /// Error report used en each step of the Ray language:
@@ -254,7 +215,6 @@ fn print_line(writer: *Writer, line_nb: usize, line: []const u8, digit_count: us
 pub fn GenReport(comptime T: type) type {
     assert(@typeInfo(T) == .@"union");
     assert(@hasDecl(T, "getMsg"));
-    assert(@hasDecl(T, "getHint"));
     assert(@hasDecl(T, "getHelp"));
 
     return struct {
@@ -300,10 +260,6 @@ pub fn GenReport(comptime T: type) type {
 
         pub fn getMsg(self: *const Self, writer: anytype) !void {
             return self.report.getMsg(writer);
-        }
-
-        pub fn getHint(self: *const Self, writer: anytype) !void {
-            return self.report.getHint(writer);
         }
 
         pub fn getHelp(self: *const Self, writer: anytype) !void {

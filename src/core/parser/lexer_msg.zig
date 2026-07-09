@@ -15,12 +15,6 @@ pub const LexerMsg = union(enum) {
         };
     }
 
-    pub fn getHint(self: Self, writer: *Writer) !void {
-        try switch (self) {
-            else => writer.writeAll("here"),
-        };
-    }
-
     pub fn getHelp(self: Self, writer: *Writer) !void {
         try switch (self) {
             .leading_zeroes => writer.writeAll("remove the leading zeros"),
