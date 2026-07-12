@@ -222,6 +222,10 @@ fn errAtSpan(self: *Self, span: Span, error_kind: ParserMsg) Error {
     return error.Err;
 }
 
+fn toSource(self: *const Self, token: TokenIndex) []const u8 {
+    return self.getTkField(.span, token).text(self.source);
+}
+
 fn synchronize(self: *Self) void {
     self.ctx.panic_mode = false;
 
@@ -255,11 +259,11 @@ fn declaration(self: *Self) Error!Node {
     else if (self.match(.@"fn"))
         self.fnDecl(false)
     else if (self.match(.@"struct"))
-        self.structDecl()
+        self.structDecl(false)
     else if (self.match(.trait))
         self.traitDecl()
     else if (self.match(.@"enum"))
-        self.enumDecl()
+        self.enumDecl(false)
     else if (self.match(.@"union"))
         self.unionDecl(false)
     else if (self.match(.@"error"))
@@ -269,13 +273,17 @@ fn declaration(self: *Self) Error!Node {
     else if (self.match(.@"extern")) {
         if (self.match(.@"fn")) {
             return self.fnDecl(true);
+        } else if (self.match(.@"struct")) {
+            return self.structDecl(true);
+        } else if (self.match(.@"enum")) {
+            return self.enumDecl(true);
         } else {
             return self.errAtPrev(.extern_sym_not_fn);
         }
     } else self.statement();
 }
 
-fn enumDecl(self: *Self) Error!Node {
+fn enumDecl(self: *Self, is_extern: bool) Error!Node {
     const tk = self.token_idx - 1;
     try self.expect(.identifier, .expectName("enum"));
     const name = self.token_idx - 1;
@@ -292,12 +300,17 @@ fn enumDecl(self: *Self) Error!Node {
 
     const functions, const traits = try self.containerFnDecls("enum");
 
+    if (is_extern) {
+        try self.checkExternDecl(name, .@"enum", functions.len, traits.len);
+    }
+
     return .{ .enum_decl = .{
         .tk = tk,
         .name = name,
         .tags = tags.toOwnedSlice(self.allocator) catch oom(),
         .functions = functions,
         .traits = traits,
+        .is_extern = is_extern,
     } };
 }
 
@@ -445,7 +458,7 @@ fn fnReturnType(self: *Self) Error!?*Ast.Type {
         null;
 }
 
-fn structDecl(self: *Self) !Node {
+fn structDecl(self: *Self, is_extern: bool) !Node {
     try self.expect(.identifier, .expectName("structure"));
     const name = self.token_idx - 1;
     self.skipNewLines();
@@ -494,12 +507,40 @@ fn structDecl(self: *Self) !Node {
 
     const functions, const traits = try self.containerFnDecls("structure");
 
+    if (is_extern) {
+        try self.checkExternDecl(name, .@"struct", functions.len, traits.len);
+    }
+
     return .{ .struct_decl = .{
         .name = name,
         .fields = fields.toOwnedSlice(self.allocator) catch oom(),
         .functions = functions,
         .traits = traits,
+        .is_extern = is_extern,
     } };
+}
+
+fn checkExternDecl(
+    self: *Self,
+    name: TokenIndex,
+    kind: enum { @"enum", @"struct" },
+    fn_len: usize,
+    trait_len: usize,
+) Error!void {
+    if (fn_len > 0) {
+        return self.errAt(name, .{ .extern_sym_has_decl = .{
+            .name = self.toSource(name),
+            .sym = if (kind == .@"enum") .@"enum" else .structure,
+            .decl = .functions,
+        } });
+    }
+    if (trait_len > 0) {
+        return self.errAt(name, .{ .extern_sym_has_decl = .{
+            .name = self.toSource(name),
+            .sym = if (kind == .@"enum") .@"enum" else .structure,
+            .decl = .traits,
+        } });
+    }
 }
 
 fn containerFnDecls(self: *Self, kind: []const u8) Error!struct { []Ast.FnDecl, []Ast.TraitDecl } {
@@ -1127,10 +1168,7 @@ fn parseExpr(self: *Self) Error!*Expr {
         .self => self.literal(.self),
         .string => self.literal(.string),
         .true => self.literal(.bool),
-        else => {
-            const span = self.token_spans[self.token_idx - 1];
-            return self.errAtPrev(.{ .expect_expr = .{ .found = span.text(self.source) } });
-        },
+        else => return self.errAtPrev(.{ .expect_expr = .{ .found = self.toSource(self.token_idx - 1) } }),
     };
 
     return self.postfix(expr);

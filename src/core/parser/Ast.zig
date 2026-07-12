@@ -46,6 +46,7 @@ pub const EnumDecl = struct {
     tags: []const Tag,
     functions: []FnDecl,
     traits: []TraitDecl,
+    is_extern: bool,
 
     pub const Tag = struct {
         name: TokenIndex,
@@ -112,6 +113,7 @@ pub const StructDecl = struct {
     fields: []VarDecl,
     functions: []FnDecl,
     traits: []TraitDecl,
+    is_extern: bool,
 };
 
 pub const TraitDecl = struct {

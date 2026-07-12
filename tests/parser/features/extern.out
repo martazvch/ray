@@ -1,0 +1,54 @@
+{
+    "extern_fn_decl": {
+        "name": "add",
+        "params": [
+            {
+                "name": "a",
+                "type": "int",
+                "value": {}
+            },
+            {
+                "name": "b",
+                "type": "str",
+                "value": {}
+            }
+        ],
+        "return_type": "bool",
+        "body": []
+    },
+    "extern_struct_decl": {
+        "name": "Foo",
+        "fields": [
+            {
+                "name": "a",
+                "type": "int",
+                "value": {}
+            },
+            {
+                "name": "b",
+                "type": "str",
+                "value": {}
+            }
+        ],
+        "functions": [],
+        "traits": []
+    },
+    "extern_enum_decl": {
+        "name": "Foo",
+        "tags": [
+            "a": {
+                "value": {
+                    "int": "21"
+                }
+            },
+            "b": {
+                "value": {
+                    "int": "4"
+                }
+            }
+        ]
+        "functions": [],
+        "traits": []
+    }
+}
+

@@ -1,0 +1,12 @@
+extern fn add(a: int, b: str) -> bool
+
+extern struct Foo {
+    a: int,
+    b: str,
+}
+
+extern enum Foo {
+    a = 21,
+    b = 4,
+}
+

@@ -4,6 +4,7 @@ const SymbolArrMap = @import("../analyzer/LexicalScope.zig").SymbolArrMap;
 const TypeInterner = @import("../analyzer/types.zig").TypeInterner;
 const NativeReg = @import("../pipeline/NativesRegister.zig");
 const Type = @import("../analyzer/types.zig").Type;
+const Obj = @import("../runtime/Obj.zig");
 const Value = @import("../runtime/values.zig").Value;
 const Vm = @import("../runtime/Vm.zig");
 const Interner = misc.Interner;
@@ -15,13 +16,35 @@ pub const Fn = *const fn (*cVm) callconv(.c) void;
 const Index = usize;
 
 const cApi = extern struct {
-    get_float: *const fn (*cVm, Index) callconv(.c) f64,
+    get_float: *const fn (*const cVm, Index) callconv(.c) f64,
     set_float: *const fn (*cVm, Index, f64) callconv(.c) void,
+    get_int: *const fn (*const cVm, Index) callconv(.c) i64,
+    set_int: *const fn (*cVm, Index, i64) callconv(.c) void,
+    get_bool: *const fn (*const cVm, Index) callconv(.c) bool,
+    set_bool: *const fn (*cVm, Index, bool) callconv(.c) void,
+    get_str: *const fn (*const cVm, Index) callconv(.c) [*c]const u8,
+    set_str: *const fn (*cVm, Index, [*c]const u8) callconv(.c) void,
+
+    get_struct: *const fn (*cVm, Index) callconv(.c) *CStruct,
+    get_field_u8: *const fn (*const CStruct, Index) callconv(.c) u8,
+
+    get_enum_tag: *const fn (*const cVm, Index) callconv(.c) i64,
 };
 
 pub const api: cApi = .{
     .get_float = getFloat,
     .set_float = setFloat,
+    .get_int = getInt,
+    .set_int = setInt,
+    .get_bool = getBool,
+    .set_bool = setBool,
+    .get_str = getStr,
+    .set_str = setStr,
+
+    .get_struct = getStruct,
+    .get_field_u8 = getFieldU8,
+
+    .get_enum_tag = getEnumTag,
 };
 
 pub const cType = enum(c_int) {
@@ -45,12 +68,59 @@ pub const FnProto = extern struct {
     };
 };
 
+pub const CStruct = opaque {};
+
 fn setFloat(c_vm: *cVm, index: Index, value: f64) callconv(.c) void {
     const vm: *Vm = @ptrCast(@alignCast(c_vm));
     vm.frame.slots[index] = .makeFloat(value);
 }
 
-fn getFloat(c_vm: *cVm, index: Index) callconv(.c) f64 {
-    const vm: *Vm = @ptrCast(@alignCast(c_vm));
+fn getFloat(c_vm: *const cVm, index: Index) callconv(.c) f64 {
+    const vm: *const Vm = @ptrCast(@alignCast(c_vm));
     return vm.frame.slots[index].float;
+}
+
+fn setBool(c_vm: *cVm, index: Index, value: bool) callconv(.c) void {
+    const vm: *Vm = @ptrCast(@alignCast(c_vm));
+    vm.frame.slots[index] = .makeBool(value);
+}
+
+fn getBool(c_vm: *const cVm, index: Index) callconv(.c) bool {
+    const vm: *const Vm = @ptrCast(@alignCast(c_vm));
+    return vm.frame.slots[index].bool;
+}
+
+fn setInt(c_vm: *cVm, index: Index, value: i64) callconv(.c) void {
+    const vm: *Vm = @ptrCast(@alignCast(c_vm));
+    vm.frame.slots[index] = .makeInt(value);
+}
+
+fn getInt(c_vm: *const cVm, index: Index) callconv(.c) i64 {
+    const vm: *const Vm = @ptrCast(@alignCast(c_vm));
+    return vm.frame.slots[index].int;
+}
+
+fn setStr(c_vm: *cVm, index: Index, value: [*c]const u8) callconv(.c) void {
+    const vm: *Vm = @ptrCast(@alignCast(c_vm));
+    vm.frame.slots[index] = .makeObj(Obj.String.takeCopy(vm, std.mem.span(value)).asObj());
+}
+
+fn getStr(c_vm: *const cVm, index: Index) callconv(.c) [*c]const u8 {
+    const vm: *const Vm = @ptrCast(@alignCast(c_vm));
+    return vm.frame.slots[index].obj.as(Obj.String).chars.ptr;
+}
+
+fn getStruct(c_vm: *const cVm, index: Index) callconv(.c) *CStruct {
+    const vm: *const Vm = @ptrCast(@alignCast(c_vm));
+    return @ptrCast(vm.frame.slots[index].obj.as(Obj.Instance));
+}
+
+fn getFieldU8(c_struct: *const CStruct, index: Index) callconv(.c) u8 {
+    const s: *const Obj.Instance = @ptrCast(@alignCast(c_struct));
+    return @intCast(s.fields[index].int);
+}
+
+fn getEnumTag(c_vm: *const cVm, index: Index) callconv(.c) i64 {
+    const vm: *const Vm = @ptrCast(@alignCast(c_vm));
+    return vm.frame.slots[index].obj.as(Obj.EnumInstance).tag_id;
 }

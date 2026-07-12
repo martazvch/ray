@@ -59,7 +59,7 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
             try self.renderSingleExpr(@tagName(node.*), n, .block, comma);
         },
         .enum_decl => |n| {
-            try self.openKey("enum", .block);
+            try self.openKey(if (n.is_extern) "extern_enum_decl" else "enum_decl", .block);
             if (n.name) |name| try self.pushKeyValue("name", self.ast.toSource(name), true);
 
             if (n.tags.len > 0) {
@@ -105,7 +105,7 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
             try self.renderSingleExpr(@tagName(node.*), n, .block, comma);
         },
         .struct_decl => |n| {
-            try self.openKey(@tagName(node.*), .block);
+            try self.openKey(if (n.is_extern) "extern_struct_decl" else @tagName(node.*), .block);
             try self.pushKeyValue("name", self.ast.toSource(n.name), true);
 
             if (n.fields.len == 0) {

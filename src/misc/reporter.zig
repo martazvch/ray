@@ -278,8 +278,9 @@ pub fn GenReport(comptime T: type) type {
                     inline for (std.meta.fields(field.type)) |subf| {
                         const subv = @field(field_info, subf.name);
 
-                        switch (@TypeOf(subv)) {
-                            usize, i64 => try writer.print(", {}", .{subv}),
+                        switch (@typeInfo(@TypeOf(subv))) {
+                            .int => try writer.print(", {}", .{subv}),
+                            .@"enum" => try writer.print(", {t}", .{subv}),
                             else => try writer.print(", {s}", .{subv}),
                         }
                     }

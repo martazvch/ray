@@ -15,4 +15,3 @@ fn a(
     a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,a:int,
 ) -> bool {}
 
-extern fn foo() {}

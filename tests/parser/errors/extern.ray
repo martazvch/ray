@@ -1,1 +1,15 @@
-extern struct Foo
+extern fn foo() {}
+
+extern struct Foo {
+    fn foo() {}
+}
+extern struct Foo {
+    impl Foo {}
+}
+
+extern enum Foo {
+    fn foo() {}
+}
+extern enum Foo {
+    impl Foo {}
+}

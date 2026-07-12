@@ -242,11 +242,5 @@
         ],
         "return_type": "void",
         "body": []
-    },
-    "extern_fn_decl": {
-        "name": "add",
-        "params": [],
-        "return_type": "void",
-        "body": []
     }
 }

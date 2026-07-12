@@ -1,2 +1,5 @@
-extern_sym_not_fn
-expect_brace_before, structure
+extern_fn_has_body
+extern_sym_has_decl, Foo, structure, functions
+extern_sym_has_decl, Foo, structure, traits
+extern_sym_has_decl, Foo, enum, functions
+extern_sym_has_decl, Foo, enum, traits
