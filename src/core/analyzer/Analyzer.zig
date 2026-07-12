@@ -1518,14 +1518,14 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
     const op: Instr.Binop.Op, const lhs_instr, const rhs_instr, const ty = instr: {
         switch (expr.op) {
             .plus, .slash, .star, .minus, .modulo => {
-                const lhs_instr, const rhs_instr, const ty = binopArithmeticCoercion(lhs, rhs) catch |e| return switch (e) {
+                const lhs_instr, const rhs_instr, const ty = self.binopArithmeticCoercion(lhs, rhs) catch |e| return switch (e) {
                     error.NonNumLsh => self.err(.{ .invalid_arithmetic = .{ .found = self.typeName(lhs.type) } }, lhs_span),
                     error.NonNumRhs => self.err(.{ .invalid_arithmetic = .{ .found = self.typeName(rhs.type) } }, rhs_span),
                 };
                 break :instr .{ getArithmeticOp(expr.op, ty), lhs_instr, rhs_instr, ty };
             },
             .greater_equal, .greater, .less_equal, .less => {
-                const lhs_instr, const rhs_instr, const ty = binopArithmeticCoercion(lhs, rhs) catch |e| return switch (e) {
+                const lhs_instr, const rhs_instr, const ty = self.binopArithmeticCoercion(lhs, rhs) catch |e| return switch (e) {
                     error.NonNumLsh => self.err(.{ .invalid_arithmetic = .{ .found = self.typeName(lhs.type) } }, lhs_span),
                     error.NonNumRhs => self.err(.{ .invalid_arithmetic = .{ .found = self.typeName(rhs.type) } }, rhs_span),
                 };
@@ -1594,6 +1594,7 @@ fn isStringRepeat(op: TokenTag, lhs: *const Type, rhs: *const Type) bool {
 }
 
 fn binopArithmeticCoercion(
+    self: *Self,
     lhs: InstrInfos,
     rhs: InstrInfos,
 ) error{ NonNumLsh, NonNumRhs }!struct { InstrIndex, InstrIndex, *const Type } {
@@ -1603,7 +1604,16 @@ fn binopArithmeticCoercion(
     if (!lhs_type.isNumeric()) return error.NonNumLsh;
     if (!rhs_type.isNumeric()) return error.NonNumRhs;
 
-    return .{ lhs.instr, rhs.instr, lhs_type };
+    if (lhs_type == rhs_type) {
+        return .{ lhs.instr, rhs.instr, lhs_type };
+    }
+
+    if (lhs_type.is(.float) and rhs_type.is(.int)) {
+        return .{ lhs.instr, self.irb.wrapInstr(.int_to_float, rhs.instr), lhs_type };
+    }
+
+    // Last case as `isNumeric` ensure that it's either a `float` or an `int`
+    return .{ self.irb.wrapInstr(.int_to_float, lhs.instr), rhs.instr, rhs_type };
 }
 
 fn getArithmeticOp(op: TokenTag, ty: *const Type) Instr.Binop.Op {

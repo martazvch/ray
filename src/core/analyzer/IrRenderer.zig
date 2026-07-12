@@ -87,6 +87,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .in => |data| self.in(data),
         .incr_rc => |index| self.indexInstr("Incr rc", index),
         .indexing => |data| self.indexing(data, false, false),
+        .int_to_float => |index| self.indexInstr("Int to float", index),
         .load_symbol => |*data| self.loadSymbol(data),
         .load_builtin => |index| self.indentAndPrintSlice("[Builtin symbol: {}]", .{index}),
         .match => |*data| self.match(data),

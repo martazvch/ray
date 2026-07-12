@@ -363,7 +363,6 @@ const Compiler = struct {
             .discard => |index| self.wrappedInstr(.pop, index),
 
             .enum_decl => |*data| self.enumDecl(data),
-            // .enum_lit => |data| self.enumLit(data),
             .fail => |data| self.returnInstr(data),
             .field => |*data| self.field(data),
             .fn_decl => |*data| self.compileFn(data),
@@ -373,6 +372,7 @@ const Compiler = struct {
             .in => |data| self.in(data),
             .incr_rc => |index| self.wrappedInstr(.incr_ref, index),
             .indexing => |data| self.indexing(data),
+            .int_to_float => |index| self.wrappedInstr(.int_to_float, index),
             // TODO: protect the cast
             .load_builtin => |index| self.writeOpAndByte(.load_fn_builtin, @intCast(index)),
             .load_symbol => |data| self.symbolAccess(.load_fn, data),

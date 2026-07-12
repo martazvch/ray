@@ -37,6 +37,7 @@ pub const Instruction = struct {
         in: In,
         incr_rc: Index,
         indexing: Indexing,
+        int_to_float: Index,
         load_symbol: LoadSymbol,
         load_builtin: usize,
         match: Match,

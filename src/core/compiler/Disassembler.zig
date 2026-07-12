@@ -144,6 +144,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .is_int => self.simpleInstruction(writer, "is_int", offset),
         .is_str => self.simpleInstruction(writer, "is_str", offset),
         .is_type => self.isType(writer, offset),
+        .int_to_float => self.simpleInstruction(writer, "int_to_float", offset),
         .iter_new_arr => self.simpleInstruction(writer, "iter_new_arr", offset),
         .iter_new_range => self.simpleInstruction(writer, "iter_new_range", offset),
         .iter_new_str => self.simpleInstruction(writer, "iter_new_str", offset),

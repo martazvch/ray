@@ -1,0 +1,4 @@
+fn main() {
+    print 1 + 5.9
+    print 4.1 + 2
+}

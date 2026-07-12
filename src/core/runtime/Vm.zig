@@ -510,6 +510,7 @@ fn execute(self: *Self) !void {
                     self.stack.push(.false_);
                 }
             },
+            .int_to_float => self.stack.peekRef(0).* = .makeFloat(@floatFromInt(self.stack.peek(0).int)),
             .iter_new_arr => self.stack.peekRef(0).* = .makeObj(Obj.ArrIterator.create(self, self.stack.peek(0))),
             .iter_new_range => self.stack.peekRef(0).* = .makeObj(Obj.RangeIterator.create(self, self.stack.peek(0).range_int)),
             .iter_new_str => self.stack.peekRef(0).* = .makeObj(Obj.StrIterator.create(self, self.stack.peek(0).obj.as(Obj.String))),
