@@ -51,6 +51,7 @@ pub const AnalyzerMsg = union(enum) {
     for_iter_non_int_range,
     implicit_select_no_type,
     implicit_select_invalid_type: struct { found: []const u8 },
+    implicit_select_union_tag_with_type: struct { tag: []const u8, expect: []const u8 },
     index_assign_str,
     invalid_arithmetic: struct { found: []const u8 },
     invalid_assign_target,
@@ -165,6 +166,7 @@ pub const AnalyzerMsg = union(enum) {
             .dynlib_unsupported_os => |e| writer.print("Unsupported plateform '{s}' for native modules", .{e.name}),
             .implicit_select_no_type => writer.writeAll("can't infer type"),
             .implicit_select_invalid_type => |e| writer.print("expect an enum or an union but found '{s}'", .{e.found}),
+            .implicit_select_union_tag_with_type => |e| writer.print("expect a value of type '{s}' for tag '{s}'", .{ e.expect, e.tag }),
             .instance_tag_access => writer.writeAll("can't access enum's tags on a runtime instance"),
             .container_unknown_decl => |e| writer.print("{s} '{s}' have no declaration '{s}'", .{ e.kind, e.ty, e.field }),
             .enum_discr_duplicate => |e| writer.print("enum's discriminant value '{}' is already used", .{e.value}),
@@ -247,7 +249,7 @@ pub const AnalyzerMsg = union(enum) {
             .undeclared_type => |e| writer.print("undeclared type '{s}'", .{e.found}),
             .undeclared_var => |e| writer.print("undeclared variable '{s}'", .{e.name}),
             .union_constr_expect_one_arg => |e| writer.print("Expect one argument when constructing union, found: {}", .{e.got}),
-            .union_constr_named_arg => writer.writeAll("Can't use named argument when constructing union"),
+            .union_constr_named_arg => writer.writeAll("can't use named argument when constructing union"),
             .union_constr_useless_paren => writer.writeAll("Useless parenthesis, union variant has no payload"),
             .union_unknown_decl => |e| writer.print("union '{s}' have no declaration '{s}'", .{ e.@"union", e.field }),
             .unknow_char_escape => |e| writer.print("unknow character escape '{s}'", .{e.found}),
@@ -352,6 +354,10 @@ pub const AnalyzerMsg = union(enum) {
                 \\use either: 'var foo: Foo = .a' or a variable with already known type"
             ),
             .implicit_select_invalid_type => writer.writeAll("implicit selector syntax is only allowed with enum and union types"),
+            .implicit_select_union_tag_with_type => writer.writeAll(
+                \\if a union's tag has no payload (no type associated with the tag), implicit selector syntax '.tagName' can be used
+                \\if it has a type, you must use constructor syntax: let value: MyUnion = .tagName(<value>)
+            ),
             .instance_tag_access => writer.writeAll(
                 \\you can either access declarations on the type name or test tag's value
                 \\with an 'if' statement like: 'if foo == .a {}' or with pattern matching via 'match'.
@@ -449,8 +455,8 @@ pub const AnalyzerMsg = union(enum) {
             .undeclared_trait => writer.writeAll("consider declaring or importing the trait before use"),
             .undeclared_type => writer.writeAll("consider declaring or importing the type before use"),
             .undeclared_var => writer.writeAll("consider declaring or importing the variable before use"),
-            .union_constr_expect_one_arg => writer.writeAll("Union variants can only hold one payload"),
-            .union_constr_named_arg => writer.writeAll("Union variants can only hold one unamed payload"),
+            .union_constr_expect_one_arg => writer.writeAll("union variants can only hold one payload"),
+            .union_constr_named_arg => writer.writeAll("union variants can only hold one unamed payload"),
             .union_constr_useless_paren => writer.writeAll("Union variant has implicit 'void' type, no need to use 'call' syntax"),
             .union_unknown_decl => writer.writeAll("refer to union's declaration to see available tags and declarations"),
             .unknow_char_escape => writer.writeAll("valid escape characters are '\\t', '\\n', '\\\\', '\\r'"),

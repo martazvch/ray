@@ -44,5 +44,9 @@ fn main() {
 
     print cell.marker == .circle
     print cell.marker != .circle
+
+    marker == .none
+    marker == Marker.none
+    Marker.none == Marker.none
 }
 

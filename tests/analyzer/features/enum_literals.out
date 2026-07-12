@@ -7,47 +7,41 @@
     [Function declaration toString, returns]
         [If]
         - condition:
-            [Binop type: eq_tag]
-                [Variable index: 0, scope: local]
-                [Constant index 3]
-                    [Enum create]
-                        - enum
-                        [Load symbol 0]
-                        - tag
-                        0
+            [Binop type: eq_int]
+                [Tag]
+                    [Variable index: 0, scope: local]
+                [Constant index 4]
+                    [Int 0]
         - then:
             [Return]
-                [Constant index 4]
+                [Constant index 5]
                     [String x]
         [If]
         - condition:
-            [Binop type: eq_tag]
-                [Variable index: 0, scope: local]
-                [Constant index 5]
-                    [Enum create]
-                        - enum
-                        [Load symbol 0]
-                        - tag
-                        1
+            [Binop type: eq_int]
+                [Tag]
+                    [Variable index: 0, scope: local]
+                [Constant index 7]
+                    [Int 1]
         - then:
             [Return]
-                [Constant index 6]
+                [Constant index 8]
                     [String o]
         [Return]
-            [Constant index 4]
+            [Constant index 5]
                 [String x]
 
 [Structure declaration Cell]
     - default values
     [Constant index 3]
         [Enum create]
-            - enum
+            - symbol
             [Load symbol 0]
             - tag
             0
-    [Constant index 5]
+    [Constant index 6]
         [Enum create]
-            - enum
+            - symbol
             [Load symbol 0]
             - tag
             1
@@ -55,7 +49,7 @@
     - default params
     [Constant index 3]
         [Enum create]
-            - enum
+            - symbol
             [Load symbol 0]
             - tag
             0
@@ -66,9 +60,9 @@
         [Invoke symbol 0]
 [Function declaration markerStuff2]
     - default params
-    [Constant index 5]
+    [Constant index 6]
         [Enum create]
-            - enum
+            - symbol
             [Load symbol 0]
             - tag
             1
@@ -79,25 +73,25 @@
         [Invoke symbol 0]
 [Function declaration getMarker, returns]
     [Return]
-        [Constant index 5]
+        [Constant index 6]
             [Enum create]
-                - enum
+                - symbol
                 [Load symbol 0]
                 - tag
                 1
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
-        [Constant index 7]
+        [Constant index 9]
             [Enum create]
-                - enum
+                - symbol
                 [Load symbol 0]
                 - tag
                 2
     [Print]
         [Variable index: 0, scope: local]
-    [Constant index 5]
+    [Constant index 6]
         [Enum create]
-            - enum
+            - symbol
             [Load symbol 0]
             - tag
             1
@@ -106,9 +100,9 @@
         [Variable index: 0, scope: local]
     [Call symbol 1]
         - args
-        [Constant index 5]
+        [Constant index 6]
             [Enum create]
-                - enum
+                - symbol
                 [Load symbol 0]
                 - tag
                 1
@@ -116,7 +110,7 @@
         - args
         [Constant index 3]
             [Enum create]
-                - enum
+                - symbol
                 [Load symbol 0]
                 - tag
                 0
@@ -126,10 +120,10 @@
             [Load symbol 0]
             - args
             [Default field constant index 3]
-            [Default field constant index 5]
-    [Constant index 5]
+            [Default field constant index 6]
+    [Constant index 6]
         [Enum create]
-            - enum
+            - symbol
             [Load symbol 0]
             - tag
             1
@@ -143,22 +137,34 @@
         [Field access 1]
             [Variable index: 1, scope: local]
     [Print]
-        [Binop type: eq_tag]
-            [Field access 0]
-                [Variable index: 1, scope: local]
-            [Constant index 5]
-                [Enum create]
-                    - enum
-                    [Load symbol 0]
-                    - tag
-                    1
+        [Binop type: eq_int]
+            [Tag]
+                [Field access 0]
+                    [Variable index: 1, scope: local]
+            [Constant index 7]
+                [Int 1]
     [Print]
-        [Binop type: ne_tag]
-            [Field access 0]
-                [Variable index: 1, scope: local]
-            [Constant index 5]
-                [Enum create]
-                    - enum
-                    [Load symbol 0]
-                    - tag
-                    1
+        [Binop type: ne_int]
+            [Tag]
+                [Field access 0]
+                    [Variable index: 1, scope: local]
+            [Constant index 7]
+                [Int 1]
+    [Pop]
+        [Binop type: eq_int]
+            [Tag]
+                [Variable index: 0, scope: local]
+            [Constant index 10]
+                [Int 2]
+    [Pop]
+        [Binop type: eq_int]
+            [Tag]
+                [Variable index: 0, scope: local]
+            [Constant index 10]
+                [Int 2]
+    [Pop]
+        [Binop type: eq_int]
+            [Constant index 10]
+                [Int 2]
+            [Constant index 10]
+                [Int 2]

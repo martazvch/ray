@@ -1,0 +1,48 @@
+-- main --
+load_constant index 3, value <union Foo.a>
+get_local index 0
+get_tag
+load_constant index 4, value 0
+eq_int
+jump_false 8 -> 18
+pop
+load_constant index 5, value I'm foo.a
+print
+jump 15 -> 36
+pop
+get_local index 0
+get_tag
+load_constant index 7, value 1
+eq_int
+jump_false 25 -> 35
+pop
+load_constant index 8, value I'm foo.b
+print
+jump 32 -> 36
+pop
+load_constant index 10, value ee
+union_constr index 1, tag 1, Bar
+get_local index 1
+get_tag
+load_constant index 4, value 0
+eq_int
+jump_false 47 -> 57
+pop
+load_constant index 12, value I'm bar.a
+print
+jump 54 -> 75
+pop
+get_local index 1
+get_tag
+load_constant index 7, value 1
+eq_int
+jump_false 64 -> 74
+pop
+load_constant index 13, value I'm bar.b
+print
+jump 71 -> 75
+pop
+ret_naked
+
+-- global scope --
+call index 0, arity 0, main

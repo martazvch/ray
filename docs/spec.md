@@ -1345,7 +1345,24 @@ Constructing payloaded variants:
 ```rust
 let t1 = Token.identifier("box")
 let t2 = Token.number(42)
-let t3 = Token.brace(.left)
+let t3: Token = .brace(.left)
+```
+
+#### Tag comparison
+
+You can test the active tag of an union like so:
+
+```rust
+union Foo {
+    a: int,
+    b,
+}
+
+let foo = Foo.a(5)
+assert(foo == Foo.a)
+assert(foo == .a)
+assert(foo != .b)
+
 ```
 
 #### Pattern matching

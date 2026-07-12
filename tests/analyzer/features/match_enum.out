@@ -12,14 +12,14 @@
     [Variable declaration index: 0, scope: local]
         [Constant index 3]
             [Enum create]
-                - enum
+                - symbol
                 [Load symbol 0]
                 - tag
                 2
     [Variable declaration index: 1, scope: local]
         [Constant index 4]
             [Enum create]
-                - enum
+                - symbol
                 [Load symbol 1]
                 - tag
                 0
@@ -30,7 +30,7 @@
         - expr:
             [Constant index 5]
                 [Enum create]
-                    - enum
+                    - symbol
                     [Load symbol 0]
                     - tag
                     1
@@ -41,7 +41,7 @@
         - expr:
             [Constant index 7]
                 [Enum create]
-                    - enum
+                    - symbol
                     [Load symbol 0]
                     - tag
                     0
@@ -52,7 +52,7 @@
         - expr:
             [Constant index 3]
                 [Enum create]
-                    - enum
+                    - symbol
                     [Load symbol 0]
                     - tag
                     2
@@ -67,7 +67,7 @@
         - expr:
             [Constant index 5]
                 [Enum create]
-                    - enum
+                    - symbol
                     [Load symbol 0]
                     - tag
                     1
@@ -78,7 +78,7 @@
         - expr:
             [Constant index 7]
                 [Enum create]
-                    - enum
+                    - symbol
                     [Load symbol 0]
                     - tag
                     0
@@ -89,7 +89,7 @@
         - expr:
             [Constant index 3]
                 [Enum create]
-                    - enum
+                    - symbol
                     [Load symbol 0]
                     - tag
                     2
@@ -105,7 +105,7 @@
             - expr:
                 [Constant index 5]
                     [Enum create]
-                        - enum
+                        - symbol
                         [Load symbol 0]
                         - tag
                         1
@@ -115,7 +115,7 @@
             - expr:
                 [Constant index 7]
                     [Enum create]
-                        - enum
+                        - symbol
                         [Load symbol 0]
                         - tag
                         0
@@ -125,7 +125,7 @@
             - expr:
                 [Constant index 3]
                     [Enum create]
-                        - enum
+                        - symbol
                         [Load symbol 0]
                         - tag
                         2
@@ -147,7 +147,7 @@
         - expr:
             [Constant index 5]
                 [Enum create]
-                    - enum
+                    - symbol
                     [Load symbol 0]
                     - tag
                     1

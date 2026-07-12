@@ -6,40 +6,41 @@
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
         [Union constructor]
-            [Union literal]
-                - union
+            [Union create]
+                - symbol
                 [Load symbol 0]
                 - tag
                 0
             - arg
-            [Constant index 3]
+            [Constant index 4]
                 [Int 5]
     [Union constructor]
-        [Union literal]
-            - union
+        [Union create]
+            - symbol
             [Load symbol 0]
             - tag
             1
         - arg
-        [Constant index 4]
+        [Constant index 6]
             [Float 1.2]
     [Assignment index: 0, scope: local, cow]
-    [Union literal]
-        - union
-        [Load symbol 0]
-        - tag
-        2
+    [Constant index 7]
+        [Union create]
+            - symbol
+            [Load symbol 0]
+            - tag
+            2
     [Assignment index: 0, scope: local, cow]
     [Union constructor]
-        [Union literal]
-            - union
+        [Union create]
+            - symbol
             [Load symbol 0]
             - tag
             3
         - arg
-        [Constant index 5]
+        [Constant index 9]
             [Enum create]
-                - enum
+                - symbol
                 [Load symbol 0]
                 - tag
                 1

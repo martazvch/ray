@@ -1,3 +1,4 @@
 union_constr_expect_one_arg, 2
 union_constr_expect_one_arg, 0
 union_constr_named_arg
+implicit_select_union_tag_with_type, b, float

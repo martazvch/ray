@@ -8,61 +8,55 @@
         [Return]
             [Constant index 3]
                 [Enum create]
-                    - enum
+                    - symbol
                     [Load symbol 0]
                     - tag
                     0
     [Function declaration toString, returns]
         [If]
         - condition:
-            [Binop type: eq_tag]
-                [Variable index: 0, scope: local]
-                [Constant index 3]
-                    [Enum create]
-                        - enum
-                        [Load symbol 0]
-                        - tag
-                        0
+            [Binop type: eq_int]
+                [Tag]
+                    [Variable index: 0, scope: local]
+                [Constant index 4]
+                    [Int 0]
         - then:
             [Return]
-                [Constant index 4]
+                [Constant index 5]
                     [String x]
         [If]
         - condition:
-            [Binop type: eq_tag]
-                [Variable index: 0, scope: local]
-                [Constant index 5]
-                    [Enum create]
-                        - enum
-                        [Load symbol 0]
-                        - tag
-                        1
+            [Binop type: eq_int]
+                [Tag]
+                    [Variable index: 0, scope: local]
+                [Constant index 7]
+                    [Int 1]
         - then:
             [Return]
-                [Constant index 6]
+                [Constant index 8]
                     [String o]
         [Return]
-            [Constant index 4]
+            [Constant index 5]
                 [String x]
 [Structure declaration Cell]
     - default values
     [Constant index 3]
         [Enum create]
-            - enum
+            - symbol
             [Load symbol 0]
             - tag
             0
-    [Constant index 5]
+    [Constant index 6]
         [Enum create]
-            - enum
+            - symbol
             [Load symbol 0]
             - tag
             1
 [Function declaration markerStuff]
     - default params
-    [Constant index 5]
+    [Constant index 6]
         [Enum create]
-            - enum
+            - symbol
             [Load symbol 0]
             - tag
             1
@@ -75,7 +69,7 @@
     - default params
     [Constant index 3]
         [Enum create]
-            - enum
+            - symbol
             [Load symbol 0]
             - tag
             0
@@ -91,7 +85,7 @@
             [Load symbol 0]
             - args
             [Default field constant index 3]
-            [Default field constant index 5]
+            [Default field constant index 6]
     [Print]
         [Field access 0]
             [Variable index: 0, scope: local]
@@ -110,7 +104,7 @@
         [Invoke symbol 1]
     [Call symbol 2]
         - args
-        [Default param constant index 5]
+        [Default param constant index 6]
     [Call symbol 3]
         - args
         [Default param constant index 3]

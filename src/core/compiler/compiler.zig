@@ -394,14 +394,14 @@ const Compiler = struct {
             .@"return" => |data| self.returnInstr(data),
             .struct_decl => |*data| self.structDecl(data),
             .struct_literal => |*data| self.structLiteral(data),
+            .tag => |index| self.wrappedInstr(.get_tag, index),
             .trait_decl => |data| self.traitDecl(data),
             .trait_obj => |data| self.traitObj(data),
             .trap => |data| self.trap(data),
             .unary => |*data| self.unary(data),
             .unbox => |index| self.wrappedInstr(.unbox, index),
-            .union_constr => |data| self.unionLit(data.union_lit, data.arg),
+            .union_constr => |data| self.unionConstr(data),
             .union_decl => |*data| self.unionDecl(data),
-            .union_lit => |data| self.unionLit(data, null),
             .union_unwrap => |data| self.unionUnwrap(data),
             .var_decl => |*data| self.varDecl(data),
             .@"while" => |data| self.whileInstr(data),
@@ -466,7 +466,6 @@ const Compiler = struct {
     fn binop(self: *Self, data: *const Instruction.Binop) Error!void {
         if (data.op == .@"and" or data.op == .@"or") return self.logicalBinop(data);
         if (data.op == .eq_null or data.op == .ne_null) return self.nullBinop(data);
-        if (data.op == .eq_tag or data.op == .ne_tag) return self.tagBinop(data);
 
         try self.compileInstr(data.lhs);
         try self.compileInstr(data.rhs);
@@ -532,12 +531,6 @@ const Compiler = struct {
     fn nullBinop(self: *Self, data: *const Instruction.Binop) Error!void {
         try self.compileInstr(data.lhs);
         self.writeOp(if (data.op == .eq_null) .eq_null else .ne_null);
-    }
-
-    fn tagBinop(self: *Self, data: *const Instruction.Binop) Error!void {
-        try self.tagId(data.lhs);
-        try self.tagId(data.rhs);
-        self.writeOp(if (data.op == .eq_tag) .eq_int else .ne_int);
     }
 
     fn tagId(self: *Self, instr: usize) Error!void {
@@ -749,6 +742,12 @@ const Compiler = struct {
                 .enum_lit => |val| Value.makeObj(Obj.EnumInstance.createComptime(
                     self.manager.alloc,
                     self.manager.state.modules.getSymbol(self.manager.mod_index, val.sym.symbol_index, .@"enum"),
+                    @intCast(val.tag_index),
+                    .null_,
+                ).asObj()),
+                .union_lit => |val| Value.makeObj(Obj.UnionInstance.createComptime(
+                    self.manager.alloc,
+                    self.manager.state.modules.getSymbol(self.manager.mod_index, val.sym.symbol_index, .@"union"),
                     @intCast(val.tag_index),
                     .null_,
                 ).asObj()),
@@ -1144,24 +1143,18 @@ const Compiler = struct {
             .is_err = data.is_err,
         });
         try self.containerFnDecls(data.functions);
+        try self.containerTraitDecls(data.traits);
     }
 
-    fn unionLit(self: *Self, data: Instruction.UnionLit, arg: ?usize) Error!void {
+    fn unionConstr(self: *Self, data: Instruction.UnionConstr) Error!void {
         // TODO: Error
-        if (data.tag_index >= std.math.maxInt(u8)) {
+        if (data.tag_lit.tag_index >= std.math.maxInt(u8)) {
             @panic("Union is to big, not implemented yet");
         }
 
-        // Naked union literals don't have any payload
-        // PERF: add a `naked_union_lit`?
-        if (arg) |instr| {
-            try self.compileInstr(instr);
-        } else {
-            self.writeOp(.push_null);
-        }
-
-        self.symbolAccess(.union_lit, data.sym);
-        self.writeByte(@intCast(data.tag_index));
+        try self.compileInstr(data.arg);
+        self.symbolAccess(.union_constr, data.tag_lit.sym);
+        self.writeByte(@intCast(data.tag_lit.tag_index));
     }
 
     fn unionUnwrap(self: *Self, data: Instruction.UnionUnwrap) Error!void {

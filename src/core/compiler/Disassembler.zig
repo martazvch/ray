@@ -205,8 +205,8 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .swap_pop => self.simpleInstruction(writer, "swap_pop", offset),
         .trait_obj => self.indexInstruction(writer, "trait_obj", offset),
         .unbox => self.simpleInstruction(writer, "unbox", offset),
-        .union_lit => self.unionLiteral(writer, offset),
-        .union_lit_ext => self.unionLiteralExt(writer, offset),
+        .union_constr => self.unionConstr(writer, offset),
+        .union_constr_ext => self.unionConstrExt(writer, offset),
         .union_unwrap => self.indexInstruction(writer, "union_unwrap", offset),
         .wide => unreachable,
     } catch oom();
@@ -508,8 +508,8 @@ fn structLiteralExt(self: *Self, writer: *Writer, offset: usize) Writer.Error!us
     return offset + 4;
 }
 
-fn unionLiteral(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
-    const text = "union_lit";
+fn unionConstr(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
+    const text = "union_constr";
     const index = self.chunk.code.items[offset + 1];
     const tag = self.chunk.code.items[offset + 2];
     const sym = self.module.unions[index];
@@ -523,8 +523,8 @@ fn unionLiteral(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize 
     return offset + 3;
 }
 
-fn unionLiteralExt(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
-    const text = "union_lit_ext";
+fn unionConstrExt(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
+    const text = "union_lit_constr";
     const index = self.chunk.code.items[offset + 1];
     const module = self.chunk.code.items[offset + 2];
     const tag = self.chunk.code.items[offset + 3];

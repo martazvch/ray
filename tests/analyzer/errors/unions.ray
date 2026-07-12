@@ -20,9 +20,5 @@ fn main() {
     Baz.c == Bar.a
 
     1 + Baz.c
-
-    let bar1 = Bar.a
-    let bar2 = Bar.b
-    bar1 == bar2
 }
 

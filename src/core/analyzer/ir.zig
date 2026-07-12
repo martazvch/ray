@@ -1,3 +1,4 @@
+const TagLit = @import("ConstantInterner.zig").Constant.TagLit;
 const ConstIdx = @import("ConstantInterner.zig").ConstIdx;
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
 
@@ -49,6 +50,7 @@ pub const Instruction = struct {
         @"return": Return,
         struct_decl: StructDecl,
         struct_literal: StructLiteral,
+        tag: Index,
         trait_decl: TraitDecl,
         trait_obj: TraitObj,
         trap: Trap,
@@ -56,7 +58,6 @@ pub const Instruction = struct {
         unbox: Index,
         union_constr: UnionConstr,
         union_decl: UnionDecl,
-        union_lit: UnionLit,
         union_unwrap: UnionUnwrap,
         var_decl: VarDecl,
         @"while": While,
@@ -91,7 +92,6 @@ pub const Instruction = struct {
             eq_int,
             eq_null,
             eq_str,
-            eq_tag,
             ge_float,
             ge_int,
             gt_float,
@@ -110,7 +110,6 @@ pub const Instruction = struct {
             ne_int,
             ne_null,
             ne_str,
-            ne_tag,
             @"or",
             question_mark_question_mark,
             sub_float,
@@ -158,11 +157,6 @@ pub const Instruction = struct {
         sym_index: SymbolIndex,
         type_id: TypeId,
         functions: []const Index,
-    };
-    // Used in constant interner
-    pub const EnumLit = struct {
-        sym: LoadSymbol,
-        tag_index: usize,
     };
     pub const Field = struct {
         structure: Index,
@@ -294,15 +288,12 @@ pub const Instruction = struct {
         sym_index: SymbolIndex,
         type_id: TypeId,
         functions: []const Index,
+        traits: []const Trait,
         is_err: bool,
     };
     pub const UnionConstr = struct {
-        union_lit: UnionLit,
+        tag_lit: TagLit,
         arg: Index,
-    };
-    pub const UnionLit = struct {
-        sym: LoadSymbol,
-        tag_index: usize,
     };
     pub const UnionUnwrap = struct {
         @"union": usize,

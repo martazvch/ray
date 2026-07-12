@@ -598,6 +598,18 @@ pub const UnionInstance = struct {
         return obj;
     }
 
+    /// Creates a compile time constant that is a naked union field
+    pub fn createComptime(allocator: Allocator, parent: *const Module.Union, tag_id: u8, payload: Value) *Self {
+        const obj = Obj.allocateComptime(allocator, Self, parent.type_id);
+        obj.parent = parent;
+        obj.tag_id = tag_id;
+        obj.payload = payload;
+        obj.obj.kind = if (parent.is_err) .@"error" else .union_instance;
+        obj.obj.type_id = parent.type_id;
+
+        return obj;
+    }
+
     pub fn asObj(self: *Self) *Obj {
         return &self.obj;
     }

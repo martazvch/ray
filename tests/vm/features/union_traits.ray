@@ -1,0 +1,37 @@
+trait Foo {
+    fn speak() { print "oui" }
+    fn speakNoDef()
+
+    fn method(self) { print "method" }
+    fn methodNoDef(self)
+}
+
+union Bar {
+    a: int,
+    b: str,
+    
+    impl Foo {
+        fn speakNoDef() { print "noDef" }
+        fn methodNoDef(self) {
+            if self == .a {
+                print "I'm a: " + str(self.a)
+            } else {
+                print "I'm b: " + self.b
+            }
+        }
+    }
+}
+
+fn main() {
+    Bar.speak()
+    Bar.speakNoDef()
+
+    var bar: Bar = .a(1)
+    bar.method()
+    bar.methodNoDef()
+
+    bar = .b("youpi")
+    bar.method()
+    bar.methodNoDef()
+}
+

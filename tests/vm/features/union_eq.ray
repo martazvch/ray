@@ -1,0 +1,22 @@
+union Foo { a, b }
+union Bar {
+    a: int,
+    b: str,
+}
+
+fn main() {
+    let foo: Foo = .a
+    if foo == .a do print "I'm foo.a"
+    else if foo == Foo.b do print "I'm foo.b"
+
+    print Foo.a == .a
+    print Foo.a == Foo.a
+
+    let bar: Bar = .b("ee")
+    if bar == Bar.a do print "I'm bar.a"
+    else if bar == .b do print "I'm bar.b"
+
+    print Bar.b == .b
+    print Bar.b == Bar.b
+}
+

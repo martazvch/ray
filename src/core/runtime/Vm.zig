@@ -721,7 +721,7 @@ fn execute(self: *Self) !void {
                 ).asObj()));
             },
             .unbox => self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.Box).value,
-            .union_lit => {
+            .union_constr => {
                 const index = self.frame.readByte();
                 const tag = self.frame.readByte();
                 self.stack.push(.makeObj(Obj.UnionInstance.create(
@@ -731,7 +731,7 @@ fn execute(self: *Self) !void {
                     self.stack.pop(),
                 ).asObj()));
             },
-            .union_lit_ext => {
+            .union_constr_ext => {
                 const index = self.frame.readByte();
                 const module = self.frame.readByte();
                 const tag = self.frame.readByte();

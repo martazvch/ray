@@ -25,17 +25,19 @@
             [Block pop count: 0, is_expr: false]
                 [Pop]
                     [Fail]
-                        [Union literal]
-                            - union
-                            [Load symbol 0]
-                            - tag
-                            1
+                        [Constant index 5]
+                            [Union create]
+                                - symbol
+                                [Load symbol 0]
+                                - tag
+                                1
     [Fail]
-        [Union literal]
-            - union
-            [Load symbol 0]
-            - tag
-            0
+        [Constant index 6]
+            [Union create]
+                - symbol
+                [Load symbol 0]
+                - tag
+                0
 
 [Function declaration main]
     [Print]
@@ -43,7 +45,7 @@
         - lhs
             [Call symbol 0]
                 - args
-                [Constant index 5]
+                [Constant index 7]
                     [Int 15]
         - rhs
             [Match is]
@@ -56,38 +58,39 @@
                     [Variable index: 0, scope: local]
                 - arms:
                     - expr:
-                        [Union literal]
-                            - union
-                            [Load symbol 0]
-                            - tag
-                            0
-                    - body:
                         [Constant index 6]
+                            [Union create]
+                                - symbol
+                                [Load symbol 0]
+                                - tag
+                                0
+                    - body:
+                        [Constant index 8]
                             [Int 1]
                     - expr:
-                        [Union literal]
-                            - union
-                            [Load symbol 0]
-                            - tag
-                            1
+                        [Constant index 5]
+                            [Union create]
+                                - symbol
+                                [Load symbol 0]
+                                - tag
+                                1
                     - body:
-                        [Constant index 7]
+                        [Constant index 9]
                             [Int 100]
             [Type id]
-                [Constant index 8]
+                [Constant index 10]
                     [Int -999]
-
     [Print]
         [Trap expr]
         - lhs
             [Call symbol 0]
                 - args
-                [Constant index 5]
+                [Constant index 7]
                     [Int 15]
         - rhs
             [Block pop count: 1, is_expr: true]
                 [Print]
                     [Variable index: 0, scope: local]
                 [Break depth: 0, pop: 1]
-                    [Constant index 9]
+                    [Constant index 11]
                         [Int 88]

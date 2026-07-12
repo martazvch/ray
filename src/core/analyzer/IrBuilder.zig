@@ -5,6 +5,7 @@ const MultiArrayList = std.MultiArrayList;
 
 const ir = @import("ir.zig");
 const Instruction = ir.Instruction;
+const Constant = @import("ConstantInterner.zig").Constant;
 const ConstIdx = @import("ConstantInterner.zig").ConstIdx;
 const misc = @import("misc");
 const oom = misc.oom;

@@ -52,6 +52,8 @@ pub const Context = struct {
     in_for: bool,
     in_trap: bool,
     in_trait: bool,
+    /// To know if we're in an equality, used for implicit selector on unions
+    in_eq: bool,
 
     pub const empty: Context = .{
         .decl_type = null,
@@ -61,6 +63,7 @@ pub const Context = struct {
         .in_for = false,
         .in_trap = false,
         .in_trait = false,
+        .in_eq = false,
     };
 
     const ContextSnapshot = struct {
@@ -354,6 +357,7 @@ fn containerTraitImpls(
             .{ .undeclared_trait = .{ .name = trait_name_str } },
             trait_span,
         );
+
         const trait_def = sym.type.as(.trait) orelse return self.err(
             .{ .not_a_trait = .{ .name = trait_name_str } },
             trait_span,
@@ -1139,6 +1143,7 @@ fn unionDecl(self: *Self, node: *const Ast.UnionDecl, ctx: *Context) StmtResult 
 
     const tags = try self.unionTags(node.tags, ty, ctx);
     const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
+    const traits = try self.containerTraitImpls(interned, node.traits, &ty.traits, ctx);
 
     return self.irb.addInstr(
         .{ .union_decl = .{
@@ -1147,6 +1152,7 @@ fn unionDecl(self: *Self, node: *const Ast.UnionDecl, ctx: *Context) StmtResult 
             .sym_index = sym.index,
             .type_id = self.ti.typeId(interned),
             .functions = funcs,
+            .traits = traits,
             .is_err = node.is_err,
         } },
         self.ast.getSpan(node).start,
@@ -1478,6 +1484,10 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
     // For enum literals
     const prev_decl = ctx.setAndGetPrevious(.decl_type, if (!lhs.type.is(.void)) lhs.type else null);
     defer ctx.decl_type = prev_decl;
+    // For implicit selector in unions, even if the tag has a payload, for equality we compare
+    // only the tag, no need to see the payload
+    const prev_eq = ctx.setAndGetPrevious(.in_eq, expr.op == .equal_equal or expr.op == .bang_bang);
+    defer ctx.in_eq = prev_eq;
 
     const rhs = try self.analyzeExpr(expr.rhs, .value, ctx);
 
@@ -1526,7 +1536,7 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
                 break :instr .{ getArithmeticOp(expr.op, ty), lhs_instr, rhs_instr, self.ti.getCached(.bool) };
             },
             .equal_equal, .bang_equal => {
-                const lhs_instr, const rhs_instr, const ty = self.binopComparisonCoercion(lhs, rhs) catch |e| return switch (e) {
+                const lhs_instr, const rhs_instr, const ty = self.binopComparisonCoercion(expr, lhs, rhs) catch |e| return switch (e) {
                     error.NonNullLhs => self.err(.{ .non_null_comp_optional = .{ .found = self.typeName(lhs_type) } }, lhs_span),
                     error.NonNullRhs => self.err(.{ .non_null_comp_optional = .{ .found = self.typeName(rhs_type) } }, rhs_span),
                     error.Invalid => self.err(
@@ -1535,7 +1545,9 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
                     ),
                 };
 
-                if (lhs_type.is(.float) or rhs_type.is(.float)) self.warn(.float_equal, self.ast.getSpan(expr));
+                if (lhs_type.is(.float) or rhs_type.is(.float)) {
+                    self.warn(.float_equal, self.ast.getSpan(expr));
+                }
 
                 break :instr .{ getComparisonOp(expr.op, ty), lhs_instr, rhs_instr, self.ti.getCached(.bool) };
             },
@@ -1613,6 +1625,7 @@ fn getArithmeticOp(op: TokenTag, ty: *const Type) Instr.Binop.Op {
 
 fn binopComparisonCoercion(
     self: *Self,
+    expr: Ast.Binop,
     lhs: InstrInfos,
     rhs: InstrInfos,
 ) error{ NonNullLhs, NonNullRhs, Invalid }!struct { InstrIndex, InstrIndex, *const Type } {
@@ -1623,10 +1636,51 @@ fn binopComparisonCoercion(
         return .{ lhs.instr, rhs.instr, lhs_type };
     }
 
-    if (lhs_type == rhs_type and
-        (lhs_type.is(.str) or lhs_type.is(.@"enum")))
-    {
-        return .{ lhs.instr, rhs.instr, lhs_type };
+    if (lhs_type == rhs_type) {
+        if (lhs_type.is(.str)) {
+            return .{ lhs.instr, rhs.instr, lhs_type };
+        }
+
+        const getTag = struct {
+            pub fn getTag(ana: *Self, instr: InstrIndex, kind: enum { @"enum", @"union" }, offset: usize) InstrIndex {
+                const instr_data = ana.irb.getInstr(instr);
+                // If it's not a constant, we have to extract the tag from runtime value
+                if (instr_data != .constant) {
+                    return ana.irb.wrapInstr(.tag, instr);
+                }
+
+                // Else, it's a regular enum constant like `Foo.tagName` or `.tagName`
+                const cte_index = instr_data.constant.index;
+                const cte = ana.state.const_interner.get(cte_index);
+                const tag_index = if (kind == .@"enum")
+                    cte.enum_lit.tag_index
+                else
+                    cte.union_lit.tag_index;
+                return ana.addConstant(.{ .int = @intCast(tag_index) }, offset);
+            }
+        }.getTag;
+
+        if (lhs_type.is(.@"union")) {
+            // Two cases where we can optimize the comparison:
+            //  - implicit_selector: `myUnion == .a`
+            //  - union_lit: `myUnion == Foo.tagName`
+            // When building an union, we'll land on `union_constr`: `myUnion == .tagName(value)`
+            if (expr.rhs.* == .implicit_selector or self.isUnionLit(rhs.instr)) {
+                return .{
+                    self.irb.wrapInstr(.tag, lhs.instr),
+                    getTag(self, rhs.instr, .@"union", self.ast.getSpan(rhs.instr).start),
+                    self.ti.getCached(.int),
+                };
+            }
+        }
+
+        if (lhs_type.is(.@"enum")) {
+            return .{
+                getTag(self, lhs.instr, .@"enum", self.ast.getSpan(expr.lhs).start),
+                getTag(self, rhs.instr, .@"enum", self.ast.getSpan(expr.rhs).start),
+                self.ti.getCached(.int),
+            };
+        }
     }
 
     if (lhs_type.is(.optional) or rhs_type.is(.optional)) {
@@ -1649,6 +1703,13 @@ fn binopComparisonCoercion(
     return error.Invalid;
 }
 
+/// Checks if the instruction is a constant and check if it's the correct kind
+pub fn isUnionLit(self: *const Self, instr: ir.Index) bool {
+    const cte_instr = self.irb.getInstr(instr);
+    if (cte_instr != .constant) return false;
+    return self.state.const_interner.get(cte_instr.constant.index) == .union_lit;
+}
+
 fn getComparisonOp(op: TokenTag, ty: *const Type) Instr.Binop.Op {
     return switch (ty.*) {
         .bool => if (op == .equal_equal) .eq_bool else .ne_bool,
@@ -1656,7 +1717,6 @@ fn getComparisonOp(op: TokenTag, ty: *const Type) Instr.Binop.Op {
         .float => if (op == .equal_equal) .eq_float else .ne_float,
         .str => if (op == .equal_equal) .eq_str else .ne_str,
         .null, .optional => if (op == .equal_equal) .eq_null else .ne_null,
-        .@"enum" => if (op == .equal_equal) .eq_tag else .ne_tag,
         else => unreachable,
     };
 }
@@ -1765,27 +1825,31 @@ pub fn implicitSelector(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result 
     const name = self.scope.getSymbolName(tag_res.ty).?;
     const sym = self.symbolIdentifier(name, span).?;
 
-    return if (decl.is(.@"enum") or (decl.is(.inline_union) and tag_res.ty.is(.@"enum"))) .{
+    if (tag_res.ty.as(.@"union")) |*u| {
+        const tag_type = u.tags.get(tag_name).?;
+
+        // If the tag type isn't void but we're not building an union instance like `.tag(value)`, error
+        // The only case allowed is if we're an equality because we only check the tag: `myUnion == .tagName`
+        if (!tag_type.is(.void) and !ctx.in_call and !ctx.in_eq) return self.err(
+            .{ .implicit_select_union_tag_with_type = .{
+                .tag = self.ast.toSource(tag),
+                .expect = self.typeName(tag_type),
+            } },
+            span,
+        );
+    }
+
+    // TODO: protect the cast
+    const tag_lit: Constant.TagLit = .{
+        .sym = .{ .module_index = null, .symbol_index = @intCast(sym.sym.index) },
+        .tag_index = @intCast(tag_res.index),
+    };
+
+    return .{
         .type = tag_res.ty,
         .ti = .{ .comp_time = true },
         .instr = self.addConstant(
-            // TODO: protect the cast
-            .{ .enum_lit = .{
-                .sym = .{ .module_index = null, .symbol_index = @intCast(sym.sym.index) },
-                .tag_index = @intCast(tag_res.index),
-            } },
-            span.start,
-        ),
-    }
-    // Union
-    else return .{
-        .type = tag_res.ty,
-        .instr = self.irb.addInstr(
-            // TODO: protect the cast
-            .{ .union_lit = .{
-                .sym = .{ .module_index = null, .symbol_index = @intCast(sym.sym.index) },
-                .tag_index = @intCast(tag_res.index),
-            } },
+            if (tag_res.ty.is(.@"enum")) .{ .enum_lit = tag_lit } else .{ .union_lit = tag_lit },
             span.start,
         ),
     };
@@ -1796,21 +1860,21 @@ const TagRes = struct {
     ty: *const Type,
 };
 fn tagIndex(self: *Self, ty: *const Type, tag: InternerIdx, span: Span) Error!?TagRes {
-    switch (ty.*) {
-        .@"enum" => |t| return .{
+    return switch (ty.*) {
+        .@"enum" => |t| .{
             .index = t.tags.getIndex(tag) orelse return null,
             .ty = ty,
         },
-        .inline_union => |*t| return findImplicitSelctInUnion(t, tag),
-        .@"union" => |t| return .{
+        .inline_union => |*t| findImplicitSelctInUnion(t, tag),
+        .@"union" => |t| .{
             .index = t.tags.getIndex(tag) orelse return null,
             .ty = ty,
         },
-        else => return self.err(
+        else => self.err(
             .{ .implicit_select_invalid_type = .{ .found = self.typeName(ty) } },
             span,
         ),
-    }
+    };
 }
 
 fn findImplicitSelctInUnion(ty: *const Type.InlineUnion, tag: InternerIdx) ?TagRes {
@@ -2057,7 +2121,7 @@ fn unionAccess(self: *Self, union_info: InstrInfos, ty: Type.Union, tag_tk: Ast.
             .tag = .{
                 .type = self.ti.intern(.{ .@"union" = ty }),
                 .ti = .{ .comp_time = ty.tags.get(tag_name).?.is(.void) },
-                .instr = self.irb.addInstr(
+                .instr = self.addConstant(
                     .{ .union_lit = .{
                         .sym = self.irb.data(union_info.instr).load_symbol,
                         .tag_index = index,
@@ -2068,6 +2132,14 @@ fn unionAccess(self: *Self, union_info: InstrInfos, ty: Type.Union, tag_tk: Ast.
         };
     } else if (ty.functions.get(tag_name)) |func| {
         return .{ .decl = .{ .type = func.type, .kind = .function, .index = func.index } };
+    } else {
+
+        // Traits
+        for (ty.traits.values()) |trait| {
+            if (trait.funcs.get(tag_name)) |f| {
+                return .{ .decl = .{ .type = f.type, .kind = .function, .index = f.index } };
+            }
+        }
     }
 
     return self.err(
@@ -2197,17 +2269,19 @@ fn boundMethod(self: *Self, func_type: *const Type, field_index: usize, structur
 fn call(self: *Self, expr: *const Ast.FnCall, ctx: *Context) Result {
     const span = self.ast.getSpan(expr);
 
-    const ctx_call = ctx.setAndGetPrevious(.in_call, true);
-    const callee = try self.analyzeExpr(expr.callee, .any, ctx);
+    const callee = callee: {
+        const ctx_call = ctx.setAndGetPrevious(.in_call, true);
+        defer ctx.in_call = ctx_call;
+        const callee = try self.analyzeExpr(expr.callee, .any, ctx);
 
-    if (callee.type.is(.@"union")) {
-        return self.unionConstr(expr, callee, ctx);
-    }
+        if (callee.type.is(.@"union")) {
+            return self.unionConstr(expr, callee, ctx);
+        }
+
+        break :callee callee;
+    };
 
     const fn_type = callee.type.as(.function) orelse return self.err(.invalid_call_target, span);
-
-    // Restore state before arguments analyzis
-    ctx.in_call = ctx_call;
     const args_res = try self.fnArgsList(expr.args, &fn_type, callee.ti.ext_mod, span, ctx);
 
     if (fn_type.kind == .intrinsic) {
@@ -3280,10 +3354,9 @@ fn unionConstr(self: *Self, expr: *const Ast.FnCall, info: InstrInfos, ctx: *Con
         span,
     );
 
-    const instr = self.irb.getInstr(info.instr);
-    std.debug.assert(instr == .union_lit);
-
-    const tag_ty = info.type.@"union".tags.values()[instr.union_lit.tag_index];
+    // Previous instruction must be a constant `union_lit`
+    const tag_lit = self.state.const_interner.get(self.irb.getConstantIdx(info.instr)).union_lit;
+    const tag_ty = info.type.@"union".tags.values()[tag_lit.tag_index];
 
     if (expr.args.len == 0) {
         if (tag_ty.is(.void)) {
@@ -3311,7 +3384,7 @@ fn unionConstr(self: *Self, expr: *const Ast.FnCall, info: InstrInfos, ctx: *Con
     return .{
         .type = info.type,
         .instr = self.irb.addInstr(
-            .{ .union_constr = .{ .union_lit = instr.union_lit, .arg = arg_res.instr } },
+            .{ .union_constr = .{ .tag_lit = tag_lit, .arg = arg_res.instr } },
             span.start,
         ),
     };
