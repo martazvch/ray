@@ -374,7 +374,7 @@ fn containerTraitImpls(
         trait_impl.funcs.ensureTotalCapacity(self.alloc, @intCast(trait_def.functions.count())) catch oom();
 
         var proto = trait_def.proto(self.alloc);
-        var func_instrs = ArrayList(InstrIndex).initCapacity(self.alloc, trait_def.functions.count()) catch oom();
+        var func_instrs = ArrayList(Instr.Trait.TraitFn).initCapacity(self.alloc, trait_def.functions.count()) catch oom();
 
         for (t.functions) |*f| {
             const fn_name_str = self.ast.toSource(f.name);
@@ -395,7 +395,10 @@ fn containerTraitImpls(
                 self.ast.getSpan(f.name),
             );
 
-            func_instrs.appendAssumeCapacity(fn_res.instr);
+            func_instrs.appendAssumeCapacity(.{
+                .index = gop.index,
+                .func = .{ .instr = fn_res.instr },
+            });
             trait_impl.funcs.putAssumeCapacity(fn_name, fn_res.sym);
             gop.value_ptr.done = true;
         }
@@ -403,19 +406,16 @@ fn containerTraitImpls(
         var it = proto.iterator();
         while (it.next()) |entry| {
             if (entry.value_ptr.done) continue;
+            const fn_index = proto.getIndex(entry.key_ptr.*).?;
 
-            // Already compiled once
-            if (entry.value_ptr.func.compiled) |compiled| {
-                trait_impl.funcs.putAssumeCapacity(entry.key_ptr.*, compiled);
-            }
-            // Compile for first time
-            else if (entry.value_ptr.func.ast) |def| {
-                const fn_res = try self.fnDeclaration(def, ctx);
-                func_instrs.appendAssumeCapacity(fn_res.instr);
+            if (entry.value_ptr.func.ast) |ast| {
+                const fn_res = try self.fnDeclaration(ast, ctx);
+                func_instrs.appendAssumeCapacity(.{
+                    .index = fn_index,
+                    .func = .{ .instr = fn_res.instr },
+                });
                 trait_impl.funcs.putAssumeCapacity(entry.key_ptr.*, fn_res.sym);
-            }
-            // Missing
-            else return self.err(
+            } else return self.err(
                 .{ .missing_fn_impl_in_trait = .{
                     .func = self.interner.getKey(entry.key_ptr.*).?,
                     .trait = trait_name_str,
@@ -1103,7 +1103,6 @@ fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult 
         gop.value_ptr.* = .{
             .ty = interned_type,
             .ast = if (f.body != null) f else null,
-            .compiled = null,
         };
     }
 

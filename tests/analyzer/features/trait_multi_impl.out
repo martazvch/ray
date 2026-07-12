@@ -2,10 +2,12 @@
 [Structure declaration Bar]
     - traits
         Foo, vtable 0:
+        - function 0
         [Function declaration speak]
             [Print]
                 [Constant index 3]
                     [String I'm Bar]
+        - function 1
         [Function declaration other]
             [Field access 2]
                 [Variable index: 0, scope: local]
@@ -13,10 +15,12 @@
 [Structure declaration Baz]
     - traits
         Foo, vtable 1:
+        - function 0
         [Function declaration speak]
             [Print]
                 [Constant index 4]
                     [String I'm Baz]
+        - function 1
         [Function declaration other]
             [Field access 4]
                 [Variable index: 0, scope: local]
@@ -42,4 +46,3 @@
     [Field access 5]
         [Variable index: 1, scope: local]
     [Invoke symbol 5]
-

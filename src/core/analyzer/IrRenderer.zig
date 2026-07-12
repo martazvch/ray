@@ -596,7 +596,10 @@ fn traitImpls(self: *Self, traits: []const Instruction.Trait) void {
                 trait.vtable_index,
             });
             for (trait.funcs) |func| {
-                self.parseInstr(func);
+                if (func.func == .instr) {
+                    self.indentAndPrintSlice("- function {}", .{func.index});
+                    self.parseInstr(func.func.instr);
+                }
             }
         }
     }

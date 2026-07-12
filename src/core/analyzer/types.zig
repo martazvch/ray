@@ -233,7 +233,10 @@ pub const Type = union(enum) {
         functions: ArrayMap(InternerIdx, TraitFn),
 
         const FnAst = @import("../parser/Ast.zig").FnDecl;
-        pub const TraitFn = struct { ty: *const Type, ast: ?*FnAst, compiled: ?LexScope.Symbol };
+        pub const TraitFn = struct {
+            ty: *const Type,
+            ast: ?*FnAst,
+        };
         pub const Proto = ArrayMap(InternerIdx, struct { done: bool = false, func: TraitFn });
 
         pub fn proto(self: *const Trait, allocator: Allocator) Proto {

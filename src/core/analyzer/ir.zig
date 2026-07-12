@@ -146,7 +146,10 @@ pub const Instruction = struct {
             mod: ?ModIndex,
         },
     };
-    pub const Continue = struct { depth: usize, pop_count: usize };
+    pub const Continue = struct {
+        depth: usize,
+        pop_count: usize,
+    };
     pub const Constant = struct {
         index: ConstIdx,
     };
@@ -224,7 +227,9 @@ pub const Instruction = struct {
             pub const Kind = enum { int, float, bool, str, obj };
         };
     };
-    pub const MultiVarDecl = struct { decls: []const Index };
+    pub const MultiVarDecl = struct {
+        decls: []const Index,
+    };
     pub const ObjFn = struct {
         obj: Index,
         fn_index: usize,
@@ -239,7 +244,9 @@ pub const Instruction = struct {
 
         pub const Kind = enum { int, float };
     };
-    pub const Return = struct { value: ?Index };
+    pub const Return = struct {
+        value: ?Index,
+    };
     pub const StructDecl = struct {
         name: usize,
         sym_index: SymbolIndex,
@@ -266,7 +273,18 @@ pub const Instruction = struct {
     pub const Trait = struct {
         name: usize,
         vtable_index: usize,
-        funcs: []const Index,
+        funcs: []const TraitFn,
+
+        pub const TraitFn = struct {
+            index: usize,
+            func: union(enum) {
+                compiled: struct {
+                    sym_index: SymbolIndex,
+                    mod_index: ?ModIndex,
+                },
+                instr: Index,
+            },
+        };
     };
     pub const Trap = struct {
         lhs: Index,

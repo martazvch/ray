@@ -2,10 +2,12 @@
 [Union declaration Bar]
     - traits
         Foo, vtable 0:
+        - function 1
         [Function declaration speakNoDef]
             [Print]
                 [Constant index 5]
                     [String noDef]
+        - function 3
         [Function declaration methodNoDef]
             [If]
             - condition:
@@ -39,10 +41,12 @@
                                 [Variable index: 0, scope: local]
                                 - tag
                                 1
+        - function 0
         [Function declaration speak]
             [Print]
                 [Constant index 3]
                     [String oui]
+        - function 2
         [Function declaration method]
             [Print]
                 [Constant index 4]

@@ -141,14 +141,21 @@ pub fn addSymbol(self: *Self, mod_index: Index, sym_index: usize, value: anytype
     array[sym_index] = value;
 }
 
-pub fn getSymbol(self: *const Self, mod_index: Index, sym_index: usize, comptime kind: enum { @"enum", structure, @"union" }) *const switch (kind) {
-    .@"enum" => Module.Enum,
-    .structure => Module.Structure,
-    .@"union" => Module.Union,
+pub fn getSymbol(
+    self: *const Self,
+    mod_index: Index,
+    sym_index: usize,
+    comptime kind: enum { @"enum", function, structure, @"union" },
+) switch (kind) {
+    .@"enum" => *const Module.Enum,
+    .function => *Obj.Function,
+    .structure => *const Module.Structure,
+    .@"union" => *const Module.Union,
 } {
     const mod = self.getFromIndex(mod_index);
     return switch (kind) {
         .@"enum" => &mod.enums[sym_index],
+        .function => mod.functions[sym_index],
         .structure => &mod.structures[sym_index],
         .@"union" => &mod.unions[sym_index],
     };

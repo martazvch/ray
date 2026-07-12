@@ -697,14 +697,25 @@ const Compiler = struct {
             vtable.name = self.manager.alloc.dupe(u8, self.manager.state.interner.getKey(decl.name).?) catch oom();
             vtable.functions = self.manager.alloc.alloc(*Obj.Function, decl.funcs.len) catch oom();
 
-            for (decl.funcs, 0..) |func, i| {
-                const fn_data = self.manager.instr_data[func].fn_decl;
-                // Structures and enums' functions have a name
-                // TODO: not all the time
-                const fn_name = self.manager.state.interner.getKey(fn_data.name orelse unreachable).?;
-                const body = try self.compileFnBody(fn_name, &fn_data);
-                vtable.functions[i] = body;
-                self.manager.state.modules.addSymbol(self.manager.mod_index, fn_data.sym_index, body);
+            for (decl.funcs) |func| {
+                switch (func.func) {
+                    .compiled => |compiled| {
+                        vtable.functions[func.index] = self.manager.state.modules.getSymbol(
+                            compiled.mod_index orelse self.manager.mod_index,
+                            compiled.sym_index,
+                            .function,
+                        );
+                    },
+                    .instr => |instr| {
+                        const fn_data = self.manager.instr_data[instr].fn_decl;
+                        // Structures and enums' functions have a name
+                        // TODO: not all the time
+                        const fn_name = self.manager.state.interner.getKey(fn_data.name orelse unreachable).?;
+                        const body = try self.compileFnBody(fn_name, &fn_data);
+                        vtable.functions[func.index] = body;
+                        self.manager.state.modules.addSymbol(self.manager.mod_index, fn_data.sym_index, body);
+                    }
+                }
             }
         }
     }

@@ -2,6 +2,7 @@
 [Structure declaration Bar]
     - traits
         Foo, vtable 0:
+        - function 0
         [Function declaration speak]
             [Print]
                 [Binop type: add_str]
@@ -14,6 +15,7 @@
 [Structure declaration Baz]
     - traits
         Foo, vtable 1:
+        - function 0
         [Function declaration speak]
             [Print]
                 [Binop type: add_str]
