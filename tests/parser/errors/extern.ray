@@ -13,3 +13,5 @@ extern enum Foo {
 extern enum Foo {
     impl Foo {}
 }
+
+extern 5

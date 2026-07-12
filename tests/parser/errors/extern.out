@@ -3,3 +3,4 @@ extern_sym_has_decl, Foo, structure, functions
 extern_sym_has_decl, Foo, structure, traits
 extern_sym_has_decl, Foo, enum, functions
 extern_sym_has_decl, Foo, enum, traits
+invalid_extern

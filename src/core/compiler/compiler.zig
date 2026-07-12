@@ -714,7 +714,7 @@ const Compiler = struct {
                         const body = try self.compileFnBody(fn_name, &fn_data);
                         vtable.functions[func.index] = body;
                         self.manager.state.modules.addSymbol(self.manager.mod_index, fn_data.sym_index, body);
-                    }
+                    },
                 }
             }
         }

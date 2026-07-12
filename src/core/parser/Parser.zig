@@ -278,7 +278,7 @@ fn declaration(self: *Self) Error!Node {
         } else if (self.match(.@"enum")) {
             return self.enumDecl(true);
         } else {
-            return self.errAtPrev(.extern_sym_not_fn);
+            return self.errAtPrev(.invalid_extern);
         }
     } else self.statement();
 }
