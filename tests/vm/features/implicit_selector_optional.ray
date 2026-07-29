@@ -1,0 +1,20 @@
+struct Data {
+    a, b: int,
+}
+
+enum Dir {up, down}
+
+fn useData(data: ?Data, dir: ?Dir) {
+    if let d = data {
+        print d.a
+        print d.b
+    }
+    if let d = dir {
+        print d
+    }
+}
+
+fn main() {
+    useData(.{ a: 1, b: 2 }, .down)
+    useData(null, null)
+}

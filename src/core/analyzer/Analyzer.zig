@@ -2387,22 +2387,27 @@ fn fnArgsList(
             }
         };
 
-        // If the function comes from another module, all of its symbols must be redeclared in this scope
-        if (param_info.type.isSymbol()) {
-            if (ext_mod) |fn_mod| {
-                // If the parameter it self is extern to the function module, fetch it from there
-                const sym_mod = if (param_info.mod_index) |mod| mod else fn_mod;
-                const module = self.state.modules.getFromIndex(sym_mod);
-                const sym_name = self.interner.intern(self.symbolName(param_info.type));
-                var sym = module.sym_infos.get(sym_name).?;
-                sym.module_index = sym_mod;
-                self.scope.declareExternSymbol(self.alloc, sym_name, sym);
+        // We use the inner type to bypass potential optional types and so on
+        const inner_type = extractDeclType(param_info.type);
+        ctx.decl_type = inner_type;
+
+        {
+            // If the function comes from another module, all of its symbols must be redeclared in this scope
+            if (inner_type.isSymbol()) {
+                if (ext_mod) |fn_mod| {
+                    // If the parameter it self is extern to the function module, fetch it from there
+                    const sym_mod = if (param_info.mod_index) |mod| mod else fn_mod;
+                    const module = self.state.modules.getFromIndex(sym_mod);
+                    const sym_name = self.interner.intern(self.symbolName(inner_type));
+                    var sym = module.sym_infos.get(sym_name).?;
+                    sym.module_index = sym_mod;
+                    sym.type = inner_type;
+                    self.scope.declareExternSymbol(self.alloc, sym_name, sym);
+                }
             }
         }
 
-        ctx.decl_type = param_info.type;
         var value = try self.analyzeExpr(arg.value, .value, ctx);
-
         _ = try self.performTypeCoercion(param_info.type, &value, false, span);
 
         self.checkWrap(&value.instr, false);
@@ -3636,6 +3641,14 @@ fn mergeTypes(self: *Self, types: []const *const Type) *const Type {
     const ty = if (set.count() == 1) set.keys()[0] else self.ti.intern(.{ .inline_union = .{ .types = set.toOwned() } });
 
     return if (optional) self.ti.intern(.{ .optional = ty }) else ty;
+}
+
+/// Gets the symbol type inside of potential optional types and so on
+fn extractDeclType(decl: *const Type) *const Type {
+    return switch (decl.*) {
+        .optional => |child| child,
+        else => decl,
+    };
 }
 
 /// Checks for `void` values, array inference, cast and function type generation
