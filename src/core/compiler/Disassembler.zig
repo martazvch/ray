@@ -105,8 +105,6 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .div_float => self.simpleInstruction(writer, "div_float", offset),
         .div_int => self.simpleInstruction(writer, "div_int", offset),
         .dup => self.simpleInstruction(writer, "dup", offset),
-        .enum_lit => self.enumLiteral(writer, offset),
-        .enum_lit_ext => self.enumLiteralExt(writer, offset),
         .eq_bool => self.simpleInstruction(writer, "eq_bool", offset),
         .eq_float => self.simpleInstruction(writer, "eq_float", offset),
         .eq_int => self.simpleInstruction(writer, "eq_int", offset),
