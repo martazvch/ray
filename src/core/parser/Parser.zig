@@ -1382,6 +1382,11 @@ fn ifExpr(self: *Self) Error!*Expr {
 
 fn implicitSelector(self: *Self) Error!*Expr {
     const expr = self.allocator.create(Expr) catch oom();
+
+    if (self.match(.left_brace)) {
+        return self.structLiteral(.{ .dot = self.token_idx - 1 });
+    }
+
     try self.expect(.identifier, .implicit_select_non_ident);
     expr.* = .{ .implicit_selector = self.token_idx - 1 };
     return expr;
@@ -1588,7 +1593,7 @@ fn postfix(self: *Self, prefixExpr: *Expr) Error!*Expr {
             self.token_idx += 1;
 
             // Can't chain them, break the loop
-            return self.structLiteral(expr);
+            return self.structLiteral(.{ .expr = expr });
         }
         // Trap
         else if (self.match(.trap)) {
@@ -1670,16 +1675,21 @@ fn indexing(self: *Self, expr: *Expr) Error!*Expr {
     return indexing_expr;
 }
 
-fn structLiteral(self: *Self, expr: *Expr) Error!*Expr {
+fn structLiteral(self: *Self, expr: Ast.StructLiteral.Kind) Error!*Expr {
     self.skipNewLines();
     const struct_lit = self.allocator.create(Expr) catch oom();
     var fields_values: ArrayList(Ast.FieldAndValue) = .empty;
 
     check: {
-        if (expr.* == .identifier) break :check;
-        if (expr.* == .field) break :check;
+        switch (expr) {
+            .expr => |e| {
+                if (e.* == .identifier) break :check;
+                if (e.* == .field) break :check;
 
-        return self.errAtPrev(.invalid_struct_literal);
+                return self.errAtPrev(.invalid_struct_literal);
+            },
+            else => {},
+        }
     }
 
     // All the skip_lines cover the different syntaxes

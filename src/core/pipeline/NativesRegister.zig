@@ -166,7 +166,13 @@ fn fnZigToRay(self: *Self, alloc: Allocator, comptime func: *const zffi.FnMeta, 
         if (gop.found_existing) {
             @panic("Already declared param with same name");
         }
-        gop.value_ptr.* = .{ .name = null, .type = param_ty, .default = null, .captured = false };
+        gop.value_ptr.* = .{
+            .name = null,
+            .type = param_ty,
+            .mod_index = null,
+            .default = null,
+            .captured = false,
+        };
     }
 
     // TODO: handle container name properly
@@ -222,7 +228,13 @@ fn fnIntrinsicToRay(
         if (gop.found_existing) {
             @panic("Already declared parameter");
         }
-        gop.value_ptr.* = .{ .name = null, .type = param_ty, .default = null, .captured = false };
+        gop.value_ptr.* = .{
+            .name = null,
+            .type = param_ty,
+            .mod_index = null,
+            .default = null,
+            .captured = false,
+        };
     }
 
     // TODO: handle container name properly
@@ -295,6 +307,7 @@ pub fn foreignFnToRay(alloc: Allocator, proto: *const ffi.FnProto, interner: *In
             .{
                 .name = param_name,
                 .type = param_ty,
+                .mod_index = null,
                 .default = null,
                 .captured = false,
             },

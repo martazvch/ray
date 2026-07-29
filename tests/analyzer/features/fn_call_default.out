@@ -33,6 +33,11 @@
     - body
     [Return]
         [Variable index: 0, scope: local]
+[Enum declaration Dir]
+    - tags
+    up
+    down
+
 [Structure declaration Foo]
     - default values
     [Constant index 3]

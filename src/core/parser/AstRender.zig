@@ -471,7 +471,10 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
         },
         .struct_literal => |e| {
             try self.openKey(@tagName(expr.*), .block);
-            try self.renderSingleExpr("structure", e.structure, .block, true);
+            switch (e.structure) {
+                .dot => try self.pushKeyValue("structure", ".", true),
+                .expr => |struct_expr| try self.renderSingleExpr("structure", struct_expr, .block, true),
+            }
 
             if (e.fields.len == 0) {
                 try self.emptyKey("fields_values", .list, false);

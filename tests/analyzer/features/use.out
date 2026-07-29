@@ -33,6 +33,11 @@
     - body
     [Return]
         [Variable index: 0, scope: local]
+[Enum declaration Dir]
+    - tags
+    up
+    down
+
 [Function declaration main]
     [Call symbol 1 module 1]
     [Variable declaration index: 0, scope: local]

@@ -268,8 +268,13 @@ pub const Return = struct {
 };
 
 pub const StructLiteral = struct {
-    structure: *Expr,
+    structure: Kind,
     fields: []FieldAndValue,
+
+    pub const Kind = union(enum) {
+        dot: TokenIndex,
+        expr: *Expr,
+    };
 };
 
 pub const FieldAndValue = struct {
@@ -363,10 +368,14 @@ pub const Unary = struct {
 
 /// Can be used with any `*Node`, `*Expr` or a `token index`
 pub fn toSource(self: *const @This(), node: anytype) []const u8 {
-    const span = if (@TypeOf(node) == usize)
-        self.token_spans[node]
-    else
-        self.getSpan(node.*);
+    const span = switch (@TypeOf(node)) {
+        usize => self.token_spans[node],
+        StructLiteral.Kind => switch (node) {
+            .dot => |tk| self.token_spans[tk],
+            .expr => |e| self.getSpan(e),
+        },
+        else => self.getSpan(node.*),
+    };
 
     return self.source[span.start..span.end];
 }
@@ -494,6 +503,10 @@ pub fn getSpan(self: *const @This(), anynode: anytype) Span {
         },
         Return => self.token_spans[node.kw],
         StructLiteral => self.getSpan(node.structure),
+        StructLiteral.Kind => switch (node) {
+            .dot => |d| self.token_spans[d],
+            .expr => |e| self.getSpan(e),
+        },
         Ternary => .{
             .start = self.getSpan(node.condition).start,
             .end = self.getSpan(node.@"else").end,

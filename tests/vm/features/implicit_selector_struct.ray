@@ -1,0 +1,19 @@
+struct Foo {
+    a: int,
+    c: str,
+}
+
+fn printFoo(foo: Foo) {
+    print foo.a
+    print foo.c
+}
+
+fn main() {
+    var foo: Foo = .{a: 1, c: "yes"}
+    printFoo(foo)
+    foo = .{a: 2, c: "no"}
+    printFoo(foo)
+
+    printFoo(.{ a: 3, c: "Tom" })
+    printFoo(foo: .{ a: 4, c: "Manon" })
+}

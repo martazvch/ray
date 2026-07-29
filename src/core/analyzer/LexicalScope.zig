@@ -318,13 +318,41 @@ pub fn getSymbol(self: *const Self, name: InternerIdx) ?*Symbol {
     return null;
 }
 
-pub fn getSymbolName(self: *const Self, sym_type: *const Type) ?InternerIdx {
+pub fn getSymbolFromType(self: *const Self, ty: *const Type) ?*Symbol {
     var it = self.iterator();
     while (it.next()) |scope| {
         var sym_it = scope.symbols.iterator();
         while (sym_it.next()) |sym| {
-            if (sym.value_ptr.type == sym_type) {
+            if (sym.value_ptr.type == ty) {
+                return sym.value_ptr;
+            }
+        }
+    }
+
+    return null;
+}
+
+pub fn getSymbolName(self: *const Self, ty: *const Type) ?InternerIdx {
+    var it = self.iterator();
+    while (it.next()) |scope| {
+        var sym_it = scope.symbols.iterator();
+        while (sym_it.next()) |sym| {
+            if (sym.value_ptr.type == ty) {
                 return sym.key_ptr.*;
+            }
+        }
+    }
+
+    return null;
+}
+
+pub fn getSymbolModule(self: *const Self, ty: *const Type) ?ModIndex {
+    var it = self.iterator();
+    while (it.next()) |scope| {
+        var sym_it = scope.symbols.iterator();
+        while (sym_it.next()) |sym| {
+            if (sym.value_ptr.type == ty) {
+                return sym.value_ptr.module_index;
             }
         }
     }

@@ -5,6 +5,7 @@ const Map = std.AutoHashMapUnmanaged;
 const asBytes = std.mem.asBytes;
 
 const LexScope = @import("LexicalScope.zig");
+const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
 const InstrIndex = @import("ir.zig").Index;
 const misc = @import("misc");
 const Interner = misc.Interner;
@@ -121,7 +122,13 @@ pub const Type = union(enum) {
         kind: Kind,
 
         pub const Kind = enum { normal, method, bound, foreign, foreign_glob, intrinsic, zig, zig_method };
-        pub const Parameter = struct { name: ?InternerIdx, type: *const Type, default: ?ConstIdx, captured: bool };
+        pub const Parameter = struct {
+            name: ?InternerIdx,
+            type: *const Type,
+            mod_index: ?ModIndex,
+            default: ?ConstIdx,
+            captured: bool,
+        };
         pub const ParamsMap = ArrayMap(InternerIdx, Parameter);
         pub const Proto = ArrayMap(InternerIdx, struct { done: bool = false, default: ?ConstIdx = null });
 
@@ -290,7 +297,7 @@ pub const Type = union(enum) {
     }
 
     pub fn isSymbol(self: *const Type) bool {
-        return self.is(.function);
+        return self.is(.function) or self.is(.structure) or self.is(.@"enum") or self.is(.@"union");
     }
 
     // TODO: values in unions can be heap...
@@ -394,7 +401,7 @@ pub const Type = union(enum) {
         hasher.update(asBytes(&loc.container));
     }
 
-    pub fn toString(self: *const Type, allocator: Allocator, interner: *const Interner, mod_name: InternerIdx) []const u8 {
+    pub fn toString(self: *const Type, allocator: Allocator, interner: *const Interner, mod_name: InternerIdx, full: bool) []const u8 {
         var wa = std.Io.Writer.Allocating.init(allocator);
         const w = &wa.writer;
 
@@ -406,16 +413,16 @@ pub const Type = union(enum) {
                 try w.writeAll("[]");
                 if (ty.child.is(.inline_union)) {
                     try w.writeAll("(");
-                    try w.writeAll(ty.child.toString(allocator, interner, mod_name));
+                    try w.writeAll(ty.child.toString(allocator, interner, mod_name, full));
                     try w.writeAll(")");
                 } else {
-                    try w.writeAll(ty.child.toString(allocator, interner, mod_name));
+                    try w.writeAll(ty.child.toString(allocator, interner, mod_name, full));
                 }
             },
             .@"enum" => |ty| {
                 // If symbol is defnined in current mod/file, don't repeat the module
                 if (ty.loc) |loc| {
-                    locToString(w, loc, interner, mod_name);
+                    locToString(w, loc, interner, mod_name, full);
                 } else {
                     w.writeAll("enum {") catch oom();
                     for (ty.tags.keys(), 0..) |k, i| {
@@ -427,32 +434,32 @@ pub const Type = union(enum) {
             },
             .error_union => |ty| {
                 errdefer oom();
-                try w.writeAll(ty.ok.toString(allocator, interner, mod_name));
+                try w.writeAll(ty.ok.toString(allocator, interner, mod_name, full));
                 try w.writeAll("!");
-                try w.writeAll(ty.err.toString(allocator, interner, mod_name));
+                try w.writeAll(ty.err.toString(allocator, interner, mod_name, full));
             },
             .function => |ty| {
                 w.writeAll("fn(") catch oom();
                 for (ty.params.values(), 0..) |p, i| {
-                    w.writeAll(p.type.toString(allocator, interner, mod_name)) catch oom();
+                    w.writeAll(p.type.toString(allocator, interner, mod_name, full)) catch oom();
                     if (i != ty.params.count() - 1) w.writeAll(", ") catch oom();
                 }
                 w.writeAll(") -> ") catch oom();
-                w.writeAll(ty.return_type.toString(allocator, interner, mod_name)) catch oom();
+                w.writeAll(ty.return_type.toString(allocator, interner, mod_name, full)) catch oom();
             },
             .module => |interned| {
                 const name = interner.getKey(interned).?;
                 w.print("module: {s}", .{name}) catch oom();
             },
             .optional => |opt| {
-                w.print("?{s}", .{opt.toString(allocator, interner, mod_name)}) catch oom();
+                w.print("?{s}", .{opt.toString(allocator, interner, mod_name, full)}) catch oom();
             },
-            .structure => |ty| locToString(w, ty.loc, interner, mod_name),
-            .trait => |ty| locToString(w, ty.loc, interner, mod_name),
-            .@"union" => |*ty| locToString(w, ty.loc, interner, mod_name),
+            .structure => |ty| locToString(w, ty.loc, interner, mod_name, full),
+            .trait => |ty| locToString(w, ty.loc, interner, mod_name, full),
+            .@"union" => |*ty| locToString(w, ty.loc, interner, mod_name, full),
             .inline_union => |u| {
                 for (u.types, 0..) |ty, i| {
-                    w.writeAll(ty.toString(allocator, interner, mod_name)) catch oom();
+                    w.writeAll(ty.toString(allocator, interner, mod_name, full)) catch oom();
                     if (i < u.types.len - 1) w.writeAll("|") catch oom();
                 }
             },
@@ -461,10 +468,10 @@ pub const Type = union(enum) {
         return w.buffered();
     }
 
-    pub fn locToString(writer: *std.Io.Writer, loc: Loc, interner: *const Interner, mod_name: InternerIdx) void {
+    pub fn locToString(writer: *std.Io.Writer, loc: Loc, interner: *const Interner, mod_name: InternerIdx, full: bool) void {
         errdefer oom();
 
-        if (loc.container == mod_name) {
+        if (loc.container == mod_name or !full) {
             try writer.print("{s}", .{interner.getKey(loc.name).?});
         } else {
             try writer.print("{s}.{s}", .{ interner.getKey(loc.container).?, interner.getKey(loc.name).? });

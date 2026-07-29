@@ -38,9 +38,6 @@ pub fn run(
     path: []const u8,
     source: [:0]const u8,
 ) !*Obj.Function {
-    // Initiliaze the path builder
-    state.path_builder.append(alloc, std.Io.Dir.cwd().realPathFileAlloc(io, ".", alloc) catch oom());
-
     const ast = try parse(io, alloc, state, file_name, source);
 
     // Extension could be either .ray or .rayn so we split dynamically

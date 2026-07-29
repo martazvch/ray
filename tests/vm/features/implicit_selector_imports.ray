@@ -1,0 +1,41 @@
+fn main() {
+    // Import the module
+    {
+        use data.math
+
+        // Checks that value actually imports the symbol
+        {
+            var dir1 = math.Dir.up
+            dir1 = .down
+        }
+
+        // Checks that type actually imports the symbol
+        {
+            var dir1: math.Dir = .up
+            dir1 = .down
+        }
+    }
+
+    // Import the item
+    {
+        use data.math.{Dir}
+
+        {
+            var dir1 = Dir.up
+            dir1 = .down
+        }
+        {
+            var dir1: Dir = .up
+            dir1 = .down
+        }
+    }
+    
+    // Uses an import that itself uses another file
+    {
+        use data.reimport
+
+        reimport.useDataAndVec(.{ a: 1, b: 2 }, .{ x: 56, y: 68 })
+    }
+
+    print "ok"
+}

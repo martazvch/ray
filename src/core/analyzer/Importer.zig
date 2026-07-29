@@ -50,7 +50,8 @@ pub fn fetchImportedFile(
 ) Result {
     if (ast.token_tags[path_chunks[0]] == .dot) {
         var buf_path: [std.fs.max_path_bytes]u8 = undefined;
-        const buf_written = sb.render(&buf_path);
+        const buf_written = sb.renderWithSep(&buf_path, std.fs.path.sep_str);
+
         const cwd = std.Io.Dir.openDirAbsolute(io, buf_written, .{}) catch unreachable;
 
         // TODO: could it be only a dot? And thus it would break at the [1..]
@@ -70,7 +71,6 @@ pub fn fetchImportedFile(
 
         // TODO: won't work with absolute path
         sb.append(alloc, p);
-        defer _ = sb.pop();
 
         return fetchFrom(io, alloc, cwd, ast, path_chunks, sb);
     }
@@ -101,7 +101,7 @@ fn fetchFrom(
                 if (cwd.access(io, file_name, .{})) {
                     return .{ .rayfile = .{
                         .name = file_name,
-                        .path = sb.renderAlloc(alloc),
+                        .path = sb.renderWithSepAlloc(alloc, std.fs.path.sep_str),
                         .content = readFile(io, alloc, &cwd, file_name),
                     } };
                 } else |_| {}
@@ -123,9 +123,11 @@ fn fetchFrom(
 
                     // We add the name after fetching the lib to avoid duplicate name
                     sb.append(alloc, name);
+                    // defer _ = sb.pop();
+
                     return .{ .dynlib = .{
                         .name = file_name,
-                        .path = sb.renderAlloc(alloc),
+                        .path = sb.renderWithSepAlloc(alloc, std.fs.path.sep_str),
                         .rayn_content = readFile(io, alloc, &cwd, file_name),
                         .lib = lib,
                         .token = part,

@@ -5,6 +5,8 @@ const Pipeline = @import("../core/pipeline/pipeline.zig");
 const Vm = @import("../core/runtime/Vm.zig");
 const State = @import("../core/pipeline/State.zig");
 
+const oom = @import("misc").oom;
+
 pub fn run(io: std.Io, allocator: Allocator, file_path: []const u8, config: State.Config) !void {
     var arena = std.heap.ArenaAllocator.init(allocator);
     const arena_alloc = arena.allocator();
@@ -19,6 +21,9 @@ pub fn run(io: std.Io, allocator: Allocator, file_path: []const u8, config: Stat
             std.process.exit(0);
         };
         defer allocator.free(file_content);
+
+        // Initiliaze the path builder
+        state.path_builder.append(arena_alloc, std.Io.Dir.cwd().realPathFileAlloc(io, ".", arena_alloc) catch oom());
 
         const entry_point = Pipeline.run(io, arena_alloc, &state, false, file_path, ".", file_content) catch |e| switch (e) {
             error.ExitOnPrint => return,

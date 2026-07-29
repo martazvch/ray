@@ -33,6 +33,11 @@
     - body
     [Return]
         [Variable index: 0, scope: local]
+[Enum declaration Dir]
+    - tags
+    up
+    down
+
 [Structure declaration Point]
     [Function declaration move]
         [Binop type: add_int]

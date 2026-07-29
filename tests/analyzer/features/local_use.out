@@ -33,6 +33,11 @@
     - body
     [Return]
         [Variable index: 0, scope: local]
+[Enum declaration Dir]
+    - tags
+    up
+    down
+
 [Function declaration main]
     [Block pop count: 4, is_expr: false]
         [Call symbol 1 module 1]
