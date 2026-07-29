@@ -122,5 +122,5 @@ fn getFieldU8(c_struct: *const CStruct, index: Index) callconv(.c) u8 {
 
 fn getEnumTag(c_vm: *const cVm, index: Index) callconv(.c) i64 {
     const vm: *const Vm = @ptrCast(@alignCast(c_vm));
-    return vm.frame.slots[index].obj.as(Obj.EnumInstance).tag_id;
+    return vm.frame.slots[index].obj.as(Obj.EnumInstance).payload;
 }

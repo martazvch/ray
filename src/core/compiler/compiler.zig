@@ -740,7 +740,7 @@ const Compiler = struct {
         }
     }
 
-    fn compileConstant(self: *Self, index: ConstIdx, mod_index: ?ModIndex) Error!void {
+    fn compileConstant(self: *Self, index: ConstIdx) Error!void {
         const idx = index.toInt();
         const cte = self.manager.constants[idx];
 
@@ -753,17 +753,16 @@ const Compiler = struct {
                 .enum_lit => |val| Value.makeObj(Obj.EnumInstance.createComptime(
                     self.manager.alloc,
                     self.manager.state.modules.getSymbol(
-                        mod_index orelse self.manager.mod_index,
+                        val.sym.module_index orelse self.manager.mod_index,
                         val.sym.symbol_index,
                         .@"enum",
                     ),
                     @intCast(val.tag_index),
-                    .null_,
                 ).asObj()),
                 .union_lit => |val| Value.makeObj(Obj.UnionInstance.createComptime(
                     self.manager.alloc,
                     self.manager.state.modules.getSymbol(
-                        mod_index orelse self.manager.mod_index,
+                        val.sym.module_index orelse self.manager.mod_index,
                         val.sym.symbol_index,
                         .@"union",
                     ),
@@ -784,7 +783,7 @@ const Compiler = struct {
 
     // TODO: protect casts
     fn constant(self: *Self, index: ConstIdx, ext_mod: ?ModIndex, load: bool) Error!void {
-        try self.compileConstant(index, ext_mod);
+        try self.compileConstant(index);
 
         if (!load) return;
 

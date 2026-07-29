@@ -536,27 +536,27 @@ pub const EnumInstance = struct {
     obj: Obj,
     parent: *const Module.Enum,
     tag_id: u8,
-    payload: Value,
+    payload: i64,
 
     const Self = @This();
 
     /// Creates a compile time constant that is a naked enum field
-    pub fn create(vm: *Vm, parent: *const Module.Enum, tag_id: u8, payload: Value) *Self {
+    pub fn create(vm: *Vm, parent: *const Module.Enum, tag_id: u8) *Self {
         const obj = Obj.allocate(vm, Self, parent.type_id);
         obj.parent = parent;
         obj.tag_id = tag_id;
-        obj.payload = payload;
+        obj.payload = parent.discriminants[tag_id];
         obj.obj.type_id = parent.type_id;
 
         return obj;
     }
 
     /// Creates a compile time constant that is a naked enum field
-    pub fn createComptime(allocator: Allocator, parent: *const Module.Enum, tag_id: u8, payload: Value) *Self {
+    pub fn createComptime(allocator: Allocator, parent: *const Module.Enum, tag_id: u8) *Self {
         const obj = Obj.allocateComptime(allocator, Self, parent.type_id);
         obj.parent = parent;
         obj.tag_id = tag_id;
-        obj.payload = payload;
+        obj.payload = parent.discriminants[tag_id];
         obj.obj.type_id = parent.type_id;
 
         return obj;
@@ -564,10 +564,6 @@ pub const EnumInstance = struct {
 
     pub fn asObj(self: *Self) *Obj {
         return &self.obj;
-    }
-
-    pub fn getDiscriminant(self: *Self) i64 {
-        return self.parent.discriminants[self.tag_id];
     }
 
     pub fn deinit(self: *Self, vm: *Vm) void {

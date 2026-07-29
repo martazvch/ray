@@ -347,13 +347,13 @@ fn execute(self: *Self) !void {
             .enum_lit => {
                 const index = self.frame.readByte();
                 const tag = self.frame.readByte();
-                self.stack.push(.makeObj(Obj.EnumInstance.create(self, &self.frame.module.enums[index], tag, .null).asObj()));
+                self.stack.push(.makeObj(Obj.EnumInstance.create(self, &self.frame.module.enums[index], tag).asObj()));
             },
             .enum_lit_ext => {
                 const index = self.frame.readByte();
                 const module = self.frame.readByte();
                 const tag = self.frame.readByte();
-                self.stack.push(.makeObj(Obj.EnumInstance.create(self, &self.modules[module].enums[index], tag, .null).asObj()));
+                self.stack.push(.makeObj(Obj.EnumInstance.create(self, &self.modules[module].enums[index], tag).asObj()));
             },
             .eq_bool => self.stack.push(Value.makeBool(self.stack.pop().bool == self.stack.pop().bool)),
             .eq_float => self.stack.push(Value.makeBool(self.stack.pop().float == self.stack.pop().float)),
