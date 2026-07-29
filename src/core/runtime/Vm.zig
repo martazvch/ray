@@ -417,7 +417,8 @@ fn execute(self: *Self) !void {
                 value.obj = self.cow(value.obj);
                 self.stack.push(value.*);
             },
-            .get_tag => self.stack.peekRef(0).* = .makeInt(self.stack.peek(0).obj.as(Obj.EnumInstance).tag_id),
+            .get_enum_tag => self.stack.peekRef(0).* = .makeInt(self.stack.peek(0).obj.as(Obj.EnumInstance).tag_id),
+            .get_union_tag => self.stack.peekRef(0).* = .makeInt(self.stack.peek(0).obj.as(Obj.UnionInstance).tag_id),
             .gt_float => self.stack.push(Value.makeBool(self.stack.pop().float < self.stack.pop().float)),
             .gt_int => self.stack.push(Value.makeBool(self.stack.pop().int < self.stack.pop().int)),
             .incr_ref => self.stack.peekRef(0).obj.ref_count += 1,

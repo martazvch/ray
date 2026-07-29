@@ -5,7 +5,7 @@ ret_naked
 
 -- methodNoDef --
 get_local index 0
-get_tag
+get_union_tag
 load_constant index 7, value 0
 eq_int
 jump_false 6 -> 24

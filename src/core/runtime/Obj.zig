@@ -540,19 +540,8 @@ pub const EnumInstance = struct {
 
     const Self = @This();
 
-    /// Creates a compile time constant that is a naked enum field
-    pub fn create(vm: *Vm, parent: *const Module.Enum, tag_id: u8) *Self {
-        const obj = Obj.allocate(vm, Self, parent.type_id);
-        obj.parent = parent;
-        obj.tag_id = tag_id;
-        obj.payload = parent.discriminants[tag_id];
-        obj.obj.type_id = parent.type_id;
-
-        return obj;
-    }
-
-    /// Creates a compile time constant that is a naked enum field
-    pub fn createComptime(allocator: Allocator, parent: *const Module.Enum, tag_id: u8) *Self {
+    /// Creates an enum instance
+    pub fn create(allocator: Allocator, parent: *const Module.Enum, tag_id: u8) *Self {
         const obj = Obj.allocateComptime(allocator, Self, parent.type_id);
         obj.parent = parent;
         obj.tag_id = tag_id;

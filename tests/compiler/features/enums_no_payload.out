@@ -4,7 +4,7 @@ ret
 
 -- toStr --
 get_local index 0
-get_tag
+get_enum_tag
 load_constant index 4, value 0
 eq_int
 jump_false 6 -> 16
@@ -20,13 +20,13 @@ ret
 load_constant index 7, value <enum Foo.a>
 load_constant index 8, value <enum Bar.b>
 get_local index 0
-get_tag
+get_enum_tag
 load_constant index 4, value 0
 eq_int
 pop
 load_constant index 4, value 0
 get_local index 0
-get_tag
+get_enum_tag
 eq_int
 pop
 load_constant index 4, value 0
@@ -34,13 +34,13 @@ load_constant index 10, value 1
 eq_int
 pop
 get_local index 1
-get_tag
+get_enum_tag
 load_constant index 4, value 0
 ne_int
 pop
 load_constant index 4, value 0
 get_local index 1
-get_tag
+get_enum_tag
 ne_int
 pop
 load_constant index 4, value 0

@@ -1655,7 +1655,11 @@ fn binopComparisonCoercion(
                 const instr_data = ana.irb.getInstr(instr);
                 // If it's not a constant, we have to extract the tag from runtime value
                 if (instr_data != .constant) {
-                    return ana.irb.wrapInstr(.tag, instr);
+                    if (kind == .@"enum") {
+                        return ana.irb.wrapInstr(.enum_tag, instr);
+                    } else {
+                        return ana.irb.wrapInstr(.union_tag, instr);
+                    }
                 }
 
                 // Else, it's a regular enum constant like `Foo.tagName` or `.tagName`
@@ -1676,7 +1680,7 @@ fn binopComparisonCoercion(
             // When building an union, we'll land on `union_constr`: `myUnion == .tagName(value)`
             if (expr.rhs.* == .implicit_selector or self.isUnionLit(rhs.instr)) {
                 return .{
-                    self.irb.wrapInstr(.tag, lhs.instr),
+                    self.irb.wrapInstr(.union_tag, lhs.instr),
                     getTag(self, rhs.instr, .@"union", self.ast.getSpan(rhs.instr).start),
                     self.ti.getCached(.int),
                 };
@@ -2851,7 +2855,7 @@ pub fn matchValue(
         },
         .@"union" => |t| {
             var matcher = matchers.Enum.init(t.proto(self.alloc));
-            break :ana .{ .@"enum", matcher.matcher() };
+            break :ana .{ .@"union", matcher.matcher() };
         },
         .inline_union => return self.err(
             .{ .match_regular_on_union = .{ .found = self.typeName(value.type) } },

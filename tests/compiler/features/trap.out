@@ -39,10 +39,10 @@ load_constant index 7, value 15
 call index 0, arity 1, failable
 jump_no_err 26 -> 50
 get_local index 0
-get_tag
+get_union_tag
 dup
 load_constant index 6, value <error ValueErr.tooSmall>
-get_tag
+get_union_tag
 eq_int
 jump_false 37 -> 46
 pop
@@ -57,10 +57,10 @@ load_constant index 11, value 25
 call index 0, arity 1, failable
 jump_no_err 57 -> 83
 get_local index 0
-get_tag
+get_union_tag
 dup
 load_constant index 6, value <error ValueErr.tooSmall>
-get_tag
+get_union_tag
 eq_int
 jump_false 68 -> 78
 pop

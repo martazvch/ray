@@ -51,7 +51,8 @@ pub const Instruction = struct {
         @"return": Return,
         struct_decl: StructDecl,
         struct_literal: StructLiteral,
-        tag: Index,
+        enum_tag: Index,
+        union_tag: Index,
         trait_decl: TraitDecl,
         trait_obj: TraitObj,
         trap: Trap,
@@ -212,7 +213,7 @@ pub const Instruction = struct {
         kind: Kind,
 
         pub const Arm = struct { expr: Index, body: Index };
-        pub const Kind = enum { bool, float, int, @"enum", string };
+        pub const Kind = enum { bool, float, int, @"enum", string, @"union" };
     };
     pub const MatchType = struct {
         expr: Index,

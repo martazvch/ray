@@ -1,7 +1,7 @@
 -- main --
 load_constant index 3, value <union Foo.a>
 get_local index 0
-get_tag
+get_union_tag
 load_constant index 4, value 0
 eq_int
 jump_false 8 -> 18
@@ -11,7 +11,7 @@ print
 jump 15 -> 36
 pop
 get_local index 0
-get_tag
+get_union_tag
 load_constant index 7, value 1
 eq_int
 jump_false 25 -> 35
@@ -23,7 +23,7 @@ pop
 load_constant index 10, value ee
 union_constr index 1, tag 1, Bar
 get_local index 1
-get_tag
+get_union_tag
 load_constant index 4, value 0
 eq_int
 jump_false 47 -> 57
@@ -33,7 +33,7 @@ print
 jump 54 -> 75
 pop
 get_local index 1
-get_tag
+get_union_tag
 load_constant index 7, value 1
 eq_int
 jump_false 64 -> 74

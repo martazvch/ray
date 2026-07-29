@@ -61,7 +61,7 @@
                 [Constant index 7]
                     [Int 15]
         - rhs
-            [Match enum]
+            [Match union]
             - expression:
                 [Variable index: 0, scope: local]
             - arms:
@@ -85,7 +85,7 @@
                 [Constant index 11]
                     [Int 25]
         - rhs
-            [Match enum]
+            [Match union]
             - expression:
                 [Variable index: 0, scope: local]
             - arms:

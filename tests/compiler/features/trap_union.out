@@ -32,10 +32,10 @@ is_type x
 jump_false 13 -> 54
 pop
 get_local index 0
-get_tag
+get_union_tag
 dup
 load_constant index 6, value <error ValueErr.tooSmall>
-get_tag
+get_union_tag
 eq_int
 jump_false 25 -> 34
 pop
@@ -44,7 +44,7 @@ jump 31 -> 50
 pop
 dup
 load_constant index 5, value <error ValueErr.tooBig>
-get_tag
+get_union_tag
 eq_int
 jump_false 40 -> 49
 pop

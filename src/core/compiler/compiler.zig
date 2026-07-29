@@ -394,7 +394,8 @@ const Compiler = struct {
             .@"return" => |data| self.returnInstr(data),
             .struct_decl => |*data| self.structDecl(data),
             .struct_literal => |*data| self.structLiteral(data),
-            .tag => |index| self.wrappedInstr(.get_tag, index),
+            .enum_tag => |index| self.wrappedInstr(.get_enum_tag, index),
+            .union_tag => |index| self.wrappedInstr(.get_union_tag, index),
             .trait_decl => |data| self.traitDecl(data),
             .trait_obj => |data| self.traitObj(data),
             .trap => |data| self.trap(data),
@@ -533,9 +534,9 @@ const Compiler = struct {
         self.writeOp(if (data.op == .eq_null) .eq_null else .ne_null);
     }
 
-    fn tagId(self: *Self, instr: usize) Error!void {
+    fn getTag(self: *Self, instr: usize, kind: enum { @"enum", @"union" }) Error!void {
         try self.compileInstr(instr);
-        self.writeOp(.get_tag);
+        self.writeOp(if (kind == .@"enum") .get_enum_tag else .get_union_tag);
     }
 
     fn block(self: *Self, data: *const Instruction.Block) Error!void {
@@ -750,7 +751,7 @@ const Compiler = struct {
                 .bool => |c| Value.makeBool(c),
                 .int => |val| Value.makeInt(val),
                 .float => |val| Value.makeFloat(val),
-                .enum_lit => |val| Value.makeObj(Obj.EnumInstance.createComptime(
+                .enum_lit => |val| Value.makeObj(Obj.EnumInstance.create(
                     self.manager.alloc,
                     self.manager.state.modules.getSymbol(
                         val.sym.module_index orelse self.manager.mod_index,
@@ -952,7 +953,9 @@ const Compiler = struct {
 
     fn match(self: *Self, data: *const Instruction.Match) Error!void {
         if (data.kind == .@"enum") {
-            try self.tagId(data.expr);
+            try self.getTag(data.expr, .@"enum");
+        } else if (data.kind == .@"union") {
+            try self.getTag(data.expr, .@"union");
         } else {
             try self.compileInstr(data.expr);
         }
@@ -968,7 +971,7 @@ const Compiler = struct {
                     self.writeOp(.eq_bool);
                 },
                 .@"enum" => {
-                    try self.tagId(arm.expr);
+                    try self.getTag(arm.expr, .@"enum");
                     self.writeOp(.eq_int);
                 },
                 .float => {
@@ -990,6 +993,10 @@ const Compiler = struct {
                 .string => {
                     try self.compileInstr(arm.expr);
                     self.writeOp(.eq_str);
+                },
+                .@"union" => {
+                    try self.getTag(arm.expr, .@"union");
+                    self.writeOp(.eq_int);
                 },
             }
 

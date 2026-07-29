@@ -4,7 +4,7 @@ ret
 
 -- toString --
 get_local index 0
-get_tag
+get_enum_tag
 load_constant index 4, value 0
 eq_int
 jump_false 6 -> 16
@@ -14,7 +14,7 @@ ret
 jump 13 -> 17
 pop
 get_local index 0
-get_tag
+get_enum_tag
 load_constant index 7, value 1
 eq_int
 jump_false 23 -> 33

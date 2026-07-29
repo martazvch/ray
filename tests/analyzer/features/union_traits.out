@@ -12,7 +12,7 @@
             [If]
             - condition:
                 [Binop type: eq_int]
-                    [Tag]
+                    [Union tag]
                         [Variable index: 0, scope: local]
                     [Constant index 7]
                         [Int 0]

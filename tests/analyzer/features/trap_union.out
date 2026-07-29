@@ -53,7 +53,7 @@
                 [Variable index: 0, scope: local]
             - arms:
             [Type id]
-                [Match enum]
+                [Match union]
                 - expression:
                     [Variable index: 0, scope: local]
                 - arms:
