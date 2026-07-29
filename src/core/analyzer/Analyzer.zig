@@ -3676,6 +3676,11 @@ fn checkTypeCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, de
     // In that case, the type has already been tested against function's type
     if (value.is(.never)) return decl;
 
+    if (decl.is(.float) and value.is(.int)) {
+        value_info.instr = self.irb.wrapInstr(.int_to_float, value_info.instr);
+        return self.ti.getCached(.float);
+    }
+
     check: {
         if (decl.is(.error_union)) {
             return self.performErrorCoercion(decl, value_info, span);
