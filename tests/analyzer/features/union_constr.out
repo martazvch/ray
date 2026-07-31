@@ -1,7 +1,7 @@
 [Enum declaration Dir]
     - tags
-    north
-    south
+    north: 0
+    south: 1
 [Union declaration Foo]
 [Function declaration main]
     [Variable declaration index: 0, scope: local]

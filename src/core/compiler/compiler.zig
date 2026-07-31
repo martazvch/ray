@@ -817,6 +817,7 @@ const Compiler = struct {
             .type_id = data.type_id,
         });
         try self.containerFnDecls(data.functions);
+        try self.containerTraitDecls(data.traits);
     }
 
     fn field(self: *Self, data: *const Instruction.Field) Error!void {

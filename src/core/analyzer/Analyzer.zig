@@ -513,6 +513,7 @@ fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
 
     const tags_res = try self.enumTags(node.tags, ty, ctx);
     const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
+    const traits = try self.containerTraitImpls(interned, node.traits, &ty.traits, ctx);
 
     return self.irb.addInstr(
         .{ .enum_decl = .{
@@ -522,6 +523,7 @@ fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
             .sym_index = sym.index,
             .type_id = self.ti.typeId(interned),
             .functions = funcs,
+            .traits = traits,
         } },
         self.ast.getSpan(node).start,
     );
@@ -2070,6 +2072,13 @@ fn enumAccess(self: *Self, enum_info: InstrInfos, ty: Type.Enum, tag_tk: Ast.Tok
         };
     } else if (ty.functions.get(tag_name)) |func| {
         return .{ .decl = .{ .type = func.type, .kind = .function, .index = func.index } };
+    } else {
+        // Traits
+        for (ty.traits.values()) |trait| {
+            if (trait.funcs.get(tag_name)) |f| {
+                return .{ .decl = .{ .type = f.type, .kind = .function, .index = f.index } };
+            }
+        }
     }
 
     return self.err(
@@ -2200,7 +2209,6 @@ fn unionAccess(self: *Self, union_info: InstrInfos, ty: Type.Union, tag_tk: Ast.
     } else if (ty.functions.get(tag_name)) |func| {
         return .{ .decl = .{ .type = func.type, .kind = .function, .index = func.index } };
     } else {
-
         // Traits
         for (ty.traits.values()) |trait| {
             if (trait.funcs.get(tag_name)) |f| {

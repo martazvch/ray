@@ -1,12 +1,12 @@
 [Enum declaration Marker]
     - tags
-    cross
-    circle
-    none
+    cross: 0
+    circle: 1
+    none: 2
 
 [Enum declaration Bar]
     - tags
-    a
+    a: 0
 
 [Function declaration main]
     [Variable declaration index: 0, scope: local]

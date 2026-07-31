@@ -35,8 +35,8 @@
         [Variable index: 0, scope: local]
 [Enum declaration Dir]
     - tags
-    up
-    down
+    up: 0
+    down: 1
 
 [Function declaration main]
     [Call symbol 1 module 1]

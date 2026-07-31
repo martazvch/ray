@@ -1,0 +1,22 @@
+trait Bar {
+    fn speak(self)
+}
+enum Foo {
+    a,
+    b,
+
+    impl Bar {
+        fn speak(self) {
+            print self == .a ? "yes" : "no"
+        }
+    }
+}
+
+fn main() {
+    let foo: Foo = .b
+    foo.speak()
+
+    let bar: Bar = foo
+    bar.speak()
+}
+

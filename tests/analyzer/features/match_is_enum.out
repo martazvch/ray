@@ -1,8 +1,8 @@
 [Enum declaration Foo]
     - tags
-    a
-    b
-    c
+    a: 0
+    b: 1
+    c: 2
 
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
@@ -12,7 +12,6 @@
                 [Load symbol 0]
                 - tag
                 0
-
     [Match is]
     - expression:
         [Variable index: 0, scope: local]

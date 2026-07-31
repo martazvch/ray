@@ -163,6 +163,7 @@ pub const Instruction = struct {
         sym_index: SymbolIndex,
         type_id: TypeId,
         functions: []const Index,
+        traits: []const Trait,
     };
     pub const Field = struct {
         structure: Index,

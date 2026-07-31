@@ -220,13 +220,8 @@ fn enumDecl(self: *Self, data: *const Instruction.EnumDecl) void {
     defer self.indent_level -= 1;
 
     self.indentAndAppendSlice("- tags");
-    if (data.tags.len > 0) {
-        for (data.tags) |tag| {
-            self.indentAndAppendSlice(tag);
-            // if (tag.value) |val| {
-            //     self.parseInstr(val);
-            // }
-        }
+    for (data.tags, data.discriminants) |tag, discr| {
+        self.indentAndPrintSlice("{s}: {}", .{ tag, discr });
     }
 
     if (data.functions.len > 0) {
@@ -235,7 +230,7 @@ fn enumDecl(self: *Self, data: *const Instruction.EnumDecl) void {
             self.parseInstr(func);
         }
     }
-    // self.traitImpls(data.traits);
+    self.traitImpls(data.traits);
 }
 
 fn discard(self: *Self) void {

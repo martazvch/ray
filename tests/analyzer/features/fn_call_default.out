@@ -35,9 +35,8 @@
         [Variable index: 0, scope: local]
 [Enum declaration Dir]
     - tags
-    up
-    down
-
+    up: 0
+    down: 1
 [Structure declaration Foo]
     - default values
     [Constant index 3]

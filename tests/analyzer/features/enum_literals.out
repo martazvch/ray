@@ -1,8 +1,8 @@
 [Enum declaration Marker]
     - tags
-    cross
-    circle
-    none
+    cross: 0
+    circle: 1
+    none: 2
     - functions
     [Function declaration toString, returns]
         [If]
