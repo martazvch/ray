@@ -1,0 +1,24 @@
+fn main() {
+    defer print 4 + 6
+    defer print "end"
+
+    {
+        print "before"
+        defer print "in defer"
+        print "after"
+        defer print "last defer"
+    }
+
+    {
+        var a = 1
+        {
+            defer {
+                a += 1
+                print "exiting block"
+            }
+            print a
+        }
+        print a
+    }
+}
+

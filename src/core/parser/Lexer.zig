@@ -39,6 +39,7 @@ pub const Token = struct {
         .{ "as", .as },
         .{ "break", .@"break" },
         .{ "continue", .@"continue" },
+        .{ "defer", .@"defer" },
         .{ "do", .do },
         .{ "else", .@"else" },
         .{ "enum", .@"enum" },
@@ -83,6 +84,7 @@ pub const Token = struct {
         colon,
         comma,
         @"continue",
+        @"defer",
         do,
         dot,
         dot_dot,
@@ -673,14 +675,15 @@ test "keywords" {
         \\\and else false for fn if null or print return 
         \\\self struct true var while not do use break 
         \\\as enum match let in fail trap is continue trait impl
-        \\\union extern
+        \\\union extern defer
     );
 
     const res = [_]Token.Tag{
         .@"and",    .@"else",  .false,       .@"for",    .@"fn",   .@"if",    .null,     .@"or",     .print,
         .@"return", .new_line, .self,        .@"struct", .true,    .@"var",   .@"while", .not,       .do,
         .use,       .@"break", .new_line,    .as,        .@"enum", .match,    .let,      .in,        .fail,
-        .trap,      .is,       .@"continue", .trait,     .impl,    .new_line, .@"union", .@"extern", .eof,
+        .trap,      .is,       .@"continue", .trait,     .impl,    .new_line, .@"union", .@"extern", .@"defer",
+        .eof,
     };
 
     for (0..res.len) |i| {

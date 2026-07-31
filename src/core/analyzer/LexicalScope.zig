@@ -90,6 +90,7 @@ pub const Scope = struct {
     /// First is the interned identifier and second is the interned module's path key of module interner
     modules: AutoHashMapUnmanaged(InternerIdx, *const Type) = .empty,
     breaks: ArrayList(Break) = .empty,
+    deferred: ArrayList(InstrIndex) = .empty,
     /// Offset to apply to any index in this scope. Correspond to the numbers of locals
     /// in parent scopes (represents stack at runtime)
     offset: usize,
@@ -134,7 +135,7 @@ pub fn open(self: *Self, allocator: Allocator, name: ?InternerIdx, opts: Scope.O
     }
 }
 
-pub fn close(self: *Self) struct { usize, []const Break } {
+pub fn close(self: *Self) struct { pop_count: usize, breaks: []const Break, deferred: []const InstrIndex } {
     const popped = self.scopes.pop().?;
     self.updateCurrent();
 
@@ -154,7 +155,11 @@ pub fn close(self: *Self) struct { usize, []const Break } {
         }
     }
 
-    return .{ popped.variables.count(), popped.breaks.items };
+    return .{
+        .pop_count = popped.variables.count(),
+        .breaks = popped.breaks.items,
+        .deferred = popped.deferred.items,
+    };
 }
 
 pub fn initGlobalScope(self: *Self, allocator: Allocator, state: *State) void {
@@ -332,34 +337,6 @@ pub fn getSymbolFromType(self: *const Self, ty: *const Type) ?*Symbol {
     return null;
 }
 
-pub fn getSymbolName(self: *const Self, ty: *const Type) ?InternerIdx {
-    var it = self.iterator();
-    while (it.next()) |scope| {
-        var sym_it = scope.symbols.iterator();
-        while (sym_it.next()) |sym| {
-            if (sym.value_ptr.type == ty) {
-                return sym.key_ptr.*;
-            }
-        }
-    }
-
-    return null;
-}
-
-pub fn getSymbolModule(self: *const Self, ty: *const Type) ?ModIndex {
-    var it = self.iterator();
-    while (it.next()) |scope| {
-        var sym_it = scope.symbols.iterator();
-        while (sym_it.next()) |sym| {
-            if (sym.value_ptr.type == ty) {
-                return sym.value_ptr.module_index;
-            }
-        }
-    }
-
-    return null;
-}
-
 pub fn declareExternSymbol(self: *Self, allocator: Allocator, name: InternerIdx, symbol: Symbol) void {
     self.current.symbols.put(allocator, name, symbol) catch oom();
 }
@@ -457,6 +434,10 @@ pub fn isVarOrSymInCurrentScope(self: *const Self, name: InternerIdx) bool {
 
 pub fn isModuleImported(self: *const Self, name: InternerIdx) bool {
     return self.getModule(name) != null;
+}
+
+pub fn addDeferedInstr(self: *Self, alloc: Allocator, instr: InstrIndex) void {
+    self.current.deferred.append(alloc, instr) catch oom();
 }
 
 fn iterator(self: *const Self) RevIterator(Scope) {

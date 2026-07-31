@@ -417,15 +417,12 @@ map["sunday"] = 12
 assert(map["monday"].len() == 3)
 ```
 
-## Control flow
-
-Ray provides a small, expressive set of control-flow constructs. Every block is an expression and must return a coherent value unless the flow exits (`return`, `break`, or error propagation).
-
-When using `break` **without** a label, it exits the inner most [block](#Blocks), `return` always exits current function.
-
 ### Blocks
 
 Blocks can be used in any expressions and are declared with `{}`. When openning a block, it creates a new lexical scope and when exiting it all local variables/declarations are gone.
+
+Ray provides a small, expressive set of control-flow constructs. Every block is an expression and must return a coherent value unless the flow exits (`return`, `break`, or error propagation).
+When using `break` **without** a label, it exits the inner most [block](#Blocks), `return` always exits current function.
 
 A block can be:
 - An expression if exited with `break <value>`
@@ -994,6 +991,39 @@ Method Lookup Order
 
 Ray uses the type of the value to infer which method applies, ensuring static dispatch:
 
+## Defer
+
+You can delay statement execution with `defer` keyword. All deferred statements will be executed at the end of current scope.
+Scopes can be either a `block` or a `function` body. Statements wil be executed in a last-in-first-out order.
+
+```rust
+fn f() {
+    print("enter f")
+    defer print("exit f")
+    defer print("before exiting")
+
+    var a = 1
+    {
+        defer {
+            a += 5
+            print("exiting block")
+        }
+        print("a: {a}")
+    }
+    print("a: {a}")
+}
+```
+
+Calling `f()` gives:
+
+```
+enter f
+a: 1
+exiting block
+a: 5
+before exiting
+exit f
+```
 
 ## Inline unions
 

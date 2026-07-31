@@ -15,6 +15,7 @@ pub const TokenIndex = usize;
 pub const Node = union(enum) {
     assignment: Assignment,
     @"continue": Continue,
+    @"defer": *Node,
     discard: *Expr,
     enum_decl: EnumDecl,
     fn_decl: FnDecl,

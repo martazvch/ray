@@ -1,15 +1,34 @@
 # Ray
 
-**Ray** is a statically typed, interpreted language sitting somewhere between a systems language and a scripting language — safe and fast enough to be taken seriously, lightweight enough to actually enjoy writing.
+**Ray** is a statically typed, interpreted language. It is safe and fast enough to be taken seriously, lightweight enough to actually enjoy writing.
 
 It runs on its own stack-based VM with a mark-and-sweep GC, and is implemented entirely in [Zig](https://ziglang.org/).
 
 ![Pipeline Tests](https://github.com/martazvch/ray/actions/workflows/main.yml/badge.svg)
 
 ```rust
-union Shape2D {
-    square: int,
-    triangle: (int, int),
+trait Move {
+    enum Dir { up, down }
+
+    fn advance(self, dir: Dir, amount = 10)
+}
+
+struct Line {
+    a, b: Vec2,
+    color: int|Color
+
+    impl Move {
+        fn advance(self, dir: Dir, amout = 10) {
+            let sign = dir == .up ? 1 : -1
+            a += sign * amout
+            b += sign * amout
+        }
+    }
+}
+
+union Shape {
+    point: Vec2,
+    line: Line,
 
     fn fmt(self) -> str {
         return match self {
@@ -17,11 +36,17 @@ union Shape2D {
             .triangle => "/\\"
         }
     }
-}
-union Shape3D {
-    cube: int,
-    cylinder: (int, int),
-    ...
+
+    fn fromString(kind: str) -> Self {
+        return match kind {
+            "point" => .point(.{ x: 1, y: 2 })
+            "line" => .line(.{
+                a: .{ x: 3, y: 4 },
+                b: .{ x: 5, y: 6 },
+                color: .red,
+            })
+        }
+    }
 }
 
 error ShapeErr {
@@ -31,14 +56,18 @@ error ShapeErr {
 
 fn getShape(dim = 2, kind: str) -> ?(Shape2D|Shape3D)!ShapeErr {
     return match dim {
-        2 => Shape2D.fromStr(kind)
-        3 => Shape3D.fromStr(kind)
+        1 => Shape.fromStr(kind)
+        2 => Shape.fromStr(kind)
         else @d => fail .wrongDim(d)
     }
 }
 
 fn main() {
-    let shape = getShape() trap err {
+    let configFile = open("config.txt", "r")
+    defer close(configFile)
+    let dim = getDimFromConfig(configFile.read())
+
+    let shape = getShape(dim) trap err {
         print "got error: {err}"
         return
     }
@@ -55,8 +84,6 @@ fn main() {
         }
     }
 }
-
-
 ```
 
 ## Why Ray
@@ -88,7 +115,7 @@ The language spec is a work in progress, but covers current syntax, semantics, a
 
 ## Build from source
 
-Requires [Zig](https://ziglang.org/) `0.15.2`.
+Requires [Zig](https://ziglang.org/) `0.16.0`.
 ```sh
 git clone https://github.com/martazvch/ray.git
 cd ray
@@ -100,6 +127,7 @@ zig build -Doptimize=ReleaseFast
 ## Tests
 
 Each pipeline stage has its own tests — AST generation, analyzer IR, compiled bytecode, and VM runtime behavior. They live in the [tests/](tests/) folder.
+
 ```sh
-zig build test -Dtest-mode -Dstress-gc
+zig build test -Dtest-mode -Dstress-gc -Doptimize=ReleaseSafe
 ```

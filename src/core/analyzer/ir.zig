@@ -64,7 +64,8 @@ pub const Instruction = struct {
         var_decl: VarDecl,
         @"while": While,
 
-        noop, // Used only by 'use' statements as they don't produce any instructions
+        /// Used by 'use' and 'defer' statements as they don't produce any instructions
+        noop,
     };
 
     pub const Indexing = struct {

@@ -163,6 +163,7 @@ fn captureFromNode(self: *Self, node: *Ast.Node, ctx: *CaptureCtx) void {
             self.captureFromExpr(n.value, ctx);
         },
         .@"continue" => {},
+        .@"defer" => |n| self.captureFromNode(n, ctx),
         .discard => |e| self.captureFromExpr(e, ctx),
         .enum_decl => {},
         .fn_decl => |*n| self.functionCaptures(n, ctx),

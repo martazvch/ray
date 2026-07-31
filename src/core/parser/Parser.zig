@@ -900,12 +900,19 @@ fn getAlias(self: *Self, token: Token.Tag) Error!?TokenIndex {
 fn statement(self: *Self) Error!Node {
     self.ctx.label = self.openningLabel();
 
+    return if (self.match(.@"continue"))
+        self.continueStmt()
+    else if (self.match(.@"defer"))
+        self.deferStmt()
+    else
+        self.deferableStmt();
+}
+
+fn deferableStmt(self: *Self) Error!Node {
     return if (self.match(.@"for"))
         self.forLoop()
     else if (self.match(.@"while"))
         self.whileStmt()
-    else if (self.match(.@"continue"))
-        self.continueStmt()
     else if (self.match(.print))
         self.print()
     else if (self.match(.underscore))
@@ -961,10 +968,19 @@ fn continueStmt(self: *Self) Error!Node {
     } };
 }
 
+fn deferStmt(self: *Self) Error!Node {
+    const heap_node = self.allocator.create(Node) catch oom();
+    heap_node.* = try self.deferableStmt();
+
+    return .{ .@"defer" = heap_node };
+}
+
 fn discard(self: *Self) Error!Node {
     try self.expect(.equal, .invalid_discard);
 
-    return .{ .discard = try self.parsePrecedenceExpr(0) };
+    return .{
+        .discard = try self.parsePrecedenceExpr(0),
+    };
 }
 
 fn forLoop(self: *Self) Error!Node {

@@ -55,6 +55,7 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
             try self.pushKeyValue("label", if (n.label) |l| self.ast.toSource(l) else "null", false);
             try self.closeKey(.block, comma);
         },
+        .@"defer" => |n| try self.renderSingleNode(@tagName(node.*), n, .block, comma),
         .discard => |n| {
             try self.renderSingleExpr(@tagName(node.*), n, .block, comma);
         },

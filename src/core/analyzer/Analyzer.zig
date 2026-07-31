@@ -211,6 +211,7 @@ pub fn analyzeNode(self: *Self, node: *const Node, expect: ExprResKind, ctx: *Co
     const instr = switch (node.*) {
         .assignment => |*n| try self.assignment(n, ctx),
         .@"continue" => |n| try self.continueStmt(n, ctx),
+        .@"defer" => |n| try self.deferStmt(n, ctx),
         .discard => |n| try self.discard(n, ctx),
         .enum_decl => |*n| try self.enumDecl(n, ctx),
         .fn_decl => |*n| (try self.fnDeclaration(n, ctx)).instr,
@@ -220,11 +221,7 @@ pub fn analyzeNode(self: *Self, node: *const Node, expect: ExprResKind, ctx: *Co
         .struct_decl => |*n| try self.structDecl(n, ctx),
         .trait_decl => |*n| try self.traitDecl(n, ctx),
         .union_decl => |*n| try self.unionDecl(n, ctx),
-        .use => |*n| b: {
-            try self.use(n);
-            // TODO: replace with a error.Noop to skip it?
-            break :b self.irb.addInstr(.noop, 0);
-        },
+        .use => |*n| try self.use(n),
         .var_decl => |*n| try self.varDecl(n, ctx),
         .@"while" => |*n| try self.whileStmt(n, ctx),
         .expr => |n| return try self.analyzeExpr(n, expect, ctx),
@@ -305,6 +302,18 @@ fn continueStmt(self: *Self, node: Ast.Continue, ctx: *const Context) StmtResult
         } },
         span.start,
     );
+}
+
+fn deferStmt(self: *Self, node: *Node, ctx: *Context) StmtResult {
+    const res = try self.analyzeNode(node, .none, ctx);
+    var instr = res.instr;
+
+    if (!res.type.is(.void)) {
+        instr = self.irb.wrapInstr(.pop, instr);
+    }
+
+    self.scope.addDeferedInstr(self.alloc, instr);
+    return self.irb.addInstr(.noop, self.ast.getSpan(node).start);
 }
 
 fn discard(self: *Self, expr: *const Expr, ctx: *Context) StmtResult {
@@ -631,8 +640,9 @@ fn endRayFnDecl(
     ctx: *Context,
 ) Error!FnDeclRes {
     const span = self.ast.getSpan(node);
+    var body: ArrayList(InstrIndex) = .empty;
 
-    const captures, const params, const ty, const body, const returns = info: {
+    const captures, const params, const ty, const returns = info: {
         errdefer _ = self.scope.close();
 
         const captures = try self.loadFunctionCaptures(&node.meta.captures);
@@ -651,10 +661,12 @@ fn endRayFnDecl(
         ctx.decl_type = fn_type.return_type;
         defer ctx.decl_type = null;
 
-        const body_instrs, const returns = try self.fnBody(node.body, &fn_type, span, ctx);
-        break :info .{ captures, params, interned_type, body_instrs, returns };
+        const returns = try self.fnBody(node.body, &fn_type, &body, span, ctx);
+        break :info .{ captures, params, interned_type, returns };
     };
-    _ = self.scope.close();
+
+    const popped_scope = self.scope.close();
+    self.addDeferredInstr(&body, popped_scope.deferred);
 
     // If it's a closure, it lives on the stack at runtime
     if (captures.len > 0) {
@@ -671,7 +683,7 @@ fn endRayFnDecl(
                 .sym_index = sym.index,
                 .type_id = self.ti.typeId(ty),
                 .name = name,
-                .body = body,
+                .body = body.toOwnedSlice(self.alloc) catch oom(),
                 .defaults = params.defaults,
                 .captures = captures,
                 .returns = returns,
@@ -822,9 +834,16 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
     return .{ .decls = decls, .defaults = defaults.toOwnedSlice(self.alloc) catch oom(), .is_method = is_method };
 }
 
-/// Analyses function's body returning all of the instructions and a flag indicating if the function returns
-fn fnBody(self: *Self, fn_body: ?Ast.Block, fn_type: *const Type.Function, name_span: Span, ctx: *Context) Error!struct { []const InstrIndex, bool } {
-    const body = fn_body orelse return .{ &.{}, false };
+/// Analyses function's body and returns if the function returns
+fn fnBody(
+    self: *Self,
+    fn_body: ?Ast.Block,
+    fn_type: *const Type.Function,
+    body_instrs: *ArrayList(InstrIndex),
+    name_span: Span,
+    ctx: *Context,
+) Error!bool {
+    const body = fn_body orelse return false;
     const nodes = body.nodes;
 
     const err_count = self.errs.items.len;
@@ -832,8 +851,8 @@ fn fnBody(self: *Self, fn_body: ?Ast.Block, fn_type: *const Type.Function, name_
     var returns = false;
     const len = nodes.len;
 
-    var instrs: ArrayList(InstrIndex) = .empty;
-    instrs.ensureTotalCapacity(self.alloc, nodes.len) catch oom();
+    // var instrs: ArrayList(InstrIndex) = .empty;
+    body_instrs.ensureTotalCapacity(self.alloc, nodes.len) catch oom();
 
     for (nodes, 0..) |*n, i| {
         const last = i == len - 1;
@@ -847,9 +866,9 @@ fn fnBody(self: *Self, fn_body: ?Ast.Block, fn_type: *const Type.Function, name_
 
         // If last expression produced a value and that it wasn't the last one we pop it
         if (fn_type.return_type == self.ti.getCached(.void) and !res.type.is(.void) and !res.type.is(.never)) {
-            instrs.appendAssumeCapacity(self.irb.wrapPreviousInstr(.pop));
+            body_instrs.appendAssumeCapacity(self.irb.wrapPreviousInstr(.pop));
         } else {
-            instrs.appendAssumeCapacity(res.instr);
+            body_instrs.appendAssumeCapacity(res.instr);
         }
 
         if (returns and !last) {
@@ -864,7 +883,7 @@ fn fnBody(self: *Self, fn_body: ?Ast.Block, fn_type: *const Type.Function, name_
         return self.err(.{ .fn_expect_value = .{ .expect = self.typeName(fn_type.return_type) } }, span);
     }
 
-    return .{ instrs.toOwnedSlice(self.alloc) catch oom(), returns };
+    return returns;
 }
 
 /// Kind has to be either `param` or `field`
@@ -1185,7 +1204,7 @@ fn unionTag(self: *Self, tag: Ast.UnionDecl.Tag, ctx: *const Context) Error!stru
     return .{ .name = name, .ty = ty };
 }
 
-fn use(self: *Self, node: *const Ast.Use) Error!void {
+fn use(self: *Self, node: *const Ast.Use) StmtResult {
     const name_token = if (node.alias) |alias| alias else node.names[node.names.len - 1];
     const module_name = self.interner.intern(self.ast.toSource(name_token));
 
@@ -1288,6 +1307,8 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
     } else {
         self.scope.declareModule(self.alloc, module_name, self.ti.intern(.{ .module = path }));
     }
+
+    return self.irb.addInstr(.noop, 0);
 }
 
 fn whileStmt(self: *Self, node: *const Ast.While, ctx: *Context) StmtResult {
@@ -1363,7 +1384,9 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
         .symbol => if (!res.ti.is_sym) return error.NotSymbol,
         // Either used by blocks or asked by top level statement but blocks consume `.none`
         .none => if (!res.type.is(.void)) {
-            return self.err(.expect_statement, self.ast.getSpan(expr));
+            if (self.scope.isGlobal()) {
+                return self.err(.expect_statement, self.ast.getSpan(expr));
+            }
         },
     }
 
@@ -1436,11 +1459,11 @@ fn block(self: *Self, expr: *const Ast.Block, pop_offset: usize, opts: LexScope.
         }
     }
 
-    const pop_count, const breaks = self.scope.close();
+    const popped_scope = self.scope.close();
     const final = ty: {
         // If the block returned and we have no breaks, it means we returned with 'return',
         // so we exited scope complytely
-        if (cf == .@"return" and breaks.len == 0) break :ty self.ti.getCached(.never);
+        if (cf == .@"return" and popped_scope.breaks.len == 0) break :ty self.ti.getCached(.never);
 
         // If the block partially or doesn't return, if we expect a value it's an error otherwise we
         // choose the safe option to return void
@@ -1453,8 +1476,9 @@ fn block(self: *Self, expr: *const Ast.Block, pop_offset: usize, opts: LexScope.
         }
 
         // Else we merge all possibilities
-        break :ty self.mergeTypes(breaks);
+        break :ty self.mergeTypes(popped_scope.breaks);
     };
+    self.addDeferredInstr(&instrs, popped_scope.deferred);
 
     // TODO: protect cast
     return .{
@@ -1463,12 +1487,21 @@ fn block(self: *Self, expr: *const Ast.Block, pop_offset: usize, opts: LexScope.
         .instr = self.irb.addInstr(
             .{ .block = .{
                 .instrs = instrs.toOwnedSlice(self.alloc) catch oom(),
-                .pop_count = @intCast(pop_count - pop_offset),
+                .pop_count = @intCast(popped_scope.pop_count - pop_offset),
                 .is_expr = !final.is(.void) and !final.is(.never),
             } },
             self.ast.getSpan(expr).start,
         ),
     };
+}
+
+/// Adds the deferred instructions in a LIFO order
+fn addDeferredInstr(self: *Self, body: *ArrayList(InstrIndex), instrs: []const InstrIndex) void {
+    body.ensureUnusedCapacity(self.alloc, instrs.len) catch oom();
+
+    for (0..instrs.len) |i| {
+        body.appendAssumeCapacity(instrs[instrs.len - i - 1]);
+    }
 }
 
 fn internLabel(self: *Self, label: ?Ast.TokenIndex) ?InternerIdx {
@@ -1805,7 +1838,8 @@ fn closure(self: *Self, expr: *const Ast.FnDecl, ctx: *Context) Result {
     const offset = span.start;
 
     ctx.fn_type = interned_type;
-    const body_instrs, const returns = try self.fnBody(expr.body, &closure_type, span, ctx);
+    var body: ArrayList(InstrIndex) = .empty;
+    const returns = try self.fnBody(expr.body, &closure_type, &body, span, ctx);
 
     // TODO: protect the cast
     return .{
@@ -1815,7 +1849,7 @@ fn closure(self: *Self, expr: *const Ast.FnDecl, ctx: *Context) Result {
                 .sym_index = sym.index,
                 .type_id = self.ti.typeId(interned_type),
                 .name = null,
-                .body = body_instrs,
+                .body = body.toOwnedSlice(self.alloc) catch oom(),
                 .defaults = param_res.defaults,
                 .captures = captures,
                 .returns = returns,

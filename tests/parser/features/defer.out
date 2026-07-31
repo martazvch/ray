@@ -1,0 +1,23 @@
+{
+    "defer": {
+        "binop": {
+            "lhs": {
+                "int": "1"
+            },
+            "rhs": {
+                "int": "1"
+            },
+            "op": "+"
+        }
+    },
+    "defer": {
+        "assignment": {
+            "assigne": {
+                "identifier": "a"
+            },
+            "value": {
+                "int": "3"
+            }
+        }
+    }
+}
