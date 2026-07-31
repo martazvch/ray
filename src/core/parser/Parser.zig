@@ -848,11 +848,13 @@ fn use(self: *Self) Error!Node {
         names.append(self.allocator, self.token_idx - 1) catch oom();
     }
 
-    if (!self.check(.identifier)) {
-        return self.errAtCurrent(.expectName("module"));
+    if (!self.check(.identifier) and !self.check(.hat)) {
+        return self.errAtCurrent(.invalid_module_path);
     }
 
-    while (self.match(.identifier) and !self.check(.eof)) {
+    while ((self.match(.identifier) or self.match(.hat)) and
+        !self.check(.eof))
+    {
         names.append(self.allocator, self.token_idx - 1) catch oom();
         if (self.match(.dot)) continue;
         break;

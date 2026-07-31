@@ -28,6 +28,7 @@ interner: Interner,
 type_interner: TypeInterner,
 const_interner: ConstInterner,
 path_builder: Sb,
+cwd: Io.Dir,
 lex_scope: LexScope,
 modules: ModuleManager,
 native_reg: NativeRegister,
@@ -75,13 +76,24 @@ pub fn defaultPrint(io: Io, text: []const u8) void {
 //     try stderr.flush();
 // }
 
-pub fn new(allocator: Allocator, config: Config) Self {
+pub fn new(io: Io, allocator: Allocator, cwd: Io.Dir, config: Config) Self {
+    // Initiliaze the path builder
+    var path_builder: Sb = .empty;
+    {
+        const path = cwd.realPathFileAlloc(io, ".", allocator) catch oom();
+        var it = std.mem.splitScalar(u8, path, std.fs.path.sep);
+        while (it.next()) |part| {
+            path_builder.append(allocator, part);
+        }
+    }
+
     var ctx: Self = .{
         .config = config,
         .interner = .init(allocator),
         .type_interner = .init(allocator),
         .const_interner = .init(allocator),
-        .path_builder = .empty,
+        .path_builder = path_builder,
+        .cwd = cwd,
         .lex_scope = .empty,
         .modules = .empty,
         .native_reg = .empty,

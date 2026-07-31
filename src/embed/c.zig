@@ -48,7 +48,7 @@ pub export fn rayNewVm(config: ConfigC) *cVm {
     } else State.defaultPrint;
 
     const heap_state = allocator.create(State) catch oom();
-    heap_state.* = .new(allocator, .{
+    heap_state.* = .new(threaded_io.io(), allocator, Io.Dir.cwd(), .{
         .embedded = config.embedded,
         .print_ast = config.print_ast,
         .print_bytecode = config.print_bytecode,

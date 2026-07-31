@@ -31,7 +31,7 @@ pub fn create(io: Io, allocator: Allocator) Self {
 
 pub fn init(self: *Self, config: Config) void {
     self.allocator = self.arena.allocator();
-    self.state = .new(self.allocator, config);
+    self.state = .new(self.io, self.allocator, Io.Dir.cwd(), config);
 }
 
 pub fn registerFn(self: *Self, func: RayFn) void {

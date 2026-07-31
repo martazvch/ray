@@ -122,9 +122,10 @@ pub fn runPipeline(self: *Self, io: Io, args: clarg.ParsedArgs(Args)) !void {
     const arena_alloc = arena.allocator();
     defer arena.deinit();
 
-    var state: State = .new(arena_alloc, .{});
+    const cwd = std.Io.Dir.cwd();
+    var state: State = .new(io, arena_alloc, cwd, .{});
 
-    const file_content = std.Io.Dir.cwd().readFileAllocOptions(io, file_path, self.allocator, .unlimited, .of(u8), 0) catch |err| {
+    const file_content = cwd.readFileAllocOptions(io, file_path, self.allocator, .unlimited, .of(u8), 0) catch |err| {
         // TODO: Ray error
         std.debug.print("Error: {}, unable to open file at: {s}\n", .{ err, file_path });
         std.process.exit(0);

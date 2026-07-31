@@ -42,6 +42,7 @@ pub const ParserMsg = union(enum) {
     import_alias_with_items,
     invalid_discard,
     invalid_label,
+    invalid_module_path,
     invalid_struct_literal,
     match_duplicate_wildcard,
     match_wildcard_not_last,
@@ -109,6 +110,7 @@ pub const ParserMsg = union(enum) {
             .import_alias_with_items => writer.writeAll("can't use a module alias when importing specific items"),
             .invalid_discard => writer.writeAll("invalid discard expression"),
             .invalid_label => writer.writeAll("can't label this expression"),
+            .invalid_module_path => writer.writeAll("module path can contain only identifiers and '^' characters"),
             .invalid_struct_literal => writer.writeAll("structure literal can only be used on literals and members"),
             .match_duplicate_wildcard => writer.writeAll("there already is a wildcard arm"),
             .match_wildcard_not_last => writer.writeAll("wildcard must be the last arm"),
@@ -151,10 +153,10 @@ pub const ParserMsg = union(enum) {
             .err_type_not_ident => writer.writeAll("when declaring an error union type, error type names should be an identifier"),
             .expect_arrow_before_fn_type => writer.writeAll("add an arrow '->' between function's arguments list and type"),
             .expect_arrow_before_arm_body => writer.writeAll(
-                "Syntax is: <pattern> => <body> with optional binding like <pattern> :: binding => <body>",
+                "syntax is: <pattern> => <body> with optional binding like <pattern> :: binding => <body>",
             ),
             .expect_arrow_or_brace_before_arm_body => writer.writeAll(
-                \\Pattern matching on types with 'is' requires one of the two syntaxes:
+                \\pattern matching on types with 'is' requires one of the two syntaxes:
                 \\  Arm as a statement:         <type> => <expr> with optional binding like <pattern> :: binding => <body>
                 \\  Arm as a sub pattern match: <type> {
                 \\                                  <pattern> => <expr>,
@@ -199,6 +201,13 @@ pub const ParserMsg = union(enum) {
             ),
             .invalid_discard => writer.writeAll("add '=' token: _ = call()"),
             .invalid_label => writer.writeAll("can only label 'for', 'while', 'blocks' and 'if' statements"),
+            .invalid_module_path => writer.writeAll(
+                \\valid module path syntaxes are:
+                \\  relative: starts with a '.': '.dir1.dir2.file'
+                \\  absolute: starts with an identifier: 'dir1.dir2.file'
+                \\  go into a parent folder with '^': '.^.^.dir'
+                \\  it can fetch either a directory or a file
+            ),
             .invalid_struct_literal => writer.writeAll("structure literals can only be acheived on types"),
             .match_duplicate_wildcard => writer.writeAll("there can only be one wildcard arm in a pattern matching expression"),
             .match_wildcard_not_last => writer.writeAll("wildcard prong must be the last one"),

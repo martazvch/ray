@@ -45,34 +45,30 @@ pub fn fetchImportedFile(
     alloc: Allocator,
     ast: *const Ast,
     path_chunks: []const Ast.TokenIndex,
-    path: ?[]const u8,
-    sb: *Sb,
+    path: *Sb,
+    cwd: *std.Io.Dir,
+    opt_path: ?[]const u8,
 ) Result {
     if (ast.token_tags[path_chunks[0]] == .dot) {
-        var buf_path: [std.fs.max_path_bytes]u8 = undefined;
-        const buf_written = sb.renderWithSep(&buf_path, std.fs.path.sep_str);
-
-        const cwd = std.Io.Dir.openDirAbsolute(io, buf_written, .{}) catch unreachable;
-
         // TODO: could it be only a dot? And thus it would break at the [1..]
-        return fetchFrom(io, alloc, cwd, ast, path_chunks[1..], sb);
+        return fetchFrom(io, alloc, cwd, ast, path_chunks[1..], path);
     }
 
     // TODO: error
-    if (path) |p| {
-        const cwd = cwd: {
+    if (opt_path) |p| {
+        cwd.* = cwd: {
             if (std.fs.path.isAbsolute(p)) {
                 break :cwd std.Io.Dir.openDirAbsolute(io, p, .{}) catch unreachable;
             } else {
-                var cwd = std.Io.Dir.cwd();
-                break :cwd cwd.openDir(io, p, .{}) catch unreachable;
+                var new_cwd = std.Io.Dir.cwd();
+                break :cwd new_cwd.openDir(io, p, .{}) catch unreachable;
             }
         };
 
         // TODO: won't work with absolute path
-        sb.append(alloc, p);
+        path.append(alloc, p);
 
-        return fetchFrom(io, alloc, cwd, ast, path_chunks, sb);
+        return fetchFrom(io, alloc, cwd, ast, path_chunks, path);
     }
 
     @panic("Absolute imports not yet implemented");
@@ -81,28 +77,32 @@ pub fn fetchImportedFile(
 fn fetchFrom(
     io: std.Io,
     alloc: Allocator,
-    init_dir: std.Io.Dir,
+    cwd: *std.Io.Dir,
     ast: *const Ast,
     path_chunks: []const Ast.TokenIndex,
-    sb: *Sb,
+    path: *Sb,
 ) Result {
-    var cwd = init_dir;
-
     for (path_chunks, 0..) |part, i| {
+        if (ast.token_tags[part] == .hat) {
+            _ = path.pop();
+            cwd.* = cwd.openDir(io, "..", .{}) catch unreachable;
+            continue;
+        }
+
         const name = ast.toSource(part);
 
         if (i == path_chunks.len - 1) {
             // Ray module
             {
-                sb.append(alloc, name);
-                defer _ = sb.pop();
+                path.append(alloc, name);
+                defer _ = path.pop();
                 const file_name = std.fmt.allocPrint(alloc, "{s}.{s}", .{ name, "ray" }) catch oom();
 
                 if (cwd.access(io, file_name, .{})) {
                     return .{ .rayfile = .{
                         .name = file_name,
-                        .path = sb.renderWithSepAlloc(alloc, std.fs.path.sep_str),
-                        .content = readFile(io, alloc, &cwd, file_name),
+                        .path = path.renderAlloc(alloc, .{ .sep = std.fs.path.sep_str }),
+                        .content = readFile(io, alloc, cwd, file_name),
                     } };
                 } else |_| {}
             }
@@ -114,7 +114,7 @@ fn fetchFrom(
                 if (cwd.access(io, file_name, .{})) {
                     const lib = NativeLib.open(
                         alloc,
-                        sb.renderWithSepAlloc(alloc, std.Io.Dir.path.sep_str),
+                        path.renderAlloc(alloc, .{ .sep = std.Io.Dir.path.sep_str }),
                         name,
                     ) catch |e| switch (e) {
                         error.UnsupportedOS => return .unsupported_os,
@@ -122,21 +122,20 @@ fn fetchFrom(
                     };
 
                     // We add the name after fetching the lib to avoid duplicate name
-                    sb.append(alloc, name);
-                    // defer _ = sb.pop();
+                    path.append(alloc, name);
 
                     return .{ .dynlib = .{
                         .name = file_name,
-                        .path = sb.renderWithSepAlloc(alloc, std.fs.path.sep_str),
-                        .rayn_content = readFile(io, alloc, &cwd, file_name),
+                        .path = path.renderAlloc(alloc, .{ .sep = std.fs.path.sep_str }),
+                        .rayn_content = readFile(io, alloc, cwd, file_name),
                         .lib = lib,
                         .token = part,
                     } };
                 } else |_| {}
             }
         } else {
-            cwd = cwd.openDir(io, name, .{}) catch return .{ .unknown_mod = part };
-            sb.append(alloc, name);
+            cwd.* = cwd.openDir(io, name, .{}) catch return .{ .unknown_mod = part };
+            path.append(alloc, name);
         }
     }
 

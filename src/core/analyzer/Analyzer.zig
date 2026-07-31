@@ -126,7 +126,6 @@ io: std.Io,
 alloc: Allocator,
 state: *State,
 interner: *Interner,
-path: *Sb,
 containers: Sb,
 scope: *LexScope,
 
@@ -155,7 +154,6 @@ pub fn init(io: std.Io, alloc: Allocator, state: *State) Self {
         .alloc = alloc,
         .state = state,
         .interner = &state.interner,
-        .path = &state.path_builder,
         .containers = .empty,
         .scope = &state.lex_scope,
         .ti = &state.type_interner,
@@ -486,7 +484,7 @@ fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
     defer snapshot.restore();
 
     var buf: [1024]u8 = undefined;
-    const container_name = self.interner.internKeepRef(self.alloc, self.containers.renderWithSep(&buf, "."));
+    const container_name = self.interner.internKeepRef(self.alloc, self.containers.render(&buf, .{ .sep = "." }));
 
     // TODO: anonymus enum
     const name_tk = node.name orelse @panic("anonymus enums aren't supported yet");
@@ -605,7 +603,7 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
     const name = try self.internIfNotInCurrentScope(node.name);
 
     var buf: [1024]u8 = undefined;
-    const container_name = self.interner.internKeepRef(self.alloc, self.containers.renderWithSep(&buf, "."));
+    const container_name = self.interner.internKeepRef(self.alloc, self.containers.render(&buf, .{ .sep = "." }));
 
     // Forward declaration in outer scope for recursion
     const sym = self.scope.declareSymbol(self.alloc, name, .function);
@@ -979,7 +977,7 @@ fn structDecl(self: *Self, node: *const Ast.StructDecl, ctx: *Context) StmtResul
     const name = try self.internIfNotInCurrentScope(node.name);
 
     var buf: [1024]u8 = undefined;
-    const container_name = self.interner.internKeepRef(self.alloc, self.containers.renderWithSep(&buf, "."));
+    const container_name = self.interner.internKeepRef(self.alloc, self.containers.render(&buf, .{ .sep = "." }));
 
     const interned = self.ti.newStruct(.{ .name = name, .container = container_name });
     const ty = &interned.structure;
@@ -1050,7 +1048,7 @@ fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult 
     const name = try self.internIfNotInCurrentScope(node.name);
 
     var buf: [1024]u8 = undefined;
-    const container_name = self.interner.internKeepRef(self.alloc, self.containers.renderWithSep(&buf, "."));
+    const container_name = self.interner.internKeepRef(self.alloc, self.containers.render(&buf, .{ .sep = "." }));
 
     const interned = self.ti.intern(.{ .trait = .{
         .loc = .{ .name = name, .container = container_name },
@@ -1123,7 +1121,7 @@ fn unionDecl(self: *Self, node: *const Ast.UnionDecl, ctx: *Context) StmtResult 
     defer snapshot.restore();
 
     var buf: [1024]u8 = undefined;
-    const container_name = self.interner.internKeepRef(self.alloc, self.containers.renderWithSep(&buf, "."));
+    const container_name = self.interner.internKeepRef(self.alloc, self.containers.render(&buf, .{ .sep = "." }));
 
     // TODO: anonymus union
     const name_tk = node.name orelse @panic("anonymus enums aren't supported yet");
@@ -1201,16 +1199,22 @@ fn use(self: *Self, node: *const Ast.Use) Error!void {
         );
     }
 
-    const old_path_length = self.path.len();
-    defer self.path.shrink(self.alloc, old_path_length);
+    const old_path_builder = self.state.path_builder;
+    const old_cwd = self.state.cwd;
+    self.state.path_builder = self.state.path_builder.dup(self.alloc);
+    defer {
+        self.state.cwd = old_cwd;
+        self.state.path_builder = old_path_builder;
+    }
 
     var result = Importer.fetchImportedFile(
         self.io,
         self.alloc,
         self.ast,
         node.names,
+        &self.state.path_builder,
+        &self.state.cwd,
         self.state.config.path,
-        self.path,
     );
     const path = path: switch (result) {
         .dynlib => |*dynlib| {

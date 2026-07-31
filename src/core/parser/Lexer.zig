@@ -103,6 +103,7 @@ pub const Token = struct {
         @"for",
         greater,
         greater_equal,
+        hat,
         identifier,
         @"if",
         impl,
@@ -374,6 +375,10 @@ pub fn next(self: *Self) Token {
                     self.index += 1;
                     res.tag = .at;
                 },
+                '^' => {
+                    res.tag = .hat;
+                    self.index += 1;
+                },
                 0 => {
                     if (self.index == self.source.len) {
                         return .{
@@ -644,7 +649,7 @@ test "numbers" {
 test "tokens" {
     var lexer = Self.init(std.testing.allocator);
     defer lexer.deinit();
-    lexer.lex("(){}.:,=!< ><= >= !=+-*/ += -= *= /= [] | @ % %= !! ? ??");
+    lexer.lex("(){}.:,=!< ><= >= !=+-*/ += -= *= /= [] | @ % %= !! ? ?? ^");
 
     const res = [_]Token.Tag{
         .left_paren,                  .right_paren, .left_brace, .right_brace,  .dot,          .colon,
@@ -652,7 +657,7 @@ test "tokens" {
         .greater_equal,               .bang_equal,  .plus,       .minus,        .star,         .slash,
         .plus_equal,                  .minus_equal, .star_equal, .slash_equal,  .left_bracket, .right_bracket,
         .pipe,                        .at,          .modulo,     .modulo_equal, .bang_bang,    .question_mark,
-        .question_mark_question_mark,
+        .question_mark_question_mark, .hat,
     };
 
     for (0..res.len) |i| {

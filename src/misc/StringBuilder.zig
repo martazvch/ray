@@ -8,23 +8,30 @@ const Self = @This();
 
 string: ArrayList([]const u8),
 
+pub const RenderOpts = struct {
+    sep: ?[]const u8 = null,
+    start_offset: usize = 0,
+    end_offset: usize = 0,
+};
 pub const empty: Self = .{ .string = .empty };
 
-pub fn deinit(self: *Self, allocator: Allocator) void {
+pub fn deinit(self: *Self, alloc: Allocator) void {
     for (self.string.items) |s| {
-        allocator.free(s);
+        alloc.free(s);
     }
-    self.string.deinit(allocator);
+    self.string.deinit(alloc);
 }
 
 /// Duplicates the string to own it
-pub fn append(self: *Self, allocator: Allocator, s: []const u8) void {
-    self.string.append(allocator, allocator.dupe(u8, s) catch oom()) catch oom();
+pub fn append(self: *Self, alloc: Allocator, s: []const u8) void {
+    self.string.append(alloc, alloc.dupe(u8, s) catch oom()) catch oom();
 }
 
 /// Duplicates the string to own it
-pub fn appendSlice(self: *Self, allocator: Allocator, s: []const []const u8) void {
-    self.string.appendSlice(allocator, allocator.dupe(u8, s) catch oom()) catch oom();
+pub fn appendSlice(self: *Self, alloc: Allocator, s: []const []const u8) void {
+    for (s) |chunk| {
+        self.append(alloc, chunk);
+    }
 }
 
 pub fn pop(self: *Self) ?[]const u8 {
@@ -35,10 +42,14 @@ pub fn popMany(self: *Self, count: usize) void {
     for (0..count) |_| _ = self.string.pop();
 }
 
-pub fn render(self: *const Self, buf: []u8) []const u8 {
+pub fn render(self: *const Self, buf: []u8, opts: RenderOpts) []const u8 {
     var w = std.Io.Writer.fixed(buf);
+    const end = self.string.items.len - opts.end_offset;
 
-    for (self.string.items) |s| {
+    for (self.string.items[opts.start_offset..end], 0..) |s, i| {
+        if (opts.sep) |sep| {
+            if (i != 0) w.writeAll(sep) catch oom();
+        }
         w.writeAll(s) catch oom();
     }
 
@@ -46,36 +57,18 @@ pub fn render(self: *const Self, buf: []u8) []const u8 {
 }
 
 /// Caller owns the memory
-pub fn renderAlloc(self: *const Self, allocator: Allocator) []const u8 {
+pub fn renderAlloc(self: *const Self, alloc: Allocator, opts: RenderOpts) []const u8 {
     var path: ArrayList(u8) = .empty;
+    const end = self.string.items.len - opts.end_offset;
 
-    for (self.string.items) |s| {
-        path.appendSlice(allocator, s) catch oom();
+    for (self.string.items[opts.start_offset..end], 0..) |s, i| {
+        if (opts.sep) |sep| {
+            if (i != 0) path.appendSlice(alloc, sep) catch oom();
+        }
+        path.appendSlice(alloc, s) catch oom();
     }
 
-    return path.toOwnedSlice(allocator) catch oom();
-}
-
-pub fn renderWithSep(self: *const Self, buf: []u8, sep: []const u8) []const u8 {
-    var w = std.Io.Writer.fixed(buf);
-
-    for (self.string.items, 0..) |s, i| {
-        if (i != 0) w.writeAll(sep) catch oom();
-        w.writeAll(s) catch oom();
-    }
-
-    return w.buffered();
-}
-
-pub fn renderWithSepAlloc(self: *const Self, allocator: Allocator, sep: []const u8) []const u8 {
-    var buf: ArrayList(u8) = .empty;
-
-    for (self.string.items, 0..) |s, i| {
-        if (i != 0) buf.appendSlice(allocator, sep) catch oom();
-        buf.appendSlice(allocator, s) catch oom();
-    }
-
-    return buf.toOwnedSlice(allocator) catch oom();
+    return path.toOwnedSlice(alloc) catch oom();
 }
 
 /// Get current count of string chunks
@@ -84,9 +77,16 @@ pub fn len(self: *const Self) usize {
 }
 
 /// Shrinks the number of string chunks
-pub fn shrink(self: *Self, allocator: Allocator, length: usize) void {
+pub fn shrink(self: *Self, alloc: Allocator, length: usize) void {
     for (self.string.items[length..]) |chunk| {
-        allocator.free(chunk);
+        alloc.free(chunk);
     }
     self.string.shrinkRetainingCapacity(length);
+}
+
+/// Creates a copy of this instance which owns its memory
+pub fn dup(self: *Self, alloc: Allocator) Self {
+    var new: Self = .empty;
+    new.appendSlice(alloc, self.string.items);
+    return new;
 }

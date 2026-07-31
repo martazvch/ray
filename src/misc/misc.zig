@@ -11,4 +11,5 @@ test {
     _ = Set;
     _ = RangeSet;
     _ = RevIterator;
+    _ = StringBuilder;
 }

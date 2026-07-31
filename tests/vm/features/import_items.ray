@@ -18,5 +18,11 @@ fn main() {
     }
 
     introduce()
+
+    {
+        use data.sub.simple_str.{fmtVec2}
+
+        fmtVec2(v)
+    }
 }
 

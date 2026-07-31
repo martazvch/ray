@@ -108,6 +108,15 @@ load_constant index 3, value '
 str_cat
 ret
 
+-- fmtVec2 --
+get_local index 0
+get_field index 0
+print
+get_local index 0
+get_field index 1
+print
+ret_naked
+
 -- global scope --
 exit_repl
 

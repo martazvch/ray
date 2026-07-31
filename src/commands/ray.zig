@@ -12,18 +12,16 @@ pub fn run(io: std.Io, allocator: Allocator, file_path: []const u8, config: Stat
     const arena_alloc = arena.allocator();
     defer arena.deinit();
 
-    var state: State = .new(arena_alloc, config);
+    const cwd = std.Io.Dir.cwd();
+    var state: State = .new(io, arena_alloc, cwd, config);
 
     const entry_point = mod: {
-        const file_content = std.Io.Dir.cwd().readFileAllocOptions(io, file_path, allocator, .unlimited, .of(u8), 0) catch |err| {
+        const file_content = cwd.readFileAllocOptions(io, file_path, allocator, .unlimited, .of(u8), 0) catch |err| {
             // TODO: Ray error
             std.debug.print("Error: {}, unable to open file at: {s}\n", .{ err, file_path });
             std.process.exit(0);
         };
         defer allocator.free(file_content);
-
-        // Initiliaze the path builder
-        state.path_builder.append(arena_alloc, std.Io.Dir.cwd().realPathFileAlloc(io, ".", arena_alloc) catch oom());
 
         const entry_point = Pipeline.run(io, arena_alloc, &state, false, file_path, ".", file_content) catch |e| switch (e) {
             error.ExitOnPrint => return,

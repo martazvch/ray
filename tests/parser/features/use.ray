@@ -3,3 +3,4 @@ use std.time.notime.lost
 use math.geom as g
 use math{Vec2, Point}
 use math.geom{Vec2 as V2, Point as Pt,}
+use .^.dir
