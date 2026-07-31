@@ -32,8 +32,8 @@ union Shape {
 
     fn fmt(self) -> str {
         return match self {
-            .square => "[]"
-            .triangle => "/\\"
+            .point => "."
+            .line => "--"
         }
     }
 

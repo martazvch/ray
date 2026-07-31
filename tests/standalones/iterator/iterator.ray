@@ -14,15 +14,15 @@ struct Data {
     second: []int,
 
     fn init() -> Self {
-        return Self{ first: [], second: [] }
+        return .{ first: [], second: [] }
     }
 
     fn initWithData(first: []int, second: []int) -> Self {
-        return Self{ first, second }
+        return .{ first, second }
     }
 
     fn iterator(self, cat: str) -> Iterator {
-        return Iterator{ items: cat == "first" ? self.first : self.second }
+        return .{ items: cat == "first" ? self.first : self.second }
     }
 }
 

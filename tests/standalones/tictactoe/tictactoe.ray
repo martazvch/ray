@@ -30,11 +30,11 @@ struct Grid {
     cells: [][]Cell,
 
     fn init() -> Self {
-        return Self{
+        return .{
             cells: [
-                [Cell{}, Cell{}, Cell{}],
-                [Cell{}, Cell{}, Cell{}],
-                [Cell{}, Cell{}, Cell{}],
+                [.{}, .{}, .{}],
+                [.{}, .{}, .{}],
+                [.{}, .{}, .{}],
             ],
         }
     }
@@ -48,7 +48,7 @@ struct Grid {
         if method {
             self.cells[x][y].mark(marker)
         } else {
-            self.cells[x][y] = Cell{marker}
+            self.cells[x][y] = .{marker}
         }
     }
 

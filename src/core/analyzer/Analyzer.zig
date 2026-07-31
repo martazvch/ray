@@ -1406,6 +1406,15 @@ fn array(self: *Self, expr: *const Ast.Array, ctx: *Context) Result {
     var values = ArrayList(InstrIndex).initCapacity(self.alloc, expr.values.len) catch oom();
     var types: Set(*const Type) = .empty;
 
+    // We extract the child here because if we have nested level of arrays like: [][]Foo,
+    // when analyzing the sub-values we must take off a lyer at a time
+    const old_decl = ctx.decl_type;
+    defer ctx.decl_type = old_decl;
+
+    if (ctx.decl_type) |decl| {
+        ctx.decl_type = extractDeclType(decl);
+    }
+
     for (expr.values) |val| {
         const val_res = try self.analyzeExpr(val, .value, ctx);
         var val_instr = val_res.instr;
@@ -3689,6 +3698,7 @@ fn mergeTypes(self: *Self, types: []const *const Type) *const Type {
 /// Gets the symbol type inside of potential optional types and so on
 fn extractDeclType(decl: *const Type) *const Type {
     return switch (decl.*) {
+        .array => |arr| arr.child,
         .optional => |child| child,
         else => decl,
     };
