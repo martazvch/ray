@@ -3189,7 +3189,9 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
     const span = self.ast.getSpan(expr.structure);
     const struct_res: InstrInfos = switch (expr.structure) {
         .dot => s: {
-            const decl = ctx.decl_type orelse @panic("can't infer");
+            const decl = ctx.decl_type orelse {
+                return self.err(.cant_infer_implicit_selector, span);
+            };
             const sym = self.scope.getSymbolFromType(decl).?;
 
             // TODO: protect cast
@@ -3244,6 +3246,9 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
             return self.err(.{ .duplicate_field = .{ .name = self.interner.getKey(field_name).? } }, field_span);
         }
         gop.value_ptr.done = true;
+
+        const old_decl_type = ctx.setAndGetPrevious(.decl_type, f.type);
+        defer ctx.decl_type = old_decl_type;
 
         var res: InstrInfos = if (fv.value) |value|
             try self.analyzeExpr(value, .value, ctx)

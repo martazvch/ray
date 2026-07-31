@@ -1,3 +1,11 @@
+struct Vec2 {
+    x, y: int,
+}
+
+struct Line {
+    a, b: Vec2,
+}
+
 struct Foo {
     a: int,
     c: str,
@@ -16,4 +24,13 @@ fn main() {
 
     printFoo(.{ a: 3, c: "Tom" })
     printFoo(foo: .{ a: 4, c: "Manon" })
+    
+    let line: Line = .{
+        a: .{ x: 1, y: 2 },
+        b: .{ x: 3, y: 4 },
+    }
+    print line.a.x
+    print line.a.y
+    print line.b.x
+    print line.b.y
 }

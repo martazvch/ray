@@ -21,6 +21,7 @@ pub const AnalyzerMsg = union(enum) {
     cant_build_native_struct: struct { name: []const u8 },
     cant_continue_scope: struct { name: []const u8 },
     cant_infer_array_type,
+    cant_infer_implicit_selector,
     dead_code,
     dot_type_on_non_mod: struct { found: []const u8 },
     duplicate_tag: struct { kind: []const u8, name: []const u8 },
@@ -156,6 +157,7 @@ pub const AnalyzerMsg = union(enum) {
             .cant_build_native_struct => |e| writer.print("can't use structure literal syntax on native structure '{s}'", .{e.name}),
             .cant_continue_scope => |e| writer.print("block '{s}' isn't continuable", .{e.name}),
             .cant_infer_array_type => writer.writeAll("can't infer array type with empty array and not declared type"),
+            .cant_infer_implicit_selector => writer.writeAll("can't infer type"),
             .dead_code => writer.writeAll("unreachable code"),
             .dot_type_on_non_mod => |e| writer.print("can't use a non-module member as a type, found '{s}'", .{e.found}),
             .duplicate_field => |e| writer.print("field '{s}' is already present in structure literal", .{e.name}),
@@ -297,6 +299,7 @@ pub const AnalyzerMsg = union(enum) {
                 \\signature like: 'var arr: [int] = []' or initialize the array with at least one value (not possible every time).
                 \\Also, doing 'var arr: [int] = []' is equivalent to 'var arr: [int]'.
             ),
+            .cant_infer_implicit_selector => writer.writeAll("add explicit type annotation 'varibale: type' or use type name in case of structure literals"),
             .container_unknown_decl => |e| writer.print("refer to {s}'s declaration to see available tags and declarations", .{e.kind}),
             .dead_code => writer.writeAll("remove unreachable code"),
             .dot_type_on_non_mod => writer.writeAll("check variable declaration to see it's type"),

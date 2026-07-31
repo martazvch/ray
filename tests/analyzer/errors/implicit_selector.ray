@@ -1,0 +1,12 @@
+struct Vec2 {
+    x, y: int,
+}
+
+struct Line {
+    a, b: Vec2,
+}
+
+fn main() {
+    let line = .{}
+}
+
