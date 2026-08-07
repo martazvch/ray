@@ -8,8 +8,7 @@
                 [Binop type: add_str]
                     [Constant index 3]
                         [String Bar ]
-                    [Zig fn call]
-                        [Builtin symbol: 2]
+                    [Call Zig symbol 2 module 0]
                         - args
                         [Variable index: 1, scope: local]
 [Structure declaration Baz]
@@ -21,8 +20,7 @@
                 [Binop type: add_str]
                     [Constant index 4]
                         [String Baz ]
-                    [Zig fn call]
-                        [Builtin symbol: 2]
+                    [Call Zig symbol 2 module 0]
                         - args
                         [Variable index: 1, scope: local]
 [Function declaration f]

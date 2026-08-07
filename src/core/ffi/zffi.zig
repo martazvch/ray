@@ -48,7 +48,6 @@ pub fn Union(types: []const std.meta.FieldEnum(All)) type {
 
 pub const Module = struct {
     name: ?[]const u8 = null,
-    is_module: bool = true,
     functions: []const FnMeta = &.{},
     structures: []const StructMeta = &.{},
     traits: []const TraitMeta = &.{},
@@ -113,6 +112,7 @@ pub const Intrinsic = struct {
     return_type: type,
 };
 
+// Helpers
 fn getMember(T: type, comptime kind: MemberKind) kind.Type() {
     const info = @typeInfo(T);
     if (info != .@"struct") {
@@ -141,6 +141,7 @@ fn getMember(T: type, comptime kind: MemberKind) kind.Type() {
     };
 }
 
+// Structures
 pub const StructMeta = struct {
     name: []const u8,
     type_name: []const u8,
@@ -173,6 +174,7 @@ pub const StructMeta = struct {
     }
 };
 
+// Native object
 pub const VTable = struct {
     get_field: *const fn (*anyopaque, *Vm, usize) Value,
     deinit_fn: *const fn (*anyopaque, *Vm) void,
@@ -213,6 +215,7 @@ pub fn makeObj(T: type, name: []const u8, value: *anyopaque, vm: *Vm) *T {
     return @ptrCast(@alignCast(&obj.child));
 }
 
+// Traits
 pub const TraitMeta = struct {
     name: []const u8,
     type_name: []const u8,
@@ -229,6 +232,7 @@ pub const TraitMeta = struct {
     }
 };
 
+// Functions
 pub fn makeNative(func: anytype) Fn {
     return struct {
         pub fn call(vm: *Vm, stack: []const Value) ?Value {

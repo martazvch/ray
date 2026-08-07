@@ -153,7 +153,7 @@ fn blackenObject(self: *Self, obj: *Obj) Allocator.Error!void {
         .iterator => if (obj.as(Obj.Iterator).parent) |*p| try self.markValue(p),
         .union_instance => try self.markValue(&obj.as(Obj.UnionInstance).payload),
         .trait_obj => try self.markObject(obj.as(Obj.TraitObj).data),
-        .native_zfn => unreachable,
+        .native_zfn => {},
         // TODO: see why we can't mark functions and structure unreachable
         // I think they should not be reachable because only allocated at comptime
         // so not in Vm's linked list of obj

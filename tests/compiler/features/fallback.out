@@ -1,19 +1,19 @@
 -- failable --
-load_constant index 3, value 5
+load_const index 3, value 5
 ret
 
 -- optional --
-load_constant index 3, value 5
+load_const index 3, value 5
 ret
 
 -- main --
 call index 0, arity 0, failable
-load_constant index 4, value 85
+load_const index 4, value 85
 fallback_err
 print
 
 call index 1, arity 0, optional
-load_constant index 4, value 85
+load_const index 4, value 85
 fallback_opt
 print
 

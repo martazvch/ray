@@ -22,8 +22,7 @@
                         [Binop type: add_str]
                             [Constant index 8]
                                 [String I'm a: ]
-                            [Zig fn call]
-                                [Builtin symbol: 2]
+                            [Call Zig symbol 2 module 0]
                                 - args
                                 [Union unwrap]
                                     - union

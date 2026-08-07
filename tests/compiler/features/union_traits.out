@@ -1,24 +1,24 @@
 -- speakNoDef --
-load_constant index 5, value noDef
+load_const index 5, value noDef
 print
 ret_naked
 
 -- methodNoDef --
 get_local index 0
 get_union_tag
-load_constant index 7, value 0
+load_const index 7, value 0
 eq_int
-jump_false 6 -> 24
+jump_false 6 -> 25
 pop
-load_constant index 8, value I'm a: 
+load_const index 8, value I'm a: 
 get_local index 0
 union_unwrap index 0
-call_zig index 2, arity 1, str
+call_zig index 2, module 0, arity 1, str
 str_cat
 print
-jump 21 -> 33
+jump 22 -> 34
 pop
-load_constant index 9, value I'm b: 
+load_const index 9, value I'm b: 
 get_local index 0
 union_unwrap index 1
 str_cat
@@ -26,19 +26,19 @@ print
 ret_naked
 
 -- speak --
-load_constant index 3, value oui
+load_const index 3, value oui
 print
 ret_naked
 
 -- method --
-load_constant index 4, value method
+load_const index 4, value method
 print
 ret_naked
 
 -- main --
 call index 6, arity 0, speak
 call index 4, arity 0, speakNoDef
-load_constant index 10, value 1
+load_const index 10, value 1
 union_constr index 0, tag 0, Bar
 get_local index 0
 call index 7, arity 1, method

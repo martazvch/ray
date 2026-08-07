@@ -17,12 +17,12 @@
 //-- test.ray --
 [Function declaration main]
     [Print]
-        [Call foreign symbol 1 module 1]
+        [Call foreign symbol 1 module 3]
             - args
             [Constant index 3]
                 [Float 4]
     [Print]
-        [Call symbol 6 module 1]
+        [Call symbol 6 module 3]
             - args
             [Constant index 4]
                 [Float 8]

@@ -1,12 +1,12 @@
 -- getValue --
-load_constant index 3, value 5
+load_const index 3, value 5
 ret
 
 -- main --
 call index 0, arity 0, getValue
 dup
 
-load_constant index 3, value 5
+load_const index 3, value 5
 eq_int
 jump_false 7 -> 17
 pop
@@ -15,7 +15,7 @@ print
 jump 14 -> 21
 pop
 
-load_constant index 4, value non
+load_const index 4, value non
 print
 pop
 

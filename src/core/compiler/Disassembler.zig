@@ -9,14 +9,18 @@ const Obj = @import("../runtime/Obj.zig");
 const oom = @import("misc").oom;
 const Chunk = @import("Chunk.zig");
 const OpCode = Chunk.OpCode;
-const Module = @import("../pipeline/ModuleManager.zig").Module;
+const CompiledMod = @import("../pipeline/ModuleManager.zig").Module;
+const NativeMod = @import("../pipeline/NativesRegister.zig").NativeModule;
 
 chunk: *const Chunk,
+/// Current module's zig functions
 zig_fns: []const *Obj.ZigFn,
-zig_structs: []const Module.Structure,
-c_fns: []const *Obj.ForeignFn,
+/// Current module's zig structures
+zig_structs: []const CompiledMod.Structure,
+/// Current module's foreign functions
+foreign_fns: []const *Obj.ForeignFn,
 render_mode: RenderMode,
-module: *const Module,
+module: *const CompiledMod,
 wide: bool,
 
 prev_line: usize = 0,
@@ -26,17 +30,17 @@ pub const RenderMode = enum { normal, @"test" };
 
 pub fn init(
     chunk: *const Chunk,
-    module: *const Module,
+    module: *const CompiledMod,
     zig_fns: []const *Obj.ZigFn,
-    zig_structs: []const Module.Structure,
-    c_fns: []const *Obj.ForeignFn,
+    zig_structs: []const CompiledMod.Structure,
+    foreign_fns: []const *Obj.ForeignFn,
 ) Self {
     return .{
         .chunk = chunk,
         .render_mode = if (options.test_mode) .@"test" else .normal,
         .zig_fns = zig_fns,
         .zig_structs = zig_structs,
-        .c_fns = c_fns,
+        .foreign_fns = foreign_fns,
         .module = module,
         .wide = false,
     };
@@ -84,130 +88,130 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         try self.lineHeader(writer, offset);
     }
 
+    const name = @tagName(op);
     return switch (op) {
-        .add_float => self.simpleInstruction(writer, "add_float", offset),
-        .add_int => self.simpleInstruction(writer, "add_int", offset),
+        .add_float => self.simpleInstruction(writer, name, offset),
+        .add_int => self.simpleInstruction(writer, name, offset),
         .array_new => self.arrayNew(writer, offset),
-        .array_set => self.simpleInstruction(writer, "array_set", offset),
-        .bound_method => self.indexInstruction(writer, "bound_method", offset),
-        .box => self.simpleInstruction(writer, "box", offset),
+        .array_set => self.simpleInstruction(writer, name, offset),
+        .bound_method => self.indexInstruction(writer, name, offset),
+        .box => self.simpleInstruction(writer, name, offset),
         .call => self.call(writer, offset),
-        .call_any => self.indexInstruction(writer, "call", offset),
+        .call_dyn => self.indexInstruction(writer, name, offset),
         .call_array, .call_string => self.callIndexArity(writer, op, offset),
         .call_ext => self.callExt(writer, false, offset),
-        .call_foreign => self.callNative(writer, .foreign, offset),
+        .call_foreign => self.callForeign(writer, name, offset),
         .call_foreign_ext => self.callExt(writer, true, offset),
-        .call_foreign_glob => self.callForeignGlob(writer, offset),
         .call_virtual => self.callIndexArity(writer, op, offset),
-        .call_zig => self.callNative(writer, .zig, offset),
-        .closure => self.indexInstruction(writer, "closure", offset),
-        .def_global => self.indexInstruction(writer, "def_global", offset),
-        .div_float => self.simpleInstruction(writer, "div_float", offset),
-        .div_int => self.simpleInstruction(writer, "div_int", offset),
-        .dup => self.simpleInstruction(writer, "dup", offset),
-        .eq_bool => self.simpleInstruction(writer, "eq_bool", offset),
-        .eq_float => self.simpleInstruction(writer, "eq_float", offset),
-        .eq_int => self.simpleInstruction(writer, "eq_int", offset),
-        .eq_null => self.simpleInstruction(writer, "eq_null", offset),
-        .eq_str => self.simpleInstruction(writer, "eq_str", offset),
-        .exit_repl => self.simpleInstruction(writer, "exit_repl", offset),
-        .fallback_err => self.simpleInstruction(writer, "fallback_err", offset),
-        .fallback_opt => self.simpleInstruction(writer, "fallback_opt", offset),
-        .ge_float => self.simpleInstruction(writer, "ge_float", offset),
-        .ge_int => self.simpleInstruction(writer, "ge_int", offset),
-        .get_capt_frame => self.indexInstruction(writer, "get_capt_frame", offset),
-        .get_capt_local => self.indexInstruction(writer, "get_capt_local", offset),
-        .get_field => self.getMember(writer, "get_field", offset),
-        .get_field_cow => self.getMember(writer, "get_field_cow", offset),
-        .get_field_native => self.getMember(writer, "get_field_native", offset),
+        .call_zig => self.callZig(writer, name, offset),
+        .closure => self.indexInstruction(writer, name, offset),
+        .def_global => self.indexInstruction(writer, name, offset),
+        .div_float => self.simpleInstruction(writer, name, offset),
+        .div_int => self.simpleInstruction(writer, name, offset),
+        .dup => self.simpleInstruction(writer, name, offset),
+        .eq_bool => self.simpleInstruction(writer, name, offset),
+        .eq_float => self.simpleInstruction(writer, name, offset),
+        .eq_int => self.simpleInstruction(writer, name, offset),
+        .eq_null => self.simpleInstruction(writer, name, offset),
+        .eq_str => self.simpleInstruction(writer, name, offset),
+        .exit_repl => self.simpleInstruction(writer, name, offset),
+        .fallback_err => self.simpleInstruction(writer, name, offset),
+        .fallback_opt => self.simpleInstruction(writer, name, offset),
+        .ge_float => self.simpleInstruction(writer, name, offset),
+        .ge_int => self.simpleInstruction(writer, name, offset),
+        .get_capt_frame => self.indexInstruction(writer, name, offset),
+        .get_capt_local => self.indexInstruction(writer, name, offset),
+        .get_field => self.getMember(writer, name, offset),
+        .get_field_cow => self.getMember(writer, name, offset),
+        .get_field_native => self.getMember(writer, name, offset),
         .get_global => self.getGlobal(writer, false, offset),
         .get_global_cow => self.getGlobal(writer, true, offset),
-        .get_local => self.indexInstruction(writer, "get_local", offset),
-        .get_local_cow => self.indexInstruction(writer, "get_local_cow", offset),
-        .get_enum_tag => self.simpleInstruction(writer, "get_enum_tag", offset),
-        .get_union_tag => self.simpleInstruction(writer, "get_union_tag", offset),
-        .gt_float => self.simpleInstruction(writer, "gt_float", offset),
-        .gt_int => self.simpleInstruction(writer, "gt_int", offset),
-        .incr_ref => self.simpleInstruction(writer, "incr_ref", offset),
-        .index_arr => self.simpleInstruction(writer, "index_arr", offset),
-        .index_range_arr => self.simpleInstruction(writer, "index_range_arr", offset),
-        .index_arr_cow => self.simpleInstruction(writer, "index_arr_cow", offset),
-        .index_range_str => self.simpleInstruction(writer, "index_range_str", offset),
-        .index_str => self.simpleInstruction(writer, "index_str", offset),
-        .in_array => self.simpleInstruction(writer, "in_array", offset),
-        .in_range_float => self.simpleInstruction(writer, "in_range_float", offset),
-        .in_range_int => self.simpleInstruction(writer, "in_range_int", offset),
-        .in_str => self.simpleInstruction(writer, "in_str", offset),
-        .is_bool => self.simpleInstruction(writer, "is_bool", offset),
-        .is_float => self.simpleInstruction(writer, "is_float", offset),
-        .is_int => self.simpleInstruction(writer, "is_int", offset),
-        .is_str => self.simpleInstruction(writer, "is_str", offset),
+        .get_local => self.indexInstruction(writer, name, offset),
+        .get_local_cow => self.indexInstruction(writer, name, offset),
+        .get_enum_tag => self.simpleInstruction(writer, name, offset),
+        .get_union_tag => self.simpleInstruction(writer, name, offset),
+        .gt_float => self.simpleInstruction(writer, name, offset),
+        .gt_int => self.simpleInstruction(writer, name, offset),
+        .incr_ref => self.simpleInstruction(writer, name, offset),
+        .index_arr => self.simpleInstruction(writer, name, offset),
+        .index_range_arr => self.simpleInstruction(writer, name, offset),
+        .index_arr_cow => self.simpleInstruction(writer, name, offset),
+        .index_range_str => self.simpleInstruction(writer, name, offset),
+        .index_str => self.simpleInstruction(writer, name, offset),
+        .in_array => self.simpleInstruction(writer, name, offset),
+        .in_range_float => self.simpleInstruction(writer, name, offset),
+        .in_range_int => self.simpleInstruction(writer, name, offset),
+        .in_str => self.simpleInstruction(writer, name, offset),
+        .is_bool => self.simpleInstruction(writer, name, offset),
+        .is_float => self.simpleInstruction(writer, name, offset),
+        .is_int => self.simpleInstruction(writer, name, offset),
+        .is_str => self.simpleInstruction(writer, name, offset),
         .is_type => self.isType(writer, offset),
-        .int_to_float => self.simpleInstruction(writer, "int_to_float", offset),
-        .iter_new_arr => self.simpleInstruction(writer, "iter_new_arr", offset),
-        .iter_new_range => self.simpleInstruction(writer, "iter_new_range", offset),
-        .iter_new_str => self.simpleInstruction(writer, "iter_new_str", offset),
-        .iter_next => self.simpleInstruction(writer, "iter_next", offset),
-        .iter_next_index => self.simpleInstruction(writer, "iter_next_index", offset),
-        .jump => self.jumpInstruction(writer, "jump", 1, offset),
-        .jump_false => self.jumpInstruction(writer, "jump_false", 1, offset),
-        .jump_true => self.jumpInstruction(writer, "jump_true", 1, offset),
-        .jump_no_err => self.jumpInstruction(writer, "jump_no_err", 1, offset),
-        .jump_null => self.jumpInstruction(writer, "jump_null", 1, offset),
-        .le_float => self.simpleInstruction(writer, "le_float", offset),
-        .le_int => self.simpleInstruction(writer, "le_int", offset),
-        .lt_float => self.simpleInstruction(writer, "lt_float", offset),
-        .lt_int => self.simpleInstruction(writer, "lt_int", offset),
-        .load_blk_val => self.simpleInstruction(writer, "load_blk_val", offset),
-        .load_constant => self.constantInstruction(writer, "load_constant", offset),
-        .load_ext_constant => self.extConstantInstruction(writer, "load_ext_constant", offset),
+        .int_to_float => self.simpleInstruction(writer, name, offset),
+        .iter_new_arr => self.simpleInstruction(writer, name, offset),
+        .iter_new_range => self.simpleInstruction(writer, name, offset),
+        .iter_new_str => self.simpleInstruction(writer, name, offset),
+        .iter_next => self.simpleInstruction(writer, name, offset),
+        .iter_next_index => self.simpleInstruction(writer, name, offset),
+        .jump => self.jumpInstruction(writer, name, 1, offset),
+        .jump_false => self.jumpInstruction(writer, name, 1, offset),
+        .jump_true => self.jumpInstruction(writer, name, 1, offset),
+        .jump_no_err => self.jumpInstruction(writer, name, 1, offset),
+        .jump_null => self.jumpInstruction(writer, name, 1, offset),
+        .le_float => self.simpleInstruction(writer, name, offset),
+        .le_int => self.simpleInstruction(writer, name, offset),
+        .lt_float => self.simpleInstruction(writer, name, offset),
+        .lt_int => self.simpleInstruction(writer, name, offset),
+        .load_blk_val => self.simpleInstruction(writer, name, offset),
+        .load_const => self.constantInstruction(writer, name, offset),
+        .load_const_ext => self.extConstantInstruction(writer, name, offset),
         .load_fn => self.loadSymbol(writer, offset),
-        .load_fn_ext => self.indexExternInstruction(writer, "load_fn_ext", offset),
-        .load_fn_builtin => self.indexInstruction(writer, "load_fn_builtin", offset),
-        .loop => self.jumpInstruction(writer, "loop", -1, offset),
-        .mod_float => self.simpleInstruction(writer, "mod_float", offset),
-        .mod_int => self.simpleInstruction(writer, "mod_int", offset),
-        .mul_float => self.simpleInstruction(writer, "mul_float", offset),
-        .mul_int => self.simpleInstruction(writer, "mul_int", offset),
-        .ne_bool => self.simpleInstruction(writer, "ne_bool", offset),
-        .ne_float => self.simpleInstruction(writer, "ne_float", offset),
-        .ne_int => self.simpleInstruction(writer, "ne_int", offset),
-        .ne_null => self.simpleInstruction(writer, "ne_null", offset),
-        .ne_null_push => self.simpleInstruction(writer, "ne_null_push", offset),
-        .ne_str => self.simpleInstruction(writer, "ne_str", offset),
-        .neg_float => self.simpleInstruction(writer, "neg_float", offset),
-        .neg_int => self.simpleInstruction(writer, "neg_int", offset),
-        .not => self.simpleInstruction(writer, "not", offset),
-        .pop => self.simpleInstruction(writer, "pop", offset),
-        .pop2 => self.simpleInstruction(writer, "pop2", offset),
-        .pop3 => self.simpleInstruction(writer, "pop3", offset),
-        .popn => self.indexInstruction(writer, "popn", offset),
-        .print => self.simpleInstruction(writer, "print", offset),
-        .push_false => self.simpleInstruction(writer, "push_false", offset),
-        .push_null => self.simpleInstruction(writer, "push_null", offset),
-        .push_true => self.simpleInstruction(writer, "push_true", offset),
-        .range_new_float => self.simpleInstruction(writer, "range_new_float", offset),
-        .range_new_int => self.simpleInstruction(writer, "range_new_int", offset),
-        .ret => self.simpleInstruction(writer, "ret", offset),
-        .ret_naked => self.simpleInstruction(writer, "ret_naked", offset),
-        .set_field => self.indexInstruction(writer, "set_field", offset),
-        .set_global => self.indexInstruction(writer, "set_global", offset),
-        .set_local => self.indexInstruction(writer, "set_local", offset),
-        .set_local_box => self.indexInstruction(writer, "set_local_box", offset),
-        .store_blk_val => self.simpleInstruction(writer, "store_blk_val", offset),
-        .str_cat => self.simpleInstruction(writer, "str_cat", offset),
-        .str_mul => self.simpleInstruction(writer, "str_mul", offset),
+        .load_fn_ext => self.indexExternInstruction(writer, name, offset),
+        .load_fn_zig => self.indexExternInstruction(writer, name, offset),
+        .loop => self.jumpInstruction(writer, name, -1, offset),
+        .mod_float => self.simpleInstruction(writer, name, offset),
+        .mod_int => self.simpleInstruction(writer, name, offset),
+        .mul_float => self.simpleInstruction(writer, name, offset),
+        .mul_int => self.simpleInstruction(writer, name, offset),
+        .ne_bool => self.simpleInstruction(writer, name, offset),
+        .ne_float => self.simpleInstruction(writer, name, offset),
+        .ne_int => self.simpleInstruction(writer, name, offset),
+        .ne_null => self.simpleInstruction(writer, name, offset),
+        .ne_null_push => self.simpleInstruction(writer, name, offset),
+        .ne_str => self.simpleInstruction(writer, name, offset),
+        .neg_float => self.simpleInstruction(writer, name, offset),
+        .neg_int => self.simpleInstruction(writer, name, offset),
+        .not => self.simpleInstruction(writer, name, offset),
+        .pop => self.simpleInstruction(writer, name, offset),
+        .pop2 => self.simpleInstruction(writer, name, offset),
+        .pop3 => self.simpleInstruction(writer, name, offset),
+        .popn => self.indexInstruction(writer, name, offset),
+        .print => self.simpleInstruction(writer, name, offset),
+        .push_false => self.simpleInstruction(writer, name, offset),
+        .push_null => self.simpleInstruction(writer, name, offset),
+        .push_true => self.simpleInstruction(writer, name, offset),
+        .range_new_float => self.simpleInstruction(writer, name, offset),
+        .range_new_int => self.simpleInstruction(writer, name, offset),
+        .ret => self.simpleInstruction(writer, name, offset),
+        .ret_naked => self.simpleInstruction(writer, name, offset),
+        .set_field => self.indexInstruction(writer, name, offset),
+        .set_global => self.indexInstruction(writer, name, offset),
+        .set_local => self.indexInstruction(writer, name, offset),
+        .set_local_box => self.indexInstruction(writer, name, offset),
+        .store_blk_val => self.simpleInstruction(writer, name, offset),
+        .str_cat => self.simpleInstruction(writer, name, offset),
+        .str_mul => self.simpleInstruction(writer, name, offset),
         .struct_lit => self.structLiteral(writer, false, offset),
         .struct_lit_ext => self.structLiteralExt(writer, offset),
         .struct_lit_zig => self.structLiteral(writer, true, offset),
-        .sub_float => self.simpleInstruction(writer, "sub_float", offset),
-        .sub_int => self.simpleInstruction(writer, "sub_int", offset),
-        .swap_pop => self.simpleInstruction(writer, "swap_pop", offset),
-        .trait_obj => self.indexInstruction(writer, "trait_obj", offset),
-        .unbox => self.simpleInstruction(writer, "unbox", offset),
+        .sub_float => self.simpleInstruction(writer, name, offset),
+        .sub_int => self.simpleInstruction(writer, name, offset),
+        .swap_pop => self.simpleInstruction(writer, name, offset),
+        .trait_obj => self.indexInstruction(writer, name, offset),
+        .unbox => self.simpleInstruction(writer, name, offset),
         .union_constr => self.unionConstr(writer, offset),
         .union_constr_ext => self.unionConstrExt(writer, offset),
-        .union_unwrap => self.indexInstruction(writer, "union_unwrap", offset),
+        .union_unwrap => self.indexInstruction(writer, name, offset),
         .wide => unreachable,
     } catch oom();
 }
@@ -405,26 +409,10 @@ fn callExt(self: *Self, writer: *Writer, native: bool, offset: usize) Writer.Err
     return offset + 4;
 }
 
-fn callForeignGlob(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
-    const text = "call_foreign_glob";
+fn callForeign(self: *Self, writer: *Writer, text: []const u8, offset: usize) Writer.Error!usize {
     const index = self.chunk.code.items[offset + 1];
     const arity = self.chunk.code.items[offset + 2];
-    const func = self.c_fns[index];
-
-    if (self.render_mode == .@"test") {
-        try writer.print("{s} index {}, arity {}, {s}\n", .{ text, index, arity, func.name });
-    } else {
-        try writer.print("{s:<20} index {:>4}, arity {:>4}, {s}\n", .{ text, index, arity, func.name });
-    }
-
-    return offset + 3;
-}
-
-fn callNative(self: *Self, writer: *Writer, comptime kind: enum { foreign, zig }, offset: usize) Writer.Error!usize {
-    const text = "call_" ++ @tagName(kind);
-    const index = self.chunk.code.items[offset + 1];
-    const arity = self.chunk.code.items[offset + 2];
-    const name = if (kind == .foreign) self.module.foreign_funcs.items[index].name else self.zig_fns[index].name;
+    const name = self.module.foreign_funcs.items[index].name;
 
     if (self.render_mode == .@"test") {
         try writer.print("{s} index {}, arity {}, {s}\n", .{ text, index, arity, name });
@@ -433,6 +421,21 @@ fn callNative(self: *Self, writer: *Writer, comptime kind: enum { foreign, zig }
     }
 
     return offset + 3;
+}
+
+fn callZig(self: *Self, writer: *Writer, text: []const u8, offset: usize) Writer.Error!usize {
+    const index = self.chunk.code.items[offset + 1];
+    const module = self.chunk.code.items[offset + 2];
+    const arity = self.chunk.code.items[offset + 3];
+    const name = self.zig_fns[index].name;
+
+    if (self.render_mode == .@"test") {
+        try writer.print("{s} index {}, module {}, arity {}, {s}\n", .{ text, index, module, arity, name });
+    } else {
+        try writer.print("{s:<20} index {:>4}, module {:>4}, arity {:>4}, {s}\n", .{ text, index, module, arity, name });
+    }
+
+    return offset + 4;
 }
 
 fn callIndexArity(self: *Self, writer: *Writer, op: OpCode, offset: usize) Writer.Error!usize {

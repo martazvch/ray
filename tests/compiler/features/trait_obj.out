@@ -1,22 +1,22 @@
 -- speak --
-load_constant index 3, value Bar 
+load_const index 3, value Bar 
 get_local index 1
-call_zig index 2, arity 1, str
+call_zig index 2, module 0, arity 1, str
 str_cat
 print
 ret_naked
 
 -- speak --
-load_constant index 4, value Baz 
+load_const index 4, value Baz 
 get_local index 1
-call_zig index 2, arity 1, str
+call_zig index 2, module 0, arity 1, str
 str_cat
 print
 ret_naked
 
 -- f --
 get_local index 0
-load_constant index 5, value 2
+load_const index 5, value 2
 call_virtual index 0, arity 2
 ret_naked
 

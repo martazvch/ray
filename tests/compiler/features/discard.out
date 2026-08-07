@@ -1,6 +1,6 @@
 -- main --
-load_constant index 3, value 3
-load_constant index 4, value 4
+load_const index 3, value 3
+load_const index 4, value 4
 add_int
 pop
 ret_naked

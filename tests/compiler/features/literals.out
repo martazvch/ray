@@ -1,8 +1,8 @@
 -- main --
-load_constant index 3, value 1
+load_const index 3, value 1
 pop
 
-load_constant index 4, value 65.82
+load_const index 4, value 65.82
 pop
 
 push_true
@@ -14,7 +14,7 @@ pop
 push_null
 pop
 
-load_constant index 5, value foo
+load_const index 5, value foo
 pop
 
 ret_naked

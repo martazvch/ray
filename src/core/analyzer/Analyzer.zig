@@ -1233,9 +1233,7 @@ fn use(self: *Self, node: *const Ast.Use) StmtResult {
         self.alloc,
         self.ast,
         node.names,
-        &self.state.path_builder,
-        &self.state.cwd,
-        self.state.config.path,
+        self.state,
     );
     const path = path: switch (result) {
         .dynlib => |*dynlib| {
@@ -1264,6 +1262,7 @@ fn use(self: *Self, node: *const Ast.Use) StmtResult {
             }
             break :path interned;
         },
+        .module => |m| m.path,
         .missing_file => |e| return self.err(
             .{ .missing_file_in_module = .{ .file = self.ast.toSource(e) } },
             self.ast.getSpan(e),
@@ -2308,17 +2307,17 @@ fn traitAccess(self: *Self, expr: *const Ast.Field, ty: *const Type, is_sym: boo
     };
 }
 
-fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_idx: InternerIdx) Result {
+fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_name: InternerIdx) Result {
     const span = self.ast.getSpan(field_tk);
     const text = self.ast.toSource(field_tk);
 
     const field_name = self.interner.intern(text);
-    const module = self.state.modules.getFromPath(module_idx).?;
+    const module = self.state.modules.getFromPath(module_name).?;
     var sym = module.sym_infos.get(field_name) orelse return self.err(
         .{ .missing_symbol_in_module = .{ .module = self.interner.getKey(module.name).?, .symbol = text } },
         span,
     );
-    const index = self.state.modules.getIndex(module_idx).?;
+    const index = self.state.modules.getIndex(module_name).?;
 
     // Declare type in current scope to emulate import, especially useful for implicit selector
     sym.module_index = index;
@@ -2329,7 +2328,11 @@ fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_idx: InternerIdx) 
         .type = sym.type,
         .ti = .{ .is_sym = true, .ext_mod = index },
         .instr = self.irb.addInstr(
-            .{ .load_symbol = .{ .module_index = index, .symbol_index = @intCast(sym.index) } },
+            .{ .load_symbol = .{
+                .module_index = index,
+                .symbol_index = @intCast(sym.index),
+                .kind = if (module.native) .zig else .ray,
+            } },
             span.start,
         ),
     };
@@ -2544,7 +2547,7 @@ fn resolveIdentifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool,
     }
 
     if (self.builtinSymbol(sym_name, span)) |res| {
-        return .{ .type = res.sym.type, .kind = .symbol, .instr = res.instr };
+        return .{ .type = res.sym.type, .kind = .symbol, .instr = res.instr, .module = res.sym.module_index };
     }
 
     if (self.scope.getModule(name)) |mod| {
@@ -2608,7 +2611,14 @@ fn builtinSymbol(self: *Self, name: InternerIdx, span: Span) ?struct { sym: *Lex
     // TODO: protect cast
     return .{
         .sym = sym,
-        .instr = self.irb.addInstr(.{ .load_builtin = @intCast(sym.index) }, span.start),
+        .instr = self.irb.addInstr(
+            .{ .load_symbol = .{
+                .symbol_index = @intCast(sym.index),
+                .module_index = sym.module_index,
+                .kind = .zig,
+            } },
+            span.start,
+        ),
     };
 }
 
@@ -3341,12 +3351,24 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
             );
 
             break :nat self.irb.addInstr(
-                .{ .call = .{
-                    .callee = self.irb.addInstr(.{ .load_builtin = init_fn.index }, span.start),
-                    .args = values,
-                    .ext_mod = null,
-                    .kind = .zig,
-                } },
+                .{
+                    .call = .{
+                        .callee = self.irb.addInstr(
+                            .{
+                                .load_symbol = .{
+                                    .symbol_index = @intCast(init_fn.index),
+                                    .module_index = struct_res.ti.ext_mod,
+                                    .kind = .zig,
+                                },
+                            },
+                            span.start,
+                        ),
+                        .args = values,
+                        .ext_mod = null,
+                        // TODO: if callee is always a symbol, info already present there
+                        .kind = .zig,
+                    },
+                },
                 span.start,
             );
         }

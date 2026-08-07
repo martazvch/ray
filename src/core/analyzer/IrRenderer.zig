@@ -89,7 +89,6 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .indexing => |data| self.indexing(data, false, false),
         .int_to_float => |index| self.indexInstr("Int to float", index),
         .load_symbol => |*data| self.loadSymbol(data),
-        .load_builtin => |index| self.indentAndPrintSlice("[Builtin symbol: {}]", .{index}),
         .match => |*data| self.match(data),
         .match_type => |data| self.matchType(data),
         .multiple_var_decl => |*data| self.multipleVarDecl(data),
@@ -253,39 +252,36 @@ fn call(self: *Self, data: *const Instruction.Call) void {
                 if (data.ext_mod) |mod| {
                     switch (data.kind) {
                         .foreign => self.indentAndPrintSlice("[Invoke foreign symbol {} module {}]", .{ f.index, mod.toInt() }),
-                        .foreign_glob => self.indentAndPrintSlice("[Invoke global foreign symbol {} module {}]", .{ f.index, mod.toInt() }),
                         .zig, .zig_method => self.indentAndPrintSlice("[Invoke Zig symbol {} module {}]", .{ f.index, mod.toInt() }),
                         else => self.indentAndPrintSlice("[Invoke symbol {} module {}]", .{ f.index, mod.toInt() }),
                     }
                 } else switch (data.kind) {
                     .foreign => self.indentAndPrintSlice("[Invoke foreign symbol {}]", .{f.index}),
-                    .foreign_glob => self.indentAndPrintSlice("[Invoke global foreign symbol {}]", .{f.index}),
                     .zig, .zig_method => self.indentAndPrintSlice("[Invoke Zig symbol {}]", .{f.index}),
                     else => self.indentAndPrintSlice("[Invoke symbol {}]", .{f.index}),
                 }
             } else if (f.kind == .virtual) {
                 self.indentAndPrintSlice("[Invoke virtual {}]", .{f.index});
+            } else if (f.kind == .field) {
+                self.indentAndPrintSlice("[Invoke field {}]", .{f.index});
             }
         },
         .load_symbol => |sym| {
             if (sym.module_index) |mod| {
                 switch (data.kind) {
                     .foreign => self.indentAndPrintSlice("[Call foreign symbol {} module {}]", .{ sym.symbol_index, mod.toInt() }),
-                    .foreign_glob => self.indentAndPrintSlice("[Call global foreign symbol {} module {}]", .{ sym.symbol_index, mod.toInt() }),
                     .zig, .zig_method => self.indentAndPrintSlice("[Call Zig symbol {} module {}]", .{ sym.symbol_index, mod.toInt() }),
                     else => self.indentAndPrintSlice("[Call symbol {} module {}]", .{ sym.symbol_index, mod.toInt() }),
                 }
             } else switch (data.kind) {
                 .foreign => self.indentAndPrintSlice("[Call foreign symbol {}]", .{sym.symbol_index}),
-                .foreign_glob => self.indentAndPrintSlice("[Call global foreign symbol {}]", .{sym.symbol_index}),
                 .zig, .zig_method => self.indentAndPrintSlice("[Call Zig symbol {}]", .{sym.symbol_index}),
                 else => self.indentAndPrintSlice("[Call symbol {}]", .{sym.symbol_index}),
             }
         },
-        .load_builtin, .identifier => {
+        .identifier => {
             self.indentAndAppendSlice(switch (data.kind) {
                 .foreign => "[Foreign fn call]",
-                .foreign_glob => "[Global foreign fn call]",
                 .zig, .zig_method => "[Zig fn call]",
                 else => "[Fn call]",
             });
@@ -451,10 +447,12 @@ fn intInstr(self: *Self, data: isize) void {
 }
 
 fn loadSymbol(self: *Self, data: *const Instruction.LoadSymbol) void {
+    const native = if (data.kind == .ray) "" else "native ";
+
     if (data.module_index) |mod| {
-        self.indentAndPrintSlice("[Load symbol {} module {}]", .{ data.symbol_index, mod.toInt() });
+        self.indentAndPrintSlice("[Load {s}symbol {} module {}]", .{ native, data.symbol_index, mod.toInt() });
     } else {
-        self.indentAndPrintSlice("[Load symbol {}]", .{data.symbol_index});
+        self.indentAndPrintSlice("[Load {s}symbol {}]", .{ native, data.symbol_index });
     }
 }
 

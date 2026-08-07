@@ -35,27 +35,26 @@ pub const OpCode = enum(u8) {
     array_set,
     bound_method,
     box,
+
     /// Calls a ray function within current module
     call,
-    /// Runtime calling convention dispatch
-    call_any,
-    /// Calls a method on an array
-    call_array,
     /// Calls a ray function within an extern module
     call_ext,
+    /// Runtime calling convention dispatch
+    call_dyn,
     /// Calls a compiled function within current module
     call_foreign,
     /// Calls a compiled function within an extern module
     call_foreign_ext,
-    /// Calls a global compiled function registered either at startup (std)
-    /// or manually when embedded
-    call_foreign_glob,
-    /// Calls a method on a string
-    call_string,
     /// Calling a virtual function on a trait object
     call_virtual,
     /// Calls a non-compiled Zig function
     call_zig,
+    /// Calls a method on a string
+    call_string,
+    /// Calls a method on an array
+    call_array,
+
     closure,
     def_global,
     div_float,
@@ -115,11 +114,11 @@ pub const OpCode = enum(u8) {
     lt_int,
     lt_float,
     load_blk_val,
-    load_constant,
-    load_ext_constant,
+    load_const,
+    load_const_ext,
     load_fn,
     load_fn_ext,
-    load_fn_builtin,
+    load_fn_zig,
     loop,
     mod_float,
     mod_int,

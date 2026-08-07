@@ -27,9 +27,6 @@ gc_alloc: Allocator,
 strings: *std.AutoHashMapUnmanaged(usize, *Obj.String),
 objects: ?*Obj,
 modules: []Module,
-glob_zig_fns: []*Obj.ZigFn,
-glob_zig_structs: []const Module.Structure,
-glob_foreign_fns: []*Obj.ForeignFn,
 state: *State,
 
 // Used ti-ype ids at runtime
@@ -61,9 +58,6 @@ pub fn init(self: *Self, io: Io, allocator: Allocator, state: *State) void {
     self.frame_stack = .empty;
     self.objects = null;
     self.state = state;
-    self.glob_zig_fns = state.native_reg.zig_fns.items;
-    self.glob_zig_structs = state.native_reg.zig_structs.items;
-    self.glob_foreign_fns = state.native_reg.foreign_fns.items;
 
     self.arr_str_type_id = state.type_interner.typeId(
         state.type_interner.intern(.{ .array = .{ .child = state.type_interner.getCached(.str) } }),
@@ -144,7 +138,7 @@ pub fn runRepl(self: *Self, entry_point: *Obj.Function, modules: []Module) !void
     self.frame = try self.frame_stack.new();
     // Reset stack pointer to start of stack
     self.frame.slots = self.stack.values[0..].ptr;
-    self.frame.module = &modules[0];
+    self.frame.module = &modules[entry_point.module_index];
     self.frame.function = entry_point;
     self.frame.ip = entry_point.chunk.code.items.ptr;
 
@@ -165,19 +159,20 @@ fn execute(self: *Self) !void {
 
         if (comptime options.print_instr) {
             var buf: [1024]u8 = undefined;
-            var stdout_writer = std.Io.File.stdout().writer(self.io, &buf);
-            const stdout = &stdout_writer.interface;
-            defer stdout.flush() catch oom();
+            var bfw = std.Io.Writer.fixed(&buf);
+            const global_mod = &self.modules[0];
 
             var dis = Disassembler.init(
                 &self.frame.function.chunk,
                 self.frame.module,
-                self.glob_zig_fns,
-                self.glob_zig_structs,
-                self.glob_foreign_fns,
+                global_mod.zig_funcs,
+                global_mod.structures,
+                global_mod.foreign_funcs.items,
             );
             const instr_nb = self.frame.instructionNb();
-            _ = dis.disInstruction(stdout, instr_nb);
+            _ = dis.disInstruction(&bfw, instr_nb);
+
+            self.state.config.printFn(self.io, bfw.buffered());
         }
 
         const instruction = self.frame.readByte();
@@ -248,25 +243,6 @@ fn execute(self: *Self) !void {
                 const boxed = Value.makeObj(Obj.Box.create(self, to_box).asObj());
                 self.stack.push(boxed);
             },
-            .call_any => {
-                const args_count = self.frame.readByte();
-                const callee = self.stack.peekRef(args_count).obj;
-
-                switch (callee.kind) {
-                    .native_zfn => {
-                        const native = callee.as(Obj.ZigFn).function;
-                        const result = native(self, (self.stack.top - args_count)[0..args_count]);
-
-                        self.stack.top -= args_count + 1;
-                        if (result) |res| self.stack.push(res);
-                    },
-                    else => {
-                        @branchHint(.likely);
-                        self.frame = try self.frame_stack.newKeepMod();
-                        self.frame.runtimeCall(callee, &self.stack, args_count, self.modules);
-                    },
-                }
-            },
             .call => {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
@@ -293,12 +269,6 @@ fn execute(self: *Self) !void {
                 const obj = self.modules[module].foreign_funcs.items[index];
                 self.callForeign(obj, arity);
             },
-            .call_foreign_glob => {
-                const index = self.frame.readByte();
-                const arity = self.frame.readByte();
-                const obj = self.glob_foreign_fns[index];
-                self.callForeign(obj, arity);
-            },
             .call_virtual => {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
@@ -312,12 +282,32 @@ fn execute(self: *Self) !void {
             },
             .call_zig => {
                 const index = self.frame.readByte();
+                const module = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const f = self.glob_zig_fns[index].function;
+                const f = self.modules[module].zig_funcs[index].function;
                 const result = f(self, (self.stack.top - arity)[0..arity]);
 
                 self.stack.top -= arity;
                 if (result) |res| self.stack.push(res);
+            },
+            .call_dyn => {
+                const args_count = self.frame.readByte();
+                const callee = self.stack.peekRef(args_count).obj;
+
+                switch (callee.kind) {
+                    .native_zfn => {
+                        const native = callee.as(Obj.ZigFn).function;
+                        const result = native(self, (self.stack.top - args_count)[0..args_count]);
+
+                        self.stack.top -= args_count + 1;
+                        if (result) |res| self.stack.push(res);
+                    },
+                    else => {
+                        @branchHint(.likely);
+                        self.frame = try self.frame_stack.newKeepMod();
+                        self.frame.runtimeCall(callee, &self.stack, args_count, self.modules);
+                    },
+                }
             },
             .closure => {
                 const captures_count = self.frame.readByte();
@@ -542,15 +532,16 @@ fn execute(self: *Self) !void {
             .le_float => self.stack.push(Value.makeBool(self.stack.pop().float >= self.stack.pop().float)),
             .le_int => self.stack.push(Value.makeBool(self.stack.pop().int >= self.stack.pop().int)),
             .load_blk_val => self.stack.push(self.frame.blk_val),
-            .load_constant => self.stack.push(self.frame.readConstant(wide)),
-            .load_ext_constant => {
+            .load_const => self.stack.push(self.frame.readConstant(wide)),
+            .load_const_ext => {
                 const const_index = self.frame.readByte();
                 const mod_index = self.frame.readByte();
                 self.stack.push(self.modules[mod_index].constants[const_index]);
             },
-            .load_fn_builtin => {
+            .load_fn_zig => {
                 const symbol_idx = self.frame.readByte();
-                self.stack.push(.makeObj(self.glob_zig_fns[symbol_idx].asObj()));
+                const mod_index = self.frame.readByte();
+                self.stack.push(.makeObj(self.modules[mod_index].zig_funcs[symbol_idx].asObj()));
             },
             .load_fn => {
                 const symbol_idx = self.frame.readByte();
@@ -676,15 +667,16 @@ fn execute(self: *Self) !void {
             },
             .struct_lit_ext => {
                 const index = self.frame.readByte();
-                const module = self.frame.readByte();
+                const mod_index = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const instance = Obj.Instance.create(self, &self.modules[module].structures[index]);
+                const instance = Obj.Instance.create(self, &self.modules[mod_index].structures[index]);
                 structLit(instance, arity, &self.stack);
             },
             .struct_lit_zig => {
                 const index = self.frame.readByte();
+                const mod_index = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const instance = Obj.Instance.create(self, &self.glob_zig_structs[index]);
+                const instance = Obj.Instance.create(self, &self.modules[mod_index].structures[index]);
                 structLit(instance, arity, &self.stack);
             },
             .sub_float => {

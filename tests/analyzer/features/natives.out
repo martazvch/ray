@@ -1,11 +1,10 @@
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
-        [Zig fn call]
-            [Builtin symbol: 4]
+        [Call Zig symbol 4 module 0]
             - args
             [Constant index 3]
                 [String natives.ray]
     [Print]
         [Field access 3]
             [Variable index: 0, scope: local]
-        [Invoke Zig symbol 3]
+        [Invoke Zig symbol 3 module 0]

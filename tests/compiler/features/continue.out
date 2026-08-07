@@ -1,6 +1,6 @@
 -- main --
-load_constant index 4, value 3
-load_constant index 3, value 0
+load_const index 4, value 3
+load_const index 3, value 0
 range_new_int
 iter_new_range
 iter_next
@@ -11,8 +11,8 @@ pop
 loop 15 -> 6
 pop2
 
-load_constant index 5, value 5
-load_constant index 3, value 0
+load_const index 5, value 5
+load_const index 3, value 0
 range_new_int
 iter_new_range
 iter_next
@@ -23,20 +23,20 @@ pop
 loop 34 -> 25
 pop2
 
-load_constant index 4, value 3
-load_constant index 3, value 0
+load_const index 4, value 3
+load_const index 3, value 0
 range_new_int
 iter_new_range
 iter_next
 jump_null 45 -> 73
 
-load_constant index 6, value 6
-load_constant index 4, value 3
+load_const index 6, value 6
+load_const index 4, value 3
 range_new_int
 iter_new_range
 iter_next
 jump_null 55 -> 68
-load_constant index 7, value 1
+load_const index 7, value 1
 pop2
 loop 61 -> 54
 pop2
@@ -46,20 +46,20 @@ pop
 loop 70 -> 44
 pop2
 
-load_constant index 4, value 3
-load_constant index 3, value 0
+load_const index 4, value 3
+load_const index 3, value 0
 range_new_int
 iter_new_range
 iter_next
 jump_null 81 -> 112
-load_constant index 7, value 1
-load_constant index 6, value 6
-load_constant index 4, value 3
+load_const index 7, value 1
+load_const index 6, value 6
+load_const index 4, value 3
 range_new_int
 iter_new_range
 iter_next
 jump_null 93 -> 107
-load_constant index 8, value 2
+load_const index 8, value 2
 popn index 5
 loop 100 -> 80
 pop2
@@ -69,10 +69,10 @@ pop2
 loop 109 -> 80
 pop2
 
-load_constant index 3, value 0
+load_const index 3, value 0
 
 get_local index 0
-load_constant index 9, value 4
+load_const index 9, value 4
 lt_int
 jump_false 120 -> 130
 pop
@@ -81,7 +81,7 @@ loop 127 -> 115
 pop
 
 get_local index 0
-load_constant index 9, value 4
+load_const index 9, value 4
 lt_int
 jump_false 136 -> 146
 pop
@@ -90,17 +90,17 @@ loop 143 -> 131
 pop
 
 get_local index 0
-load_constant index 6, value 6
+load_const index 6, value 6
 lt_int
 jump_false 152 -> 179
 pop
 
 get_local index 0
-load_constant index 9, value 4
+load_const index 9, value 4
 lt_int
 jump_false 161 -> 175
 pop
-load_constant index 7, value 1
+load_const index 7, value 1
 pop
 loop 168 -> 156
 pop
@@ -110,17 +110,17 @@ loop 176 -> 147
 pop
 
 get_local index 0
-load_constant index 9, value 4
+load_const index 9, value 4
 lt_int
 jump_false 185 -> 215
 pop
-load_constant index 7, value 1
+load_const index 7, value 1
 get_local index 0
-load_constant index 9, value 4
+load_const index 9, value 4
 lt_int
 jump_false 196 -> 210
 pop
-load_constant index 8, value 2
+load_const index 8, value 2
 pop2
 loop 203 -> 180
 pop

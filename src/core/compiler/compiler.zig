@@ -20,6 +20,7 @@ const CompilerMsg = @import("compiler_msg.zig").CompilerMsg;
 const ConstInterner = @import("../analyzer/ConstantInterner.zig");
 const Constant = ConstInterner.Constant;
 const ConstIdx = ConstInterner.ConstIdx;
+const NativeMod = @import("../pipeline/NativesRegister.zig").NativeModule;
 
 const misc = @import("misc");
 const Interner = misc.Interner;
@@ -41,9 +42,7 @@ pub const CompilationUnit = struct {
     render: bool,
 
     // For disassembler
-    zig_fns: []const *Obj.ZigFn,
-    zig_structs: []const Module.Structure,
-    c_fns: []const *Obj.ForeignFn,
+    global_mod: *const NativeMod,
 
     const Self = @This();
     const Error = error{ Err, TooManyConst } || std.Io.Writer.Error;
@@ -59,9 +58,7 @@ pub const CompilationUnit = struct {
             .errs = .empty,
             .instr_data = undefined,
             .instr_lines = undefined,
-            .zig_fns = state.native_reg.zig_fns.items,
-            .zig_structs = state.native_reg.zig_structs.items,
-            .c_fns = state.native_reg.foreign_fns.items,
+            .global_mod = state.native_reg.getGlobalScope(),
             .constants = state.const_interner.constants.items,
             .line = 0,
             .compiled_constants = .empty,
@@ -302,9 +299,9 @@ const Compiler = struct {
             var dis = Disassembler.init(
                 &self.function.chunk,
                 self.manager.state.modules.getFromIndex(self.manager.mod_index),
-                self.manager.zig_fns,
-                self.manager.zig_structs,
-                self.manager.c_fns,
+                self.manager.global_mod.zig_fns.items,
+                self.manager.global_mod.zig_structs.items,
+                self.manager.global_mod.foreign_fns.items,
             );
             dis.disChunk(&alloc_writer.writer, self.function.name);
 
@@ -345,6 +342,12 @@ const Compiler = struct {
         }
     }
 
+    fn zigSymbolAccess(self: *Self, comptime op: OpCode, sym_data: Instruction.LoadSymbol) void {
+        const mod = sym_data.module_index orelse @panic("native symbols must have a module index");
+        self.writeOpAndByte(op, sym_data.symbol_index);
+        self.writeByte(@intCast(mod.toInt()));
+    }
+
     fn compileInstr(self: *Self, instr: ir.Index) Error!void {
         self.manager.line = self.manager.instr_lines[instr];
 
@@ -373,9 +376,10 @@ const Compiler = struct {
             .incr_rc => |index| self.wrappedInstr(.incr_ref, index),
             .indexing => |data| self.indexing(data),
             .int_to_float => |index| self.wrappedInstr(.int_to_float, index),
-            // TODO: protect the cast
-            .load_builtin => |index| self.writeOpAndByte(.load_fn_builtin, @intCast(index)),
-            .load_symbol => |data| self.symbolAccess(.load_fn, data),
+            .load_symbol => |data| switch (data.kind) {
+                .ray => self.symbolAccess(.load_fn, data),
+                .zig => self.zigSymbolAccess(.load_fn_zig, data),
+            },
             .match => |*data| self.match(data),
             .match_type => |data| self.matchType(data),
             .multiple_var_decl => |*data| self.multipleVarDecl(data),
@@ -572,20 +576,18 @@ const Compiler = struct {
     fn call(self: *Self, data: *const Instruction.Call) Error!void {
         switch (self.at(data.callee)) {
             .field => |f| {
-                // If we call a method / static function, calling a field holding a function is another call conv
                 if (f.kind == .function) {
                     return self.invoke(data, f);
                 }
                 if (f.kind == .virtual) {
                     return self.virtualCall(data, f);
                 }
+
+                // If we call a method, a static function or a field holding a function
+                // it is dynamically resolved by 'call_dyn'
+
             },
-            .load_symbol => |sym| {
-                return self.callSymbol(data, 0, sym.symbol_index, sym.module_index);
-            },
-            .load_builtin => |b| {
-                return self.callSymbol(data, 0, b, null);
-            },
+            .load_symbol => |sym| return self.callSymbol(data, 0, sym.symbol_index, sym.module_index),
             .obj_func => |obj_data| {
                 return self.callObjFn(obj_data, data.args);
             },
@@ -596,7 +598,7 @@ const Compiler = struct {
         try self.compileInstr(data.callee);
         try self.compileArgs(data.args);
         // TODO: protect cast
-        self.writeOpAndByte(.call_any, @intCast(data.args.len));
+        self.writeOpAndByte(.call_dyn, @intCast(data.args.len));
     }
 
     fn invoke(self: *Self, data: *const Instruction.Call, callee: Instruction.Field) Error!void {
@@ -615,15 +617,21 @@ const Compiler = struct {
     // TODO: protect casts
     fn callSymbol(self: *Self, data: *const Instruction.Call, arity_offset: usize, sym_index: usize, sym_mod: ?ModIndex) Error!void {
         try self.compileArgs(data.args);
+
+        const is_ext = sym_mod != null;
+        const op: OpCode = switch (data.kind) {
+            .foreign => if (is_ext) .call_foreign_ext else .call_foreign,
+            .zig, .zig_method => .call_zig,
+            .normal, .method, .bound => if (is_ext) .call_ext else .call,
+            // Only called at analyzis time
+            .intrinsic => unreachable,
+        };
+        self.writeOpAndByte(op, @intCast(sym_index));
+
         if (sym_mod) |mod| {
-            self.writeOpAndByte(if (data.kind == .foreign) .call_foreign_ext else .call_ext, @intCast(sym_index));
             self.writeByte(@intCast(mod.toInt()));
-        } else switch (data.kind) {
-            .foreign => self.writeOpAndByte(.call_foreign, @intCast(sym_index)),
-            .foreign_glob => self.writeOpAndByte(.call_foreign_glob, @intCast(sym_index)),
-            .zig, .zig_method => self.writeOpAndByte(.call_zig, @intCast(sym_index)),
-            else => self.writeOpAndByte(.call, @intCast(sym_index)),
         }
+
         self.writeByte(@intCast(data.args.len + arity_offset));
     }
 
@@ -795,10 +803,10 @@ const Compiler = struct {
             else => |i| {
                 const idx = i.toInt();
                 if (ext_mod) |mod| {
-                    self.writeOpAndByte(.load_ext_constant, @intCast(idx));
+                    self.writeOpAndByte(.load_const_ext, @intCast(idx));
                     self.writeByte(@intCast(mod.toInt()));
                 } else {
-                    try self.writeOpAndMaybeShort(.load_constant, idx);
+                    try self.writeOpAndMaybeShort(.load_const, idx);
                 }
             },
         }
@@ -1042,6 +1050,7 @@ const Compiler = struct {
         for (data.arms) |arm| {
             self.writeOp(.dup);
 
+            // TODO: do not specialize those op codes, no need
             switch (arm.kind) {
                 .int => self.writeOp(.is_int),
                 .float => self.writeOp(.is_float),
@@ -1117,8 +1126,11 @@ const Compiler = struct {
         try self.compileArgs(data.values);
 
         switch (self.at(data.structure)) {
-            .load_symbol => |sym| self.symbolAccess(.struct_lit, sym),
-            .load_builtin => |index| self.writeOpAndByte(.struct_lit_zig, @intCast(index)),
+            .load_symbol => |sym| if (sym.kind == .ray)
+                self.symbolAccess(.struct_lit, sym)
+            else
+                self.zigSymbolAccess(.struct_lit_zig, sym),
+
             else => @panic("Impossible? Change Ir to only allow a symbol index + module"),
         }
         self.writeByte(@intCast(data.values.len));

@@ -116,6 +116,6 @@
             - args
             [Default param constant index 4]
     [Print]
-        [Call symbol 5 module 1]
+        [Call symbol 5 module 3]
             - args
-            [Default param constant index 5, module 1]
+            [Default param constant index 5, module 3]

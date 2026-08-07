@@ -5,10 +5,10 @@ pop
 push_false
 jump_false 6 -> 15
 pop
-load_constant index 3, value 1
+load_const index 3, value 1
 jump 12 -> 18
 pop
-load_constant index 4, value 0
+load_const index 4, value 0
 print
 ret_naked
 

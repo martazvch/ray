@@ -1,5 +1,5 @@
 -- speak --
-load_constant index 3, value I'm Bar
+load_const index 3, value I'm Bar
 print
 ret_naked
 
@@ -9,7 +9,7 @@ call index 2, arity 1, speak
 ret_naked
 
 -- speak --
-load_constant index 4, value I'm Baz
+load_const index 4, value I'm Baz
 print
 ret_naked
 

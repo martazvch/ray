@@ -1,12 +1,12 @@
 -- main --
-load_constant index 4, value 5
+load_const index 4, value 5
 union_constr index 0, tag 0, Foo
-load_constant index 6, value 1.2
+load_const index 6, value 1.2
 union_constr index 0, tag 1, Foo
 set_local index 0
-load_constant index 7, value <union Foo.c>
+load_const index 7, value <union Foo.c>
 set_local index 0
-load_constant index 9, value <enum Dir.south>
+load_const index 9, value <enum Dir.south>
 union_constr index 0, tag 3, Foo
 set_local index 0
 ret_naked

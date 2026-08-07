@@ -9,7 +9,7 @@ add_int
 ret
 
 -- introduce --
-load_constant index 3, value This is a mathematical module
+load_const index 3, value This is a mathematical module
 print
 ret_naked
 
@@ -20,11 +20,11 @@ struct_lit index 0, arity 2, Vec2
 ret
 
 -- getInt --
-load_constant index 4, value 12
+load_const index 4, value 12
 ret
 
 -- getInt2 --
-load_constant index 4, value 12
+load_const index 4, value 12
 ret
 
 -- getIntDef --
@@ -36,7 +36,7 @@ exit_repl
 
 // ---- test.ray ----
 -- static --
-load_constant index 4, value 3
+load_const index 4, value 3
 ret
 
 -- method --
@@ -45,11 +45,11 @@ get_field index 0
 ret
 
 -- copy --
-load_constant index 5, value 5
+load_const index 5, value 5
 ret
 
 -- main --
-load_constant index 3, value 0
+load_const index 3, value 0
 struct_lit index 1, arity 1, Bar
 
 load_fn index 2, copy
@@ -57,7 +57,7 @@ struct_lit index 0, arity 1, Foo
 
 get_local index 1
 get_field index 0
-call index 0
+call_dyn index 0
 print
 
 load_fn index 0, static
@@ -66,7 +66,7 @@ set_field index 0
 
 get_local index 1
 get_field index 0
-call index 0
+call_dyn index 0
 print
 
 get_local index 0
@@ -76,16 +76,16 @@ set_field index 0
 
 get_local index 1
 get_field index 0
-call index 0
+call_dyn index 0
 print
 
-load_fn_ext index 3, module 1
+load_fn_ext index 3, module 3
 get_local_cow index 1
 set_field index 0
 
 get_local index 1
 get_field index 0
-call index 0
+call_dyn index 0
 print
 
 ret_naked

@@ -1,5 +1,5 @@
 -- main --
-load_constant index 3, value abcd
+load_const index 3, value abcd
 call_string index 0, arity 0
 print
 ret_naked

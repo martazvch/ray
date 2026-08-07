@@ -1,10 +1,10 @@
 //---- test.ray ----
 
 -- main --
-load_constant index 3, value natives.ray
-call_zig index 4, arity 1, open
+load_const index 3, value natives.ray
+call_zig index 4, module 0, arity 1, open
 get_local index 0
-call_zig index 3, arity 1, readAll
+call_zig index 3, module 0, arity 1, readAll
 print
 ret_naked
 

@@ -2,10 +2,13 @@ const std = @import("std");
 const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 const NativeLib = @import("NativeLib.zig");
+const NativeModule = @import("../pipeline/NativesRegister.zig").NativeModule;
+const State = @import("../pipeline/State.zig");
 
 const Ast = @import("../parser/Ast.zig");
 
 const misc = @import("misc");
+const InternerIdx = misc.Interner.Index;
 const Sb = misc.StringBuilder;
 const oom = misc.oom;
 
@@ -22,6 +25,9 @@ pub const Result = union(enum) {
         rayn_content: [:0]const u8,
         lib: NativeLib,
         token: usize,
+    },
+    module: struct {
+        path: InternerIdx,
     },
     missing_file: usize,
     missing_dynlib_file: usize,
@@ -45,18 +51,18 @@ pub fn fetchImportedFile(
     alloc: Allocator,
     ast: *const Ast,
     path_chunks: []const Ast.TokenIndex,
-    path: *Sb,
-    cwd: *std.Io.Dir,
-    opt_path: ?[]const u8,
+    state: *State,
 ) Result {
+    // Relative imports
     if (ast.token_tags[path_chunks[0]] == .dot) {
         // TODO: could it be only a dot? And thus it would break at the [1..]
-        return fetchFrom(io, alloc, cwd, ast, path_chunks[1..], path);
+        return fetchFrom(io, alloc, &state.cwd, ast, path_chunks[1..], &state.path_builder);
     }
 
+    // Import from CLI additional path
     // TODO: error
-    if (opt_path) |p| {
-        cwd.* = cwd: {
+    if (state.config.path) |p| {
+        state.cwd = cwd: {
             if (std.fs.path.isAbsolute(p)) {
                 break :cwd std.Io.Dir.openDirAbsolute(io, p, .{}) catch unreachable;
             } else {
@@ -66,9 +72,18 @@ pub fn fetchImportedFile(
         };
 
         // TODO: won't work with absolute path
-        path.append(alloc, p);
+        state.path_builder.append(alloc, p);
 
-        return fetchFrom(io, alloc, cwd, ast, path_chunks, path);
+        return fetchFrom(io, alloc, &state.cwd, ast, path_chunks, &state.path_builder);
+    }
+
+    // Import from native std modules
+    if (path_chunks.len > 1) {
+        @panic("Absolute import of length > 1 are not implemented yet");
+    }
+
+    if (state.modules.getFromPath(state.interner.intern(ast.toSource(path_chunks[0])))) |mod| {
+        return .{ .module = .{ .path = mod.path } };
     }
 
     @panic("Absolute imports not yet implemented");

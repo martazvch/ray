@@ -121,7 +121,7 @@ pub const Type = union(enum) {
         return_type: *const Type,
         kind: Kind,
 
-        pub const Kind = enum { normal, method, bound, foreign, foreign_glob, intrinsic, zig, zig_method };
+        pub const Kind = enum { normal, method, bound, foreign, intrinsic, zig, zig_method };
         pub const Parameter = struct {
             name: ?InternerIdx,
             type: *const Type,

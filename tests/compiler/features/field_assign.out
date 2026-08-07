@@ -1,8 +1,8 @@
 -- main --
-load_constant index 3, value Tom
+load_const index 3, value Tom
 struct_lit index 0, arity 1, Person
 
-load_constant index 4, value Martin
+load_const index 4, value Martin
 get_local_cow index 0
 set_field index 0
 ret_naked

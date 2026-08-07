@@ -39,7 +39,6 @@ pub const Instruction = struct {
         indexing: Indexing,
         int_to_float: Index,
         load_symbol: LoadSymbol,
-        load_builtin: usize,
         match: Match,
         match_type: MatchType,
         multiple_var_decl: MultiVarDecl,
@@ -206,6 +205,9 @@ pub const Instruction = struct {
     pub const LoadSymbol = struct {
         module_index: ?ModIndex,
         symbol_index: u8,
+        kind: Kind = .ray,
+
+        pub const Kind = enum { ray, zig };
     };
     pub const Match = struct {
         expr: Index,

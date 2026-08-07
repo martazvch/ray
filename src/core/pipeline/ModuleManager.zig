@@ -6,6 +6,7 @@ const Value = @import("../runtime/values.zig").Value;
 const Obj = @import("../runtime/Obj.zig");
 const State = @import("../pipeline/State.zig");
 const TypeId = @import("../analyzer/types.zig").TypeId;
+const NativeMod = @import("NativesRegister.zig").NativeModule;
 
 const misc = @import("misc");
 const InternerIndex = misc.Interner.Index;
@@ -16,6 +17,8 @@ const Self = @This();
 pub const Module = struct {
     path: InternerIndex,
     name: InternerIndex,
+    /// Tells if it's a native Zig module
+    native: bool,
     /// Type infos gathered by the analyzer used when importing a module
     /// It has all the analyzis-time data to type check
     sym_infos: SymbolArrMap,
@@ -27,6 +30,7 @@ pub const Module = struct {
     unions: []Union,
     functions: []*Obj.Function,
     foreign_funcs: std.ArrayList(*Obj.ForeignFn),
+    zig_funcs: []*Obj.ZigFn,
     structures: []Structure,
     vtables: []VTable,
 
@@ -58,6 +62,7 @@ pub const Module = struct {
     pub const empty: Module = .{
         .path = undefined,
         .name = undefined,
+        .native = false,
         .sym_infos = .empty,
         .globals = &.{},
         .constants = &.{},
@@ -65,6 +70,7 @@ pub const Module = struct {
         .unions = &.{},
         .functions = &.{},
         .foreign_funcs = .empty,
+        .zig_funcs = &.{},
         .structures = &.{},
         .vtables = &.{},
     };
@@ -89,7 +95,7 @@ pub const empty: Self = .{
     .modules = .empty,
 };
 
-pub fn open(self: *Self, allocator: Allocator, path: InternerIndex, name: InternerIndex) Index {
+pub fn open(self: *Self, allocator: Allocator, path: InternerIndex, name: InternerIndex, native: bool) Index {
     if (self.getIndex(path)) |index| {
         return index;
     }
@@ -97,20 +103,31 @@ pub fn open(self: *Self, allocator: Allocator, path: InternerIndex, name: Intern
     var mod: Module = .empty;
     mod.path = path;
     mod.name = name;
+    mod.native = native;
     self.modules.put(allocator, path, mod) catch oom();
 
     return .toIndex(self.modules.count() - 1);
 }
 
-pub fn updateWithSymsInfo(self: *Self, allocator: Allocator, index: Index, symbols: SymbolArrMap) void {
+pub fn updateWithSymsInfo(self: *Self, allocator: Allocator, index: Index, symbols: *const SymbolArrMap) void {
     var mod = self.getFromIndex(index);
     mod.sym_infos.ensureUnusedCapacity(allocator, symbols.count()) catch oom();
 
-    for (symbols.values()) |sym| {
-        mod.sym_infos.putAssumeCapacity(sym.name, sym);
+    var it = symbols.iterator();
+    while (it.next()) |entry| {
+        mod.sym_infos.putAssumeCapacity(entry.value_ptr.name, entry.value_ptr.*);
     }
 }
 
+pub fn updateWithSyms(self: *Self, allocator: Allocator, index: Index, native_mod: *const NativeMod) void {
+    self.updateWithSymsInfo(allocator, index, &native_mod.zig_fns_meta);
+
+    const mod = self.getFromIndex(index);
+    mod.zig_funcs = native_mod.zig_fns.items;
+    mod.foreign_funcs = native_mod.foreign_fns;
+}
+
+/// Used between analyzis and compilation as we know the exact number of symbols
 pub fn ensureCompileSizes(self: *Self, allocator: Allocator, index: Index, state: *const State) void {
     const mod = self.getFromIndex(index);
 

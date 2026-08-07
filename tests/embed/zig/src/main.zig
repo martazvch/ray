@@ -12,21 +12,10 @@ pub fn main(init: std.process.Init) !void {
         std.debug.assert(debug_allocator.deinit() == .ok);
     }
 
-    var vm = ray.create(init.io, debug_allocator.allocator());
-    defer vm.deinit();
+    var arena = std.heap.ArenaAllocator.init(debug_allocator.allocator());
+    defer arena.deinit();
 
-    vm.init(
-        .{
-            .embedded = true,
-            .print_ir = true,
-            .print_bytecode = true,
-        },
-    );
-
-    try vm.run("print 14");
-    try vm.run("print float(14)");
-    try vm.run("print isLess(14, 15)");
-    try vm.run("print isLess(15, 14)");
+    try Tester.testDir(init.io, arena.allocator(), "../cases");
 }
 
 test {

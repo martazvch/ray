@@ -26,6 +26,10 @@ void isLess(RayVm *vm) {
 static char *output = NULL;
 
 void print(const char *text) {
+    if (output) {
+        free(output);
+        output = NULL;
+    }
     size_t len = strlen(text);
     output = malloc(len + 1);
     if (output) memcpy(output, text, len + 1);
@@ -98,6 +102,8 @@ bool runTest(RayVm *vm, const char *file_name, Part *part, int part_id) {
 }
 
 bool testDir(const char *path) {
+    bool res = true;
+
     tinydir_dir dir;
     if (tinydir_open(&dir, path) == -1) {
         return false;
@@ -130,6 +136,8 @@ bool testDir(const char *path) {
             RayVm *vm = rayNewVm((Config){
                 .embedded = true,
                 .printFn = print,
+                .print_ir = false,
+                .print_bytecode = false,
             });
             rayRegisterFn(
                 vm,
@@ -149,8 +157,8 @@ bool testDir(const char *path) {
             int part_id = 0;
             da_foreach(Part, part, c) {
                 if (!runTest(vm, file.name, part, part_id)) {
-                    rayDeinitVm(vm);
-                    return false;
+                    res = false;
+                    break;
                 }
                 part_id++;
             }
@@ -164,5 +172,5 @@ bool testDir(const char *path) {
 
     tinydir_close(&dir);
 
-    return true;
+    return res;
 }

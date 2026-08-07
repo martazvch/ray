@@ -40,15 +40,20 @@ pub const Symbol = struct {
     type: *const Type,
     index: usize,
     module_index: ?ModIndex = null,
+    kind: Kind = .ray,
+
+    pub const Kind = enum { ray, zig, foreign };
 };
 
 pub const VariableMap = AutoArrayHashMapUnmanaged(InternerIdx, Variable);
+pub const SymbolMap = AutoHashMapUnmanaged(InternerIdx, Symbol);
 pub const SymbolArrMap = AutoArrayHashMapUnmanaged(InternerIdx, Symbol);
 
 scopes: ArrayList(Scope),
 current: *Scope,
 builtins: AutoHashMapUnmanaged(InternerIdx, *const Type),
-natives: AutoHashMapUnmanaged(InternerIdx, Symbol),
+natives: SymbolMap,
+native_mods: AutoHashMapUnmanaged(InternerIdx, SymbolMap),
 
 enum_count: usize,
 func_count: usize,
@@ -69,6 +74,7 @@ pub const empty: Self = .{
     .current = undefined,
     .builtins = .empty,
     .natives = .empty,
+    .native_mods = .empty,
 
     .enum_count = 0,
     .func_count = 0,
@@ -86,6 +92,7 @@ pub const Scope = struct {
     name: ?InternerIdx,
     variables: VariableMap = .empty,
     forwarded: VariableMap = .empty,
+    // TODO: why array? If I change it breaks
     symbols: SymbolArrMap = .empty,
     /// First is the interned identifier and second is the interned module's path key of module interner
     modules: AutoHashMapUnmanaged(InternerIdx, *const Type) = .empty,
@@ -174,22 +181,18 @@ pub fn initGlobalScope(self: *Self, allocator: Allocator, state: *State) void {
         );
     }
 
+    const global_mod = state.native_reg.getGlobalScope();
     for ([_]*const Meta{
-        &state.native_reg.zig_fns_meta,
-        &state.native_reg.foreign_fns_meta,
-        &state.native_reg.zig_structs_meta,
+        &global_mod.zig_fns_meta,
+        &global_mod.foreign_fns_meta,
+        &global_mod.zig_structs_meta,
         &state.native_reg.intrinsics_meta,
     }) |reg| {
         self.natives.ensureUnusedCapacity(allocator, @intCast(reg.count())) catch oom();
 
-        var count: usize = 0;
         var it = reg.iterator();
-        while (it.next()) |entry| : (count += 1) {
-            self.natives.putAssumeCapacity(entry.key_ptr.*, .{
-                .name = entry.key_ptr.*,
-                .index = count,
-                .type = entry.value_ptr.*,
-            });
+        while (it.next()) |entry| {
+            self.natives.putAssumeCapacity(entry.key_ptr.*, entry.value_ptr.*);
         }
     }
 }

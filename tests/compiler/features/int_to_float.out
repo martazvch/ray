@@ -1,11 +1,11 @@
 -- main --
-load_constant index 3, value 1
+load_const index 3, value 1
 int_to_float
-load_constant index 4, value 1
+load_const index 4, value 1
 add_float
 pop
-load_constant index 4, value 1
-load_constant index 5, value 2
+load_const index 4, value 1
+load_const index 5, value 2
 int_to_float
 add_float
 pop

@@ -7,7 +7,6 @@ const Vm = @import("../runtime/Vm.zig");
 const Module = @This();
 
 pub const module: zffi.Module = .{
-    .is_module = false,
     .functions = &.{
         .init(Module, "test_native_new", "", &.{
             .{ .name = "value1" },

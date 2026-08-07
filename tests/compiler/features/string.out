@@ -1,7 +1,7 @@
 -- main --
-load_constant index 3, value Tom
+load_const index 3, value Tom
 get_local index 0
-load_constant index 4, value 1
+load_const index 4, value 1
 index_str
 print
 ret_naked

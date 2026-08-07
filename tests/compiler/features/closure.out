@@ -1,5 +1,5 @@
 -- set --
-load_constant index 4, value updated
+load_const index 4, value updated
 set_local_box index 0
 ret_naked
 
@@ -10,7 +10,7 @@ print
 ret_naked
 
 -- set_vars --
-load_constant index 3, value init
+load_const index 3, value init
 box
 
 load_fn index 1, set
@@ -33,10 +33,10 @@ ret_naked
 call index 0, arity 0, set_vars
 
 get_global index 0
-call index 0
+call_dyn index 0
 
 get_global index 1
-call index 0
+call_dyn index 0
 
 ret_naked
 

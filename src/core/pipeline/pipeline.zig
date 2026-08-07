@@ -47,6 +47,7 @@ pub fn run(
         alloc,
         state.interner.intern(path),
         state.interner.intern(mod_name),
+        false,
     );
 
     var analyzer: Analyzer = .init(io, alloc, state);
@@ -65,7 +66,7 @@ pub fn run(
         if (options.test_mode and !is_sub) return error.ExitOnPrint;
     }
 
-    state.updateModWithScope(alloc, mod_index);
+    state.updateModWithSymsInfo(alloc, mod_index);
     state.modules.ensureCompileSizes(alloc, mod_index, state);
 
     // Compiler
@@ -98,6 +99,7 @@ pub fn runFrontend(io: Io, alloc: Allocator, state: *State, is_sub: bool, file_n
         alloc,
         state.interner.intern(file_name),
         state.interner.intern(mod_name),
+        false,
     );
 
     const ast = try parse(io, alloc, state, file_name, source);

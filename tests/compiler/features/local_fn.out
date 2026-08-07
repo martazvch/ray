@@ -1,5 +1,5 @@
 -- add1 --
-load_constant index 3, value 1
+load_const index 3, value 1
 get_local index 0
 get_local index 2
 add_int
@@ -7,8 +7,8 @@ get_local index 1
 ret
 
 -- main --
-load_constant index 3, value 1
-load_constant index 4, value 2
+load_const index 3, value 1
+load_const index 4, value 2
 call index 1, arity 2, add1
 pop
 ret_naked
