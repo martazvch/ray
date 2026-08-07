@@ -4,11 +4,5 @@ fn main() {
     let foo = Foo{}
     for v in foo {}
 
-    let i = 8
-    for i, v in [true] {}
-
-    let v = 8
-    for i, v in [true] {}
-
     for s in 1.2..5.6 {}
 }

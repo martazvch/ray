@@ -109,7 +109,9 @@ pub fn open(self: *Self, allocator: Allocator, path: InternerIndex, name: Intern
     return .toIndex(self.modules.count() - 1);
 }
 
-pub fn updateWithSymsInfo(self: *Self, allocator: Allocator, index: Index, symbols: *const SymbolArrMap) void {
+/// Adds symbols informations to module so that other module can have type informations when importing
+/// symbols from this one
+pub fn registerSymsInfo(self: *Self, allocator: Allocator, index: Index, symbols: *const SymbolArrMap) void {
     var mod = self.getFromIndex(index);
     mod.sym_infos.ensureUnusedCapacity(allocator, symbols.count()) catch oom();
 
@@ -119,8 +121,10 @@ pub fn updateWithSymsInfo(self: *Self, allocator: Allocator, index: Index, symbo
     }
 }
 
-pub fn updateWithSyms(self: *Self, allocator: Allocator, index: Index, native_mod: *const NativeMod) void {
-    self.updateWithSymsInfo(allocator, index, &native_mod.zig_fns_meta);
+/// After creating a native module, we have both compiled functions and symbols informations
+/// Adds the informations and the compiled objects
+pub fn registerSymsFromNativeMod(self: *Self, allocator: Allocator, index: Index, native_mod: *const NativeMod) void {
+    self.registerSymsInfo(allocator, index, &native_mod.zig_fns_meta);
 
     const mod = self.getFromIndex(index);
     mod.zig_funcs = native_mod.zig_fns.items;

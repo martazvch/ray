@@ -334,7 +334,7 @@ fn containerFnDecls(
     func_instrs.ensureTotalCapacity(self.alloc, decls.len) catch oom();
 
     for (decls) |*f| {
-        const fn_name = self.interner.intern(self.ast.toSource(f.name));
+        const fn_name = self.internToken(f.name);
         const fn_res = try self.fnDeclaration(f, ctx);
         func_instrs.appendAssumeCapacity(fn_res.instr);
         funcs.putAssumeCapacity(fn_name, fn_res.sym);
@@ -441,8 +441,11 @@ fn containerTraitImpls(
 }
 
 fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
-    const binding = try self.internIfNotInCurrentScope(node.binding);
-    const index_interned = if (node.index_binding) |index| try self.internIfNotInCurrentScope(index) else null;
+    const binding = self.internToken(node.binding);
+    const index_interned = if (node.index_binding) |index|
+        self.internToken(index)
+    else
+        null;
 
     const res = try self.analyzeExpr(node.expr, .value, ctx);
 
@@ -489,6 +492,8 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
 }
 
 fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
+    const span = self.ast.getSpan(node);
+
     const snapshot = ctx.snapshot();
     defer snapshot.restore();
 
@@ -497,12 +502,12 @@ fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
 
     // TODO: anonymus enum
     const name_tk = node.name orelse @panic("anonymus enums aren't supported yet");
-    const name = try self.internIfNotInCurrentScope(name_tk);
+    const name = self.internToken(name_tk);
 
     const interned = self.ti.newEnum(.{ .name = name, .container = container_name });
     const ty = &interned.@"enum";
 
-    const sym = self.scope.declareSymbol(self.alloc, name, .@"enum");
+    const sym = try self.declareSymbol(name, .@"enum", span);
     sym.type = interned;
 
     ctx.self_type = interned;
@@ -525,7 +530,7 @@ fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
             .functions = funcs,
             .traits = traits,
         } },
-        self.ast.getSpan(node).start,
+        span.start,
     );
 }
 
@@ -611,13 +616,13 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
     const snapshot = ctx.snapshot();
     defer snapshot.restore();
 
-    const name = try self.internIfNotInCurrentScope(node.name);
+    const name = self.internToken(node.name);
 
     var buf: [1024]u8 = undefined;
     const container_name = self.interner.internKeepRef(self.alloc, self.containers.render(&buf, .{ .sep = "." }));
 
     // Forward declaration in outer scope for recursion
-    const sym = self.scope.declareSymbol(self.alloc, name, .function);
+    const sym = try self.declareSymbol(name, .function, self.ast.getSpan(node.name));
 
     self.scope.open(self.alloc, null, .{ .barrier = true });
 
@@ -785,7 +790,7 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
 
     for (params, 0..) |*p, i| {
         const span = self.ast.getSpan(p.name);
-        const param_name = self.interner.intern(self.ast.toSource(p.name));
+        const param_name = self.internToken(p.name);
 
         if (i == 0 and param_name == self.cached_names.self) {
             const self_type = ctx.self_type orelse return self.err(.self_outside_decl, span);
@@ -800,10 +805,6 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
                 .captured = false,
             });
             continue;
-        }
-
-        if (self.scope.isVarOrSymInCurrentScope(param_name)) {
-            return self.err(.{ .already_declared_param = .{ .name = self.ast.toSource(p.name) } }, span);
         }
 
         var const_index: ?ConstIdx = null;
@@ -823,7 +824,7 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
 
         if (param_res.type.is(.void)) return self.err(.void_param, span);
 
-        _ = try self.declareVariable(param_name, param_res.type, .{ .captured = p.meta.captured }, span);
+        _ = try self.declareVariable(param_name, param_res.type, .{ .captured = p.meta.captured, .is_fn_param = true }, span);
         decls.putAssumeCapacity(param_name, .{
             .name = param_name,
             .type = param_res.type,
@@ -942,7 +943,7 @@ fn checkWrap(self: *Self, instr: *InstrIndex, heap: bool) void {
 
 fn varDecl(self: *Self, node: *const Ast.VarDecl, ctx: *Context) StmtResult {
     const span = self.ast.getSpan(node.name);
-    const name = try self.internIfNotInCurrentScope(node.name);
+    const name = self.internToken(node.name);
     var checked_type = try self.checkAndGetType(node.typ, ctx);
 
     ctx.decl_type = if (!checked_type.is(.void)) checked_type else null;
@@ -995,7 +996,7 @@ fn multiVarDecl(self: *Self, node: *const Ast.MultiVarDecl, ctx: *Context) StmtR
 
 fn structDecl(self: *Self, node: *const Ast.StructDecl, ctx: *Context) StmtResult {
     const span = self.ast.getSpan(node);
-    const name = try self.internIfNotInCurrentScope(node.name);
+    const name = self.internToken(node.name);
 
     var buf: [1024]u8 = undefined;
     const container_name = self.interner.internKeepRef(self.alloc, self.containers.render(&buf, .{ .sep = "." }));
@@ -1006,7 +1007,7 @@ fn structDecl(self: *Self, node: *const Ast.StructDecl, ctx: *Context) StmtResul
     ctx.self_type = interned;
     defer ctx.self_type = null;
 
-    const sym = self.scope.declareSymbol(self.alloc, name, .structure);
+    const sym = try self.declareSymbol(name, .structure, span);
     sym.type = interned;
 
     try self.openContainer(node.name);
@@ -1036,7 +1037,7 @@ fn structureFields(self: *Self, fields: []const Ast.VarDecl, ty: *Type.Structure
 
     for (fields) |*f| {
         const span = self.ast.getSpan(f.name);
-        const field_name = self.interner.intern(self.ast.toSource(f.name));
+        const field_name = self.internToken(f.name);
 
         if (ty.fields.get(field_name) != null) return self.err(
             .{ .already_declared_field = .{ .name = self.ast.toSource(f.name) } },
@@ -1066,7 +1067,7 @@ fn structureFields(self: *Self, fields: []const Ast.VarDecl, ty: *Type.Structure
 
 fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult {
     const span = self.ast.getSpan(node);
-    const name = try self.internIfNotInCurrentScope(node.name);
+    const name = self.internToken(node.name);
 
     var buf: [1024]u8 = undefined;
     const container_name = self.interner.internKeepRef(self.alloc, self.containers.render(&buf, .{ .sep = "." }));
@@ -1082,7 +1083,7 @@ fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult 
     ctx.in_trait = true;
     defer ctx.in_trait = false;
 
-    const sym = self.scope.declareSymbol(self.alloc, name, .trait);
+    const sym = try self.declareSymbol(name, .trait, span);
     sym.type = interned;
 
     try self.openContainer(node.name);
@@ -1094,7 +1095,7 @@ fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult 
     func_instrs.ensureUnusedCapacity(self.alloc, node.functions.len) catch oom();
 
     for (node.functions) |*f| {
-        const fn_name = self.interner.intern(self.ast.toSource(f.name));
+        const fn_name = self.internToken(f.name);
         const gop = ty.functions.getOrPutAssumeCapacity(fn_name);
 
         if (gop.found_existing) return self.err(
@@ -1146,12 +1147,13 @@ fn unionDecl(self: *Self, node: *const Ast.UnionDecl, ctx: *Context) StmtResult 
 
     // TODO: anonymus union
     const name_tk = node.name orelse @panic("anonymus enums aren't supported yet");
-    const name = try self.internIfNotInCurrentScope(name_tk);
+    const name = self.internToken(name_tk);
 
+    const span = self.ast.getSpan(name_tk);
     const interned = self.ti.newUnion(.{ .name = name, .container = container_name }, node.is_err);
     const ty = &interned.@"union";
 
-    const sym = self.scope.declareSymbol(self.alloc, name, .@"union");
+    const sym = try self.declareSymbol(name, .@"union", span);
     sym.type = interned;
 
     ctx.self_type = interned;
@@ -1174,7 +1176,7 @@ fn unionDecl(self: *Self, node: *const Ast.UnionDecl, ctx: *Context) StmtResult 
             .traits = traits,
             .is_err = node.is_err,
         } },
-        self.ast.getSpan(node).start,
+        span.start,
     );
 }
 
@@ -1201,14 +1203,14 @@ fn unionTags(self: *Self, tags: []const Ast.UnionDecl.Tag, ty: *Type.Union, ctx:
 }
 
 fn unionTag(self: *Self, tag: Ast.UnionDecl.Tag, ctx: *const Context) Error!struct { name: InternerIdx, ty: *const Type } {
-    const name = self.interner.intern(self.ast.toSource(tag.name));
+    const name = self.internToken(tag.name);
     const ty = if (tag.payload) |ty| try self.checkAndGetType(ty, ctx) else self.ti.cache.void;
     return .{ .name = name, .ty = ty };
 }
 
 fn use(self: *Self, node: *const Ast.Use) StmtResult {
     const name_token = if (node.alias) |alias| alias else node.names[node.names.len - 1];
-    const module_name = self.interner.intern(self.ast.toSource(name_token));
+    const module_name = self.internToken(name_token);
 
     // Check for empty items because it would fail to compile:
     //   use .math
@@ -1286,7 +1288,7 @@ fn use(self: *Self, node: *const Ast.Use) StmtResult {
         const mod_index = self.state.modules.getIndex(path).?;
 
         for (items) |item| {
-            const item_name = self.interner.intern(self.ast.toSource(item.item));
+            const item_name = self.internToken(item.item);
             var sym = mod.sym_infos.get(item_name) orelse return self.err(
                 .{ .missing_symbol_in_module = .{
                     .module = self.ast.toSource(node.names[node.names.len - 1]),
@@ -1302,7 +1304,7 @@ fn use(self: *Self, node: *const Ast.Use) StmtResult {
 
             sym.module_index = mod_index;
             const item_token = if (item.alias) |alias| alias else item.item;
-            const item_interned = self.interner.intern(self.ast.toSource(item_token));
+            const item_interned = self.internToken(item_token);
             self.scope.declareExternSymbol(self.alloc, item_interned, sym);
         }
     } else {
@@ -1516,7 +1518,7 @@ fn addDeferredInstr(self: *Self, body: *ArrayList(InstrIndex), instrs: []const I
 
 fn internLabel(self: *Self, label: ?Ast.TokenIndex) ?InternerIdx {
     const lbl = label orelse return null;
-    return self.interner.intern(self.ast.toSource(lbl));
+    return self.internToken(lbl);
 }
 
 fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
@@ -1825,8 +1827,9 @@ fn breakExpr(self: *Self, expr: *const Ast.Break, ctx: *Context) Result {
 }
 
 fn closure(self: *Self, expr: *const Ast.FnDecl, ctx: *Context) Result {
+    const span = self.ast.getSpan(expr);
     // TODO: create an anonymus name generator mechanism
-    var sym = self.scope.declareSymbol(self.alloc, self.interner.intern("azert"), .function);
+    var sym = try self.declareSymbol(self.interner.intern("azert"), .function, span);
 
     self.scope.open(self.alloc, null, .{ .barrier = true });
     defer _ = self.scope.close();
@@ -1844,7 +1847,6 @@ fn closure(self: *Self, expr: *const Ast.FnDecl, ctx: *Context) Result {
     const interned_type = self.ti.intern(.{ .function = closure_type });
     sym.type = interned_type;
 
-    const span = self.ast.getSpan(expr);
     const offset = span.start;
 
     ctx.fn_type = interned_type;
@@ -1872,7 +1874,7 @@ fn closure(self: *Self, expr: *const Ast.FnDecl, ctx: *Context) Result {
 pub fn implicitSelector(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result {
     const span = self.ast.getSpan(tag);
     const decl = ctx.decl_type orelse return self.err(.implicit_select_no_type, span);
-    const tag_name = self.interner.intern(self.ast.toSource(tag));
+    const tag_name = self.internToken(tag);
 
     const tag_res = try self.tagIndex(decl, tag_name, span) orelse return self.err(
         .{ .container_unknown_decl = .{
@@ -2042,6 +2044,16 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
                 .{ .field = .{ .structure = struct_res.instr, .index = field_res.index, .kind = field_res.kind } },
                 span.start,
             ),
+    };
+}
+
+fn boundMethod(self: *Self, func_type: *const Type, field_index: usize, structure: InstrIndex, span: Span) Result {
+    const bounded_type = func_type.function.toBoundMethod(self.alloc);
+    const ty = self.ti.intern(.{ .function = bounded_type });
+
+    return .{
+        .type = ty,
+        .instr = self.irb.addInstr(.{ .bound_method = .{ .structure = structure, .index = field_index } }, span.start),
     };
 }
 
@@ -2338,16 +2350,6 @@ fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_name: InternerIdx)
     };
 }
 
-fn boundMethod(self: *Self, func_type: *const Type, field_index: usize, structure: InstrIndex, span: Span) Result {
-    const bounded_type = func_type.function.toBoundMethod(self.alloc);
-    const ty = self.ti.intern(.{ .function = bounded_type });
-
-    return .{
-        .type = ty,
-        .instr = self.irb.addInstr(.{ .bound_method = .{ .structure = structure, .index = field_index } }, span.start),
-    };
-}
-
 fn call(self: *Self, expr: *const Ast.FnCall, ctx: *Context) Result {
     const span = self.ast.getSpan(expr);
 
@@ -2421,7 +2423,7 @@ fn fnArgsList(
             if (arg.name) |param_name| {
                 if (ty.kind == .bound) return self.err(.named_arg_in_bounded, self.ast.getSpan(param_name));
 
-                const name = self.interner.intern(self.ast.toSource(param_name));
+                const name = self.internToken(param_name);
 
                 param_info = ty.params.getPtr(name) orelse return self.err(
                     .{ .unknown_param = .{ .name = self.ast.toSource(param_name) } },
@@ -2901,7 +2903,7 @@ fn match(self: *Self, expr: Ast.Match, expect: ExprResKind, ctx: *Context) Resul
 
         self.scope.open(self.alloc, null, .{});
         alias = try self.declareVariable(
-            self.interner.intern(self.ast.toSource(tk)),
+            self.internToken(tk),
             value.type,
             .{},
             self.ast.getSpan(tk),
@@ -3147,7 +3149,7 @@ fn pattern(self: *Self, pat: Ast.Pattern, ctx: *Context) Result {
         .value => |v| {
             const value_res = try self.analyzeExpr(v.expr, .value, ctx);
             if (v.alias) |alias| {
-                const binding = try self.internIfNotInCurrentScope(alias);
+                const binding = self.internToken(alias);
                 _ = try self.forwardDeclareVariable(binding, value_res.type, false, self.ast.getSpan(alias));
             }
 
@@ -3169,7 +3171,7 @@ fn nullablePattern(self: *Self, pat: Ast.Pattern.Nullable, ctx: *Context) Result
     );
 
     // TODO: be sure that it's in the correct scope
-    const binding = try self.internIfNotInCurrentScope(pat.binding);
+    const binding = self.internToken(pat.binding);
     _ = try self.forwardDeclareVariable(binding, ty, false, self.ast.getSpan(pat.binding));
 
     return .{
@@ -3294,7 +3296,7 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
 
     for (expr.fields) |*fv| {
         const field_span = self.ast.getSpan(fv.name);
-        const field_name = self.interner.intern(self.ast.toSource(fv.name));
+        const field_name = self.internToken(fv.name);
 
         const f = struct_type.fields.get(field_name) orelse return self.err(
             .{ .unknown_struct_field = .{ .name = self.ast.toSource(fv.name) } },
@@ -3436,7 +3438,7 @@ fn trap(self: *Self, expr: Ast.Trap, expect: ExprResKind, ctx: *Context) Result 
 
 fn trapIdent(self: *Self, binding: Ast.Trap.Binding, err_type: Type.ErrorUnion, expect: ExprResKind, ctx: *Context) Result {
     if (binding.token) |token| {
-        const err_name = try self.internIfNotInCurrentScope(token);
+        const err_name = self.internToken(token);
         const binding_span = self.ast.getSpan(token);
         _ = try self.forwardDeclareVariable(err_name, err_type.err, false, binding_span);
     }
@@ -3450,7 +3452,7 @@ fn trapMatch(self: *Self, expr: *Expr, err_type: Type.ErrorUnion, expect: ExprRe
         return self.err(.trap_match_not_ident, self.ast.getSpan(match_expr));
     }
 
-    const err_name = try self.internIfNotInCurrentScope(match_expr.identifier);
+    const err_name = self.internToken(match_expr.identifier);
     const binding_span = self.ast.getSpan(match_expr.identifier);
 
     // If it's a `trap match`, we open another scope to discard the error at the end
@@ -3537,18 +3539,6 @@ fn unionConstr(self: *Self, expr: *const Ast.FnCall, info: InstrInfos, ctx: *Con
     };
 }
 
-/// Checks if identifier name is already declared, otherwise interns it and returns the key
-fn internIfNotInCurrentScope(self: *Self, token: usize) Error!usize {
-    const name = self.interner.intern(self.ast.toSource(token));
-
-    if (self.scope.isVarOrSymInCurrentScope(name)) return self.err(
-        .{ .already_declared = .{ .name = self.interner.getKey(name).? } },
-        self.ast.getSpan(token),
-    );
-
-    return name;
-}
-
 /// Checks that the node is a declared type and return it's value. If node is `.empty`, returns `void`
 const TypeRes = struct {
     type: *const Type,
@@ -3619,7 +3609,7 @@ pub fn checkAndGetTypeInfo(self: *Self, ty: ?*const Ast.Type, ctx: *const Contex
             const mod_index = self.state.modules.getIndex(module_type).?;
 
             const symbol_token = fields[1];
-            const symbol_name = self.interner.intern(self.ast.toSource(symbol_token));
+            const symbol_name = self.internToken(symbol_token);
             var final = module.sym_infos.get(symbol_name) orelse return self.err(
                 .{ .missing_symbol_in_module = .{
                     .module = self.ast.toSource(module_token),
@@ -4026,6 +4016,7 @@ const VarConf = struct {
     constant: bool = true,
     comp_time: bool = false,
     ext_mod: ?ModIndex = null,
+    is_fn_param: bool = false,
 };
 fn declareVariable(self: *Self, name: InternerIdx, ty: *const Type, conf: VarConf, span: Span) Error!usize {
     return self.scope.declareVar(
@@ -4037,7 +4028,19 @@ fn declareVariable(self: *Self, name: InternerIdx, ty: *const Type, conf: VarCon
         conf.constant,
         conf.comp_time,
         conf.ext_mod,
-    ) catch self.err(.too_many_locals, span);
+    ) catch |e| switch (e) {
+        error.TooManyLocals => self.err(.too_many_locals, span),
+        error.AlreadyDeclared => switch (conf.is_fn_param) {
+            true => self.err(
+                .{ .already_declared_param = .{ .name = self.interner.getKey(name).? } },
+                span,
+            ),
+            false => self.err(
+                .{ .already_declared = .{ .name = self.interner.getKey(name).? } },
+                span,
+            ),
+        },
+    };
 }
 
 fn forwardDeclareVariable(self: *Self, name: InternerIdx, ty: *const Type, captured: bool, span: Span) Error!void {
@@ -4083,4 +4086,15 @@ pub fn addConstant(self: *Self, constant: Constant, offset: usize) InstrIndex {
 
 pub fn getConstant(self: *const Self, instr: InstrIndex) Constant {
     return self.state.getConstant(self.irb.getConstantIdx(instr));
+}
+
+fn declareSymbol(self: *Self, name: InternerIdx, kind: LexScope.SymKind, span: Span) Error!*LexScope.Symbol {
+    return self.scope.declareSymbol(self.alloc, name, kind) catch self.err(
+        .{ .already_declared = .{ .name = self.interner.getKey(name).? } },
+        span,
+    );
+}
+
+fn internToken(self: *Self, token: usize) InternerIdx {
+    return self.interner.intern(self.ast.toSource(token));
 }

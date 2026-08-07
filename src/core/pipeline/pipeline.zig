@@ -66,7 +66,7 @@ pub fn run(
         if (options.test_mode and !is_sub) return error.ExitOnPrint;
     }
 
-    state.updateModWithSymsInfo(alloc, mod_index);
+    state.registerModPubSymbols(alloc, mod_index);
     state.modules.ensureCompileSizes(alloc, mod_index, state);
 
     // Compiler

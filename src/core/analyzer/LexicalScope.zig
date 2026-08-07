@@ -45,6 +45,7 @@ pub const Symbol = struct {
     pub const Kind = enum { ray, zig, foreign };
 };
 
+pub const Error = error{ TooManyLocals, AlreadyDeclared };
 pub const VariableMap = AutoArrayHashMapUnmanaged(InternerIdx, Variable);
 pub const SymbolMap = AutoHashMapUnmanaged(InternerIdx, Symbol);
 pub const SymbolArrMap = AutoArrayHashMapUnmanaged(InternerIdx, Symbol);
@@ -230,11 +231,17 @@ pub fn declareVar(
     constant: bool,
     comp_time: bool,
     ext_mode: ?ModIndex,
-) error{TooManyLocals}!usize {
+) Error!usize {
     const index = self.current.variables.count();
-    if (index == 255 and !self.isGlobal()) return error.TooManyLocals;
+    if (index == 255 and !self.isGlobal()) {
+        return error.TooManyLocals;
+    }
 
-    self.current.variables.put(allocator, name, .{
+    const gop = self.current.variables.getOrPut(allocator, name) catch oom();
+    if (gop.found_existing) {
+        return error.AlreadyDeclared;
+    }
+    gop.value_ptr.* = .{
         .name = name,
         .type = ty,
         .kind = if (self.isGlobal()) .global else .local,
@@ -244,7 +251,7 @@ pub fn declareVar(
         .constant = constant,
         .comp_time = comp_time,
         .ext_mod = ext_mode,
-    }) catch oom();
+    };
 
     return index;
 }
@@ -284,12 +291,14 @@ pub fn getVarInCurrentScopeAt(self: *const Self, index: usize) *Variable {
 }
 
 /// Declares a symbol in current scope
-pub fn declareSymbol(
-    self: *Self,
-    allocator: Allocator,
-    name: InternerIdx,
-    kind: enum { function, @"enum", structure, trait, @"union" },
-) *Symbol {
+pub const SymKind = enum {
+    function,
+    @"enum",
+    structure,
+    trait,
+    @"union",
+};
+pub fn declareSymbol(self: *Self, allocator: Allocator, name: InternerIdx, kind: SymKind) Error!*Symbol {
     const index = switch (kind) {
         .@"enum" => &self.enum_count,
         .function => &self.func_count,
@@ -298,21 +307,24 @@ pub fn declareSymbol(
         .@"union" => &self.union_count,
     };
 
-    self.current.symbols.put(allocator, name, .{
+    const gop = self.current.symbols.getOrPut(allocator, name) catch oom();
+
+    if (gop.found_existing) {
+        return error.AlreadyDeclared;
+    }
+    gop.value_ptr.* = .{
         .name = name,
         .type = undefined,
         .index = index.*,
-    }) catch oom();
+    };
 
     index.* += 1;
 
-    const sym = self.current.symbols.getPtr(name).?;
-
     if (self.save) {
-        self.saved_syms.append(allocator, sym) catch oom();
+        self.saved_syms.append(allocator, gop.value_ptr) catch oom();
     }
 
-    return sym;
+    return gop.value_ptr;
 }
 
 pub fn getSymbol(self: *const Self, name: InternerIdx) ?*Symbol {
@@ -429,10 +441,6 @@ pub fn getType(self: *Self, name: InternerIdx) ?*const Type {
     }
 
     return null;
-}
-
-pub fn isVarOrSymInCurrentScope(self: *const Self, name: InternerIdx) bool {
-    return self.current.variables.get(name) != null or self.current.symbols.get(name) != null;
 }
 
 pub fn isModuleImported(self: *const Self, name: InternerIdx) bool {

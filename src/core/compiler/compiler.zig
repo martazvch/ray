@@ -376,10 +376,13 @@ const Compiler = struct {
             .incr_rc => |index| self.wrappedInstr(.incr_ref, index),
             .indexing => |data| self.indexing(data),
             .int_to_float => |index| self.wrappedInstr(.int_to_float, index),
+
+            // Standalone 'load_symbol' can only mean that we're loading a function to bind it to a runtime value
             .load_symbol => |data| switch (data.kind) {
                 .ray => self.symbolAccess(.load_fn, data),
                 .zig => self.zigSymbolAccess(.load_fn_zig, data),
             },
+
             .match => |*data| self.match(data),
             .match_type => |data| self.matchType(data),
             .multiple_var_decl => |*data| self.multipleVarDecl(data),
@@ -575,22 +578,20 @@ const Compiler = struct {
 
     fn call(self: *Self, data: *const Instruction.Call) Error!void {
         switch (self.at(data.callee)) {
-            .field => |f| {
-                if (f.kind == .function) {
-                    return self.invoke(data, f);
-                }
-                if (f.kind == .virtual) {
-                    return self.virtualCall(data, f);
-                }
-
-                // If we call a method, a static function or a field holding a function
-                // it is dynamically resolved by 'call_dyn'
-
+            .field => |f| switch (f.kind) {
+                .function => return self.invoke(data, f),
+                .virtual => return self.virtualCall(data, f),
+                // If we call a field holding a function it is dynamically resolved by 'call_dyn'
+                .field => {},
+                .field_native => unreachable,
             },
-            .load_symbol => |sym| return self.callSymbol(data, 0, sym.symbol_index, sym.module_index),
+            .load_symbol => |sym| {
+                return self.callSymbol(data, 0, sym.symbol_index, sym.module_index);
+            },
             .obj_func => |obj_data| {
                 return self.callObjFn(obj_data, data.args);
             },
+            // Dynamic call resolved at runtime
             else => {},
         }
 
@@ -628,6 +629,7 @@ const Compiler = struct {
         };
         self.writeOpAndByte(op, @intCast(sym_index));
 
+        // 'call_zig' uses an external module by default
         if (sym_mod) |mod| {
             self.writeByte(@intCast(mod.toInt()));
         }
@@ -1126,12 +1128,11 @@ const Compiler = struct {
         try self.compileArgs(data.values);
 
         switch (self.at(data.structure)) {
-            .load_symbol => |sym| if (sym.kind == .ray)
-                self.symbolAccess(.struct_lit, sym)
-            else
-                self.zigSymbolAccess(.struct_lit_zig, sym),
-
-            else => @panic("Impossible? Change Ir to only allow a symbol index + module"),
+            .load_symbol => |sym| switch (sym.kind) {
+                .ray => self.symbolAccess(.struct_lit, sym),
+                .zig => self.zigSymbolAccess(.struct_lit_zig, sym),
+            },
+            else => unreachable,
         }
         self.writeByte(@intCast(data.values.len));
     }

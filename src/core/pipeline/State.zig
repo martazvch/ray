@@ -17,6 +17,7 @@ const Constant = ConstInterner.Constant;
 const zffi = @import("../ffi/zffi.zig");
 const ffi = @import("../ffi/ffi.zig");
 const NativeLib = @import("../analyzer/NativeLib.zig");
+const SymbolTable = @import("SymbolTable.zig");
 
 const misc = @import("misc");
 const Interner = misc.Interner;
@@ -30,6 +31,7 @@ const_interner: ConstInterner,
 path_builder: Sb,
 cwd: Io.Dir,
 lex_scope: LexScope,
+symbol_table: SymbolTable,
 modules: ModuleManager,
 native_reg: NativeRegister,
 strings: std.AutoHashMapUnmanaged(usize, *Obj.String),
@@ -95,6 +97,7 @@ pub fn new(io: Io, allocator: Allocator, cwd: Io.Dir, config: Config) Self {
         .path_builder = path_builder,
         .cwd = cwd,
         .lex_scope = .empty,
+        .symbol_table = .empty,
         .modules = .empty,
         .native_reg = undefined,
         .strings = .empty,
@@ -125,7 +128,7 @@ pub fn new(io: Io, allocator: Allocator, cwd: Io.Dir, config: Config) Self {
                 ctx.interner.intern(mod.value_ptr.path),
                 true,
             );
-            ctx.modules.updateWithSyms(allocator, index, mod.value_ptr);
+            ctx.modules.registerSymsFromNativeMod(allocator, index, mod.value_ptr);
         }
     }
 
@@ -145,7 +148,7 @@ pub fn initGlobalScope(self: *Self, allocator: Allocator) void {
         self.lex_scope.initGlobalScope(allocator, self);
         // If embedded/Repl, all code is treated as local code to allow impur code
         self.lex_scope.open(allocator, null, .{ .barrier = true });
-        self.modules.updateWithSyms(allocator, .toIndex(0), self.native_reg.getGlobalScope());
+        self.modules.registerSymsFromNativeMod(allocator, .toIndex(0), self.native_reg.getGlobalScope());
     }
 }
 
@@ -167,9 +170,11 @@ pub fn registerCFn(self: *Self, allocator: Allocator, func: ffi.FnProto) void {
     _ = self.native_reg.registerForeignFnInGlobal(allocator, &func, &self.interner, &self.type_interner);
 }
 
-/// Used after analyzer to update the module with last scope symbols infos (needed when importing a module)
-pub fn updateModWithSymsInfo(self: *Self, allocator: Allocator, index: ModIndex) void {
-    self.modules.updateWithSymsInfo(allocator, index, &self.lex_scope.current.symbols);
+/// Used after analyzer to register module's public symbols informations
+/// They correspond to the symbols that can be imported
+pub fn registerModPubSymbols(self: *Self, allocator: Allocator, index: ModIndex) void {
+    self.modules.registerSymsInfo(allocator, index, &self.lex_scope.current.symbols);
+    self.symbol_table.addFrom(allocator, &self.lex_scope.current.symbols);
 }
 
 pub fn addConstant(self: *Self, allocator: Allocator, constant: Constant) ConstIdx {
