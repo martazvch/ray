@@ -151,6 +151,7 @@ fn blackenObject(self: *Self, obj: *Obj) Allocator.Error!void {
             try self.markArray(instance.fields);
         },
         .iterator => if (obj.as(Obj.Iterator).parent) |*p| try self.markValue(p),
+        .reference => try self.markValue(obj.as(Obj.Ref).child),
         .union_instance => try self.markValue(&obj.as(Obj.UnionInstance).payload),
         .trait_obj => try self.markObject(obj.as(Obj.TraitObj).data),
         .native_zfn => {},

@@ -76,13 +76,15 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .call => |*data| self.call(data),
         .constant => |data| self.constant(data),
         .@"continue" => |data| self.continueInstr(data),
+        .deref => |index| self.indexInstr("Deref", index),
         .discard => |index| self.indexInstr("Discard", index),
         .enum_decl => |*data| self.enumDecl(data),
+        .enum_tag => |index| self.indexInstr("Enum tag", index),
         .fail => |data| self.returnInstr("Fail", data),
         .field => |data| self.getField(data, false),
         .fn_decl => |*data| self.fnDeclaration(data),
         .for_loop => |data| self.forLoop(data),
-        .identifier => |*data| self.identifier(data),
+        .identifier => |data| self.identifier(data),
         .@"if" => |*data| self.ifInstr(data),
         .in => |data| self.in(data),
         .incr_rc => |index| self.indexInstr("Incr rc", index),
@@ -98,11 +100,10 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .pop => |index| self.indexInstr("Pop", index),
         .print => |index| self.indexInstr("Print", index),
         .range => |data| self.range(data),
+        .pointer => |data| self.pointer(data),
         .@"return" => |data| self.returnInstr("Return", data),
         .struct_decl => |*data| self.structDecl(data),
         .struct_literal => |*data| self.structLiteral(data),
-        .enum_tag => |index| self.indexInstr("Enum tag", index),
-        .union_tag => |index| self.indexInstr("Union tag", index),
         .trait_decl => |data| self.traitDecl(data),
         .trait_obj => |data| self.traitObj(data),
         .trap => |data| self.trap(data),
@@ -110,6 +111,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .unbox => |index| self.indexInstr("Unbox", index),
         .union_constr => |data| self.unionConstr(data),
         .union_decl => |*data| self.unionDecl(data),
+        .union_tag => |index| self.indexInstr("Union tag", index),
         .union_unwrap => |data| self.unionUnwrap(data),
         .var_decl => |*data| self.varDecl(data),
         .@"while" => |data| self.whileInstr(data),
@@ -405,7 +407,7 @@ fn forLoop(self: *Self, data: Instruction.For) void {
     self.indent_level -= 1;
 }
 
-fn identifier(self: *Self, data: *const Instruction.Variable) void {
+fn identifier(self: *Self, data: Instruction.Variable) void {
     self.indentAndPrintSlice("[Variable index: {}, scope: {t}]", .{
         data.index, data.scope,
     });
@@ -514,6 +516,17 @@ fn range(self: *Self, data: Instruction.Range) void {
     self.parseInstr(data.start);
     self.indentAndAppendSlice("- end:");
     self.parseInstr(data.end);
+}
+
+fn pointer(self: *Self, data: Instruction.Pointer) void {
+    self.indentAndAppendSlice("[Pointer]");
+
+    self.indent_level += 1;
+    defer self.indent_level -= 1;
+    switch (data) {
+        .variable => |v| self.identifier(v),
+        .field => |f| self.getField(f, false),
+    }
 }
 
 fn returnInstr(self: *Self, text: []const u8, data: Instruction.Return) void {

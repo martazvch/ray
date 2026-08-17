@@ -124,6 +124,19 @@ load_const index 33, value 4.3
 mod_float
 pop
 
+load_const index 3, value 1
+load_const index 16, value 2
+
+ptr_local index 0
+ptr_local index 1
+eq_ref
+pop
+
+ptr_local index 0
+ptr_local index 1
+ne_ref
+pop
+
 ret_naked
 
 -- global scope --

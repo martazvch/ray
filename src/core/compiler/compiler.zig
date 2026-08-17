@@ -363,9 +363,11 @@ const Compiler = struct {
 
             .constant => |data| self.constant(data.index, null, true),
             .@"continue" => |data| self.continueInstr(data),
+            .deref => |index| self.wrappedInstr(.deref, index),
             .discard => |index| self.wrappedInstr(.pop, index),
 
             .enum_decl => |*data| self.enumDecl(data),
+            .enum_tag => |index| self.wrappedInstr(.get_enum_tag, index),
             .fail => |data| self.returnInstr(data),
             .field => |*data| self.field(data),
             .fn_decl => |*data| self.compileFn(data),
@@ -395,14 +397,13 @@ const Compiler = struct {
             // will be the one extracted, it acts as if we just declared the value in scope
             .pat_nullable => |index| self.wrappedInstr(.ne_null_push, index),
 
+            .pointer => |index| self.pointer(index),
             .pop => |index| self.wrappedInstr(.pop, index),
             .print => |index| self.wrappedInstr(.print, index),
             .range => |data| self.range(data),
             .@"return" => |data| self.returnInstr(data),
             .struct_decl => |*data| self.structDecl(data),
             .struct_literal => |*data| self.structLiteral(data),
-            .enum_tag => |index| self.wrappedInstr(.get_enum_tag, index),
-            .union_tag => |index| self.wrappedInstr(.get_union_tag, index),
             .trait_decl => |data| self.traitDecl(data),
             .trait_obj => |data| self.traitObj(data),
             .trap => |data| self.trap(data),
@@ -410,6 +411,7 @@ const Compiler = struct {
             .unbox => |index| self.wrappedInstr(.unbox, index),
             .union_constr => |data| self.unionConstr(data),
             .union_decl => |*data| self.unionDecl(data),
+            .union_tag => |index| self.wrappedInstr(.get_union_tag, index),
             .union_unwrap => |data| self.unionUnwrap(data),
             .var_decl => |*data| self.varDecl(data),
             .@"while" => |data| self.whileInstr(data),
@@ -489,6 +491,7 @@ const Compiler = struct {
                 .eq_bool => .eq_bool,
                 .eq_float => .eq_float,
                 .eq_int => .eq_int,
+                .eq_ref => .eq_ref,
                 .eq_str => .eq_str,
                 .ge_float => .ge_float,
                 .ge_int => .ge_int,
@@ -506,6 +509,7 @@ const Compiler = struct {
                 .ne_bool => .ne_bool,
                 .ne_float => .ne_float,
                 .ne_int => .ne_int,
+                .ne_ref => .ne_ref,
                 .ne_str => .ne_str,
                 .question_mark_question_mark => .fallback_opt,
                 .sub_float => .sub_float,
@@ -1103,6 +1107,20 @@ const Compiler = struct {
         try self.compileInstr(data.end);
         try self.compileInstr(data.start);
         self.writeOp(if (data.kind == .int) .range_new_int else .range_new_float);
+    }
+
+    fn pointer(self: *Self, instr: Instruction.Pointer) Error!void {
+        switch (instr) {
+            .variable => |v| switch (v.scope) {
+                .local => self.writeOpAndByte(.ptr_local, @intCast(v.index)),
+                .global => self.writeOpAndByte(.ptr_global, @intCast(v.index)),
+                .builtin => unreachable,
+            },
+            .field => |f| {
+                try self.compileInstr(f.structure);
+                self.writeOpAndByte(.ptr_field, @intCast(f.index));
+            },
+        }
     }
 
     fn returnInstr(self: *Self, data: Instruction.Return) Error!void {

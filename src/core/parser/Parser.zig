@@ -813,6 +813,10 @@ fn parseScalarType(self: *Self) Error!*Ast.Type {
     else if (self.match(.question_mark)) {
         ty.* = .{ .optional = .{ .token = self.token_idx - 1, .child = try self.parseType() } };
     }
+    // Pointer
+    else if (self.match(.star)) {
+        ty.* = .{ .pointer = .{ .token = self.token_idx - 1, .child = try self.parseType() } };
+    }
     // Unknown
     else {
         return self.errAtCurrent(.expectName("type"));
@@ -1179,7 +1183,7 @@ fn parseExpr(self: *Self) Error!*Expr {
         .left_bracket => self.array(),
         .left_paren => self.leftParenExprStart(),
         .match => self.matchExpr(),
-        .minus, .not => self.unary(),
+        .star, .minus, .not => self.unary(),
         .null => self.literal(.null),
         .pipe => self.closure(),
         .@"return" => self.returnExpr(),
@@ -1612,6 +1616,12 @@ fn postfix(self: *Self, prefixExpr: *Expr) Error!*Expr {
 
             // Can't chain them, break the loop
             return self.structLiteral(.{ .expr = expr });
+        }
+        // Deref
+        else if (self.match(.dot_star)) {
+            const deref = self.allocator.create(Expr) catch oom();
+            deref.* = .{ .deref = .{ .expr = expr } };
+            expr = deref;
         }
         // Trap
         else if (self.match(.trap)) {

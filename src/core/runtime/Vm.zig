@@ -324,6 +324,7 @@ fn execute(self: *Self) !void {
                 const idx = self.frame.readByte();
                 self.frame.module.globals[idx] = self.stack.pop();
             },
+            .deref => self.stack.push(self.stack.pop().obj.as(Obj.Ref).child.*),
             .div_float => {
                 const rhs = self.stack.pop().float;
                 self.stack.peekRef(0).float /= rhs;
@@ -338,6 +339,11 @@ fn execute(self: *Self) !void {
             .eq_float => self.stack.push(Value.makeBool(self.stack.pop().float == self.stack.pop().float)),
             .eq_int => self.stack.push(Value.makeBool(self.stack.pop().int == self.stack.pop().int)),
             .eq_null => self.stack.push(Value.makeBool(self.stack.pop() == .null)),
+            .eq_ref => {
+                const ref1 = self.stack.pop().obj.as(Obj.Ref).child;
+                const ref2 = self.stack.pop().obj.as(Obj.Ref).child;
+                self.stack.push(.makeBool(ref1 == ref2));
+            },
             .eq_str => self.stack.push(Value.makeBool(self.stack.pop().obj.as(Obj.String) == self.stack.pop().obj.as(Obj.String))),
             .exit_repl => {
                 // Just deletes the current call self.frame
@@ -588,6 +594,11 @@ fn execute(self: *Self) !void {
             .ne_float => self.stack.push(Value.makeBool(self.stack.pop().float != self.stack.pop().float)),
             .ne_null => self.stack.push(Value.makeBool(self.stack.pop() != .null)),
             .ne_null_push => self.stack.push(Value.makeBool(self.stack.peek(0) != .null)),
+            .ne_ref => {
+                const ref1 = self.stack.pop().obj.as(Obj.Ref).child;
+                const ref2 = self.stack.pop().obj.as(Obj.Ref).child;
+                self.stack.push(.makeBool(ref1 != ref2));
+            },
             .ne_str => self.stack.push(Value.makeBool(self.stack.pop().obj.as(Obj.String) != self.stack.pop().obj.as(Obj.String))),
             .neg_float => self.stack.peekRef(0).float *= -1,
             .neg_int => self.stack.peekRef(0).int *= -1,
@@ -604,6 +615,19 @@ fn execute(self: *Self) !void {
                 var writer = &wa.writer;
                 self.stack.pop().print(writer);
                 self.state.config.printFn(self.io, writer.buffered());
+            },
+            .ptr_local => {
+                const idx = self.frame.readByte();
+                self.stack.push(.makeObj(Obj.Ref.create(self, &self.frame.slots[idx]).asObj()));
+            },
+            .ptr_global => {
+                const idx = self.frame.readByte();
+                self.stack.push(.makeObj(Obj.Ref.create(self, &self.frame.module.globals[idx]).asObj()));
+            },
+            .ptr_field => {
+                const idx = self.frame.readByte();
+                const field = &self.stack.pop().obj.as(Obj.Instance).fields[idx];
+                self.stack.push(.makeObj(Obj.Ref.create(self, field).asObj()));
             },
             .push_false => self.stack.push(Value.false_),
             .push_null => self.stack.push(Value.null_),

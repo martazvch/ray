@@ -1,0 +1,30 @@
+struct Foo {
+    a: int,
+    b: str,
+}
+
+fn f(a: *int) {
+    print a.*
+}
+
+fn main() {
+    var a = 1
+    let b = *a
+    let c = *a
+    print *a == b
+    print b == c
+    print *a != b
+    print b != *a
+
+    let foo = Foo{ a: 2, b: "ok" }
+    let ref1 = *foo.a
+    let ref2 = *foo.b
+    print *foo.a == *foo.a
+    print ref1 == *foo.a
+    print ref2 == ref2
+
+    f(*a)
+    a = 6
+    f(*a)
+}
+

@@ -85,7 +85,7 @@ All the supported operators are listed below from highest to lowest [precedence]
 | Description | operators | Associativity |
 | --------------- | --------------- | --------------- |
 | unary postfix | `()` `[]` `.` `?` `!` | none |
-| unary prefix | `-` `!` | none |
+| unary prefix | `-` `!` `*` | none |
 | multiplicative | `*` `/` `%` | left |
 | additive | `+` `-` | left |
 | shift | `<<` `>>` | left |
@@ -105,7 +105,7 @@ All the supported operators are listed below from highest to lowest [precedence]
 ### Precedence
 
 Precedence expresses the *weight* of each operator used to determine the order of resolution.
-For example `==` has a higher precedence than `&&` meaning that the two expressions below are equivalent:
+For example `==` has a higher precedence than `and` meaning that the two expressions below are equivalent:
 
 ```zig
 if (a == 1 and b == 2) { ... }
@@ -155,7 +155,7 @@ Ray supports:
 - [bools](#Booleans): `bool`
 - [strings](#Strings): `str`
 - [null](#Null): `null`
-- [references](#References)
+- [pointers](#Pointers)
 - [arrays](#Arrays)
 - [tuples](#Tuples)
 - [maps](#Maps)
@@ -247,9 +247,9 @@ let id = getId() ?? 0
 
 In pattern matching, the value `!null` can be used to represent any-non-null value.
 
-### References
+### Pointers
 
-In Ray, everything is by default passed by value, meaning that whenever you assign a value or pass a value to an expression (function call, structure literal, ...) you copy the data (not really true, see [clone on write](#Clone%20on%20write) section). So any changes on the value won't be reflected on the source of the value:
+In Ray, everything is by default passed by value, meaning that whenever you assign a value or pass a value to an expression (function call, structure literal, ...) you copy the data. So any changes on the value won't be reflected on the source of the value:
 
 ```zig
 var count = 0
@@ -259,12 +259,12 @@ assert(count == 1)
 assert(other_count == 0)
 ```
 
-If you want to store a *reference* to the source of the value to reflect changes on it, you can get a reference with `&` operator then modifying its value 
-with `.*` postfix syntax (known as *dereferencing*).
+If you want to store a *pointer* to the source of the value to reflect changes on it, you can get a pointer with `*` prefix operator then modifying its value 
+with `.*` postfix operator (known as *dereferencing*).
 
 ```zig
 var count = 0
-var ref_count = &count
+var ref_count = *count
 ref_count.* += 1
 assert(count == 1)
 assert(ref_count.* == 1)
@@ -277,7 +277,7 @@ struct User {
     id: int
 }
 
-fn foo(user: &User) {
+fn foo(user: *User) {
     // Syntax 1
     var id = user.*.id
     // Syntax 2
@@ -653,7 +653,7 @@ arr.map(fn(x) -> int { return x + 1 })
 
 #### Closures
 
-Closures capture surrounding variables by reference:
+Closures capture surrounding variables by pointers:
 
 ```rust
 let factor = 3
@@ -880,7 +880,7 @@ struct Point {
 ```
 
 > [!NOTE]
-> `self` is always passed as a reference to the instance. If you don't want to mutate the instance, first create a copy and the mutate it
+> `self` is always passed as a pointer to the instance. If you don't want to mutate the instance, first create a copy and the mutate it
 
 #### Static functions
 
@@ -1834,6 +1834,23 @@ rect.area() // calls the function defined on the structure
 rect.Drawable.area() // calls the trait implementation
 ```
 
+## Modules
+
+Each file is treated as a module and can be imported. To import it you have to give the path to `use` keyword.
+Absolute paths starts with an identifier and relative ones start with `.`. When using relative paths, `^` refers to parent directory.
+You can import symbols from those module or the module itself and each one can be aliased.
+
+```rust
+use plotting         // absolute path
+use .entities.player // relative path, looks for 'player.ray' inside 'entities' folder: './entities/player.ray'
+use .^.ui.hud        // relative path, looks for 'hud.ray' inside '../ui' folder: './../ui/hid.ray'
+
+use plotting as plt  // creates an alias 'plt' for plotting module
+
+use .^.math{ Vec2, Rect }           // imports 'Vec2' and 'Rect' structures from '../math.ray' file
+use .^.math{ Vec2 as V, Rect as R } // creates an alias 'V' for 'Vec2' and 'R' for 'Rect'
+```
+
 ## Clone on write (COW)
 
 Ray uses *clone-on-write* semantics for all heap-allocated objects (arrays, maps, strings, ...) to provide value semantics with efficient sharing.
@@ -1875,7 +1892,7 @@ For example:
 ```rust
 let a = [1, 2, 3]
 let b = a // no copy, only increments interal reference count
-assert(&a == &b)
+assert(*a == *b)
 
 b[0] = 10 // perfoms a copy, leaving `a` untouched
 ```

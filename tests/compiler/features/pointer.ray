@@ -1,0 +1,14 @@
+struct Foo {
+    a: int,
+    b: str,
+}
+
+fn main() {
+    let a = 1
+    let b = *a
+
+    let foo = Foo{ a: 2, b: "ok" }
+    let ref1 = *foo.a
+    let ref2 = *foo.b
+}
+

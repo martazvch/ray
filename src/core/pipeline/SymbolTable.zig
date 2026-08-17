@@ -20,7 +20,7 @@ pub fn addFrom(self: *Self, alloc: Allocator, other: *const SymbolArrMap) void {
 
         // TODO: real error
         if (gop.found_existing) {
-            @panic("Can't be possible due to type interning");
+            return;
         }
 
         gop.value_ptr.* = sym;

@@ -26,8 +26,10 @@ pub const Instruction = struct {
         call: Call,
         @"continue": Continue,
         constant: Constant,
+        deref: Index,
         discard: Index,
         enum_decl: EnumDecl,
+        enum_tag: Index,
         fail: Return,
         field: Field,
         fn_decl: FnDecl,
@@ -44,14 +46,13 @@ pub const Instruction = struct {
         multiple_var_decl: MultiVarDecl,
         obj_func: ObjFn,
         pat_nullable: Index,
+        pointer: Pointer,
         pop: Index,
         print: Index,
         range: Range,
         @"return": Return,
         struct_decl: StructDecl,
         struct_literal: StructLiteral,
-        enum_tag: Index,
-        union_tag: Index,
         trait_decl: TraitDecl,
         trait_obj: TraitObj,
         trap: Trap,
@@ -59,6 +60,7 @@ pub const Instruction = struct {
         unbox: Index,
         union_constr: UnionConstr,
         union_decl: UnionDecl,
+        union_tag: Index,
         union_unwrap: UnionUnwrap,
         var_decl: VarDecl,
         @"while": While,
@@ -93,6 +95,7 @@ pub const Instruction = struct {
             eq_float,
             eq_int,
             eq_null,
+            eq_ref,
             eq_str,
             ge_float,
             ge_int,
@@ -111,6 +114,7 @@ pub const Instruction = struct {
             ne_float,
             ne_int,
             ne_null,
+            ne_ref,
             ne_str,
             @"or",
             question_mark_question_mark,
@@ -249,6 +253,10 @@ pub const Instruction = struct {
         kind: Kind,
 
         pub const Kind = enum { int, float };
+    };
+    pub const Pointer = union(enum) {
+        variable: Variable,
+        field: Field,
     };
     pub const Return = struct {
         value: ?Index,

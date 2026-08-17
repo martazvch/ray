@@ -42,6 +42,7 @@ pub const Type = union(enum) {
     inline_union: InlineUnion,
     module: InternerIdx,
     optional: *const Type,
+    pointer: *const Type,
     structure: Structure,
     trait: Trait,
     @"union": Union,
@@ -374,6 +375,7 @@ pub const Type = union(enum) {
             .module => |interned| hasher.update(asBytes(&interned)),
             .optional => |child| child.hash(allocator, hasher),
             .range => |r| r.hash(allocator, hasher),
+            .pointer => |child| child.hash(allocator, hasher),
             .structure => |ty| hashLoc(hasher, ty.loc),
             .trait => |ty| hashLoc(hasher, ty.loc),
             .@"union" => |*ty| {
@@ -453,6 +455,9 @@ pub const Type = union(enum) {
             },
             .optional => |opt| {
                 w.print("?{s}", .{opt.toString(allocator, interner, mod_name, full)}) catch oom();
+            },
+            .pointer => |child| {
+                w.print("*{s}", .{child.toString(allocator, interner, mod_name, full)}) catch oom();
             },
             .structure => |ty| locToString(w, ty.loc, interner, mod_name, full),
             .trait => |ty| locToString(w, ty.loc, interner, mod_name, full),

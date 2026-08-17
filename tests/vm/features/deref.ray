@@ -1,0 +1,58 @@
+struct Bar {
+    a: bool,
+    b: str,
+}
+
+struct Foo {
+    b: *int,
+    c: *Bar,
+    d: **int,
+    e: **Bar,
+}
+
+fn main() {
+    var a = "sss"
+    let b = *a
+    print b == *a
+    print b.*
+ 
+    let c = *b
+    print c == *b
+    print c.* == *a
+    print c.* == b
+
+    a = "ok"
+    print b.*
+    print c.*.*
+
+    var value = 9
+    var bar = Bar{ a: true, b: "ok" }
+    let pvalue = *value
+    let pbar = *bar
+
+    let foo = Foo{ b: *value, c: *bar, d: *pvalue, e: *pbar }
+    print foo.b == *value
+    print foo.b.* == value
+
+    print foo.c == *bar
+    print foo.c.*.a == bar.a
+
+    print foo.d == *pvalue
+    print foo.d.* == *value
+    print foo.d.*.* == value
+
+    print foo.e == *pbar
+    print foo.e.* == *bar
+    print foo.e.*.*.b == bar.b
+
+    value = 15
+    print foo.b.*
+    print foo.d.*.*
+
+    bar.a = false
+    print foo.c.*.a
+    print foo.e.*.*.a
+    bar.b = "new"
+    print foo.c.*.b
+    print foo.e.*.*.b
+}

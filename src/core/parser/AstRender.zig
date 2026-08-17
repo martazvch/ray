@@ -340,6 +340,7 @@ fn renderType(self: *Self, typ: ?*Ast.Type) Error![]const u8 {
             } else try w.writeAll("void");
         },
         .optional => |t| try w.print("?{s}", .{try self.renderType(t.child)}),
+        .pointer => |t| try w.print("&{s}", .{try self.renderType(t.child)}),
         .scalar => |t| try w.writeAll(self.ast.toSource(t)),
         .@"union" => |types| {
             for (types, 0..) |t, i| {
@@ -354,6 +355,8 @@ fn renderType(self: *Self, typ: ?*Ast.Type) Error![]const u8 {
 }
 
 fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
+    const name = @tagName(expr.*);
+
     switch (expr.*) {
         .array => |*e| {
             if (e.values.len == 0)
@@ -368,7 +371,7 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
         },
         .block => |*e| try self.renderBlock(e, null, comma),
         .binop => |*e| {
-            try self.openKey(@tagName(expr.*), .block);
+            try self.openKey(name, .block);
             try self.renderSingleExpr("lhs", e.lhs, .block, true);
             try self.renderSingleExpr("rhs", e.rhs, .block, true);
             try self.pushKeyValue("op", switch (e.op) {
@@ -392,29 +395,30 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
             }, false);
             try self.closeKey(.block, comma);
         },
-        .bool => |e| try self.pushKeyValue(@tagName(expr.*), self.ast.toSource(e), comma),
+        .bool => |e| try self.pushKeyValue(name, self.ast.toSource(e), comma),
         .@"break" => |e| {
             if (e.label == null and e.expr == null) {
                 try self.emptyKey("break", .block, comma);
                 return;
             }
 
-            try self.openKey(@tagName(expr.*), .block);
+            try self.openKey(name, .block);
             if (e.label) |label| try self.pushKeyValue("label", self.ast.toSource(label), e.expr != null);
             if (e.expr) |data| try self.renderExpr(data, false);
             try self.closeKey(.block, comma);
         },
         .closure => |*e| try self.renderFnDecl("", e, comma),
-        .fail => |e| try self.renderSingleExpr(@tagName(expr.*), e.expr, .block, comma),
-        .float => |e| try self.pushKeyValue(@tagName(expr.*), self.ast.toSource(e), comma),
+        .deref => |e| try self.renderSingleExpr(name, e.expr, .block, comma),
+        .fail => |e| try self.renderSingleExpr(name, e.expr, .block, comma),
+        .float => |e| try self.pushKeyValue(name, self.ast.toSource(e), comma),
         .field => |e| {
-            try self.openKey(@tagName(expr.*), .block);
+            try self.openKey(name, .block);
             try self.renderSingleExpr("structure", e.structure, .block, true);
             try self.pushKeyValue("field_name", self.ast.toSource(e.field), false);
             try self.closeKey(.block, comma);
         },
         .fn_call => |e| {
-            try self.openKey(@tagName(expr.*), .block);
+            try self.openKey(name, .block);
             try self.renderSingleExpr("callee", e.callee, .block, true);
 
             if (e.args.len == 0) {
@@ -422,9 +426,9 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
             } else {
                 try self.openKey("args", .list);
                 for (e.args, 0..) |arg, i| {
-                    if (arg.name) |name| {
+                    if (arg.name) |n| {
                         try self.openAnonKey(.block);
-                        try self.pushKeyValue("name", self.ast.toSource(name), true);
+                        try self.pushKeyValue("name", self.ast.toSource(n), true);
                         try self.renderExpr(arg.value, false);
                         try self.closeKey(.block, i != e.args.len - 1);
                     } else {
@@ -437,11 +441,11 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
             try self.closeKey(.block, comma);
         },
         .grouping => |e| {
-            try self.renderSingleExpr(@tagName(expr.*), e.expr, .block, comma);
+            try self.renderSingleExpr(name, e.expr, .block, comma);
         },
-        .identifier => |e| try self.pushKeyValue(@tagName(expr.*), self.ast.toSource(e), comma),
+        .identifier => |e| try self.pushKeyValue(name, self.ast.toSource(e), comma),
         .@"if" => |e| {
-            try self.openKey(@tagName(expr.*), .block);
+            try self.openKey(name, .block);
             try self.pattern(e.pattern, true);
             try self.renderSingleNode("then", &e.then, .block, true);
             if (e.@"else") |*data| {
@@ -456,22 +460,23 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
             try self.renderSingleExpr("index", e.index, .block, false);
             try self.closeKey(.block, comma);
         },
-        .int => |e| try self.pushKeyValue(@tagName(expr.*), self.ast.toSource(e), comma),
-        .self => try self.pushKeyValue(@tagName(expr.*), "{}", comma),
+        .int => |e| try self.pushKeyValue(name, self.ast.toSource(e), comma),
+        .self => try self.pushKeyValue(name, "{}", comma),
         .string => |e| {
             const text = self.ast.toSource(e);
-            try self.pushKeyValue(@tagName(expr.*), text[1 .. text.len - 1], comma);
+            try self.pushKeyValue(name, text[1 .. text.len - 1], comma);
         },
-        .null => try self.pushKeyValue(@tagName(expr.*), "{}", comma),
+        .null => try self.pushKeyValue(name, "{}", comma),
         .match => |n| try self.match(n, comma),
         .pattern => |n| try self.pattern(n, comma),
+        // .reference => |e| try self.renderSingleExpr(name, e.expr, .block, comma),
         .@"return" => |e| {
             if (e.expr) |data| {
-                try self.renderSingleExpr(@tagName(expr.*), data, .block, comma);
+                try self.renderSingleExpr(name, data, .block, comma);
             } else try self.emptyKey("return", .block, comma);
         },
         .struct_literal => |e| {
-            try self.openKey(@tagName(expr.*), .block);
+            try self.openKey(name, .block);
             switch (e.structure) {
                 .dot => try self.pushKeyValue("structure", ".", true),
                 .expr => |struct_expr| try self.renderSingleExpr("structure", struct_expr, .block, true),
@@ -496,14 +501,14 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
             try self.closeKey(.block, comma);
         },
         .ternary => |e| {
-            try self.openKey(@tagName(expr.*), .block);
+            try self.openKey(name, .block);
             try self.renderSingleExpr("condition", e.condition, .block, true);
             try self.renderSingleExpr("then", e.then, .block, true);
             try self.renderSingleExpr("else", e.@"else", .block, false);
             try self.closeKey(.block, comma);
         },
         .trap => |e| {
-            try self.openKey(@tagName(expr.*), .block);
+            try self.openKey(name, .block);
             try self.renderSingleExpr("lhs", e.lhs, .block, true);
             try self.openKey("rhs", .block);
             switch (e.rhs) {
@@ -519,7 +524,7 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
             try self.closeKey(.block, comma);
         },
         .unary => |e| {
-            try self.openKey(@tagName(expr.*), .block);
+            try self.openKey(name, .block);
             try self.pushKeyValue("op", self.ast.toSource(e.op), true);
             try self.renderSingleExpr("expr", e.expr, .block, false);
             try self.closeKey(.block, comma);

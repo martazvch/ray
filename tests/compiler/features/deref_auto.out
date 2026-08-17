@@ -1,0 +1,32 @@
+-- main --
+load_const index 3, value ok
+struct_lit index 0, arity 1, Baz
+load_const index 4, value 5
+ptr_local index 0
+incr_ref
+struct_lit index 1, arity 2, Bar
+ptr_local index 1
+incr_ref
+ptr_local index 1
+incr_ref
+struct_lit index 2, arity 1, Foo
+ptr_local index 3
+incr_ref
+get_local index 4
+deref
+get_field index 0
+deref
+get_field index 0
+print
+get_local index 4
+deref
+get_field index 0
+deref
+get_field index 1
+deref
+get_field index 0
+print
+ret_naked
+
+-- global scope --
+call index 0, arity 0, main

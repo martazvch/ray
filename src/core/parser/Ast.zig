@@ -98,6 +98,7 @@ pub const Type = union(enum) {
     fields: []TokenIndex,
     error_union: struct { ok: *Type, errs: []const TokenIndex },
     optional: struct { token: TokenIndex, child: *Type },
+    pointer: struct { token: TokenIndex, child: *Type },
     scalar: TokenIndex,
     @"union": []const *Type,
     self: TokenIndex,
@@ -172,6 +173,7 @@ pub const Expr = union(enum) {
     bool: Bool,
     @"break": Break,
     closure: FnDecl,
+    deref: Deref,
     fail: Fail,
     field: Field,
     float: Float,
@@ -215,6 +217,10 @@ pub const Break = struct {
     kw: TokenIndex,
     label: ?TokenIndex,
     expr: ?*Expr,
+};
+
+pub const Deref = struct {
+    expr: *Expr,
 };
 
 pub const Fail = struct {
@@ -433,6 +439,10 @@ pub fn getSpan(self: *const @This(), anynode: anytype) Span {
                 .start = t.token,
                 .end = self.getSpan(t.child).end,
             },
+            .pointer => |t| .{
+                .start = t.token,
+                .end = self.getSpan(t.child).end,
+            },
             .scalar, .self => |t| self.token_spans[t],
             .@"union" => |u| .{
                 .start = self.getSpan(u[0]).start,
@@ -464,6 +474,7 @@ pub fn getSpan(self: *const @This(), anynode: anytype) Span {
             .start = self.token_spans[node.kw].start,
             .end = self.getSpan(e).end,
         } else self.token_spans[node.kw],
+        Deref => self.getSpan(node.expr),
         Fail => .{
             .start = self.token_spans[node.kw].start,
             .end = self.getSpan(node.expr).end,

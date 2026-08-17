@@ -1347,6 +1347,7 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
         .bool => |e| self.boolLit(e),
         .@"break" => |*e| self.breakExpr(e, ctx),
         .closure => |*e| self.closure(e, ctx),
+        .deref => |e| self.deref(e, ctx),
         .fail => |e| self.fail(e, ctx),
         .field => |*e| self.field(e, ctx),
         .float => |e| self.floatLit(e, false),
@@ -1696,7 +1697,7 @@ fn binopComparisonCoercion(
     }
 
     if (lhs_type == rhs_type) {
-        if (lhs_type.is(.str)) {
+        if (lhs_type.is(.bool) or lhs_type.is(.str) or lhs_type.is(.pointer)) {
             return .{ lhs.instr, rhs.instr, lhs_type };
         }
 
@@ -1778,6 +1779,7 @@ fn getComparisonOp(op: TokenTag, ty: *const Type) Instr.Binop.Op {
         .bool => if (op == .equal_equal) .eq_bool else .ne_bool,
         .int => if (op == .equal_equal) .eq_int else .ne_int,
         .float => if (op == .equal_equal) .eq_float else .ne_float,
+        .pointer => if (op == .equal_equal) .eq_ref else .ne_ref,
         .str => if (op == .equal_equal) .eq_str else .ne_str,
         .null, .optional => if (op == .equal_equal) .eq_null else .ne_null,
         else => unreachable,
@@ -1958,6 +1960,22 @@ fn findImplicitSelctInUnion(ty: *const Type.InlineUnion, tag: InternerIdx) ?TagR
     return null;
 }
 
+fn deref(self: *Self, expr: Ast.Deref, ctx: *Context) Result {
+    const span = self.ast.getSpan(expr.expr);
+    const res = try self.analyzeExpr(expr.expr, .value, ctx);
+
+    const ref = res.type.as(.pointer) orelse return self.err(
+        .{ .invalid_deref = .{ .found = self.typeName(res.type) } },
+        span,
+    );
+
+    return .{
+        .type = ref,
+        .ti = res.ti,
+        .instr = self.irb.addInstr(.{ .deref = res.instr }, span.start),
+    };
+}
+
 fn fail(self: *Self, expr: Ast.Fail, ctx: *Context) Result {
     const span = self.ast.getSpan(expr);
     const fn_type = ctx.fn_type orelse return self.err(.fail_outside_fn, span);
@@ -1987,7 +2005,13 @@ fn fail(self: *Self, expr: Ast.Fail, ctx: *Context) Result {
 
 pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
     const span = self.ast.getSpan(expr.structure);
-    const struct_res = try self.analyzeExpr(expr.structure, .any, ctx);
+    var struct_res = try self.analyzeExpr(expr.structure, .any, ctx);
+
+    // Auto-dereference
+    if (struct_res.type.as(.pointer)) |ptr| {
+        struct_res.type = ptr;
+        struct_res.instr = self.irb.wrapInstr(.deref, struct_res.instr);
+    }
 
     const field_res = switch (struct_res.type.*) {
         .array => return self.runtimeObjFnAccess(.array, struct_res.instr, expr.field, struct_res.type),
@@ -3467,6 +3491,10 @@ fn unary(self: *Self, expr: *const Ast.Unary, ctx: *Context) Result {
     const span = self.ast.getSpan(expr);
     const op = self.ast.token_tags[expr.op];
 
+    if (op == .star) {
+        return self.pointer(expr.expr, span, ctx);
+    }
+
     const rhs = switch (expr.expr.*) {
         .int => |i| return self.intLit(i, true),
         .float => |f| return self.floatLit(f, true),
@@ -3482,7 +3510,7 @@ fn unary(self: *Self, expr: *const Ast.Unary, ctx: *Context) Result {
     }
 
     return .{
-        .type = rhs.type,
+        .type = ty,
         .ti = rhs.ti,
         .instr = self.irb.addInstr(
             .{ .unary = .{
@@ -3492,6 +3520,33 @@ fn unary(self: *Self, expr: *const Ast.Unary, ctx: *Context) Result {
             } },
             span.start,
         ),
+    };
+}
+
+fn pointer(self: *Self, expr: *Expr, span: Span, ctx: *Context) Result {
+    const res = try self.analyzeExpr(expr, .value, ctx);
+
+    // Values can hold functions so we check for that case
+    if (res.type.is(.function)) {
+        return self.err(.invalid_pointer, span);
+    }
+
+    const ref: Instr.Pointer = switch (self.irb.data(res.instr)) {
+        .identifier => |ident| .{ .variable = ident },
+        .field => |f| ref: {
+            if (f.kind != .field) {
+                return self.err(.invalid_pointer, span);
+            }
+
+            break :ref .{ .field = f };
+        },
+        else => return self.err(.invalid_pointer, span),
+    };
+
+    return .{
+        .type = self.ti.intern(.{ .pointer = res.type }),
+        .ti = res.ti,
+        .instr = self.irb.addInstr(.{ .pointer = ref }, span.start),
     };
 }
 
@@ -3647,6 +3702,10 @@ pub fn checkAndGetTypeInfo(self: *Self, ty: ?*const Ast.Type, ctx: *const Contex
         .optional => |opt| {
             const child = try self.checkAndGetType(opt.child, ctx);
             return .{ .type = self.ti.intern(.{ .optional = child }) };
+        },
+        .pointer => |ref| {
+            const child = try self.checkAndGetType(ref.child, ctx);
+            return .{ .type = self.ti.intern(.{ .pointer = child }) };
         },
         .scalar => {
             const interned = self.interner.intern(self.ast.toSource(t));

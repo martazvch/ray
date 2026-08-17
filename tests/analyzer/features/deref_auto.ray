@@ -1,0 +1,23 @@
+struct Baz {
+    a: str
+}
+struct Bar {
+    a: int,
+    b: *Baz,
+}
+
+struct Foo {
+    a: *Bar,
+}
+
+fn main() {
+    let baz = Baz{ a: "ok" }
+    let bar = Bar{ a: 5, b: *baz }
+    let pbar = *bar
+
+    let foo = Foo{ a: *bar }
+    let pfoo = *foo
+    print pfoo.a.a
+    print pfoo.a.b.a
+}
+

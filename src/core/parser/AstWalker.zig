@@ -220,6 +220,7 @@ fn captureFromExpr(self: *Self, expr: *Ast.Expr, ctx: *CaptureCtx) void {
             }
         },
         .@"break" => |e| if (e.expr) |val| self.captureFromExpr(val, ctx),
+        .deref => |e| self.captureFromExpr(e.expr, ctx),
         .fail => |e| self.captureFromExpr(e.expr, ctx),
         .fn_call => |*e| {
             self.captureFromExpr(e.callee, ctx);
@@ -267,6 +268,7 @@ fn captureFromExpr(self: *Self, expr: *Ast.Expr, ctx: *CaptureCtx) void {
             }
         },
         .pattern => |e| self.captureFromPattern(e, ctx),
+        // .reference => |e| self.captureFromExpr(e.expr, ctx),
         .@"return" => |e| if (e.expr) |val| self.captureFromExpr(val, ctx),
         .struct_literal => |e| {
             for (e.fields) |f| {

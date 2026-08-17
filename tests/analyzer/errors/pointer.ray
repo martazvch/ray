@@ -1,0 +1,11 @@
+struct Foo {}
+fn foo() {}
+
+fn main() {
+    let value = 1
+    let a = *1
+    let f = *foo
+    let b = *(1 + value)
+    let c = *Foo
+}
+

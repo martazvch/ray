@@ -58,8 +58,10 @@ pub const AnalyzerMsg = union(enum) {
     invalid_assign_target,
     invalid_call_target,
     invalid_comparison: struct { ty1: []const u8, ty2: []const u8 },
+    invalid_deref: struct { found: []const u8 },
     invalid_logical: struct { found: []const u8 },
     invalid_in_type: struct { found: []const u8 },
+    invalid_pointer,
     invalid_unary: struct { found: []const u8 },
     instance_tag_access,
     iter_non_iterable: struct { found: []const u8 },
@@ -195,9 +197,11 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_assign_target => writer.writeAll("invalid assignment target"),
             .invalid_call_target => writer.writeAll("invalid call target, can only call functions and methods"),
             .invalid_comparison => |e| writer.print("trait 'Eq' must be implemented to compare type '{s}' with '{s}'", .{ e.ty1, e.ty2 }),
+            .invalid_deref => |e| writer.print("can't dereference non-pointer type, found '{s}'", .{e.found}),
             .invalid_logical => writer.writeAll("logical operators must be used with booleans"),
             .invalid_in_type => |e| writer.print("can't use 'in' expression with '{s}' type", .{e.found}),
             .invalid_index => |e| writer.print("invalid index type, found '{s}'", .{e.found}),
+            .invalid_pointer => writer.writeAll("can't create a pointer from this expression"),
             .invalid_unary => writer.writeAll("invalid unary operation"),
             .iter_non_iterable => |e| writer.print("can't iterate over type '{s}'", .{e.found}),
             .match_all_arms_dont_return => writer.writeAll("all paths of match expression don't return a value"),
@@ -370,11 +374,13 @@ pub const AnalyzerMsg = union(enum) {
             .invalid_assign_target => writer.writeAll("can only assign to variables"),
             .invalid_call_target => writer.writeAll("change call target to a function or a method or remove the call"),
             .invalid_comparison => writer.writeAll("native comparison is only possible for simple native types, otherwise trait 'Eq' must be implemented"),
+            .invalid_deref => writer.writeAll("only pointers can be dereferenced to access pointed memory"),
             .invalid_logical => writer.writeAll("modify the logic to operate on booleans"),
             .invalid_in_type => writer.writeAll("can only use 'in' with int and float ranges, arrays and strings"),
             // TODO: when there will be Range, modify
             .invalid_index => writer.writeAll("can only use integer or ranges as index"),
             .invalid_unary => |e| writer.print("can only negate boolean type, found '{s}'", .{e.found}),
+            .invalid_pointer => writer.writeAll("can only create a pointer from a variable or a field"),
             .iter_non_iterable => writer.writeAll(
                 \\it is only possible to iterate over builtin types array, string, range and maps and over types
                 \\that implement the Iterator trait

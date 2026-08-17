@@ -1,0 +1,18 @@
+{
+    "deref": {
+        "identifier": "foo"
+    },
+    "deref": {
+        "deref": {
+            "identifier": "foo"
+        }
+    },
+    "field": {
+        "structure": {
+            "deref": {
+                "identifier": "foo"
+            }
+        },
+        "field_name": "bar"
+    }
+}

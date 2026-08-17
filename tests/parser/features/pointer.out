@@ -1,0 +1,19 @@
+{
+    "unary": {
+        "op": "*",
+        "expr": {
+            "identifier": "foo"
+        }
+    },
+    "unary": {
+        "op": "*",
+        "expr": {
+            "field": {
+                "structure": {
+                    "identifier": "foo"
+                },
+                "field_name": "bar"
+            }
+        }
+    }
+}
