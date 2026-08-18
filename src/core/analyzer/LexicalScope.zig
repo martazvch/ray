@@ -296,13 +296,14 @@ pub const SymKind = enum {
     trait,
     @"union",
 };
-pub fn declareSymbol(self: *Self, allocator: Allocator, name: InternerIdx, kind: SymKind) Error!*Symbol {
-    const index = switch (kind) {
+pub fn declareSymbol(self: *Self, allocator: Allocator, name: InternerIdx, ty: *const Type) Error!usize {
+    const index = switch (ty.*) {
         .@"enum" => &self.enum_count,
         .function => &self.func_count,
         .structure => &self.struct_count,
         .trait => &self.trait_count,
         .@"union" => &self.union_count,
+        else => unreachable,
     };
 
     const gop = self.current.symbols.getOrPut(allocator, name) catch oom();
@@ -312,17 +313,16 @@ pub fn declareSymbol(self: *Self, allocator: Allocator, name: InternerIdx, kind:
     }
     gop.value_ptr.* = .{
         .name = name,
-        .type = undefined,
+        .type = ty,
         .index = index.*,
     };
-
-    index.* += 1;
 
     if (self.save) {
         self.saved_syms.append(allocator, gop.value_ptr) catch oom();
     }
 
-    return gop.value_ptr;
+    defer index.* += 1;
+    return index.*;
 }
 
 pub fn getSymbol(self: *const Self, name: InternerIdx) ?*Symbol {

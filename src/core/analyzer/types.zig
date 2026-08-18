@@ -160,7 +160,12 @@ pub const Type = union(enum) {
                 val.captured = false;
             }
 
-            return .{ .loc = null, .params = params, .return_type = self.return_type, .kind = .bound };
+            return .{
+                .loc = null,
+                .params = params,
+                .return_type = self.return_type,
+                .kind = .bound,
+            };
         }
 
         pub fn toAnon(self: *const Function, allocator: Allocator) Function {
@@ -570,6 +575,15 @@ pub const TypeInterner = struct {
     pub fn typeId(self: *const TypeInterner, ty: *const Type) TypeId {
         // Safe unwrap because in `intern` we add every new type in `ids`
         return @intCast(self.ids.getIndex(ty).?);
+    }
+
+    pub fn newFunction(self: *TypeInterner, loc: Type.Loc) *Type {
+        return self.intern(.{ .function = .{
+            .loc = loc,
+            .params = .empty,
+            .return_type = undefined,
+            .kind = undefined,
+        } });
     }
 
     pub fn newEnum(self: *TypeInterner, loc: Type.Loc) *Type {

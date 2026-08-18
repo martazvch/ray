@@ -493,10 +493,7 @@ fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
     const name = self.internToken(name_tk);
 
     const interned = self.ti.newEnum(.{ .name = name, .container = container_name });
-    const ty = &interned.@"enum";
-
-    const sym = try self.declareSymbol(name, .@"enum", span);
-    sym.type = interned;
+    const sym_index = try self.declareSymbol(name, interned, span);
 
     ctx.self_type = interned;
     defer ctx.self_type = null;
@@ -504,6 +501,7 @@ fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
     try self.openContainer(name_tk);
     defer self.closeContainer();
 
+    const ty = &interned.@"enum";
     const tags_res = try self.enumTags(node.tags, ty, ctx);
     const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
     const traits = try self.containerTraitImpls(interned, node.traits, &ty.traits, ctx);
@@ -513,7 +511,7 @@ fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
             .name = name,
             .tags = tags_res.names,
             .discriminants = tags_res.discriminants,
-            .sym_index = sym.index,
+            .sym_index = sym_index,
             .type_id = self.ti.typeId(interned),
             .functions = funcs,
             .traits = traits,
@@ -608,21 +606,20 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
 
     var buf: [1024]u8 = undefined;
     const container_name = self.interner.internKeepRef(self.alloc, self.containers.render(&buf, .{ .sep = "." }));
+    const interned = self.ti.newFunction(.{ .name = name, .container = container_name });
 
     // Forward declaration in outer scope for recursion
-    const sym = try self.declareSymbol(name, .function, self.ast.getSpan(node.name));
-
+    const sym_index = try self.declareSymbol(name, interned, self.ast.getSpan(node.name));
     self.scope.open(self.alloc, null, .{ .barrier = true });
 
     self.containers.append(self.alloc, self.ast.toSource(node.name));
     defer _ = self.containers.pop();
-    const loc: Type.Loc = .{ .name = name, .container = container_name };
 
     if (node.is_extern) {
         defer _ = self.scope.close();
-        return self.endExternFnDecl(node, name, loc, sym, ctx);
+        return self.endExternFnDecl(node, name, interned, sym_index, ctx);
     } else {
-        return self.endRayFnDecl(node, name, loc, sym, ctx);
+        return self.endRayFnDecl(node, name, interned, sym_index, ctx);
     }
 }
 
@@ -630,34 +627,30 @@ fn endRayFnDecl(
     self: *Self,
     node: *const Ast.FnDecl,
     name: InternerIdx,
-    loc: Type.Loc,
-    sym: *LexScope.Symbol,
+    ty: *Type,
+    sym_index: usize,
     ctx: *Context,
 ) Error!FnDeclRes {
     const span = self.ast.getSpan(node);
     var body: ArrayList(InstrIndex) = .empty;
 
-    const captures, const params, const ty, const returns = info: {
+    const captures, const params, const returns = info: {
         errdefer _ = self.scope.close();
 
         const captures = try self.loadFunctionCaptures(&node.meta.captures);
         const params = try self.fnParams(node.params, ctx);
 
-        const fn_type: Type.Function = .{
-            .loc = loc,
-            .params = params.decls,
-            .return_type = try self.checkAndGetType(node.return_type, ctx),
-            .kind = if (params.is_method) .method else .normal,
-        };
-        const interned_type = self.ti.intern(.{ .function = fn_type });
-        sym.type = interned_type;
-        ctx.fn_type = interned_type;
+        const fn_type = &ty.function;
+        fn_type.params = params.decls;
+        fn_type.return_type = try self.checkAndGetType(node.return_type, ctx);
+        fn_type.kind = if (params.is_method) .method else .normal;
 
+        ctx.fn_type = ty;
         ctx.decl_type = fn_type.return_type;
         defer ctx.decl_type = null;
 
-        const returns = try self.fnBody(node.body, &fn_type, &body, span, ctx);
-        break :info .{ captures, params, interned_type, returns };
+        const returns = try self.fnBody(node.body, fn_type, &body, span, ctx);
+        break :info .{ captures, params, returns };
     };
 
     const popped_scope = self.scope.close();
@@ -669,13 +662,13 @@ fn endRayFnDecl(
     }
 
     if (name == self.cached_names.main and self.scope.isGlobal()) {
-        self.main = sym.index;
+        self.main = sym_index;
     }
 
     return .{
         .instr = self.irb.addInstr(
             .{ .fn_decl = .{
-                .sym_index = sym.index,
+                .sym_index = sym_index,
                 .type_id = self.ti.typeId(ty),
                 .name = name,
                 .body = body.toOwnedSlice(self.alloc) catch oom(),
@@ -685,7 +678,7 @@ fn endRayFnDecl(
             } },
             span.start,
         ),
-        .sym = sym.*,
+        .sym = self.scope.getSymbol(name).?.*,
     };
 }
 
@@ -693,8 +686,8 @@ fn endExternFnDecl(
     self: *Self,
     node: *const Ast.FnDecl,
     name: InternerIdx,
-    loc: Type.Loc,
-    sym: *LexScope.Symbol,
+    ty: *Type,
+    sym_index: usize,
     ctx: *Context,
 ) Error!FnDeclRes {
     const span = self.ast.getSpan(node.name);
@@ -703,17 +696,12 @@ fn endExternFnDecl(
     const params = try self.fnParams(node.params, ctx);
 
     const return_ty = try self.checkAndGetType(node.return_type, ctx);
-    const fn_type: Type.Function = .{
-        .loc = loc,
-        .params = params.decls,
-        .return_type = return_ty,
-        .kind = .foreign,
-    };
-    const interned_type = self.ti.intern(.{ .function = fn_type });
-    sym.type = interned_type;
+    const fn_type = &ty.function;
+    fn_type.params = params.decls;
+    fn_type.return_type = return_ty;
+    fn_type.kind = .foreign;
 
     const mod = self.state.modules.getFromIndex(self.mod_index);
-
     const lib = self.state.dynlib orelse return self.err(
         .{ .extern_fn_not_in_rayn = .{ .name = name_text } },
         span,
@@ -733,8 +721,8 @@ fn endExternFnDecl(
     return .{
         .instr = self.irb.addInstr(
             .{ .fn_decl = .{
-                .sym_index = sym.index,
-                .type_id = self.ti.typeId(interned_type),
+                .sym_index = sym_index,
+                .type_id = self.ti.typeId(ty),
                 .name = name,
                 .body = &.{},
                 .defaults = params.defaults,
@@ -743,7 +731,7 @@ fn endExternFnDecl(
             } },
             span.start,
         ),
-        .sym = sym.*,
+        .sym = self.scope.getSymbol(name).?.*,
     };
 }
 
@@ -1000,8 +988,7 @@ fn structDecl(self: *Self, node: *const Ast.StructDecl, ctx: *Context) StmtResul
     ctx.self_type = interned;
     defer ctx.self_type = null;
 
-    const sym = try self.declareSymbol(name, .structure, span);
-    sym.type = interned;
+    const sym_index = try self.declareSymbol(name, interned, span);
 
     try self.openContainer(node.name);
     defer self.closeContainer();
@@ -1013,8 +1000,8 @@ fn structDecl(self: *Self, node: *const Ast.StructDecl, ctx: *Context) StmtResul
     return self.irb.addInstr(
         .{ .struct_decl = .{
             .name = name,
-            .sym_index = sym.index,
-            .type_id = self.ti.typeId(sym.type),
+            .sym_index = sym_index,
+            .type_id = self.ti.typeId(interned),
             .fields_count = node.fields.len,
             .default_fields = default_fields,
             .functions = funcs,
@@ -1076,8 +1063,7 @@ fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult 
     ctx.in_trait = true;
     defer ctx.in_trait = false;
 
-    const sym = try self.declareSymbol(name, .trait, span);
-    sym.type = interned;
+    const sym_index = try self.declareSymbol(name, interned, span);
 
     try self.openContainer(node.name);
     defer self.closeContainer();
@@ -1123,8 +1109,8 @@ fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult 
     return self.irb.addInstr(
         .{ .trait_decl = .{
             .name = name,
-            .sym_index = sym.index,
-            .type_id = self.ti.typeId(sym.type),
+            .sym_index = sym_index,
+            .type_id = self.ti.typeId(interned),
             .functions = func_instrs.toOwnedSlice(self.alloc) catch oom(),
         } },
         span.start,
@@ -1144,10 +1130,8 @@ fn unionDecl(self: *Self, node: *const Ast.UnionDecl, ctx: *Context) StmtResult 
 
     const span = self.ast.getSpan(name_tk);
     const interned = self.ti.newUnion(.{ .name = name, .container = container_name }, node.is_err);
-    const ty = &interned.@"union";
 
-    const sym = try self.declareSymbol(name, .@"union", span);
-    sym.type = interned;
+    const sym_index = try self.declareSymbol(name, interned, span);
 
     ctx.self_type = interned;
     defer ctx.self_type = null;
@@ -1155,6 +1139,7 @@ fn unionDecl(self: *Self, node: *const Ast.UnionDecl, ctx: *Context) StmtResult 
     try self.openContainer(name_tk);
     defer self.closeContainer();
 
+    const ty = &interned.@"union";
     const tags = try self.unionTags(node.tags, ty, ctx);
     const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
     const traits = try self.containerTraitImpls(interned, node.traits, &ty.traits, ctx);
@@ -1163,7 +1148,7 @@ fn unionDecl(self: *Self, node: *const Ast.UnionDecl, ctx: *Context) StmtResult 
         .{ .union_decl = .{
             .name = name,
             .tags = tags,
-            .sym_index = sym.index,
+            .sym_index = sym_index,
             .type_id = self.ti.typeId(interned),
             .functions = funcs,
             .traits = traits,
@@ -1823,8 +1808,6 @@ fn breakExpr(self: *Self, expr: *const Ast.Break, ctx: *Context) Result {
 
 fn closure(self: *Self, expr: *const Ast.FnDecl, ctx: *Context) Result {
     const span = self.ast.getSpan(expr);
-    // TODO: create an anonymus name generator mechanism
-    var sym = try self.declareSymbol(self.interner.intern("azert"), .function, span);
 
     self.scope.open(self.alloc, null, .{ .barrier = true });
     defer _ = self.scope.close();
@@ -1839,22 +1822,24 @@ fn closure(self: *Self, expr: *const Ast.FnDecl, ctx: *Context) Result {
         .return_type = try self.checkAndGetType(expr.return_type, ctx),
         .kind = .normal,
     };
-    const interned_type = self.ti.intern(.{ .function = closure_type });
-    sym.type = interned_type;
+    const interned = self.ti.intern(.{ .function = closure_type });
+
+    // TODO: create an anonymus name generator mechanism
+    const sym_index = try self.declareSymbol(self.interner.intern("azert"), interned, span);
 
     const offset = span.start;
 
-    ctx.fn_type = interned_type;
+    ctx.fn_type = interned;
     var body: ArrayList(InstrIndex) = .empty;
     const returns = try self.fnBody(expr.body, &closure_type, &body, span, ctx);
 
     // TODO: protect the cast
     return .{
-        .type = interned_type,
+        .type = interned,
         .instr = self.irb.addInstr(
             .{ .fn_decl = .{
-                .sym_index = sym.index,
-                .type_id = self.ti.typeId(interned_type),
+                .sym_index = sym_index,
+                .type_id = self.ti.typeId(interned),
                 .name = null,
                 .body = body.toOwnedSlice(self.alloc) catch oom(),
                 .defaults = param_res.defaults,
@@ -4157,8 +4142,8 @@ pub fn getConstant(self: *const Self, instr: InstrIndex) Constant {
     return self.state.getConstant(self.irb.getConstantIdx(instr));
 }
 
-fn declareSymbol(self: *Self, name: InternerIdx, kind: LexScope.SymKind, span: Span) Error!*LexScope.Symbol {
-    return self.scope.declareSymbol(self.alloc, name, kind) catch self.err(
+fn declareSymbol(self: *Self, name: InternerIdx, ty: *const Type, span: Span) Error!usize {
+    return self.scope.declareSymbol(self.alloc, name, ty) catch self.err(
         .{ .already_declared = .{ .name = self.interner.getKey(name).? } },
         span,
     );
