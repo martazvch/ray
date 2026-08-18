@@ -48,7 +48,6 @@ pub const Symbol = struct {
 pub const Error = error{ TooManyLocals, AlreadyDeclared };
 pub const VariableMap = AutoArrayHashMapUnmanaged(InternerIdx, Variable);
 pub const SymbolMap = AutoHashMapUnmanaged(InternerIdx, Symbol);
-pub const SymbolArrMap = AutoArrayHashMapUnmanaged(InternerIdx, Symbol);
 
 scopes: ArrayList(Scope),
 current: *Scope,
@@ -93,8 +92,7 @@ pub const Scope = struct {
     name: ?InternerIdx,
     variables: VariableMap = .empty,
     forwarded: VariableMap = .empty,
-    // TODO: why array? If I change it breaks
-    symbols: SymbolArrMap = .empty,
+    symbols: SymbolMap = .empty,
     /// First is the interned identifier and second is the interned module's path key of module interner
     modules: AutoHashMapUnmanaged(InternerIdx, *const Type) = .empty,
     breaks: ArrayList(Break) = .empty,

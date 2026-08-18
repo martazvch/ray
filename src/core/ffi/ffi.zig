@@ -1,6 +1,5 @@
 const std = @import("std");
 const misc = @import("misc");
-const SymbolArrMap = @import("../analyzer/LexicalScope.zig").SymbolArrMap;
 const TypeInterner = @import("../analyzer/types.zig").TypeInterner;
 const NativeReg = @import("../pipeline/NativesRegister.zig");
 const Type = @import("../analyzer/types.zig").Type;

@@ -4,3 +4,4 @@ invalid_assign_target
 type_mismatch, int, float
 assign_to_constant, cte
 invalid_assign_target
+assign_to_constant, constFoo

@@ -8,7 +8,7 @@ const MapNameType = @import("../analyzer/types.zig").MapNameType;
 const Type = @import("../analyzer/types.zig").Type;
 const TypeInterner = @import("../analyzer/types.zig").TypeInterner;
 const Symbol = @import("../analyzer/LexicalScope.zig").Symbol;
-const SymbolArrMap = @import("../analyzer/LexicalScope.zig").SymbolArrMap;
+const SymbolMap = @import("../analyzer/LexicalScope.zig").SymbolMap;
 
 const Module = @import("ModuleManager.zig").Module;
 const Obj = @import("../runtime/Obj.zig");
@@ -46,7 +46,7 @@ intrinsics: std.AutoHashMapUnmanaged(Interner.Index, zffi.IntrinsicFn),
 intrinsics_meta: Meta,
 
 const Self = @This();
-pub const Meta = SymbolArrMap;
+pub const Meta = SymbolMap;
 
 pub fn init(self: *Self, alloc: Allocator, interner: *Interner) void {
     self.mods = .empty;

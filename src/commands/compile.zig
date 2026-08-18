@@ -278,7 +278,7 @@ fn transpileInstr(self: *Self, instr: usize, interner: *const misc.Interner) !vo
                 self.printSlice("pub const {s} = struct {{", .{struct_name}, .all);
                 self.openScope();
 
-                std.log.debug("Syms: {any}", .{self.lex_scope.stack.getLast().symbols.values()});
+                // std.log.debug("Syms: {any}", .{self.lex_scope.stack.getLast().symbols.values()});
 
                 // TODO: maybe handle defaults better, see when doing the same for functions
                 var def_count: usize = 0;
@@ -293,7 +293,7 @@ fn transpileInstr(self: *Self, instr: usize, interner: *const misc.Interner) !vo
                         self.printSlice("{s}: {s}", .{ interner.getKey(name).?, getType(field.type, interner) }, .all);
                     }
                 }
-                std.log.debug("Syms: {any}", .{self.lex_scope.stack.getLast().symbols.values()});
+                // std.log.debug("Syms: {any}", .{self.lex_scope.stack.getLast().symbols.values()});
 
                 for (n.functions) |func| {
                     try self.transpilefn(self.irb.instructions.items(.data)[func].fn_decl, interner);

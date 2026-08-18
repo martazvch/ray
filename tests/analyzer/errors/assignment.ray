@@ -1,4 +1,6 @@
 struct Foo {
+    a: int,
+
     fn f(self, a: int) { print a }
 }
 
@@ -18,11 +20,14 @@ fn main() {
     cte = 7
 
     // Assign to method
-    var foo = Foo {}
+    var foo = Foo{ a: 5 }
 
     fn f2(this: Foo, a: int) {
         print 2 * a
     }
 
     foo.f = f2
+
+    let constFoo = Foo{ a: 5 }
+    constFoo.a = 1
 }

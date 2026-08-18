@@ -1,7 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const SymbolArrMap = @import("../analyzer/LexicalScope.zig").SymbolArrMap;
+const SymbolMap = @import("../analyzer/LexicalScope.zig").SymbolMap;
 const Value = @import("../runtime/values.zig").Value;
 const Obj = @import("../runtime/Obj.zig");
 const State = @import("../pipeline/State.zig");
@@ -21,7 +21,7 @@ pub const Module = struct {
     native: bool,
     /// Type infos gathered by the analyzer used when importing a module
     /// It has all the analyzis-time data to type check
-    sym_infos: SymbolArrMap,
+    sym_infos: SymbolMap,
     /// Compiled values/symbols used at runtime
     globals: []Value,
     constants: []Value,
@@ -111,7 +111,7 @@ pub fn open(self: *Self, allocator: Allocator, path: InternerIndex, name: Intern
 
 /// Adds symbols informations to module so that other module can have type informations when importing
 /// symbols from this one
-pub fn registerSymsInfo(self: *Self, allocator: Allocator, index: Index, symbols: *const SymbolArrMap) void {
+pub fn registerSymsInfo(self: *Self, allocator: Allocator, index: Index, symbols: *const SymbolMap) void {
     var mod = self.getFromIndex(index);
     mod.sym_infos.ensureUnusedCapacity(allocator, symbols.count()) catch oom();
 
