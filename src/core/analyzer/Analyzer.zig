@@ -48,6 +48,7 @@ pub const Context = struct {
     decl_type: ?*const Type,
     fn_type: ?*const Type,
     self_type: ?*const Type,
+    in_assign: bool,
     in_call: bool,
     in_for: bool,
     in_trap: bool,
@@ -59,6 +60,7 @@ pub const Context = struct {
         .decl_type = null,
         .fn_type = null,
         .self_type = null,
+        .in_assign = false,
         .in_call = false,
         .in_for = false,
         .in_trap = false,
@@ -233,35 +235,21 @@ pub fn analyzeNode(self: *Self, node: *const Node, expect: ExprResKind, ctx: *Co
 fn assignment(self: *Self, node: *const Ast.Assignment, ctx: *Context) StmtResult {
     const span = self.ast.getSpan(node.assigne);
 
-    const assigne: InstrInfos = switch (node.assigne.*) {
-        .identifier => |e| b: {
-            var assigne = try self.expectVariableIdentifier(e);
-            if (assigne.variable.constant) return self.err(.{ .assign_to_constant = .{ .name = self.ast.toSource(e) } }, span);
-
-            assigne.variable.initialized = true;
-            break :b .{ .type = assigne.variable.type, .instr = assigne.instr };
-        },
-        .field => |*e| b: {
-            const field_result = try self.field(e, ctx);
-            if (field_result.ti.is_sym) return self.err(.assign_to_struct_fn, span);
-
-            // Resolving methods without call result in a bound method
-            if (field_result.type.* == .function and field_result.type.function.kind == .bound) {
-                return self.err(.assign_to_struct_fn, span);
-            }
-            break :b .{ .type = field_result.type, .instr = field_result.instr };
-        },
-        .fn_call => return self.err(.invalid_assign_target, span),
-        .indexing => |*expr| b: {
-            const res = try self.indexing(expr, ctx);
-
-            if (res.type.* == .str) {
-                return self.err(.index_assign_str, self.ast.getSpan(expr.expr));
-            }
-            break :b res;
-        },
+    switch (node.assigne.*) {
+        .identifier, .field, .indexing => {},
         else => return self.err(.invalid_assign_target, span),
+    }
+
+    const assigne = assigne: {
+        ctx.in_assign = true;
+        defer ctx.in_assign = false;
+        break :assigne try self.analyzeExpr(node.assigne, .value, ctx);
     };
+
+    // In case we resolved to a method (passes 'field' test) or a variable holding a function
+    if (assigne.ti.is_sym) {
+        return self.err(.invalid_assign_target, span);
+    }
 
     const prev_decl = ctx.setAndGetPrevious(.decl_type, assigne.type);
     defer ctx.decl_type = prev_decl;
@@ -796,7 +784,12 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
             const self_type = ctx.self_type orelse return self.err(.self_outside_decl, span);
 
             is_method = true;
-            _ = try self.declareVariable(param_name, self_type, .{ .captured = p.meta.captured }, .zero);
+            _ = try self.declareVariable(
+                param_name,
+                self_type,
+                .{ .captured = p.meta.captured, .constant = false },
+                .zero,
+            );
             decls.putAssumeCapacity(param_name, .{
                 .name = param_name,
                 .type = self_type,
@@ -2025,7 +2018,7 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
         },
         .module => |ty| return self.moduleAccess(expr.field, ty),
         .str => return self.runtimeObjFnAccess(.string, struct_res.instr, expr.field, struct_res.type),
-        .structure => |*ty| try self.structureAccess(expr.field, ty, struct_res.ti.is_sym, ctx.in_call),
+        .structure => |*ty| try self.structureAccess(expr.field, ty, struct_res.ti.is_sym, ctx),
         .trait => try self.traitAccess(expr, struct_res.type, struct_res.ti.is_sym),
         .@"union" => |ty| b: {
             const res = try self.unionAccess(struct_res, ty, expr.field);
@@ -2043,7 +2036,7 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
 
     const is_static = field_res.kind == .function and struct_res.ti.is_sym;
 
-    if (!is_static and field_res.kind != .field and field_res.kind != .field_native and !ctx.in_call) {
+    if (!is_static and field_res.kind != .field and field_res.kind != .field_native and !ctx.in_call and !ctx.in_assign) {
         return self.boundMethod(field_res.type, field_res.index, struct_res.instr, span);
     }
 
@@ -2263,7 +2256,7 @@ fn structureAccess(
     field_tk: Ast.TokenIndex,
     ty: *const Type.Structure,
     is_symbol: bool,
-    in_call: bool,
+    ctx: *Context,
 ) Error!AccessResult {
     const text = self.ast.toSource(field_tk);
     const field_name = self.interner.intern(text);
@@ -2294,7 +2287,7 @@ fn structureAccess(
             return self.err(.{ .undeclared_field_access = .{ .name = text } }, self.ast.getSpan(field_tk));
         };
 
-        if (in_call) {
+        if (ctx.in_call) {
             const fn_type = &func.type.function;
             // Call method on type
             if (is_symbol and fn_type.kind == .method) {
@@ -2543,10 +2536,17 @@ fn resolveIdentifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool,
     const name = self.interner.intern(text);
 
     if (self.variableIdentifier(name, span)) |res| {
-        if (initialized and !res.variable.initialized) {
-            return self.err(.{ .use_uninit_var = .{ .name = text } }, self.ast.getSpan(token_name));
-        }
+        if (initialized and !res.variable.initialized) return self.err(
+            .{ .use_uninit_var = .{ .name = text } },
+            self.ast.getSpan(token_name),
+        );
         res.variable.used = true;
+        res.variable.initialized = true;
+
+        if (ctx.in_assign and res.variable.constant) return self.err(
+            .{ .assign_to_constant = .{ .name = text } },
+            span,
+        );
 
         return .{
             .type = res.variable.type,
@@ -2770,16 +2770,25 @@ fn in(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
 }
 
 fn indexing(self: *Self, expr: *const Ast.Indexing, ctx: *Context) Result {
+    const span = self.ast.getSpan(expr.expr);
+    // While resolving indecies, we turn off 'in_assign' flag because if the index is a const
+    // variable it's gonna error because it's resolved as the lhs of assignment
+    const prev_assign = ctx.setAndGetPrevious(.in_assign, false);
     const index, const index_kind = try self.expectIndex(expr.index, ctx);
+    ctx.in_assign = prev_assign;
+
     const expr_res = try self.analyzeExpr(expr.expr, .value, ctx);
 
     // NOTE: when implementing maps, disallow range for it
     const elem_type = switch (expr_res.type.*) {
         .array => |t| t.child,
-        .str => expr_res.type,
+        .str => if (ctx.in_assign)
+            return self.err(.index_assign_str, span)
+        else
+            expr_res.type,
         else => return self.err(
             .{ .non_indexable_type = .{ .found = self.typeName(expr_res.type) } },
-            self.ast.getSpan(expr.expr),
+            span,
         ),
     };
 
@@ -2852,7 +2861,8 @@ pub fn intLit(self: *Self, expr: Ast.Int, negate: bool) Result {
 }
 
 pub fn identifier(self: *Self, expr: Ast.Identifier, ctx: *Context) Result {
-    const res = try self.resolveIdentifier(expr, true, ctx);
+    // No need for the value to be initialized to be assigned
+    const res = try self.resolveIdentifier(expr, if (ctx.in_assign) false else true, ctx);
     return .{
         .type = res.type,
         .ti = .{

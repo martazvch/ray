@@ -9,6 +9,6 @@ fn main() {
     var twoDim = [[1, 2], [3, 4]]
     print twoDim[0][1][2]
 
-    let name = "Tom"
+    var name = "Tom"
     name[1] = "i"
 }

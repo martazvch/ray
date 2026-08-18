@@ -1,3 +1,7 @@
+struct Foo {
+    fn f(self, a: int) { print a }
+}
+
 fn add(a: int) {
     // Can't assign to function parameter
     a = 4
@@ -12,4 +16,13 @@ fn main() {
 
     let cte = 5
     cte = 7
+
+    // Assign to method
+    var foo = Foo {}
+
+    fn f2(this: Foo, a: int) {
+        print 2 * a
+    }
+
+    foo.f = f2
 }
