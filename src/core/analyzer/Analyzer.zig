@@ -3633,11 +3633,12 @@ fn loadSymbolFromDot(self: *Self, span: Span, ctx: *Context) Result {
     const decl = ctx.decl_type orelse {
         return self.err(.cant_infer_implicit_selector, span);
     };
-    const sym = self.scope.getSymbolFromType(decl).?;
+    const inner_type = extractDeclType(decl);
+    const sym = self.scope.getSymbolFromType(inner_type).?;
 
     // TODO: protect cast
     return .{
-        .type = decl,
+        .type = sym.type,
         .instr = self.irb.addInstr(
             .{ .load_symbol = .{
                 .symbol = @intCast(sym.index),

@@ -17,4 +17,10 @@ fn useData(data: ?Data, dir: ?Dir) {
 fn main() {
     useData(.{ a: 1, b: 2 }, .down)
     useData(null, null)
+
+    let data: ?Data = .{ a: 3, b: 4 }
+    if let d = data {
+        print d.a
+        print d.b
+    }
 }
