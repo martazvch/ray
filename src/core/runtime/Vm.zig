@@ -324,7 +324,7 @@ fn execute(self: *Self) !void {
                 const idx = self.frame.readByte();
                 self.frame.module.globals[idx] = self.stack.pop();
             },
-            .deref => self.stack.push(self.stack.pop().obj.as(Obj.Ref).child.*),
+            .deref => self.stack.push(self.stack.pop().obj.as(Obj.Pointer).child.*),
             .div_float => {
                 const rhs = self.stack.pop().float;
                 self.stack.peekRef(0).float /= rhs;
@@ -339,9 +339,9 @@ fn execute(self: *Self) !void {
             .eq_float => self.stack.push(Value.makeBool(self.stack.pop().float == self.stack.pop().float)),
             .eq_int => self.stack.push(Value.makeBool(self.stack.pop().int == self.stack.pop().int)),
             .eq_null => self.stack.push(Value.makeBool(self.stack.pop() == .null)),
-            .eq_ref => {
-                const ref1 = self.stack.pop().obj.as(Obj.Ref).child;
-                const ref2 = self.stack.pop().obj.as(Obj.Ref).child;
+            .eq_ptr => {
+                const ref1 = self.stack.pop().obj.as(Obj.Pointer).child;
+                const ref2 = self.stack.pop().obj.as(Obj.Pointer).child;
                 self.stack.push(.makeBool(ref1 == ref2));
             },
             .eq_str => self.stack.push(Value.makeBool(self.stack.pop().obj.as(Obj.String) == self.stack.pop().obj.as(Obj.String))),
@@ -594,9 +594,9 @@ fn execute(self: *Self) !void {
             .ne_float => self.stack.push(Value.makeBool(self.stack.pop().float != self.stack.pop().float)),
             .ne_null => self.stack.push(Value.makeBool(self.stack.pop() != .null)),
             .ne_null_push => self.stack.push(Value.makeBool(self.stack.peek(0) != .null)),
-            .ne_ref => {
-                const ref1 = self.stack.pop().obj.as(Obj.Ref).child;
-                const ref2 = self.stack.pop().obj.as(Obj.Ref).child;
+            .ne_ptr => {
+                const ref1 = self.stack.pop().obj.as(Obj.Pointer).child;
+                const ref2 = self.stack.pop().obj.as(Obj.Pointer).child;
                 self.stack.push(.makeBool(ref1 != ref2));
             },
             .ne_str => self.stack.push(Value.makeBool(self.stack.pop().obj.as(Obj.String) != self.stack.pop().obj.as(Obj.String))),
@@ -618,16 +618,21 @@ fn execute(self: *Self) !void {
             },
             .ptr_local => {
                 const idx = self.frame.readByte();
-                self.stack.push(.makeObj(Obj.Ref.create(self, &self.frame.slots[idx]).asObj()));
+                self.stack.push(.makeObj(Obj.Pointer.create(self, &self.frame.slots[idx]).asObj()));
             },
             .ptr_global => {
                 const idx = self.frame.readByte();
-                self.stack.push(.makeObj(Obj.Ref.create(self, &self.frame.module.globals[idx]).asObj()));
+                self.stack.push(.makeObj(Obj.Pointer.create(self, &self.frame.module.globals[idx]).asObj()));
             },
             .ptr_field => {
                 const idx = self.frame.readByte();
                 const field = &self.stack.pop().obj.as(Obj.Instance).fields[idx];
-                self.stack.push(.makeObj(Obj.Ref.create(self, field).asObj()));
+                self.stack.push(.makeObj(Obj.Pointer.create(self, field).asObj()));
+            },
+            .ptr_store => {
+                const ptr = self.stack.pop().obj.as(Obj.Pointer);
+                const value = self.stack.pop();
+                ptr.child.* = value;
             },
             .push_false => self.stack.push(Value.false_),
             .push_null => self.stack.push(Value.null_),

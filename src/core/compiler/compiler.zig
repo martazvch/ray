@@ -446,6 +446,11 @@ const Compiler = struct {
 
         // TODO: no use of data.cow?
         const variable_data, const unbox = switch (self.manager.instr_data[data.assigne]) {
+            .deref => |deref| {
+                try self.compileInstr(deref);
+                self.writeOp(.ptr_store);
+                return;
+            },
             .identifier => |*variable| .{ variable, false },
             .indexing => |indexing_data| return self.arrayAssign(indexing_data),
             .field => |*field_data| return self.fieldAssignment(field_data),
@@ -490,7 +495,7 @@ const Compiler = struct {
                 .eq_bool => .eq_bool,
                 .eq_float => .eq_float,
                 .eq_int => .eq_int,
-                .eq_ref => .eq_ref,
+                .eq_ptr => .eq_ptr,
                 .eq_str => .eq_str,
                 .ge_float => .ge_float,
                 .ge_int => .ge_int,
@@ -508,7 +513,7 @@ const Compiler = struct {
                 .ne_bool => .ne_bool,
                 .ne_float => .ne_float,
                 .ne_int => .ne_int,
-                .ne_ref => .ne_ref,
+                .ne_ptr => .ne_ptr,
                 .ne_str => .ne_str,
                 .question_mark_question_mark => .fallback_opt,
                 .sub_float => .sub_float,

@@ -1,0 +1,10 @@
+-- main --
+load_const index 3, value 1
+ptr_local index 0
+load_const index 4, value 6
+get_local index 1
+ptr_store
+ret_naked
+
+-- global scope --
+call index 0, arity 0, main

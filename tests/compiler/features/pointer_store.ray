@@ -1,0 +1,6 @@
+fn main() {
+    let a = 1
+    let ptr = *a
+    ptr.* = 6
+}
+

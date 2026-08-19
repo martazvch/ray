@@ -53,6 +53,7 @@ pub const Context = struct {
     in_for: bool,
     in_trap: bool,
     in_trait: bool,
+    in_deref: bool,
     /// To know if we're in an equality, used for implicit selector on unions
     in_eq: bool,
 
@@ -66,6 +67,7 @@ pub const Context = struct {
         .in_trap = false,
         .in_trait = false,
         .in_eq = false,
+        .in_deref = false,
     };
 
     const ContextSnapshot = struct {
@@ -236,13 +238,14 @@ fn assignment(self: *Self, node: *const Ast.Assignment, ctx: *Context) StmtResul
     const span = self.ast.getSpan(node.assigne);
 
     switch (node.assigne.*) {
-        .identifier, .field, .indexing => {},
+        .deref, .identifier, .indexing, .field => {},
         else => return self.err(.invalid_assign_target, span),
     }
 
     const assigne = assigne: {
         ctx.in_assign = true;
         defer ctx.in_assign = false;
+
         break :assigne try self.analyzeExpr(node.assigne, .value, ctx);
     };
 
@@ -1773,7 +1776,7 @@ fn getComparisonOp(op: TokenTag, ty: *const Type) Instr.Binop.Op {
         .bool => if (op == .equal_equal) .eq_bool else .ne_bool,
         .int => if (op == .equal_equal) .eq_int else .ne_int,
         .float => if (op == .equal_equal) .eq_float else .ne_float,
-        .pointer => if (op == .equal_equal) .eq_ref else .ne_ref,
+        .pointer => if (op == .equal_equal) .eq_ptr else .ne_ptr,
         .str => if (op == .equal_equal) .eq_str else .ne_str,
         .null, .optional => if (op == .equal_equal) .eq_null else .ne_null,
         else => unreachable,
@@ -1956,6 +1959,8 @@ fn findImplicitSelctInUnion(ty: *const Type.InlineUnion, tag: InternerIdx) ?TagR
 
 fn deref(self: *Self, expr: Ast.Deref, ctx: *Context) Result {
     const span = self.ast.getSpan(expr.expr);
+    const prev_deref = ctx.setAndGetPrevious(.in_deref, true);
+    defer ctx.in_deref = prev_deref;
     const res = try self.analyzeExpr(expr.expr, .value, ctx);
 
     const ref = res.type.as(.pointer) orelse return self.err(
@@ -2559,7 +2564,8 @@ fn resolveIdentifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool,
         res.variable.used = true;
         res.variable.initialized = true;
 
-        if (ctx.in_assign and res.variable.constant) return self.err(
+        // We can assign to a constant pointer if we're dereferencing it
+        if (ctx.in_assign and !ctx.in_deref and res.variable.constant) return self.err(
             .{ .assign_to_constant = .{ .name = text } },
             span,
         );

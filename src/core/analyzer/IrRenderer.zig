@@ -163,6 +163,13 @@ fn assignment(self: *Self, data: *const Instruction.Assignment) void {
     self.parseInstr(data.value);
 
     const variable_data, const unbox = switch (self.instrs[data.assigne]) {
+        .deref => |deref| {
+            self.indentAndAppendSlice("[Pointer store]");
+            self.indent_level += 1;
+            defer self.indent_level -= 1;
+            self.parseInstr(deref);
+            return;
+        },
         .indexing => |indexing_data| return self.indexing(indexing_data, data.cow, true),
         .identifier => |*variable| .{ variable, false },
         .field => |member| return self.fieldAssignment(member, data.cow),

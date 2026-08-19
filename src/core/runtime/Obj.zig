@@ -40,7 +40,7 @@ const Kind = enum {
     native_zfn,
     foreign_fn,
     native_obj,
-    reference,
+    pointer,
     string,
     trait_obj,
     union_instance,
@@ -57,7 +57,7 @@ const Kind = enum {
             ZigFn => .native_zfn,
             ForeignFn => .foreign_fn,
             NativeObj => .native_obj,
-            Ref => .reference,
+            Pointer => .pointer,
             String => .string,
             TraitObj => .trait_obj,
             UnionInstance => .union_instance,
@@ -840,7 +840,7 @@ pub const TraitObj = struct {
     }
 };
 
-pub const Ref = struct {
+pub const Pointer = struct {
     obj: Obj,
     child: *Value,
 
@@ -869,7 +869,7 @@ pub fn deepCopy(self: *Obj, vm: *Vm) *Obj {
         .enum_instance, .@"error", .union_instance => @panic("TODO"),
         .instance => self.as(Instance).deepCopy(vm).asObj(),
         // Immutable, shallow copy ok
-        .box, .closure, .function, .iterator, .foreign_fn, .native_zfn, .native_obj, .string, .trait_obj, .reference => self,
+        .box, .closure, .function, .iterator, .foreign_fn, .native_zfn, .native_obj, .string, .trait_obj, .pointer => self,
     };
 }
 
@@ -903,7 +903,7 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
             const object = self.as(NativeObj);
             object.deinit(vm);
         },
-        .reference => self.as(Ref).deinit(vm),
+        .pointer => self.as(Pointer).deinit(vm),
         .string => self.as(String).deinit(vm.gc_alloc),
         .trait_obj => self.as(TraitObj).deinit(vm),
         .union_instance => self.as(UnionInstance).deinit(vm),
@@ -950,7 +950,7 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
         .foreign_fn => try writer.print("<foreign fn {s}>", .{self.as(ForeignFn).name}),
         .native_zfn => try writer.print("<native zig fn {s}>", .{self.as(ZigFn).name}),
         .native_obj => try writer.print("<native object {s}>", .{self.as(NativeObj).name}),
-        .reference => try writer.print("<ref 0x{x}>", .{@intFromPtr(self.as(Ref).child)}),
+        .pointer => try writer.print("<pointer 0x{x}>", .{@intFromPtr(self.as(Pointer).child)}),
         .string => try writer.print("{s}", .{self.as(String).chars}),
         .trait_obj => try writer.print("<trait obj {s}>", .{self.as(TraitObj).vtable.name}),
         .union_instance, .@"error" => {
@@ -979,7 +979,7 @@ pub fn log(self: *Obj) void {
         .foreign_fn => std.debug.print("<foreign fn {s}>", .{self.as(ForeignFn).name}),
         .native_zfn => std.debug.print("<native zig fn {s}>", .{self.as(ZigFn).name}),
         .native_obj => unreachable,
-        .reference => std.debug.print("<ref 0x{x}>", .{@intFromPtr(self.as(Ref).child)}),
+        .pointer => std.debug.print("<pointer 0x{x}>", .{@intFromPtr(self.as(Pointer).child)}),
         .string => std.debug.print("{s}", .{self.as(String).chars}),
         .trait_obj => std.debug.print("<trait obj {s}>", .{self.as(TraitObj).vtable.name}),
         .union_instance => std.debug.print("<union instance {s}>", .{self.as(EnumInstance).parent.name}),

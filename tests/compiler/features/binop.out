@@ -129,12 +129,12 @@ load_const index 16, value 2
 
 ptr_local index 0
 ptr_local index 1
-eq_ref
+eq_ptr
 pop
 
 ptr_local index 0
 ptr_local index 1
-ne_ref
+ne_ptr
 pop
 
 ret_naked

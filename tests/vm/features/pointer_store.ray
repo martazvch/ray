@@ -1,0 +1,9 @@
+fn main() {
+    let a = 1
+    let ptr = *a
+    print ptr.*
+
+    ptr.* = 6
+    print ptr.*
+}
+
