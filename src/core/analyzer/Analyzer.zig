@@ -26,7 +26,7 @@ const State = @import("../pipeline/State.zig");
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
 const ffi = @import("../ffi/ffi.zig");
 const Value = @import("../runtime/values.zig").Value;
-const CFn = @import("../runtime/Obj.zig").ForeignFn;
+const ForeignFn = @import("../runtime/Obj.zig").ForeignFn;
 
 const type_mod = @import("types.zig");
 const Type = type_mod.Type;
@@ -701,7 +701,6 @@ fn endExternFnDecl(
     fn_type.return_type = return_ty;
     fn_type.kind = .foreign;
 
-    const mod = self.state.modules.getFromIndex(self.mod_index);
     const lib = self.state.dynlib orelse return self.err(
         .{ .extern_fn_not_in_rayn = .{ .name = name_text } },
         span,
@@ -714,9 +713,8 @@ fn endExternFnDecl(
         span,
     );
     const returns = !return_ty.is(.void);
-    const obj_func = CFn.create(self.alloc, name_text, func, returns);
-
-    mod.foreign_funcs.append(self.alloc, obj_func) catch oom();
+    const obj_func = ForeignFn.create(self.alloc, name_text, func, returns);
+    self.state.modules.addForeignSymbol(self.alloc, self.mod_index, obj_func);
 
     return .{
         .instr = self.irb.addInstr(
@@ -758,33 +756,20 @@ const Params = struct {
 };
 
 fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
-    var decls: AutoArrayHashMapUnmanaged(InternerIdx, Type.Function.Parameter) = .empty;
+    var decls: Type.Function.ParamsMap = .empty;
     decls.ensureTotalCapacity(self.alloc, params.len) catch oom();
 
     var is_method = false;
     var defaults: ArrayList(InstrIndex) = .empty;
 
-    for (params, 0..) |*p, i| {
+    for (params, 0..) |p, i| {
         const span = self.ast.getSpan(p.name);
         const param_name = self.internToken(p.name);
 
+        // Self parameter
         if (i == 0 and param_name == self.cached_names.self) {
-            const self_type = ctx.self_type orelse return self.err(.self_outside_decl, span);
-
+            try self.selfParam(p, &decls, span, ctx);
             is_method = true;
-            _ = try self.declareVariable(
-                param_name,
-                self_type,
-                .{ .captured = p.meta.captured, .constant = false },
-                .zero,
-            );
-            decls.putAssumeCapacity(param_name, .{
-                .name = param_name,
-                .type = self_type,
-                .mod_index = null,
-                .default = null,
-                .captured = false,
-            });
             continue;
         }
 
@@ -803,11 +788,17 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
             defaults.append(self.alloc, value_res.instr) catch oom();
         }
 
-        if (param_res.type.is(.void)) return self.err(.void_param, span);
+        if (param_res.type.is(.void)) {
+            return self.err(.void_param, span);
+        }
 
-        _ = try self.declareVariable(param_name, param_res.type, .{ .captured = p.meta.captured, .is_fn_param = true }, span);
+        _ = try self.declareVariable(
+            param_name,
+            param_res.type,
+            .{ .captured = p.meta.captured, .is_fn_param = true },
+            span,
+        );
         decls.putAssumeCapacity(param_name, .{
-            .name = param_name,
             .type = param_res.type,
             .mod_index = param_res.mod,
             .default = const_index,
@@ -815,7 +806,34 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
         });
     }
 
-    return .{ .decls = decls, .defaults = defaults.toOwnedSlice(self.alloc) catch oom(), .is_method = is_method };
+    return .{
+        .decls = decls,
+        .defaults = defaults.toOwnedSlice(self.alloc) catch oom(),
+        .is_method = is_method,
+    };
+}
+
+fn selfParam(
+    self: *Self,
+    param: Ast.VarDecl,
+    decls: *Type.Function.ParamsMap,
+    span: Span,
+    ctx: *Context,
+) Error!void {
+    const self_type = ctx.self_type orelse return self.err(.self_outside_decl, span);
+
+    _ = try self.declareVariable(
+        self.cached_names.self,
+        self_type,
+        .{ .captured = param.meta.captured, .constant = false },
+        .zero,
+    );
+    decls.putAssumeCapacity(self.cached_names.self, .{
+        .type = self_type,
+        .mod_index = null,
+        .default = null,
+        .captured = false,
+    });
 }
 
 /// Analyses function's body and returns if the function returns
@@ -1263,7 +1281,6 @@ fn use(self: *Self, node: *const Ast.Use) StmtResult {
 
     if (node.items) |items| {
         const mod = self.state.modules.getFromPath(path).?;
-        const mod_index = self.state.modules.getIndex(path).?;
 
         for (items) |item| {
             const item_name = self.internToken(item.item);
@@ -1280,7 +1297,6 @@ fn use(self: *Self, node: *const Ast.Use) StmtResult {
                 @panic("Import not supported yet");
             }
 
-            sym.module_index = mod_index;
             const item_token = if (item.alias) |alias| alias else item.item;
             const item_interned = self.internToken(item_token);
             self.scope.declareExternSymbol(self.alloc, item_interned, sym);
@@ -1884,7 +1900,7 @@ pub fn implicitSelector(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result 
 
     // TODO: protect the cast
     const tag_lit: Constant.TagLit = .{
-        .sym = .{ .module_index = sym.module_index, .symbol_index = @intCast(sym.index) },
+        .sym = .{ .module = sym.module, .symbol = @intCast(sym.index) },
         .tag_index = @intCast(tag_res.index),
     };
 
@@ -2037,13 +2053,20 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
         // If it's a static function, we just call it
         .instr = if (is_static)
             self.irb.addInstr(
-                .{ .load_symbol = .{ .symbol_index = @intCast(field_res.index), .module_index = struct_res.ti.ext_mod } },
+                .{ .load_symbol = .{
+                    .symbol = @intCast(field_res.index),
+                    .module = self.getExtModOrCurrent(struct_res.ti.ext_mod),
+                } },
                 span.start,
             )
             // Other wise we still want to compute 'self' to call the method on it
         else
             self.irb.addInstr(
-                .{ .field = .{ .structure = struct_res.instr, .index = field_res.index, .kind = field_res.kind } },
+                .{ .field = .{
+                    .structure = struct_res.instr,
+                    .index = field_res.index,
+                    .kind = field_res.kind,
+                } },
                 span.start,
             ),
     };
@@ -2134,7 +2157,6 @@ fn runtimeFnToType(self: *Self, func: type_mod.ObjFnTypeInfo, current_generic: *
     params.putAssumeCapacity(
         self.interner.intern("self"),
         .{
-            .name = self.interner.intern("self"),
             .type = current_generic,
             .mod_index = null,
             .default = null,
@@ -2143,10 +2165,15 @@ fn runtimeFnToType(self: *Self, func: type_mod.ObjFnTypeInfo, current_generic: *
     );
 
     for (func.params) |p| {
-        const ty = self.runtimeObjToType(p, current_generic);
+        const ty = self.runtimeObjToType(p.ty, current_generic);
         params.putAssumeCapacity(
-            0,
-            .{ .name = null, .type = ty, .mod_index = null, .default = null, .captured = false },
+            self.interner.intern(p.name),
+            .{
+                .type = ty,
+                .mod_index = null,
+                .default = null,
+                .captured = false,
+            },
         );
     }
 
@@ -2160,7 +2187,7 @@ fn runtimeFnToType(self: *Self, func: type_mod.ObjFnTypeInfo, current_generic: *
     return self.ti.intern(ty);
 }
 
-fn runtimeObjToType(self: *Self, ty: type_mod.ObjFnType, current_generic: *const Type) *const Type {
+fn runtimeObjToType(self: *Self, ty: type_mod.ObjFnTypeInfo.FnType, current_generic: *const Type) *const Type {
     return switch (ty) {
         .bool => self.ti.getCached(.bool),
         .int => self.ti.getCached(.int),
@@ -2327,24 +2354,23 @@ fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_name: InternerIdx)
 
     const field_name = self.interner.intern(text);
     const module = self.state.modules.getFromPath(module_name).?;
-    var sym = module.sym_infos.get(field_name) orelse return self.err(
-        .{ .missing_symbol_in_module = .{ .module = self.interner.getKey(module.name).?, .symbol = text } },
+    const sym = module.sym_infos.get(field_name) orelse return self.err(
+        .{ .missing_symbol_in_module = .{
+            .module = self.interner.getKey(module.name).?,
+            .symbol = text,
+        } },
         span,
     );
-    const index = self.state.modules.getIndex(module_name).?;
-
-    // Declare type in current scope to emulate import, especially useful for implicit selector
-    sym.module_index = index;
     self.scope.declareExternSymbol(self.alloc, field_name, sym);
 
     // TODO: protect the cast
     return .{
         .type = sym.type,
-        .ti = .{ .is_sym = true, .ext_mod = index },
+        .ti = .{ .is_sym = true, .ext_mod = sym.module },
         .instr = self.irb.addInstr(
             .{ .load_symbol = .{
-                .module_index = index,
-                .symbol_index = @intCast(sym.index),
+                .module = sym.module,
+                .symbol = @intCast(sym.index),
                 .kind = if (module.native) .zig else .ray,
             } },
             span.start,
@@ -2381,7 +2407,7 @@ fn call(self: *Self, expr: *const Ast.FnCall, ctx: *Context) Result {
             .{ .call = .{
                 .callee = callee.instr,
                 .args = args_res.instrs,
-                .ext_mod = callee.ti.ext_mod,
+                .module = self.getExtModOrCurrent(callee.ti.ext_mod),
                 .kind = fn_type.kind,
             } },
             span.start,
@@ -2400,16 +2426,21 @@ fn fnArgsList(
 ) Error!struct { instrs: []const Instr.Arg, first: *const Type } {
     var proto = ty.proto(self.alloc);
     const param_count = proto.count();
-    const params = ty.params.values()[@intFromBool(ty.kind == .method)..];
+    const params = ty.getParams();
 
-    if (args.len > param_count) return self.err(.{ .too_many_fn_args = .{ .expect = param_count, .found = args.len } }, err_span);
+    if (args.len > param_count) return self.err(
+        .{ .too_many_fn_args = .{ .expect = param_count, .found = args.len } },
+        err_span,
+    );
 
     var instrs = self.alloc.alloc(Instr.Arg, params.len) catch oom();
-    var proto_values = proto.values();
 
-    for (proto_values, 0..) |val, i| {
-        if (val.default) |def| {
-            instrs[i] = .{ .default = .{ .const_index = def, .mod = ext_mod } };
+    for (params, 0..) |param, i| {
+        if (param.default) |def| {
+            instrs[i] = .{ .default = .{
+                .constant = def,
+                .module = self.getExtModOrCurrent(ext_mod),
+            } };
         }
     }
 
@@ -2418,64 +2449,29 @@ fn fnArgsList(
     defer ctx.decl_type = prev_decl;
 
     for (args, 0..) |arg, i| {
-        var param_info: *const Type.Function.Parameter = undefined;
         const span = self.ast.getSpan(arg.value);
-
-        const index = value: {
-            if (arg.name) |param_name| {
-                if (ty.kind == .bound) return self.err(.named_arg_in_bounded, self.ast.getSpan(param_name));
-
-                const name = self.internToken(param_name);
-
-                param_info = ty.params.getPtr(name) orelse return self.err(
-                    .{ .unknown_param = .{ .name = self.ast.toSource(param_name) } },
-                    self.ast.getSpan(param_name),
-                );
-
-                const gop = proto.getOrPutAssumeCapacity(name);
-
-                if (gop.value_ptr.done) return self.err(
-                    .{ .duplicate_param = .{ .name = self.ast.toSource(param_name) } },
-                    self.ast.getSpan(param_name),
-                );
-                gop.value_ptr.done = true;
-
-                break :value gop.index;
-            } else {
-                param_info = &params[i];
-                proto_values[i].done = true;
-
-                break :value i;
-            }
-        };
+        const param_res = try self.getFnParamIndex(i, arg, ty, &proto);
 
         // We use the inner type to bypass potential optional types and so on
-        const inner_type = extractDeclType(param_info.type);
+        const inner_type = extractDeclType(param_res.info.type);
         ctx.decl_type = inner_type;
 
-        {
-            // If the function comes from another module, all of its symbols must be redeclared in this scope
-            if (inner_type.isSymbol()) {
-                if (ext_mod) |fn_mod| {
-                    // If the parameter it self is extern to the function module, fetch it from there
-                    const sym_mod = if (param_info.mod_index) |mod| mod else fn_mod;
-                    const module = self.state.modules.getFromIndex(sym_mod);
-                    const sym_name = self.interner.intern(self.symbolName(inner_type));
-                    var sym = module.sym_infos.get(sym_name).?;
-                    sym.module_index = sym_mod;
-                    sym.type = inner_type;
-                    self.scope.declareExternSymbol(self.alloc, sym_name, sym);
-                }
-            }
+        ext_type: {
+            // If the function comes from another module, all of its symbols must be redeclared
+            // in this scope to allow implicit selector syntax
+            if (ext_mod == null) break :ext_type;
+            const ext_sym = self.state.symbol_table.get(inner_type) orelse break :ext_type;
+            const sym_name = self.interner.intern(self.typeName(inner_type));
+            self.scope.declareExternSymbol(self.alloc, sym_name, ext_sym);
         }
 
         var value = try self.analyzeExpr(arg.value, .value, ctx);
-        _ = try self.performTypeCoercion(param_info.type, &value, false, span);
+        _ = try self.performTypeCoercion(param_res.info.type, &value, false, span);
 
         self.checkWrap(&value.instr, false);
-        if (param_info.captured) value.instr = self.irb.wrapPreviousInstr(.box);
+        if (param_res.info.captured) value.instr = self.irb.wrapPreviousInstr(.box);
 
-        instrs[index] = .{ .instr = value.instr };
+        instrs[param_res.index] = .{ .instr = value.instr };
 
         if (i == 0) {
             first = value.type;
@@ -2485,15 +2481,61 @@ fn fnArgsList(
     // Check if any missing non-default parameter
     const err_count = self.errs.items.len;
 
-    for (proto.keys(), proto_values) |k, v| {
-        if (v.done or v.default != null) continue;
-        self.err(.{ .missing_function_param = .{ .name = self.interner.getKey(k).? } }, err_span) catch {};
+    var it = proto.iterator();
+    while (it.next()) |p| {
+        if (p.value_ptr.done or p.value_ptr.default != null) continue;
+        self.err(
+            .{ .missing_function_param = .{ .name = self.interner.getKey(p.key_ptr.*).? } },
+            err_span,
+        ) catch {};
     }
 
     return if (err_count < self.errs.items.len)
         error.Err
     else
         .{ .instrs = instrs, .first = first };
+}
+
+const ParamRes = struct {
+    index: usize,
+    info: *const Type.Function.Parameter,
+};
+fn getFnParamIndex(
+    self: *Self,
+    index: usize,
+    arg: Ast.FnCall.Arg,
+    ty: *const Type.Function,
+    proto: *Type.Function.Proto,
+) Error!ParamRes {
+    const params = ty.getParams();
+
+    if (arg.name) |param_name| {
+        if (ty.kind == .bound) return self.err(
+            .named_arg_in_bounded,
+            self.ast.getSpan(param_name),
+        );
+
+        const name = self.internToken(param_name);
+        const gop = proto.getOrPutAssumeCapacity(name);
+
+        if (gop.value_ptr.done) return self.err(
+            .{ .duplicate_param = .{ .name = self.ast.toSource(param_name) } },
+            self.ast.getSpan(param_name),
+        );
+        gop.value_ptr.done = true;
+
+        const param_info = ty.params.getPtr(name) orelse return self.err(
+            .{ .unknown_param = .{ .name = self.ast.toSource(param_name) } },
+            self.ast.getSpan(param_name),
+        );
+
+        return .{ .index = gop.index, .info = param_info };
+    } else {
+        const param_info = &proto.values()[index];
+        param_info.done = true;
+
+        return .{ .index = index, .info = &params[index] };
+    }
 }
 
 fn intrinsicCall(self: *Self, ty: *const Type.Function, first_param: *const Type, span: Span) Result {
@@ -2554,11 +2596,11 @@ fn resolveIdentifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool,
     } else name;
 
     if (self.symbolIdentifier(sym_name, span)) |res| {
-        return .{ .type = res.sym.type, .kind = .symbol, .instr = res.instr, .module = res.sym.module_index };
+        return .{ .type = res.sym.type, .kind = .symbol, .instr = res.instr, .module = res.sym.module };
     }
 
     if (self.builtinSymbol(sym_name, span)) |res| {
-        return .{ .type = res.sym.type, .kind = .symbol, .instr = res.instr, .module = res.sym.module_index };
+        return .{ .type = res.sym.type, .kind = .symbol, .instr = res.instr, .module = res.sym.module };
     }
 
     if (self.scope.getModule(name)) |mod| {
@@ -2609,7 +2651,7 @@ fn symbolIdentifier(self: *Self, name: InternerIdx, span: Span) ?struct { sym: *
     return .{
         .sym = sym,
         .instr = self.irb.addInstr(
-            .{ .load_symbol = .{ .module_index = sym.module_index, .symbol_index = @intCast(sym.index) } },
+            .{ .load_symbol = .{ .module = sym.module, .symbol = @intCast(sym.index) } },
             span.start,
         ),
     };
@@ -2624,8 +2666,8 @@ fn builtinSymbol(self: *Self, name: InternerIdx, span: Span) ?struct { sym: *Lex
         .sym = sym,
         .instr = self.irb.addInstr(
             .{ .load_symbol = .{
-                .symbol_index = @intCast(sym.index),
-                .module_index = sym.module_index,
+                .symbol = @intCast(sym.index),
+                .module = sym.module,
                 .kind = .zig,
             } },
             span.start,
@@ -3269,26 +3311,8 @@ fn returnExpr(self: *Self, expr: *const Ast.Return, ctx: *Context) Result {
 
 fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Result {
     const span = self.ast.getSpan(expr.structure);
-    const struct_res: InstrInfos = switch (expr.structure) {
-        .dot => s: {
-            const decl = ctx.decl_type orelse {
-                return self.err(.cant_infer_implicit_selector, span);
-            };
-            const sym = self.scope.getSymbolFromType(decl).?;
-
-            // TODO: protect cast
-            break :s .{
-                .type = decl,
-                .instr = self.irb.addInstr(
-                    .{ .load_symbol = .{
-                        .symbol_index = @intCast(sym.index),
-                        .module_index = sym.module_index,
-                    } },
-                    span.start,
-                ),
-                .ti = .{ .ext_mod = sym.module_index },
-            };
-        },
+    const struct_res = switch (expr.structure) {
+        .dot => try self.loadSymbolFromDot(span, ctx),
         .expr => |struct_expr| self.analyzeExpr(struct_expr, .symbol, ctx) catch |e| switch (e) {
             error.NotSymbol => return self.err(.non_struct_struct_literal, span),
             else => return e,
@@ -3307,7 +3331,10 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
     for (struct_type.fields.values(), 0..) |f, i| {
         if (f.default) |def| {
             // TODO: module could be different from the one defining the structure
-            values[i] = .{ .default = .{ .const_index = def, .mod = struct_res.ti.ext_mod } };
+            values[i] = .{ .default = .{
+                .constant = def,
+                .module = self.getExtModOrCurrent(struct_res.ti.ext_mod),
+            } };
         }
     }
 
@@ -3377,15 +3404,15 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
                         .callee = self.irb.addInstr(
                             .{
                                 .load_symbol = .{
-                                    .symbol_index = @intCast(init_fn.index),
-                                    .module_index = struct_res.ti.ext_mod,
+                                    .symbol = @intCast(init_fn.index),
+                                    .module = self.getExtModOrCurrent(struct_res.ti.ext_mod),
                                     .kind = .zig,
                                 },
                             },
                             span.start,
                         ),
                         .args = values,
-                        .ext_mod = null,
+                        .module = self.getExtModOrCurrent(null),
                         // TODO: if callee is always a symbol, info already present there
                         .kind = .zig,
                     },
@@ -3399,6 +3426,11 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
             span.start,
         ),
     };
+}
+
+fn getExtModOrCurrent(self: *const Self, other: ?ModIndex) ModIndex {
+    const ext = other orelse return self.mod_index;
+    return if (ext != self.mod_index) ext else self.mod_index;
 }
 
 fn ternary(self: *Self, expr: *const Ast.Ternary, ctx: *Context) Result {
@@ -3589,6 +3621,26 @@ fn unionConstr(self: *Self, expr: *const Ast.FnCall, info: InstrInfos, ctx: *Con
     };
 }
 
+fn loadSymbolFromDot(self: *Self, span: Span, ctx: *Context) Result {
+    const decl = ctx.decl_type orelse {
+        return self.err(.cant_infer_implicit_selector, span);
+    };
+    const sym = self.scope.getSymbolFromType(decl).?;
+
+    // TODO: protect cast
+    return .{
+        .type = decl,
+        .instr = self.irb.addInstr(
+            .{ .load_symbol = .{
+                .symbol = @intCast(sym.index),
+                .module = sym.module,
+            } },
+            span.start,
+        ),
+        .ti = .{ .ext_mod = sym.module },
+    };
+}
+
 /// Checks that the node is a declared type and return it's value. If node is `.empty`, returns `void`
 const TypeRes = struct {
     type: *const Type,
@@ -3656,30 +3708,28 @@ pub fn checkAndGetTypeInfo(self: *Self, ty: ?*const Ast.Type, ctx: *const Contex
 
             // If `identifier` returned no error and it's a module, safe unwrap
             const module = self.state.modules.getFromPath(module_type).?;
-            const mod_index = self.state.modules.getIndex(module_type).?;
 
             const symbol_token = fields[1];
             const symbol_name = self.internToken(symbol_token);
-            var final = module.sym_infos.get(symbol_name) orelse return self.err(
+            const final = module.sym_infos.get(symbol_name) orelse return self.err(
                 .{ .missing_symbol_in_module = .{
                     .module = self.ast.toSource(module_token),
                     .symbol = self.ast.toSource(symbol_token),
                 } },
                 self.ast.getSpan(symbol_token),
             );
-
-            // Declare type in current scope to emulate import, especially useful for implicit selector
-            final.module_index = mod_index;
             self.scope.declareExternSymbol(self.alloc, symbol_name, final);
 
-            return .{ .type = final.type, .mod = mod_index };
+            return .{ .type = final.type, .mod = final.module };
         },
         .function => |func| {
             var params: AutoArrayHashMapUnmanaged(InternerIdx, Type.Function.Parameter) = .{};
             for (func.params, 0..) |p, i| {
                 const res = try self.checkAndGetTypeInfo(p, ctx);
-                params.put(self.alloc, i, .{
-                    .name = null,
+                var buf: [100]u8 = undefined;
+                const name = std.fmt.bufPrint(&buf, "@anonParam{}", .{i}) catch oom();
+
+                params.put(self.alloc, self.interner.intern(name), .{
                     .type = res.type,
                     .mod_index = res.mod,
                     .default = null,
@@ -4060,10 +4110,6 @@ pub fn typeName(self: *const Self, ty: *const Type) []const u8 {
     return ty.toString(self.alloc, self.interner, self.mod_name, true);
 }
 
-pub fn symbolName(self: *const Self, ty: *const Type) []const u8 {
-    return ty.toString(self.alloc, self.interner, self.mod_name, false);
-}
-
 const VarConf = struct {
     captured: bool = false,
     initialized: bool = true,
@@ -4143,7 +4189,7 @@ pub fn getConstant(self: *const Self, instr: InstrIndex) Constant {
 }
 
 fn declareSymbol(self: *Self, name: InternerIdx, ty: *const Type, span: Span) Error!usize {
-    return self.scope.declareSymbol(self.alloc, name, ty) catch self.err(
+    return self.scope.declareSymbol(self.alloc, name, self.mod_index, ty) catch self.err(
         .{ .already_declared = .{ .name = self.interner.getKey(name).? } },
         span,
     );

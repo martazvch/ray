@@ -210,6 +210,7 @@ fn printIr(io: Io, alloc: Allocator, state: *const State, file_name: []const u8,
         alloc,
         analyzer.irb.instructions.items(.data),
         state.const_interner.constants.items,
+        analyzer.mod_index,
         &state.interner,
     );
     try stdout.writeAll(try ir_renderer.renderIr(file_name, analyzer.irb.roots.items));

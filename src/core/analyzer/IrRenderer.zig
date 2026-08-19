@@ -17,6 +17,7 @@ const Type = ir.Type;
 const Span = @import("../parser/Lexer.zig").Span;
 const Token = @import("../parser/Lexer.zig").Token;
 const Constant = @import("ConstantInterner.zig").Constant;
+const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
 
 const Labels = struct { depth: usize, msg: []const u8 };
 
@@ -27,6 +28,7 @@ indent_level: u8,
 wa: std.Io.Writer.Allocating,
 writer: *std.Io.Writer,
 constants: []const Constant,
+module: ModIndex,
 
 const indent_size: u8 = 4;
 const spaces: [1024]u8 = [_]u8{' '} ** 1024;
@@ -34,7 +36,13 @@ const spaces: [1024]u8 = [_]u8{' '} ** 1024;
 const Error = std.Io.Writer.Error;
 const Self = @This();
 
-pub fn init(allocator: Allocator, instrs: []const Instruction.Data, constants: []const Constant, interner: *const Interner) Self {
+pub fn init(
+    allocator: Allocator,
+    instrs: []const Instruction.Data,
+    constants: []const Constant,
+    module: ModIndex,
+    interner: *const Interner,
+) Self {
     return .{
         .allocator = allocator,
         .interner = interner,
@@ -43,6 +51,7 @@ pub fn init(allocator: Allocator, instrs: []const Instruction.Data, constants: [
         .writer = undefined,
         .indent_level = 0,
         .constants = constants,
+        .module = module,
     };
 }
 
@@ -90,7 +99,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .incr_rc => |index| self.indexInstr("Incr rc", index),
         .indexing => |data| self.indexing(data, false, false),
         .int_to_float => |index| self.indexInstr("Int to float", index),
-        .load_symbol => |*data| self.loadSymbol(data),
+        .load_symbol => |data| self.loadSymbol(data),
         .match => |*data| self.match(data),
         .match_type => |data| self.matchType(data),
         .multiple_var_decl => |*data| self.multipleVarDecl(data),
@@ -251,11 +260,11 @@ fn call(self: *Self, data: *const Instruction.Call) void {
             self.parseInstr(data.callee);
 
             if (f.kind == .function) {
-                if (data.ext_mod) |mod| {
+                if (data.module != self.module) {
                     switch (data.kind) {
-                        .foreign => self.indentAndPrintSlice("[Invoke foreign symbol {} module {}]", .{ f.index, mod.toInt() }),
-                        .zig, .zig_method => self.indentAndPrintSlice("[Invoke Zig symbol {} module {}]", .{ f.index, mod.toInt() }),
-                        else => self.indentAndPrintSlice("[Invoke symbol {} module {}]", .{ f.index, mod.toInt() }),
+                        .foreign => self.indentAndPrintSlice("[Invoke foreign symbol {} module {}]", .{ f.index, data.module.toInt() }),
+                        .zig, .zig_method => self.indentAndPrintSlice("[Invoke Zig symbol {} module {}]", .{ f.index, data.module.toInt() }),
+                        else => self.indentAndPrintSlice("[Invoke symbol {} module {}]", .{ f.index, data.module.toInt() }),
                     }
                 } else switch (data.kind) {
                     .foreign => self.indentAndPrintSlice("[Invoke foreign symbol {}]", .{f.index}),
@@ -269,16 +278,16 @@ fn call(self: *Self, data: *const Instruction.Call) void {
             }
         },
         .load_symbol => |sym| {
-            if (sym.module_index) |mod| {
+            if (sym.module != self.module) {
                 switch (data.kind) {
-                    .foreign => self.indentAndPrintSlice("[Call foreign symbol {} module {}]", .{ sym.symbol_index, mod.toInt() }),
-                    .zig, .zig_method => self.indentAndPrintSlice("[Call Zig symbol {} module {}]", .{ sym.symbol_index, mod.toInt() }),
-                    else => self.indentAndPrintSlice("[Call symbol {} module {}]", .{ sym.symbol_index, mod.toInt() }),
+                    .foreign => self.indentAndPrintSlice("[Call foreign symbol {} module {}]", .{ sym.symbol, sym.module.toInt() }),
+                    .zig, .zig_method => self.indentAndPrintSlice("[Call Zig symbol {} module {}]", .{ sym.symbol, sym.module.toInt() }),
+                    else => self.indentAndPrintSlice("[Call symbol {} module {}]", .{ sym.symbol, sym.module.toInt() }),
                 }
             } else switch (data.kind) {
-                .foreign => self.indentAndPrintSlice("[Call foreign symbol {}]", .{sym.symbol_index}),
-                .zig, .zig_method => self.indentAndPrintSlice("[Call Zig symbol {}]", .{sym.symbol_index}),
-                else => self.indentAndPrintSlice("[Call symbol {}]", .{sym.symbol_index}),
+                .foreign => self.indentAndPrintSlice("[Call foreign symbol {}]", .{sym.symbol}),
+                .zig, .zig_method => self.indentAndPrintSlice("[Call Zig symbol {}]", .{sym.symbol}),
+                else => self.indentAndPrintSlice("[Call symbol {}]", .{sym.symbol}),
             }
         },
         .identifier => {
@@ -312,10 +321,10 @@ fn argsList(self: *Self, kind: []const u8, args: []const Instruction.Arg) void {
     for (args) |arg| {
         switch (arg) {
             .default => |def| {
-                if (def.mod) |mod| {
-                    self.indentAndPrintSlice("[Default {s} constant index {}, module {}]", .{ kind, def.const_index.toInt(), mod.toInt() });
+                if (def.module != self.module) {
+                    self.indentAndPrintSlice("[Default {s} constant index {}, module {}]", .{ kind, def.constant.toInt(), def.module.toInt() });
                 } else {
-                    self.indentAndPrintSlice("[Default {s} constant index {}]", .{ kind, def.const_index.toInt() });
+                    self.indentAndPrintSlice("[Default {s} constant index {}]", .{ kind, def.constant.toInt() });
                 }
             },
             .instr => |i| self.parseInstr(i),
@@ -347,7 +356,7 @@ fn tagLiteral(self: *Self, data: Constant.TagLit, comptime kind: enum { @"enum",
     self.indent_level += 1;
     defer self.indent_level -= 1;
     self.indentAndAppendSlice("- symbol");
-    self.loadSymbol(&data.sym);
+    self.loadSymbol(data.sym);
     self.indentAndAppendSlice("- tag");
     self.indentAndPrintSlice("{}", .{data.tag_index});
 }
@@ -448,13 +457,17 @@ fn intInstr(self: *Self, data: isize) void {
     self.indentAndPrintSlice("[Int {}]", .{data});
 }
 
-fn loadSymbol(self: *Self, data: *const Instruction.LoadSymbol) void {
+fn loadSymbol(self: *Self, data: Instruction.LoadSymbol) void {
     const native = if (data.kind == .ray) "" else "native ";
 
-    if (data.module_index) |mod| {
-        self.indentAndPrintSlice("[Load {s}symbol {} module {}]", .{ native, data.symbol_index, mod.toInt() });
+    if (data.module != self.module) {
+        self.indentAndPrintSlice("[Load {s}symbol {} module {}]", .{
+            native,
+            data.symbol,
+            data.module.toInt(),
+        });
     } else {
-        self.indentAndPrintSlice("[Load {s}symbol {}]", .{ native, data.symbol_index });
+        self.indentAndPrintSlice("[Load {s}symbol {}]", .{ native, data.symbol });
     }
 }
 

@@ -114,7 +114,7 @@ fn registerStruct(self: *Self, alloc: Allocator, comptime zstruct: zffi.StructMe
         .name = struct_name,
         .type = ty,
         .index = self.current.zig_structs_meta.count(),
-        .module_index = .toIndex(self.current.index),
+        .module = .toIndex(self.current.index),
     };
     self.current.scratch_structs.put(
         alloc,
@@ -131,7 +131,12 @@ fn registerStruct(self: *Self, alloc: Allocator, comptime zstruct: zffi.StructMe
         const reg = self.registerZigFn(alloc, func, interner, ti);
         ty.structure.functions.putAssumeCapacity(
             interned_name,
-            .{ .name = interned_name, .index = reg.index, .type = reg.type },
+            .{
+                .name = interned_name,
+                .index = reg.index,
+                .type = reg.type,
+                .module = .toIndex(self.current.index),
+            },
         );
     }
 
@@ -184,7 +189,7 @@ fn registerZigFn(self: *Self, alloc: Allocator, comptime func: *const zffi.FnMet
         .name = fn_name,
         .type = fn_type,
         .index = self.current.zig_fns.items.len,
-        .module_index = .toIndex(self.current.index),
+        .module = .toIndex(self.current.index),
     };
 
     self.current.zig_fns.append(alloc, .create(alloc, func.name, func.function)) catch oom();
@@ -208,7 +213,6 @@ fn fnZigToRay(self: *Self, alloc: Allocator, comptime func: *const zffi.FnMeta, 
             @panic("Already declared param with same name");
         }
         gop.value_ptr.* = .{
-            .name = null,
             .type = param_ty,
             .mod_index = null,
             .default = null,
@@ -251,6 +255,7 @@ pub fn registerIntrinsics(self: *Self, alloc: Allocator, interner: *Interner, ti
             .name = fn_name,
             .type = fn_type,
             .index = self.intrinsics.count() - 1,
+            .module = .toIndex(self.current.index),
         };
     }
 }
@@ -274,7 +279,6 @@ fn fnIntrinsicToRay(
             @panic("Already declared parameter");
         }
         gop.value_ptr.* = .{
-            .name = null,
             .type = param_ty,
             .mod_index = null,
             .default = null,
@@ -342,7 +346,7 @@ fn registerForeignFn(self: *Self, alloc: Allocator, proto: *const ffi.FnProto, i
         .name = fn_name,
         .type = fn_type,
         .index = self.current.foreign_fns_meta.count(),
-        .module_index = .toIndex(self.current.index),
+        .module = .toIndex(self.current.index),
     }) catch oom();
     const native = Obj.ForeignFn.create(alloc, name_str, proto.func, proto.return_type != .void);
 
@@ -362,7 +366,6 @@ pub fn foreignFnToRay(alloc: Allocator, proto: *const ffi.FnProto, interner: *In
         params.putAssumeCapacity(
             param_name,
             .{
-                .name = param_name,
                 .type = param_ty,
                 .mod_index = null,
                 .default = null,

@@ -31,7 +31,9 @@ const_interner: ConstInterner,
 path_builder: Sb,
 cwd: Io.Dir,
 lex_scope: LexScope,
+/// Registers all the importable symbols from all modules in a flat table
 symbol_table: SymbolTable,
+/// Registers all the symbols per module
 modules: ModuleManager,
 native_reg: NativeRegister,
 strings: std.AutoHashMapUnmanaged(usize, *Obj.String),
@@ -170,11 +172,11 @@ pub fn registerCFn(self: *Self, allocator: Allocator, func: ffi.FnProto) void {
     _ = self.native_reg.registerForeignFnInGlobal(allocator, &func, &self.interner, &self.type_interner);
 }
 
-/// Used after analyzer to register module's public symbols informations
+/// Used after analyzer to register module's public symbols' information
 /// They correspond to the symbols that can be imported
 pub fn registerModPubSymbols(self: *Self, allocator: Allocator, index: ModIndex) void {
     self.modules.registerSymsInfo(allocator, index, &self.lex_scope.current.symbols);
-    self.symbol_table.addFrom(allocator, &self.lex_scope.current.symbols);
+    self.symbol_table.addFrom(allocator, &self.lex_scope.current.symbols_type);
 }
 
 pub fn addConstant(self: *Self, allocator: Allocator, constant: Constant) ConstIdx {

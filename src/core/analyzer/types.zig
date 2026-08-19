@@ -124,7 +124,6 @@ pub const Type = union(enum) {
 
         pub const Kind = enum { normal, method, bound, foreign, intrinsic, zig, zig_method };
         pub const Parameter = struct {
-            name: ?InternerIdx,
             type: *const Type,
             mod_index: ?ModIndex,
             default: ?ConstIdx,
@@ -149,6 +148,10 @@ pub const Type = union(enum) {
             }
 
             return res;
+        }
+
+        pub fn getParams(self: *const Function) []const Parameter {
+            return self.params.values()[@intFromBool(self.kind == .method)..];
         }
 
         pub fn toBoundMethod(self: *const Function, allocator: Allocator) Function {
@@ -623,20 +626,24 @@ pub const ObjFnInfos = struct {
     type_info: ObjFnTypeInfo,
 };
 pub const ObjFnTypeInfo = struct {
-    params: []const ObjFnType,
-    return_type: ObjFnType,
-};
+    params: []const Param,
+    return_type: FnType,
 
-pub const ObjFnType = enum {
-    bool,
-    int,
-    float,
-    str,
-    generic,
-    void,
-    array_int,
-    array_float,
-    array_str,
+    pub const Param = struct {
+        name: []const u8,
+        ty: FnType,
+    };
+    pub const FnType = enum {
+        bool,
+        int,
+        float,
+        str,
+        generic,
+        void,
+        array_int,
+        array_float,
+        array_str,
+    };
 };
 
 test "inline union" {

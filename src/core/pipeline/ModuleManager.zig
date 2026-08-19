@@ -162,6 +162,11 @@ pub fn addSymbol(self: *Self, mod_index: Index, sym_index: usize, value: anytype
     array[sym_index] = value;
 }
 
+pub fn addForeignSymbol(self: *Self, alloc: Allocator, mod_index: Index, value: *Obj.ForeignFn) void {
+    const module = self.getFromIndex(mod_index);
+    module.foreign_funcs.append(alloc, value) catch oom();
+}
+
 pub fn getSymbol(
     self: *const Self,
     mod_index: Index,

@@ -211,7 +211,10 @@ pub const Array = struct {
         return getDefApiFns(Self);
     }
 
-    pub const _defapi_push: ObjFnTypeInfo = .{ .params = &.{.generic}, .return_type = .void };
+    pub const _defapi_push: ObjFnTypeInfo = .{
+        .params = &.{.{ .name = "value", .ty = .generic }},
+        .return_type = .void,
+    };
     pub fn _api_push(self: *Self, vm: *Vm, stack: []Value) ?Value {
         self.values.append(vm.gc_alloc, stack[0]) catch oom();
         return null;
@@ -334,7 +337,10 @@ pub const String = struct {
         return .makeInt(@intCast(self.chars.len));
     }
 
-    pub const _defapi_split: ObjFnTypeInfo = .{ .params = &.{.str}, .return_type = .array_str };
+    pub const _defapi_split: ObjFnTypeInfo = .{
+        .params = &.{.{ .name = "splitter", .ty = .str }},
+        .return_type = .array_str,
+    };
     pub fn _api_split(self: *Self, vm: *Vm, stack: []Value) ?Value {
         const sep = stack[0].obj.as(String).chars;
         var split = std.mem.splitSequence(u8, self.chars, sep);

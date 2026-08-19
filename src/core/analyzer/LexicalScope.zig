@@ -39,7 +39,7 @@ pub const Symbol = struct {
     name: InternerIdx,
     type: *const Type,
     index: usize,
-    module_index: ?ModIndex = null,
+    module: ModIndex,
     kind: Kind = .ray,
 
     pub const Kind = enum { ray, zig, foreign };
@@ -48,6 +48,7 @@ pub const Symbol = struct {
 pub const Error = error{ TooManyLocals, AlreadyDeclared };
 pub const VariableMap = AutoArrayHashMapUnmanaged(InternerIdx, Variable);
 pub const SymbolMap = AutoHashMapUnmanaged(InternerIdx, Symbol);
+pub const SymbolTypeMap = AutoHashMapUnmanaged(*const Type, Symbol);
 
 scopes: ArrayList(Scope),
 current: *Scope,
@@ -93,6 +94,7 @@ pub const Scope = struct {
     variables: VariableMap = .empty,
     forwarded: VariableMap = .empty,
     symbols: SymbolMap = .empty,
+    symbols_type: SymbolTypeMap = .empty,
     /// First is the interned identifier and second is the interned module's path key of module interner
     modules: AutoHashMapUnmanaged(InternerIdx, *const Type) = .empty,
     breaks: ArrayList(Break) = .empty,
@@ -296,7 +298,13 @@ pub const SymKind = enum {
     trait,
     @"union",
 };
-pub fn declareSymbol(self: *Self, allocator: Allocator, name: InternerIdx, ty: *const Type) Error!usize {
+pub fn declareSymbol(
+    self: *Self,
+    allocator: Allocator,
+    name: InternerIdx,
+    module: ModIndex,
+    ty: *const Type,
+) Error!usize {
     const index = switch (ty.*) {
         .@"enum" => &self.enum_count,
         .function => &self.func_count,
@@ -311,11 +319,14 @@ pub fn declareSymbol(self: *Self, allocator: Allocator, name: InternerIdx, ty: *
     if (gop.found_existing) {
         return error.AlreadyDeclared;
     }
-    gop.value_ptr.* = .{
+    const symbol: Symbol = .{
         .name = name,
         .type = ty,
         .index = index.*,
+        .module = module,
     };
+    gop.value_ptr.* = symbol;
+    self.current.symbols_type.put(allocator, ty, symbol) catch oom();
 
     if (self.save) {
         self.saved_syms.append(allocator, gop.value_ptr) catch oom();
@@ -339,11 +350,8 @@ pub fn getSymbol(self: *const Self, name: InternerIdx) ?*Symbol {
 pub fn getSymbolFromType(self: *const Self, ty: *const Type) ?*Symbol {
     var it = self.iterator();
     while (it.next()) |scope| {
-        var sym_it = scope.symbols.iterator();
-        while (sym_it.next()) |sym| {
-            if (sym.value_ptr.type == ty) {
-                return sym.value_ptr;
-            }
+        if (scope.symbols_type.getPtr(ty)) |sym| {
+            return sym;
         }
     }
 
@@ -352,6 +360,7 @@ pub fn getSymbolFromType(self: *const Self, ty: *const Type) ?*Symbol {
 
 pub fn declareExternSymbol(self: *Self, allocator: Allocator, name: InternerIdx, symbol: Symbol) void {
     self.current.symbols.put(allocator, name, symbol) catch oom();
+    self.current.symbols_type.put(allocator, symbol.type, symbol) catch oom();
 }
 
 pub fn getBuiltinSymbol(self: *const Self, name: InternerIdx) ?*Symbol {

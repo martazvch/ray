@@ -142,14 +142,14 @@ pub const Instruction = struct {
     pub const Call = struct {
         callee: Index,
         args: []const Arg,
-        ext_mod: ?ModIndex,
+        module: ModIndex,
         kind: CallKind,
     };
     pub const Arg = union(enum) {
         instr: Index,
         default: struct {
-            const_index: ConstIdx,
-            mod: ?ModIndex,
+            constant: ConstIdx,
+            module: ModIndex,
         },
     };
     pub const Continue = struct {
@@ -207,8 +207,8 @@ pub const Instruction = struct {
         pub const Kind = enum { array, range_int, range_float, string };
     };
     pub const LoadSymbol = struct {
-        module_index: ?ModIndex,
-        symbol_index: u8,
+        symbol: u8,
+        module: ModIndex,
         kind: Kind = .ray,
 
         pub const Kind = enum { ray, zig };

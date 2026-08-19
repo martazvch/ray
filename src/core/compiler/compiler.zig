@@ -329,23 +329,22 @@ const Compiler = struct {
 
     /// Creates a symbol based on the opcode. If module index isn't null, uses the `_ext` version of the opcode
     fn symbolAccess(self: *Self, comptime op: OpCode, sym_data: Instruction.LoadSymbol) void {
-        if (sym_data.module_index) |mod| {
+        if (sym_data.module != self.manager.mod_index) {
             if (!@hasField(OpCode, @tagName(op) ++ "_ext")) {
                 @compileError("Opcode " ++ @tagName(op) ++ " doesn't have an `_ext` version");
             }
 
-            self.writeOpAndByte(@field(OpCode, @tagName(op) ++ "_ext"), sym_data.symbol_index);
+            self.writeOpAndByte(@field(OpCode, @tagName(op) ++ "_ext"), sym_data.symbol);
             // TODO: protect cast
-            self.writeByte(@intCast(mod.toInt()));
+            self.writeByte(@intCast(sym_data.module.toInt()));
         } else {
-            self.writeOpAndByte(op, sym_data.symbol_index);
+            self.writeOpAndByte(op, sym_data.symbol);
         }
     }
 
     fn zigSymbolAccess(self: *Self, comptime op: OpCode, sym_data: Instruction.LoadSymbol) void {
-        const mod = sym_data.module_index orelse @panic("native symbols must have a module index");
-        self.writeOpAndByte(op, sym_data.symbol_index);
-        self.writeByte(@intCast(mod.toInt()));
+        self.writeOpAndByte(op, sym_data.symbol);
+        self.writeByte(@intCast(sym_data.module.toInt()));
     }
 
     fn compileInstr(self: *Self, instr: ir.Index) Error!void {
@@ -361,7 +360,7 @@ const Compiler = struct {
             .@"break" => |data| self.breakInstr(data),
             .call => |*data| self.call(data),
 
-            .constant => |data| self.constant(data.index, null, true),
+            .constant => |data| self.constant(data.index, self.manager.mod_index, true),
             .@"continue" => |data| self.continueInstr(data),
             .deref => |index| self.wrappedInstr(.deref, index),
             .discard => |index| self.wrappedInstr(.pop, index),
@@ -590,7 +589,7 @@ const Compiler = struct {
                 .field_native => unreachable,
             },
             .load_symbol => |sym| {
-                return self.callSymbol(data, 0, sym.symbol_index, sym.module_index);
+                return self.callSymbol(data, 0, sym.symbol, sym.module);
             },
             .obj_func => |obj_data| {
                 return self.callObjFn(obj_data, data.args);
@@ -608,7 +607,7 @@ const Compiler = struct {
 
     fn invoke(self: *Self, data: *const Instruction.Call, callee: Instruction.Field) Error!void {
         try self.compileInstr(callee.structure);
-        try self.callSymbol(data, 1, callee.index, data.ext_mod);
+        try self.callSymbol(data, 1, callee.index, data.module);
     }
 
     fn virtualCall(self: *Self, data: *const Instruction.Call, callee: Instruction.Field) Error!void {
@@ -620,10 +619,16 @@ const Compiler = struct {
     }
 
     // TODO: protect casts
-    fn callSymbol(self: *Self, data: *const Instruction.Call, arity_offset: usize, sym_index: usize, sym_mod: ?ModIndex) Error!void {
+    fn callSymbol(
+        self: *Self,
+        data: *const Instruction.Call,
+        arity_offset: usize,
+        sym_index: usize,
+        sym_mod: ModIndex,
+    ) Error!void {
         try self.compileArgs(data.args);
 
-        const is_ext = sym_mod != null;
+        const is_ext = sym_mod != self.manager.mod_index;
         const op: OpCode = switch (data.kind) {
             .foreign => if (is_ext) .call_foreign_ext else .call_foreign,
             .zig, .zig_method => .call_zig,
@@ -634,8 +639,8 @@ const Compiler = struct {
         self.writeOpAndByte(op, @intCast(sym_index));
 
         // 'call_zig' uses an external module by default
-        if (sym_mod) |mod| {
-            self.writeByte(@intCast(mod.toInt()));
+        if (is_ext) {
+            self.writeByte(@intCast(sym_mod.toInt()));
         }
 
         self.writeByte(@intCast(data.args.len + arity_offset));
@@ -652,7 +657,7 @@ const Compiler = struct {
         // TODO: protext casts
         for (args) |arg| {
             switch (arg) {
-                .default => |def| try self.constant(def.const_index, def.mod, true),
+                .default => |def| try self.constant(def.constant, def.module, true),
                 .instr => |instr| try self.compileInstr(instr),
             }
         }
@@ -739,7 +744,7 @@ const Compiler = struct {
         for (instrs) |instr| {
             // TODO: protect this
             const const_data = self.at(instr).constant;
-            try self.constant(const_data.index, null, false);
+            try self.constant(const_data.index, self.manager.mod_index, false);
         }
     }
 
@@ -768,8 +773,8 @@ const Compiler = struct {
                 .enum_lit => |val| Value.makeObj(Obj.EnumInstance.create(
                     self.manager.alloc,
                     self.manager.state.modules.getSymbol(
-                        val.sym.module_index orelse self.manager.mod_index,
-                        val.sym.symbol_index,
+                        val.sym.module,
+                        val.sym.symbol,
                         .@"enum",
                     ),
                     @intCast(val.tag_index),
@@ -777,8 +782,8 @@ const Compiler = struct {
                 .union_lit => |val| Value.makeObj(Obj.UnionInstance.createComptime(
                     self.manager.alloc,
                     self.manager.state.modules.getSymbol(
-                        val.sym.module_index orelse self.manager.mod_index,
-                        val.sym.symbol_index,
+                        val.sym.module,
+                        val.sym.symbol,
                         .@"union",
                     ),
                     @intCast(val.tag_index),
@@ -797,7 +802,7 @@ const Compiler = struct {
     }
 
     // TODO: protect casts
-    fn constant(self: *Self, index: ConstIdx, ext_mod: ?ModIndex, load: bool) Error!void {
+    fn constant(self: *Self, index: ConstIdx, mod: ModIndex, load: bool) Error!void {
         try self.compileConstant(index);
 
         if (!load) return;
@@ -808,7 +813,7 @@ const Compiler = struct {
             .null => self.writeOp(.push_null),
             else => |i| {
                 const idx = i.toInt();
-                if (ext_mod) |mod| {
+                if (mod != self.manager.mod_index) {
                     self.writeOpAndByte(.load_const_ext, @intCast(idx));
                     self.writeByte(@intCast(mod.toInt()));
                 } else {

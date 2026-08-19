@@ -228,7 +228,7 @@ fn transpileInstr(self: *Self, instr: usize, interner: *const misc.Interner) !vo
             self.appendSlice(interner.getKey(variable.name).?, .none);
         },
         .load_symbol => |n| {
-            const symbol = self.lex_scope.getSymbol(n.symbol_index);
+            const symbol = self.lex_scope.getSymbol(n.symbol);
             const sym_name = interner.getKey(symbol.name).?;
             self.appendSlice(sym_name, .none);
         },
@@ -309,7 +309,7 @@ fn transpileInstr(self: *Self, instr: usize, interner: *const misc.Interner) !vo
             try self.transpileInstr(n.structure, interner);
 
             const sym = switch (self.irb.instructions.items(.data)[n.structure]) {
-                .load_symbol => |sym| self.lex_scope.getSymbol(sym.symbol_index),
+                .load_symbol => |sym| self.lex_scope.getSymbol(sym.symbol),
                 else => unreachable,
             };
             const struct_type = sym.type.structure;
@@ -395,18 +395,18 @@ fn transpilefn(self: *Self, instr_data: ir.Instruction.FnDecl, interner: *const 
 
     const fn_type = sym.type.function;
 
-    for (fn_type.params.values(), 0..) |p, i| {
+    var it = fn_type.params.iterator();
+    while (it.next()) |p| {
         std.log.debug("Param: {any}", .{p});
-        const p_name = p.name orelse @panic("Anonymus param not yet supported");
-        const p_text = interner.getKey(p_name).?;
+        const p_text = interner.getKey(p.key_ptr.*).?;
 
         if (std.mem.eql(u8, p_text, "self")) {
-            self.printSlice("{s}: *{s}", .{ p_text, getType(p.type, interner) }, .none);
+            self.printSlice("{s}: *{s}", .{ p_text, getType(p.value_ptr.type, interner) }, .none);
         } else {
-            self.printSlice("{s}: {s}", .{ p_text, getType(p.type, interner) }, .none);
+            self.printSlice("{s}: {s}", .{ p_text, getType(p.value_ptr.type, interner) }, .none);
         }
 
-        if (i < fn_type.params.count() - 1) self.appendSlice(", ", .none);
+        if (it.index < fn_type.params.count() - 1) self.appendSlice(", ", .none);
     }
 
     self.printSlice(
