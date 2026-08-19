@@ -325,7 +325,7 @@ fn transpileInstr(self: *Self, instr: usize, interner: *const misc.Interner) !vo
                     self.printSlice(".{s} = ", .{interner.getKey(struct_type.fields.keys()[i]).?}, .none);
                     switch (value) {
                         .instr => |val_instr| try self.transpileInstr(val_instr, interner),
-                        .default => |def_val| try self.transpileConstant(def_val.const_index, interner),
+                        .default => |def_val| try self.transpileConstant(def_val.constant, interner),
                     }
                     self.appendSlice(",", .{ .indent = false });
                 }

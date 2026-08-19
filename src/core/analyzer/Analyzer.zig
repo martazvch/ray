@@ -3392,40 +3392,45 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
     return .{
         .type = struct_res.type,
         .ti = .{ .comp_time = comp_time, .ext_mod = struct_res.ti.ext_mod },
-        .instr = if (struct_type.native) nat: {
-            const init_fn = struct_type.functions.get(self.cached_names.init) orelse return self.err(
-                .{ .cant_build_native_struct = .{ .name = self.ast.toSource(expr.structure) } },
-                span,
-            );
-
-            break :nat self.irb.addInstr(
-                .{
-                    .call = .{
-                        .callee = self.irb.addInstr(
-                            .{
-                                .load_symbol = .{
-                                    .symbol = @intCast(init_fn.index),
-                                    .module = self.getExtModOrCurrent(struct_res.ti.ext_mod),
-                                    .kind = .zig,
-                                },
-                            },
-                            span.start,
-                        ),
-                        .args = values,
-                        .module = self.getExtModOrCurrent(null),
-                        // TODO: if callee is always a symbol, info already present there
-                        .kind = .zig,
-                    },
-                },
+        .instr = if (struct_type.native)
+            try self.callInitOnNativeStruct(&struct_type, values, struct_res.ti.ext_mod, span)
+        else
+            self.irb.addInstr(
+                .{ .struct_literal = .{ .structure = struct_res.instr, .values = values } },
                 span.start,
-            );
-        }
-        // Ray structure
-        else self.irb.addInstr(
-            .{ .struct_literal = .{ .structure = struct_res.instr, .values = values } },
-            span.start,
-        ),
+            ),
     };
+}
+
+fn callInitOnNativeStruct(
+    self: *Self,
+    ty: *const Type.Structure,
+    args: []const Instr.Arg,
+    mod: ?ModIndex,
+    span: Span,
+) Error!InstrIndex {
+    const init_fn = ty.functions.get(self.cached_names.init) orelse return self.err(
+        .{ .cant_build_native_struct = .{ .name = self.ast.toSource(span) } },
+        span,
+    );
+    const callee = self.irb.addInstr(
+        .{ .load_symbol = .{
+            .symbol = @intCast(init_fn.index),
+            .module = self.getExtModOrCurrent(mod),
+            .kind = .zig,
+        } },
+        span.start,
+    );
+
+    return self.irb.addInstr(
+        .{ .call = .{
+            .callee = callee,
+            .args = args,
+            .module = self.getExtModOrCurrent(null),
+            .kind = .zig,
+        } },
+        span.start,
+    );
 }
 
 fn getExtModOrCurrent(self: *const Self, other: ?ModIndex) ModIndex {

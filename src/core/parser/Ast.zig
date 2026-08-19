@@ -377,6 +377,7 @@ pub const Unary = struct {
 pub fn toSource(self: *const @This(), node: anytype) []const u8 {
     const span = switch (@TypeOf(node)) {
         usize => self.token_spans[node],
+        Span => node,
         StructLiteral.Kind => switch (node) {
             .dot => |tk| self.token_spans[tk],
             .expr => |e| self.getSpan(e),
