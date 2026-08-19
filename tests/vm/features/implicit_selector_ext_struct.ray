@@ -1,0 +1,11 @@
+use data.geom
+
+fn main() {
+    let square: geom.Square = .{
+        side: 8,
+        middle: .{ x: 1, y: 2 },
+    }
+
+    print square.middle.x
+    print square.middle.y
+}

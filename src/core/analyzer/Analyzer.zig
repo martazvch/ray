@@ -2452,18 +2452,7 @@ fn fnArgsList(
         const span = self.ast.getSpan(arg.value);
         const param_res = try self.getFnParamIndex(i, arg, ty, &proto);
 
-        // We use the inner type to bypass potential optional types and so on
-        const inner_type = extractDeclType(param_res.info.type);
-        ctx.decl_type = inner_type;
-
-        ext_type: {
-            // If the function comes from another module, all of its symbols must be redeclared
-            // in this scope to allow implicit selector syntax
-            if (ext_mod == null) break :ext_type;
-            const ext_sym = self.state.symbol_table.get(inner_type) orelse break :ext_type;
-            const sym_name = self.interner.intern(self.typeName(inner_type));
-            self.scope.declareExternSymbol(self.alloc, sym_name, ext_sym);
-        }
+        self.maybeDeclExtSymAndSetDeclType(param_res.info.type, ext_mod, ctx);
 
         var value = try self.analyzeExpr(arg.value, .value, ctx);
         _ = try self.performTypeCoercion(param_res.info.type, &value, false, span);
@@ -3356,8 +3345,7 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
         }
         gop.value_ptr.done = true;
 
-        const old_decl_type = ctx.setAndGetPrevious(.decl_type, f.type);
-        defer ctx.decl_type = old_decl_type;
+        self.maybeDeclExtSymAndSetDeclType(f.type, struct_res.ti.ext_mod, ctx);
 
         var res: InstrInfos = if (fv.value) |value|
             try self.analyzeExpr(value, .value, ctx)
@@ -3400,6 +3388,21 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
                 span.start,
             ),
     };
+}
+
+/// This function extract the inner type (?T -> T) and declares it as an extern symbol if it
+/// comes from another module. If so, also set `decl_type` in `ctx` to this type
+fn maybeDeclExtSymAndSetDeclType(self: *Self, ty: *const Type, mod: ?ModIndex, ctx: *Context) void {
+    // We use the inner type to bypass potential optional types and so on
+    const inner_type = extractDeclType(ty);
+    ctx.decl_type = inner_type;
+
+    // If the function comes from another module, all of its symbols must be redeclared
+    // in this scope to allow implicit selector syntax
+    if (mod == null) return;
+    const ext_sym = self.state.symbol_table.get(inner_type) orelse return;
+    const sym_name = self.interner.intern(self.typeName(inner_type));
+    self.scope.declareExternSymbol(self.alloc, sym_name, ext_sym);
 }
 
 fn callInitOnNativeStruct(
