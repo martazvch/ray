@@ -125,7 +125,6 @@ pub const Type = union(enum) {
         pub const Kind = enum { normal, method, bound, foreign, intrinsic, zig, zig_method };
         pub const Parameter = struct {
             type: *const Type,
-            mod_index: ?ModIndex,
             default: ?ConstIdx,
             captured: bool,
         };

@@ -70,24 +70,11 @@ pub const Context = struct {
         .in_deref = false,
     };
 
-    const ContextSnapshot = struct {
-        saved: Context,
-        ctx: *Context,
-
-        pub fn restore(self: ContextSnapshot) void {
-            self.ctx.* = self.saved;
-        }
-    };
-
     pub fn setAndGetPrevious(self: *Context, comptime f: FieldEnum(Context), value: @FieldType(Context, @tagName(f))) @TypeOf(value) {
         const prev = @field(self, @tagName(f));
         @field(self, @tagName(f)) = value;
 
         return prev;
-    }
-
-    pub fn snapshot(self: *Context) ContextSnapshot {
-        return .{ .saved = self.*, .ctx = self };
     }
 
     pub fn reset(self: *Context) void {
@@ -485,9 +472,6 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
 fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
     const span = self.ast.getSpan(node);
 
-    const snapshot = ctx.snapshot();
-    defer snapshot.restore();
-
     var buf: [1024]u8 = undefined;
     const container_name = self.interner.internKeepRef(self.alloc, self.containers.render(&buf, .{ .sep = "." }));
 
@@ -602,9 +586,6 @@ fn enumDescriminant(self: *Self, tag: Ast.EnumDecl.Tag, ctx: *Context) Error!?Di
 const FnDeclRes = struct { instr: usize, sym: LexScope.Symbol };
 
 fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDeclRes {
-    const snapshot = ctx.snapshot();
-    defer snapshot.restore();
-
     const name = self.internToken(node.name);
 
     var buf: [1024]u8 = undefined;
@@ -648,9 +629,12 @@ fn endRayFnDecl(
         fn_type.return_type = try self.checkAndGetType(node.return_type, ctx);
         fn_type.kind = if (params.is_method) .method else .normal;
 
-        ctx.fn_type = ty;
+        const prev_fn_type = ctx.setAndGetPrevious(.fn_type, ty);
         ctx.decl_type = fn_type.return_type;
-        defer ctx.decl_type = null;
+        defer {
+            ctx.fn_type = prev_fn_type;
+            ctx.decl_type = null;
+        }
 
         const returns = try self.fnBody(node.body, fn_type, &body, span, ctx);
         break :info .{ captures, params, returns };
@@ -803,7 +787,6 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
         );
         decls.putAssumeCapacity(param_name, .{
             .type = param_res.type,
-            .mod_index = param_res.mod,
             .default = const_index,
             .captured = p.meta.captured,
         });
@@ -833,7 +816,6 @@ fn selfParam(
     );
     decls.putAssumeCapacity(self.cached_names.self, .{
         .type = self_type,
-        .mod_index = null,
         .default = null,
         .captured = false,
     });
@@ -1139,9 +1121,6 @@ fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult 
 }
 
 fn unionDecl(self: *Self, node: *const Ast.UnionDecl, ctx: *Context) StmtResult {
-    const snapshot = ctx.snapshot();
-    defer snapshot.restore();
-
     var buf: [1024]u8 = undefined;
     const container_name = self.interner.internKeepRef(self.alloc, self.containers.render(&buf, .{ .sep = "." }));
 
@@ -2163,7 +2142,6 @@ fn runtimeFnToType(self: *Self, func: type_mod.ObjFnTypeInfo, current_generic: *
         self.interner.intern("self"),
         .{
             .type = current_generic,
-            .mod_index = null,
             .default = null,
             .captured = false,
         },
@@ -2175,7 +2153,6 @@ fn runtimeFnToType(self: *Self, func: type_mod.ObjFnTypeInfo, current_generic: *
             self.interner.intern(p.name),
             .{
                 .type = ty,
-                .mod_index = null,
                 .default = null,
                 .captured = false,
             },
@@ -3746,7 +3723,6 @@ pub fn checkAndGetTypeInfo(self: *Self, ty: ?*const Ast.Type, ctx: *const Contex
 
                 params.put(self.alloc, self.interner.intern(name), .{
                     .type = res.type,
-                    .mod_index = res.mod,
                     .default = null,
                     .captured = false,
                 }) catch oom();

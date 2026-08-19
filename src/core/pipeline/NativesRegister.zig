@@ -214,7 +214,6 @@ fn fnZigToRay(self: *Self, alloc: Allocator, comptime func: *const zffi.FnMeta, 
         }
         gop.value_ptr.* = .{
             .type = param_ty,
-            .mod_index = null,
             .default = null,
             .captured = false,
         };
@@ -280,7 +279,6 @@ fn fnIntrinsicToRay(
         }
         gop.value_ptr.* = .{
             .type = param_ty,
-            .mod_index = null,
             .default = null,
             .captured = false,
         };
@@ -367,7 +365,6 @@ pub fn foreignFnToRay(alloc: Allocator, proto: *const ffi.FnProto, interner: *In
             param_name,
             .{
                 .type = param_ty,
-                .mod_index = null,
                 .default = null,
                 .captured = false,
             },
