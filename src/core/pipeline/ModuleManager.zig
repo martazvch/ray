@@ -1,7 +1,9 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const SymbolMap = @import("../analyzer/LexicalScope.zig").SymbolMap;
+const LexScope = @import("../analyzer/LexicalScope.zig");
+const SymbolMap = LexScope.SymbolMap;
+const VariableMap = LexScope.VariableMap;
 const Value = @import("../runtime/values.zig").Value;
 const Obj = @import("../runtime/Obj.zig");
 const State = @import("../pipeline/State.zig");
@@ -19,13 +21,17 @@ pub const Module = struct {
     name: InternerIndex,
     /// Tells if it's a native Zig module
     native: bool,
+    /// Compiled values used at runtime
+    globals: []Value,
+    /// Compiled constants
+    constants: []Value,
+
     /// Type infos gathered by the analyzer used when importing a module
     /// It has all the analyzis-time data to type check
     sym_infos: SymbolMap,
-    /// Compiled values/symbols used at runtime
-    globals: []Value,
-    constants: []Value,
+    globals_infos: VariableMap,
 
+    /// Compiled objects
     enums: []Enum,
     unions: []Union,
     functions: []*Obj.Function,
@@ -64,6 +70,7 @@ pub const Module = struct {
         .name = undefined,
         .native = false,
         .sym_infos = .empty,
+        .globals_infos = .empty,
         .globals = &.{},
         .constants = &.{},
         .enums = &.{},
@@ -121,6 +128,20 @@ pub fn registerSymsInfo(self: *Self, allocator: Allocator, index: Index, symbols
     }
 }
 
+/// Adds symbols informations to module so that other module can have type informations when importing
+/// symbols from this one
+pub fn registerGlobalsInfo(self: *Self, allocator: Allocator, index: Index, globals: *const VariableMap) void {
+    var mod = self.getFromIndex(index);
+    mod.globals_infos.ensureUnusedCapacity(allocator, @intCast(globals.count())) catch oom();
+
+    std.log.debug("Registers in module: {}", .{index});
+    var it = globals.iterator();
+    while (it.next()) |entry| {
+        std.log.debug("Constant name: {}, index: {}", .{ entry.key_ptr.*, entry.value_ptr.index });
+        mod.globals_infos.putAssumeCapacity(entry.key_ptr.*, entry.value_ptr.*);
+    }
+}
+
 /// After creating a native module, we have both compiled functions and symbols informations
 /// Adds the informations and the compiled objects
 pub fn registerSymsFromNativeMod(self: *Self, allocator: Allocator, index: Index, native_mod: *const NativeMod) void {
@@ -146,12 +167,16 @@ pub fn ensureCompileSizes(self: *Self, allocator: Allocator, index: Index, state
     mod.vtables = try allocator.realloc(mod.vtables, state.lex_scope.vtable_count);
 }
 
-pub fn addGlobal(self: *Self, mod: Index, index: usize, value: Value) void {
-    self.getFromIndex(mod).globals[index] = value;
+pub fn setGlobal(self: *Self, module_index: Index, value_index: usize, value: Value) void {
+    self.getFromIndex(module_index).globals[value_index] = value;
 }
 
-pub fn addSymbol(self: *Self, mod_index: Index, sym_index: usize, value: anytype) void {
-    const module = self.getFromIndex(mod_index);
+pub fn getGlobal(self: *Self, mod: Index, index: usize) Value {
+    return self.getFromIndex(mod).globals[index];
+}
+
+pub fn addSymbol(self: *Self, module_index: Index, sym_index: usize, value: anytype) void {
+    const module = self.getFromIndex(module_index);
     const array = switch (@TypeOf(value)) {
         Module.Enum => module.enums,
         Module.Union => module.unions,
@@ -189,6 +214,10 @@ pub fn getSymbol(
 
 pub fn addConstant(self: *Self, mod: Index, index: usize, value: Value) void {
     self.getFromIndex(mod).constants[index] = value;
+}
+
+pub fn getConstant(self: *Self, mod: Index, index: usize) Value {
+    return self.getFromIndex(mod).constants[index];
 }
 
 pub fn getFromIndex(self: *const Self, index: Index) *Module {

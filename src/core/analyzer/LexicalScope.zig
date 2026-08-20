@@ -237,11 +237,7 @@ pub fn declareVar(
         return error.TooManyLocals;
     }
 
-    const gop = self.current.variables.getOrPut(allocator, name) catch oom();
-    if (gop.found_existing) {
-        return error.AlreadyDeclared;
-    }
-    gop.value_ptr.* = .{
+    const variable: Variable = .{
         .name = name,
         .type = ty,
         .kind = if (self.isGlobal()) .global else .local,
@@ -252,6 +248,12 @@ pub fn declareVar(
         .comp_time = comp_time,
         .ext_mod = ext_mode,
     };
+
+    const gop = self.current.variables.getOrPut(allocator, name) catch oom();
+    if (gop.found_existing) {
+        return error.AlreadyDeclared;
+    }
+    gop.value_ptr.* = variable;
 
     return index;
 }

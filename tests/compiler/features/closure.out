@@ -41,10 +41,4 @@ call_dyn index 0
 ret_naked
 
 -- global scope --
-push_null
-def_global index 0
-
-push_null
-def_global index 1
-
 call index 3, arity 0, main

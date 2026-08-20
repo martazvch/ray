@@ -2,7 +2,6 @@
 var a: int = 7.5
 var b: float = "foo"
 var c: bool = 8
-var e: str = 2/4
 
 // Unknown type
 var a: floa = 7.5

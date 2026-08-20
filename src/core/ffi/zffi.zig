@@ -46,8 +46,14 @@ pub fn Union(types: []const std.meta.FieldEnum(All)) type {
     );
 }
 
+pub const Constant = struct {
+    name: []const u8,
+    desc: ?[]const u8 = null,
+};
+
 pub const Module = struct {
     name: ?[]const u8 = null,
+    constants: []const Constant = &.{},
     functions: []const FnMeta = &.{},
     structures: []const StructMeta = &.{},
     traits: []const TraitMeta = &.{},

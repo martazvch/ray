@@ -105,7 +105,6 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .call_virtual => self.callIndexArity(writer, op, offset),
         .call_zig => self.callZig(writer, name, offset),
         .closure => self.indexInstruction(writer, name, offset),
-        .def_global => self.indexInstruction(writer, name, offset),
         .deref => self.simpleInstruction(writer, name, offset),
         .div_float => self.simpleInstruction(writer, name, offset),
         .div_int => self.simpleInstruction(writer, name, offset),
@@ -128,6 +127,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .get_field_native => self.getMember(writer, name, offset),
         .get_global => self.getGlobal(writer, false, offset),
         .get_global_cow => self.getGlobal(writer, true, offset),
+        .get_global_ext => self.getGlobalExt(writer, name, offset),
         .get_local => self.indexInstruction(writer, name, offset),
         .get_local_cow => self.indexInstruction(writer, name, offset),
         .get_enum_tag => self.simpleInstruction(writer, name, offset),
@@ -317,6 +317,19 @@ fn getGlobal(self: *Self, writer: *Writer, cow: bool, offset: usize) Writer.Erro
     try writer.writeAll("\n");
 
     return offset + 2;
+}
+
+fn getGlobalExt(self: *Self, writer: *Writer, name: []const u8, offset: usize) Writer.Error!usize {
+    const index = self.chunk.code.items[offset + 1];
+    const module = self.chunk.code.items[offset + 2];
+
+    if (self.render_mode == .@"test") {
+        try writer.print("{s} index {}, module {}\n", .{ name, index, module });
+    } else {
+        try writer.print("{s:<20} index {:>4}, module {:>4}\n", .{ name, index, module });
+    }
+
+    return offset + 3;
 }
 
 fn constantInstruction(self: *Self, writer: *Writer, name: []const u8, offset: usize) Writer.Error!usize {

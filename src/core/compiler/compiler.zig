@@ -218,6 +218,13 @@ const Compiler = struct {
 
     /// Emits the corresponding `get_global` or `get_local` with the correct index
     fn emitGetVar(self: *Self, variable: *const Instruction.Variable) void {
+        if (variable.module) |mod| {
+            std.debug.assert(variable.scope == .global);
+            self.writeOpAndByte(.get_global_ext, @intCast(variable.index));
+            self.writeByte(@intCast(mod.toInt()));
+            return;
+        }
+
         // BUG: Protect the cast, we can't have more than 256 variable to lookup for now
         self.writeOpAndByte(
             if (variable.scope == .local)
@@ -228,15 +235,6 @@ const Compiler = struct {
                 unreachable,
             @intCast(variable.index),
         );
-    }
-
-    /// Define the variable with value on top of stack for global variables.
-    /// For locals, they are already sitting on top of stack
-    fn defineVariable(self: *Self, infos: Instruction.Variable) void {
-        // BUG: Protect the cast, we can't have more than 256 variable to lookup for now
-        if (infos.scope == .global) {
-            self.writeOpAndByte(.def_global, @intCast(infos.index));
-        }
     }
 
     fn emitJump(self: *Self, kind: OpCode) usize {
@@ -373,6 +371,7 @@ const Compiler = struct {
             .for_loop => |data| self.forLoop(data),
             .identifier => |*data| self.identifier(data),
             .@"if" => |*data| self.ifInstr(data),
+            .import_global => |data| self.importGlobal(data),
             .in => |data| self.in(data),
             .incr_rc => |index| self.wrappedInstr(.incr_ref, index),
             .indexing => |data| self.indexing(data),
@@ -807,10 +806,10 @@ const Compiler = struct {
     }
 
     // TODO: protect casts
-    fn constant(self: *Self, index: ConstIdx, mod: ModIndex, load: bool) Error!void {
+    fn constant(self: *Self, index: ConstIdx, mod: ModIndex, push_to_stack: bool) Error!void {
         try self.compileConstant(index);
 
-        if (!load) return;
+        if (!push_to_stack) return;
 
         switch (index) {
             .true => self.writeOp(.push_true),
@@ -940,6 +939,12 @@ const Compiler = struct {
         }
 
         try self.patchJump(else_jump);
+    }
+
+    /// Doesn't emit anything, global values are known at comptime, so we just transfert the constant
+    fn importGlobal(self: *Self, data: Instruction.ImportGlobal) Error!void {
+        const value = self.manager.state.modules.getGlobal(data.import.module, data.import.index);
+        self.manager.state.modules.setGlobal(self.manager.mod_index, data.index, value);
     }
 
     fn in(self: *Self, data: Instruction.In) Error!void {
@@ -1233,23 +1238,37 @@ const Compiler = struct {
     }
 
     fn varDecl(self: *Self, data: *const Instruction.VarDecl) Error!void {
-        if (data.value) |val| {
-            try self.compileInstr(val);
-        } else {
-            self.writeOp(.push_null);
-        }
-
-        // TODO: Fix this, just to avoid accessing an empty slot at runtime
-        // If we are top level, value should be pure and compile time known
-        // The purpose is to initialize the slot so when accessed like self.globals[idx] we don't segfault
-        // PERF: fix this
+        // TODO: Protect the cast, we can't have more than 256 variable to lookup for now
         if (data.variable.scope == .global) {
-            self.manager.state.modules.addGlobal(self.manager.mod_index, data.variable.index, .null_);
-        } else if (data.box) {
-            self.writeOp(.box);
-        }
+            const value: Value = value: {
+                const value_instr = data.value orelse break :value .null_;
+                const const_index = self.at(value_instr).constant.index;
+                try self.compileConstant(const_index);
 
-        self.defineVariable(data.variable);
+                break :value self.manager.state.modules.getConstant(
+                    self.manager.mod_index,
+                    const_index.toInt(),
+                );
+            };
+
+            self.manager.state.modules.setGlobal(
+                self.manager.mod_index,
+                data.variable.index,
+                value,
+            );
+        }
+        // Local value left on stack
+        else {
+            if (data.value) |val| {
+                try self.compileInstr(val);
+            } else {
+                self.writeOp(.push_null);
+            }
+
+            if (data.box) {
+                self.writeOp(.box);
+            }
+        }
     }
 
     fn whileInstr(self: *Self, data: Instruction.While) Error!void {

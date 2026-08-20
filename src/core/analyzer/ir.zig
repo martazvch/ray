@@ -40,6 +40,7 @@ pub const Instruction = struct {
         incr_rc: Index,
         indexing: Indexing,
         int_to_float: Index,
+        import_global: ImportGlobal,
         load_symbol: LoadSymbol,
         match: Match,
         match_type: MatchType,
@@ -206,6 +207,15 @@ pub const Instruction = struct {
 
         pub const Kind = enum { array, range_int, range_float, string };
     };
+    pub const ImportGlobal = struct {
+        // Global variable index
+        index: usize,
+        /// Imported symbol
+        import: struct {
+            index: usize,
+            module: ModIndex,
+        },
+    };
     pub const LoadSymbol = struct {
         symbol: u8,
         module: ModIndex,
@@ -339,6 +349,7 @@ pub const Instruction = struct {
     pub const Variable = struct {
         index: u64,
         scope: Scope,
+        module: ?ModIndex = null,
     };
     pub const While = struct { cond: Index, body: Index };
 };

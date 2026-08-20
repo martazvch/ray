@@ -34,6 +34,7 @@ fn main() {
         }
         loc2 = loc1
     }
+
+    loc2 = "still glob"
 }
 
-loc2 = "still glob"

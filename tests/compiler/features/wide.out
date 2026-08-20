@@ -1,7 +1,4 @@
 -- main --
-ret_naked
-
--- global scope --
 load_const index 3, value 1
 load_const index 4, value 2
 load_const index 5, value 3
@@ -263,5 +260,8 @@ wide
 load_const index 258, value 256
 wide
 array_new length 256, type_id x
-def_global index 0
+
+ret_naked
+
+-- global scope --
 call index 0, arity 0, main

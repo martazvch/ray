@@ -1,0 +1,47 @@
+//---- math ----
+
+-- len --
+get_local index 0
+get_field index 0
+get_local index 0
+get_field index 1
+add_int
+ret
+
+-- introduce --
+load_const index 3, value This is a mathematical module
+print
+ret_naked
+
+-- getVecFromPos --
+get_local index 0
+get_local index 1
+struct_lit index 0, arity 2, Vec2
+ret
+
+-- getInt --
+load_const index 4, value 12
+ret
+
+-- getInt2 --
+load_const index 4, value 12
+ret
+
+-- getIntDef --
+get_local index 0
+ret
+
+-- global scope --
+exit_repl
+
+//---- test ----
+
+-- main --
+get_global index 1, math
+print
+get_global_ext index 0, module 3
+print
+ret_naked
+
+-- global scope --
+call index 0, arity 0, main

@@ -111,7 +111,6 @@ pub fn new(io: Io, allocator: Allocator, cwd: Io.Dir, config: Config) Self {
     ctx.native_reg.init(allocator, &ctx.interner);
 
     ctx.type_interner.cacheFrequentTypes(&ctx.interner);
-    // ctx.registerMod(allocator, @import("../builtins/std.zig"));
     ctx.registerMod(allocator, @import("../builtins/builtins.zig"));
     ctx.registerMod(allocator, @import("../builtins/math.zig"));
     ctx.registerMod(allocator, @import("../builtins/file.zig"));
@@ -176,6 +175,7 @@ pub fn registerCFn(self: *Self, allocator: Allocator, func: ffi.FnProto) void {
 /// They correspond to the symbols that can be imported
 pub fn registerModPubSymbols(self: *Self, allocator: Allocator, index: ModIndex) void {
     self.modules.registerSymsInfo(allocator, index, &self.lex_scope.current.symbols);
+    self.modules.registerGlobalsInfo(allocator, index, &self.lex_scope.current.variables);
     self.symbol_table.addFrom(allocator, &self.lex_scope.current.symbols_type);
 }
 

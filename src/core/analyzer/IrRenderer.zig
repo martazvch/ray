@@ -95,6 +95,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .for_loop => |data| self.forLoop(data),
         .identifier => |data| self.identifier(data),
         .@"if" => |*data| self.ifInstr(data),
+        .import_global => |data| self.importGlobal(data),
         .in => |data| self.in(data),
         .incr_rc => |index| self.indexInstr("Incr rc", index),
         .indexing => |data| self.indexing(data, false, false),
@@ -424,9 +425,15 @@ fn forLoop(self: *Self, data: Instruction.For) void {
 }
 
 fn identifier(self: *Self, data: Instruction.Variable) void {
-    self.indentAndPrintSlice("[Variable index: {}, scope: {t}]", .{
-        data.index, data.scope,
-    });
+    if (data.module) |mod| {
+        self.indentAndPrintSlice("[Variable index: {}, scope: {t}, module {}]", .{
+            data.index, data.scope, mod.toInt(),
+        });
+    } else {
+        self.indentAndPrintSlice("[Variable index: {}, scope: {t}]", .{
+            data.index, data.scope,
+        });
+    }
 }
 
 fn ifInstr(self: *Self, data: *const Instruction.If) void {
@@ -448,6 +455,13 @@ fn ifInstr(self: *Self, data: *const Instruction.If) void {
         self.parseInstr(instr);
         self.indent_level -= 1;
     }
+}
+
+fn importGlobal(self: *Self, data: Instruction.ImportGlobal) void {
+    self.indentAndPrintSlice(
+        "[Import global index {}, symbol index {} module {}]",
+        .{ data.index, data.import.index, data.import.module.toInt() },
+    );
 }
 
 fn in(self: *Self, data: Instruction.In) void {

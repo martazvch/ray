@@ -2,9 +2,8 @@ var a = 0
 var b = true
 var c = 56.7
 
-var d = 12 / 34
-
-var e: int = 12 / 34
-var f: float = 4. / 2.
-
-fn main() {}
+fn main() {
+    var d = 12 / 34
+    var e: int = 12 / 34
+    var f: float = 4. / 2.
+}

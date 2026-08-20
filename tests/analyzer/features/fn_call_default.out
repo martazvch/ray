@@ -37,6 +37,13 @@
     - tags
     up: 0
     down: 1
+[Variable declaration index: 0, scope: global]
+    [Constant index 6]
+        [Int 8]
+[Variable declaration index: 1, scope: global]
+    [Constant index 7]
+        [String math]
+
 [Structure declaration Foo]
     - default values
     [Constant index 3]

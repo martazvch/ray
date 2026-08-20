@@ -1,7 +1,6 @@
 type_mismatch, int, float
 type_mismatch, float, str
 type_mismatch, bool, int
-type_mismatch, str, int
 
 undeclared_type, floa
 undeclared_type, Int

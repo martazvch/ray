@@ -320,10 +320,6 @@ fn execute(self: *Self) !void {
                 self.stack.top -= captures_count + 1;
                 self.stack.push(Value.makeObj(closure.asObj()));
             },
-            .def_global => {
-                const idx = self.frame.readByte();
-                self.frame.module.globals[idx] = self.stack.pop();
-            },
             .deref => self.stack.push(self.stack.pop().obj.as(Obj.Pointer).child.*),
             .div_float => {
                 const rhs = self.stack.pop().float;
@@ -404,6 +400,11 @@ fn execute(self: *Self) !void {
                 const value = &self.frame.module.globals[idx];
                 value.obj = self.cow(value.obj);
                 self.stack.push(value.*);
+            },
+            .get_global_ext => {
+                const index = self.frame.readByte();
+                const module = self.frame.readByte();
+                self.stack.push(self.modules[module].globals[index]);
             },
             // TODO: see if same compiler bug as get_global
             .get_local => self.stack.push(self.frame.slots[self.frame.readByte()]),

@@ -7,8 +7,9 @@ const ffi = @import("../ffi/ffi.zig");
 const MapNameType = @import("../analyzer/types.zig").MapNameType;
 const Type = @import("../analyzer/types.zig").Type;
 const TypeInterner = @import("../analyzer/types.zig").TypeInterner;
-const Symbol = @import("../analyzer/LexicalScope.zig").Symbol;
-const SymbolMap = @import("../analyzer/LexicalScope.zig").SymbolMap;
+const LexScope = @import("../analyzer/LexicalScope.zig");
+const Symbol = LexScope.Symbol;
+const SymbolMap = LexScope.SymbolMap;
 
 const Module = @import("ModuleManager.zig").Module;
 const Obj = @import("../runtime/Obj.zig");
@@ -21,6 +22,7 @@ const oom = misc.oom;
 pub const NativeModule = struct {
     path: []const u8,
     index: usize,
+
     /// Native Zig functions used at runtime
     zig_fns: ArrayList(*Obj.ZigFn) = .empty,
     /// Native Zig functions translated to Ray's type system for compilation
@@ -36,6 +38,9 @@ pub const NativeModule = struct {
     foreign_fns: ArrayList(*Obj.ForeignFn) = .empty,
     /// Foreign functions translated to Ray's type system for compilation
     foreign_fns_meta: Meta = .empty,
+
+    // Constants
+    // constants: std.AutoHashMapUnmanaged(Interner.Index, Constant) = .empty,
 };
 
 mods: std.AutoArrayHashMapUnmanaged(Interner.Index, NativeModule),

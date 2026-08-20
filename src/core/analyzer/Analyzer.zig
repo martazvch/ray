@@ -938,6 +938,11 @@ fn varDecl(self: *Self, node: *const Ast.VarDecl, ctx: *Context) StmtResult {
         checked_type = try self.performTypeCoercion(checked_type, &value_res, false, self.ast.getSpan(value));
         self.checkWrap(&value_res.instr, value_res.ti.heap);
 
+        // For now, we don't accept anything other than scalar constants
+        if (self.scope.isGlobal() and self.irb.getInstr(value_res.instr) != .constant) {
+            return self.err(.non_comptime_in_global, self.ast.getSpan(value));
+        }
+
         break :v value_res;
     } else null;
 
@@ -1265,23 +1270,40 @@ fn use(self: *Self, node: *const Ast.Use) StmtResult {
         const mod = self.state.modules.getFromPath(path).?;
 
         for (items) |item| {
+            const item_token = if (item.alias) |alias| alias else item.item;
+            const item_interned = self.internToken(item_token);
+            const span = self.ast.getSpan(item_token);
             const item_name = self.internToken(item.item);
-            var sym = mod.sym_infos.get(item_name) orelse return self.err(
+
+            // Symbols
+            if (mod.sym_infos.get(item_name)) |sym| {
+                // TODO: error
+                if (!sym.type.is(.function) and !sym.type.is(.structure) and !sym.type.is(.@"enum")) {
+                    @panic("Import not supported yet");
+                }
+
+                self.scope.declareExternSymbol(self.alloc, item_interned, sym);
+            }
+            // Global variables
+            else if (mod.globals_infos.get(item_name)) |cte| {
+                const index = try self.declareVariable(item_name, cte.type, .{ .comp_time = true }, span);
+
+                return self.irb.addInstr(
+                    .{ .import_global = .{
+                        .index = index,
+                        .import = .{ .index = cte.index, .module = self.state.modules.getIndex(path).? },
+                    } },
+                    span.start,
+                );
+            }
+            // Missing
+            else return self.err(
                 .{ .missing_symbol_in_module = .{
                     .module = self.ast.toSource(node.names[node.names.len - 1]),
                     .symbol = self.ast.toSource(item.item),
                 } },
                 self.ast.getSpan(item.item),
             );
-
-            // TODO: error
-            if (!sym.type.is(.function) and !sym.type.is(.structure) and !sym.type.is(.@"enum")) {
-                @panic("Import not supported yet");
-            }
-
-            const item_token = if (item.alias) |alias| alias else item.item;
-            const item_interned = self.internToken(item_token);
-            self.scope.declareExternSymbol(self.alloc, item_interned, sym);
         }
     } else {
         self.scope.declareModule(self.alloc, module_name, self.ti.intern(.{ .module = path }));
@@ -1368,10 +1390,6 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
                 return self.err(.expect_statement, self.ast.getSpan(expr));
             }
         },
-    }
-
-    if (self.scope.isGlobal() and !res.ti.comp_time) {
-        return self.err(.non_comptime_in_global, self.ast.getSpan(expr));
     }
 
     return res;
@@ -2336,28 +2354,45 @@ fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_name: InternerIdx)
 
     const field_name = self.interner.intern(text);
     const module = self.state.modules.getFromPath(module_name).?;
-    const sym = module.sym_infos.get(field_name) orelse return self.err(
+
+    if (module.sym_infos.get(field_name)) |sym| {
+        self.scope.declareExternSymbol(self.alloc, field_name, sym);
+        // TODO: protect the cast
+        return .{
+            .type = sym.type,
+            .ti = .{ .is_sym = true, .ext_mod = sym.module },
+            .instr = self.irb.addInstr(
+                .{ .load_symbol = .{
+                    .module = sym.module,
+                    .symbol = @intCast(sym.index),
+                    .kind = if (module.native) .zig else .ray,
+                } },
+                span.start,
+            ),
+        };
+    }
+    // Global
+    else if (module.globals_infos.get(field_name)) |glob| {
+        return .{
+            .type = glob.type,
+            .instr = self.irb.addInstr(
+                .{ .identifier = .{
+                    .index = glob.index,
+                    .scope = .global,
+                    .module = self.state.modules.getIndex(module_name).?,
+                } },
+                span.start,
+            ),
+        };
+    }
+    // Not found
+    else return self.err(
         .{ .missing_symbol_in_module = .{
             .module = self.interner.getKey(module.name).?,
             .symbol = text,
         } },
         span,
     );
-    self.scope.declareExternSymbol(self.alloc, field_name, sym);
-
-    // TODO: protect the cast
-    return .{
-        .type = sym.type,
-        .ti = .{ .is_sym = true, .ext_mod = sym.module },
-        .instr = self.irb.addInstr(
-            .{ .load_symbol = .{
-                .module = sym.module,
-                .symbol = @intCast(sym.index),
-                .kind = if (module.native) .zig else .ray,
-            } },
-            span.start,
-        ),
-    };
 }
 
 fn call(self: *Self, expr: *const Ast.FnCall, ctx: *Context) Result {

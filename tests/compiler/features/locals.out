@@ -18,6 +18,4 @@ set_global index 0
 ret_naked
 
 -- global scope --
-load_const index 3, value sneaky
-def_global index 0
 call index 0, arity 0, main

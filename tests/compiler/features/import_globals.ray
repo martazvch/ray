@@ -1,0 +1,9 @@
+use data.math
+let glob_value = 1
+use data.math.{name}
+
+fn main() {
+    print name
+    print math.eight
+}
+

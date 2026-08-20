@@ -56,7 +56,6 @@ pub const OpCode = enum(u8) {
     call_array,
 
     closure,
-    def_global,
     deref,
     div_float,
     div_int,
@@ -79,6 +78,7 @@ pub const OpCode = enum(u8) {
     get_field_native,
     get_global,
     get_global_cow,
+    get_global_ext,
     get_local,
     get_local_cow,
     get_enum_tag,

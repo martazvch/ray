@@ -20,3 +20,6 @@ fn getInt2(a: int) -> int { return 12 }
 fn getIntDef(a=9) -> int { return a }
 
 enum Dir { up, down }
+
+let eight = 8
+let name = "math"
