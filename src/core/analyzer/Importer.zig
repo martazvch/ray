@@ -59,6 +59,11 @@ pub fn fetchImportedFile(
         return fetchFrom(io, alloc, &state.cwd, ast, path_chunks[1..], &state.path_builder);
     }
 
+    // Absolute imports (from std for example)
+    if (state.modules.getFromPath(state.interner.intern(ast.toSource(path_chunks[0])))) |mod| {
+        return .{ .module = .{ .path = mod.path } };
+    }
+
     // Import from CLI additional path
     // TODO: error
     if (state.config.path) |p| {
@@ -80,10 +85,6 @@ pub fn fetchImportedFile(
     // Import from native std modules
     if (path_chunks.len > 1) {
         @panic("Absolute import of length > 1 are not implemented yet");
-    }
-
-    if (state.modules.getFromPath(state.interner.intern(ast.toSource(path_chunks[0])))) |mod| {
-        return .{ .module = .{ .path = mod.path } };
     }
 
     @panic("Absolute imports not yet implemented");

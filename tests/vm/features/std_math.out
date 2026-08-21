@@ -1,0 +1,8 @@
+<native zig fn cos>
+1
+-1
+1
+<native zig fn sin>
+0.41078129050290885
+0
+-1

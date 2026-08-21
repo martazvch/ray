@@ -1,0 +1,12 @@
+use math as m
+use math.{cos, sin, e}
+
+fn main() {
+    print m.cos(m.pi)
+    print cos(0)
+    print m.sin(e)
+    print sin(0)
+
+    print m.sign(-5)
+}
+
