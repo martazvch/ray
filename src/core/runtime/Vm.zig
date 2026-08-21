@@ -160,14 +160,11 @@ fn execute(self: *Self) !void {
         if (comptime options.print_instr) {
             var buf: [1024]u8 = undefined;
             var bfw = std.Io.Writer.fixed(&buf);
-            const global_mod = &self.modules[0];
 
             var dis = Disassembler.init(
                 &self.frame.function.chunk,
-                self.frame.module,
-                global_mod.zig_funcs,
-                global_mod.structures,
-                global_mod.foreign_funcs.items,
+                self.frame.module.index,
+                &self.state.modules,
             );
             const instr_nb = self.frame.instructionNb();
             _ = dis.disInstruction(&bfw, instr_nb);
@@ -256,18 +253,18 @@ fn execute(self: *Self) !void {
                 self.frame = try self.frame_stack.newKeepMod();
                 self.frame.call(self.modules[module].functions[index], &self.stack, arity, self.modules);
             },
-            .call_foreign => {
+            .call_extern => {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const obj = self.frame.module.foreign_funcs.items[index];
-                self.callForeign(obj, arity);
+                const obj = self.frame.module.extern_funcs.items[index];
+                self.callExtern(obj, arity);
             },
-            .call_foreign_ext => {
+            .call_extern_ext => {
                 const index = self.frame.readByte();
                 const module = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const obj = self.modules[module].foreign_funcs.items[index];
-                self.callForeign(obj, arity);
+                const obj = self.modules[module].extern_funcs.items[index];
+                self.callExtern(obj, arity);
             },
             .call_virtual => {
                 const index = self.frame.readByte();
@@ -766,7 +763,7 @@ fn execute(self: *Self) !void {
     }
 }
 
-fn callForeign(self: *Self, obj: *Obj.ForeignFn, arity: usize) void {
+fn callExtern(self: *Self, obj: *Obj.ExternFn, arity: usize) void {
     const base = self.stack.top - arity;
     const prev_slot = self.frame.slots;
     defer self.frame.slots = prev_slot;

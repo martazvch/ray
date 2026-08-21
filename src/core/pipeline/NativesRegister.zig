@@ -10,8 +10,11 @@ const TypeInterner = @import("../analyzer/types.zig").TypeInterner;
 const LexScope = @import("../analyzer/LexicalScope.zig");
 const Symbol = LexScope.Symbol;
 const SymbolMap = LexScope.SymbolMap;
+const Variable = LexScope.Variable;
+const VariableMap = LexScope.VariableMap;
 
 const Module = @import("ModuleManager.zig").Module;
+const Value = @import("../runtime/values.zig").Value;
 const Obj = @import("../runtime/Obj.zig");
 const Vm = @import("../runtime/Vm.zig");
 
@@ -23,24 +26,26 @@ pub const NativeModule = struct {
     path: []const u8,
     index: usize,
 
+    // Globals
+    globals: ArrayList(Value) = .empty,
+    globals_meta: VariableMap = .empty,
+
     /// Native Zig functions used at runtime
     zig_fns: ArrayList(*Obj.ZigFn) = .empty,
     /// Native Zig functions translated to Ray's type system for compilation
     zig_fns_meta: Meta = .empty,
+
+    /// Extern functions used at runtime
+    extern_fns: ArrayList(*Obj.ExternFn) = .empty,
+    /// Extern functions translated to Ray's type system for compilation
+    extern_fns_meta: Meta = .empty,
+
     /// Native structures used at runtime
     zig_structs: ArrayList(Module.Structure) = .empty,
     /// Native structures translated to Ray's type system for compilation
     zig_structs_meta: Meta = .empty,
     /// Native structures translated to Ray's type system used here for self references
     scratch_structs: Meta = .empty,
-
-    /// Foreign functions used at runtime
-    foreign_fns: ArrayList(*Obj.ForeignFn) = .empty,
-    /// Foreign functions translated to Ray's type system for compilation
-    foreign_fns_meta: Meta = .empty,
-
-    // Constants
-    // constants: std.AutoHashMapUnmanaged(Interner.Index, Constant) = .empty,
 };
 
 mods: std.AutoArrayHashMapUnmanaged(Interner.Index, NativeModule),
@@ -93,6 +98,10 @@ pub fn registerMod(self: *Self, alloc: Allocator, interner: *Interner, ti: *Type
 
     inline for (mod.functions) |func| {
         _ = self.registerZigFn(alloc, &func, interner, ti);
+    }
+
+    inline for (mod.globals) |cte| {
+        _ = self.registerGlobal(alloc, cte, interner, ti);
     }
 }
 
@@ -336,29 +345,29 @@ fn zigToRay(self: *Self, alloc: Allocator, T: type, interner: *Interner, ti: *Ty
 }
 
 /// Declares in global scope, used when not declaring via a module
-pub fn registerForeignFnInGlobal(self: *Self, alloc: Allocator, proto: *const ffi.FnProto, interner: *Interner, ti: *TypeInterner) Registered {
+pub fn registerExternFnInGlobal(self: *Self, alloc: Allocator, proto: *const ffi.FnProto, interner: *Interner, ti: *TypeInterner) Registered {
     self.current = self.getGlobalScope();
-    return self.registerForeignFn(alloc, proto, interner, ti);
+    return self.registerExternFn(alloc, proto, interner, ti);
 }
 
-fn registerForeignFn(self: *Self, alloc: Allocator, proto: *const ffi.FnProto, interner: *Interner, ti: *TypeInterner) Registered {
-    const fn_type = foreignFnToRay(alloc, proto, interner, ti);
+fn registerExternFn(self: *Self, alloc: Allocator, proto: *const ffi.FnProto, interner: *Interner, ti: *TypeInterner) Registered {
+    const fn_type = externFnToRay(alloc, proto, interner, ti);
     const name_str = std.mem.span(proto.name);
     const fn_name = interner.intern(name_str);
-    self.current.foreign_fns_meta.put(alloc, fn_name, .{
+    self.current.extern_fns_meta.put(alloc, fn_name, .{
         .name = fn_name,
         .type = fn_type,
-        .index = self.current.foreign_fns_meta.count(),
+        .index = self.current.extern_fns_meta.count(),
         .module = .toIndex(self.current.index),
     }) catch oom();
-    const native = Obj.ForeignFn.create(alloc, name_str, proto.func, proto.return_type != .void);
+    const native = Obj.ExternFn.create(alloc, name_str, proto.func, proto.return_type != .void);
 
-    self.current.foreign_fns.append(alloc, native) catch oom();
+    self.current.extern_fns.append(alloc, native) catch oom();
 
-    return .{ .index = self.current.foreign_fns.items.len - 1, .type = fn_type };
+    return .{ .index = self.current.extern_fns.items.len - 1, .type = fn_type };
 }
 
-pub fn foreignFnToRay(alloc: Allocator, proto: *const ffi.FnProto, interner: *Interner, ti: *TypeInterner) *const Type {
+pub fn externFnToRay(alloc: Allocator, proto: *const ffi.FnProto, interner: *Interner, ti: *TypeInterner) *const Type {
     var params: Type.Function.ParamsMap = .empty;
     params.ensureTotalCapacity(alloc, proto.params.len - 1) catch oom();
 
@@ -378,7 +387,7 @@ pub fn foreignFnToRay(alloc: Allocator, proto: *const ffi.FnProto, interner: *In
 
     // TODO: handle container name properly
     const ty: Type.Function = .{
-        .kind = .foreign,
+        .kind = .@"extern",
         .loc = .{
             .name = interner.intern(std.mem.span(proto.name)),
             .container = interner.intern("std"),
@@ -397,4 +406,31 @@ fn cTypeToRay(ty: ffi.cType, ti: *TypeInterner) *const Type {
         .float => ti.getCached(.float),
         .bool => ti.getCached(.bool),
     };
+}
+
+fn registerGlobal(self: *Self, alloc: Allocator, global: zffi.Global, interner: *Interner, ti: *TypeInterner) void {
+    const name = interner.intern(global.name);
+    const gop = self.current.globals_meta.getOrPut(alloc, name) catch oom();
+    if (gop.found_existing) {
+        @panic("Already declared global in module");
+    }
+
+    gop.value_ptr.* = .{
+        .name = name,
+        .type = switch (global.value) {
+            .bool => ti.getCached(.bool),
+            .float => ti.getCached(.float),
+            .int => ti.getCached(.int),
+            else => unreachable,
+        },
+        .index = self.current.globals_meta.count() - 1,
+        .comp_time = true,
+        .constant = true,
+        .initialized = true,
+        .kind = .global,
+        .captured = false,
+        .ext_mod = .toIndex(self.current.index),
+    };
+
+    self.current.globals.append(alloc, global.value) catch oom();
 }

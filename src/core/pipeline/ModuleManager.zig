@@ -19,26 +19,28 @@ const Self = @This();
 pub const Module = struct {
     path: InternerIndex,
     name: InternerIndex,
-    /// Tells if it's a native Zig module
+    index: Index,
     native: bool,
+
     /// Compiled values used at runtime
-    globals: []Value,
-    /// Compiled constants
-    constants: []Value,
+    globals: []Value = &.{},
+    /// Compiled constants used at runtime
+    constants: []Value = &.{},
 
     /// Type infos gathered by the analyzer used when importing a module
     /// It has all the analyzis-time data to type check
-    sym_infos: SymbolMap,
-    globals_infos: VariableMap,
+    sym_infos: SymbolMap = .empty,
+    globals_infos: VariableMap = .empty,
 
     /// Compiled objects
-    enums: []Enum,
-    unions: []Union,
-    functions: []*Obj.Function,
-    foreign_funcs: std.ArrayList(*Obj.ForeignFn),
-    zig_funcs: []*Obj.ZigFn,
-    structures: []Structure,
-    vtables: []VTable,
+    enums: []Enum = &.{},
+    unions: []Union = &.{},
+    functions: []*Obj.Function = &.{},
+    zig_funcs: []*Obj.ZigFn = &.{},
+    extern_funcs: std.ArrayList(*Obj.ExternFn) = .empty,
+    structures: []Structure = &.{},
+    zig_structs: []Structure = &.{},
+    vtables: []VTable = &.{},
 
     pub const Enum = struct {
         name: []const u8,
@@ -64,26 +66,8 @@ pub const Module = struct {
         name: []const u8,
         functions: []*Obj.Function,
     };
-
-    pub const empty: Module = .{
-        .path = undefined,
-        .name = undefined,
-        .native = false,
-        .sym_infos = .empty,
-        .globals_infos = .empty,
-        .globals = &.{},
-        .constants = &.{},
-        .enums = &.{},
-        .unions = &.{},
-        .functions = &.{},
-        .foreign_funcs = .empty,
-        .zig_funcs = &.{},
-        .structures = &.{},
-        .vtables = &.{},
-    };
 };
 
-// TODO: make a utils tool because it's a common pattern
 pub const Index = enum(usize) {
     _,
 
@@ -103,17 +87,20 @@ pub const empty: Self = .{
 };
 
 pub fn open(self: *Self, allocator: Allocator, path: InternerIndex, name: InternerIndex, native: bool) Index {
-    if (self.getIndex(path)) |index| {
-        return index;
+    const gop = self.modules.getOrPut(allocator, path) catch oom();
+    if (gop.found_existing) {
+        return gop.value_ptr.index;
     }
 
-    var mod: Module = .empty;
-    mod.path = path;
-    mod.name = name;
-    mod.native = native;
-    self.modules.put(allocator, path, mod) catch oom();
+    const index: Index = .toIndex(self.modules.count() - 1);
+    gop.value_ptr.* = .{
+        .name = name,
+        .path = path,
+        .native = native,
+        .index = index,
+    };
 
-    return .toIndex(self.modules.count() - 1);
+    return index;
 }
 
 /// Adds symbols informations to module so that other module can have type informations when importing
@@ -134,10 +121,8 @@ pub fn registerGlobalsInfo(self: *Self, allocator: Allocator, index: Index, glob
     var mod = self.getFromIndex(index);
     mod.globals_infos.ensureUnusedCapacity(allocator, @intCast(globals.count())) catch oom();
 
-    std.log.debug("Registers in module: {}", .{index});
     var it = globals.iterator();
     while (it.next()) |entry| {
-        std.log.debug("Constant name: {}, index: {}", .{ entry.key_ptr.*, entry.value_ptr.index });
         mod.globals_infos.putAssumeCapacity(entry.key_ptr.*, entry.value_ptr.*);
     }
 }
@@ -146,10 +131,13 @@ pub fn registerGlobalsInfo(self: *Self, allocator: Allocator, index: Index, glob
 /// Adds the informations and the compiled objects
 pub fn registerSymsFromNativeMod(self: *Self, allocator: Allocator, index: Index, native_mod: *const NativeMod) void {
     self.registerSymsInfo(allocator, index, &native_mod.zig_fns_meta);
+    self.registerGlobalsInfo(allocator, index, &native_mod.globals_meta);
 
     const mod = self.getFromIndex(index);
+    mod.globals = native_mod.globals.items;
     mod.zig_funcs = native_mod.zig_fns.items;
-    mod.foreign_funcs = native_mod.foreign_fns;
+    mod.extern_funcs = native_mod.extern_fns;
+    mod.zig_structs = native_mod.zig_structs.items;
 }
 
 /// Used between analyzis and compilation as we know the exact number of symbols
@@ -171,11 +159,11 @@ pub fn setGlobal(self: *Self, module_index: Index, value_index: usize, value: Va
     self.getFromIndex(module_index).globals[value_index] = value;
 }
 
-pub fn getGlobal(self: *Self, mod: Index, index: usize) Value {
+pub fn getGlobal(self: *const Self, mod: Index, index: usize) Value {
     return self.getFromIndex(mod).globals[index];
 }
 
-pub fn addSymbol(self: *Self, module_index: Index, sym_index: usize, value: anytype) void {
+pub fn setSymbol(self: *Self, module_index: Index, sym_index: usize, value: anytype) void {
     const module = self.getFromIndex(module_index);
     const array = switch (@TypeOf(value)) {
         Module.Enum => module.enums,
@@ -187,19 +175,28 @@ pub fn addSymbol(self: *Self, module_index: Index, sym_index: usize, value: anyt
     array[sym_index] = value;
 }
 
-pub fn addForeignSymbol(self: *Self, alloc: Allocator, mod_index: Index, value: *Obj.ForeignFn) void {
+pub fn setExternFn(self: *Self, alloc: Allocator, mod_index: Index, value: *Obj.ExternFn) void {
     const module = self.getFromIndex(mod_index);
-    module.foreign_funcs.append(alloc, value) catch oom();
+    module.extern_funcs.append(alloc, value) catch oom();
 }
 
 pub fn getSymbol(
     self: *const Self,
     mod_index: Index,
     sym_index: usize,
-    comptime kind: enum { @"enum", function, structure, @"union" },
+    comptime kind: enum {
+        @"enum",
+        function,
+        function_extern,
+        function_zig,
+        structure,
+        @"union",
+    },
 ) switch (kind) {
     .@"enum" => *const Module.Enum,
     .function => *Obj.Function,
+    .function_extern => *Obj.ExternFn,
+    .function_zig => *Obj.ZigFn,
     .structure => *const Module.Structure,
     .@"union" => *const Module.Union,
 } {
@@ -207,16 +204,18 @@ pub fn getSymbol(
     return switch (kind) {
         .@"enum" => &mod.enums[sym_index],
         .function => mod.functions[sym_index],
+        .function_extern => mod.extern_funcs.items[sym_index],
+        .function_zig => mod.zig_funcs[sym_index],
         .structure => &mod.structures[sym_index],
         .@"union" => &mod.unions[sym_index],
     };
 }
 
-pub fn addConstant(self: *Self, mod: Index, index: usize, value: Value) void {
+pub fn setConstant(self: *Self, mod: Index, index: usize, value: Value) void {
     self.getFromIndex(mod).constants[index] = value;
 }
 
-pub fn getConstant(self: *Self, mod: Index, index: usize) Value {
+pub fn getConstant(self: *const Self, mod: Index, index: usize) Value {
     return self.getFromIndex(mod).constants[index];
 }
 
@@ -226,11 +225,6 @@ pub fn getFromIndex(self: *const Self, index: Index) *Module {
 
 pub fn getFromPath(self: *Self, path: InternerIndex) ?*Module {
     return self.modules.getPtr(path);
-}
-
-pub fn getIndex(self: *const Self, name: InternerIndex) ?Index {
-    const index = self.modules.getIndex(name) orelse return null;
-    return Index.toIndex(index);
 }
 
 pub fn has(self: *const Self, name: InternerIndex) bool {

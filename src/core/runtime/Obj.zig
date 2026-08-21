@@ -34,11 +34,11 @@ const Kind = enum {
     closure,
     enum_instance,
     @"error",
+    extern_fn,
     function,
     instance,
     iterator,
     native_zfn,
-    foreign_fn,
     native_obj,
     pointer,
     string,
@@ -51,16 +51,16 @@ const Kind = enum {
             Box => .box,
             Closure => .closure,
             EnumInstance => .enum_instance,
+            ExternFn => .extern_fn,
             Function => .function,
             Instance => .instance,
             Iterator => .iterator,
-            ZigFn => .native_zfn,
-            ForeignFn => .foreign_fn,
             NativeObj => .native_obj,
             Pointer => .pointer,
             String => .string,
             TraitObj => .trait_obj,
             UnionInstance => .union_instance,
+            ZigFn => .native_zfn,
             else => @compileError(@typeName(T) ++ " isn't a runtime object type"),
         };
     }
@@ -468,7 +468,7 @@ pub const ZigFn = struct {
     }
 };
 
-pub const ForeignFn = struct {
+pub const ExternFn = struct {
     obj: Obj,
     name: []const u8,
     function: ffi.Fn,
@@ -869,7 +869,7 @@ pub fn deepCopy(self: *Obj, vm: *Vm) *Obj {
         .enum_instance, .@"error", .union_instance => @panic("TODO"),
         .instance => self.as(Instance).deepCopy(vm).asObj(),
         // Immutable, shallow copy ok
-        .box, .closure, .function, .iterator, .foreign_fn, .native_zfn, .native_obj, .string, .trait_obj, .pointer => self,
+        .box, .closure, .function, .iterator, .extern_fn, .native_zfn, .native_obj, .string, .trait_obj, .pointer => self,
     };
 }
 
@@ -891,8 +891,8 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
             const iterator = self.as(Iterator);
             iterator.deinit(vm.gc_alloc);
         },
-        .foreign_fn => {
-            const function = self.as(ForeignFn);
+        .extern_fn => {
+            const function = self.as(ExternFn);
             function.deinit(vm.gc_alloc);
         },
         .native_zfn => {
@@ -947,7 +947,7 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
         },
         .instance => try writer.print("<instance of {s}>", .{self.as(Instance).parent.name}),
         .iterator => try writer.writeAll("<iterator>"),
-        .foreign_fn => try writer.print("<foreign fn {s}>", .{self.as(ForeignFn).name}),
+        .extern_fn => try writer.print("<extern fn {s}>", .{self.as(ExternFn).name}),
         .native_zfn => try writer.print("<native zig fn {s}>", .{self.as(ZigFn).name}),
         .native_obj => try writer.print("<native object {s}>", .{self.as(NativeObj).name}),
         .pointer => try writer.print("<pointer 0x{x}>", .{@intFromPtr(self.as(Pointer).child)}),
@@ -976,7 +976,7 @@ pub fn log(self: *Obj) void {
         .function => std.debug.print("<fn {s}>", .{self.as(Function).name}),
         .instance => std.debug.print("<instance of {s}>", .{self.as(Instance).parent.name}),
         .iterator => std.debug.print("<iterator>", .{}),
-        .foreign_fn => std.debug.print("<foreign fn {s}>", .{self.as(ForeignFn).name}),
+        .extern_fn => std.debug.print("<extern fn {s}>", .{self.as(ExternFn).name}),
         .native_zfn => std.debug.print("<native zig fn {s}>", .{self.as(ZigFn).name}),
         .native_obj => unreachable,
         .pointer => std.debug.print("<pointer 0x{x}>", .{@intFromPtr(self.as(Pointer).child)}),

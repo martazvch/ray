@@ -125,15 +125,15 @@ exit_repl
 -- main --
 load_const index 3, value 1
 load_const index 4, value 90
-struct_lit_ext index 0, module 4, arity 2
+struct_lit_ext index 0, module 4, arity 2, Point
 
 get_local index 0
-call_ext index 1, module 4, arity 1
+call_ext index 1, module 4, arity 1, display
 
 load_const index 5, value 10
 get_local index 0
 incr_ref
-struct_lit_ext index 1, module 4, arity 2
+struct_lit_ext index 1, module 4, arity 2, Square
 
 get_local index 1
 get_field index 1
@@ -145,7 +145,7 @@ get_field index 1
 get_field index 1
 print
 
-call_ext index 1, module 3, arity 0
+call_ext index 1, module 3, arity 0, introduce
 
 get_local index 1
 get_field index 1
@@ -153,7 +153,7 @@ get_field index 0
 get_local index 1
 get_field index 1
 get_field index 1
-call_ext index 2, module 3, arity 2
+call_ext index 2, module 3, arity 2, getVecFromPos
 
 get_local index 2
 get_field index 0
@@ -164,23 +164,23 @@ get_field index 1
 print
 
 load_const index 6, value local import
-call_ext index 1, module 5, arity 1
+call_ext index 1, module 5, arity 1, quote
 print
 
 get_local index 0
-call_ext index 1, module 4, arity 1
+call_ext index 1, module 4, arity 1, display
 
 load_const index 7, value just 
 load_const index 8, value concaneted
-call_ext index 0, module 5, arity 2
+call_ext index 0, module 5, arity 2, concat
 print
 
 get_local index 1
 get_local index 0
-call_ext index 3, module 4, arity 2
+call_ext index 3, module 4, arity 2, moveCenter
 
 get_local index 3
-call_ext index 1, module 4, arity 1
+call_ext index 1, module 4, arity 1, display
 
 get_local index 1
 get_field index 1

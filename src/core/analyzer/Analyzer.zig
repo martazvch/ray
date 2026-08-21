@@ -26,7 +26,7 @@ const State = @import("../pipeline/State.zig");
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
 const ffi = @import("../ffi/ffi.zig");
 const Value = @import("../runtime/values.zig").Value;
-const ForeignFn = @import("../runtime/Obj.zig").ForeignFn;
+const ExternFn = @import("../runtime/Obj.zig").ExternFn;
 
 const type_mod = @import("types.zig");
 const Type = type_mod.Type;
@@ -686,7 +686,7 @@ fn endExternFnDecl(
     const fn_type = &ty.function;
     fn_type.params = params.decls;
     fn_type.return_type = return_ty;
-    fn_type.kind = .foreign;
+    fn_type.kind = .@"extern";
 
     const lib = self.state.dynlib orelse return self.err(
         .{ .extern_fn_not_in_rayn = .{ .name = name_text } },
@@ -700,8 +700,8 @@ fn endExternFnDecl(
         span,
     );
     const returns = !return_ty.is(.void);
-    const obj_func = ForeignFn.create(self.alloc, name_text, func, returns);
-    self.state.modules.addForeignSymbol(self.alloc, self.mod_index, obj_func);
+    const obj_func = ExternFn.create(self.alloc, name_text, func, returns);
+    self.state.modules.setExternFn(self.alloc, self.mod_index, obj_func);
 
     return .{
         .instr = self.irb.addInstr(
@@ -1291,7 +1291,7 @@ fn use(self: *Self, node: *const Ast.Use) StmtResult {
                 return self.irb.addInstr(
                     .{ .import_global = .{
                         .index = index,
-                        .import = .{ .index = cte.index, .module = self.state.modules.getIndex(path).? },
+                        .import = .{ .index = cte.index, .module = mod.index },
                     } },
                     span.start,
                 );
@@ -1882,7 +1882,7 @@ pub fn implicitSelector(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result 
     );
 
     // It must exist because type parsed before expression, so if not existing it would have errored already
-    const sym = self.scope.getSymbolFromType(tag_res.ty).?;
+    const sym = self.scope.getSymbolFromType(tag_res.ty) orelse self.state.symbol_table.get(tag_res.ty).?;
 
     if (tag_res.ty.as(.@"union")) |*u| {
         const tag_type = u.tags.get(tag_name).?;
@@ -2356,7 +2356,6 @@ fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_name: InternerIdx)
     const module = self.state.modules.getFromPath(module_name).?;
 
     if (module.sym_infos.get(field_name)) |sym| {
-        self.scope.declareExternSymbol(self.alloc, field_name, sym);
         // TODO: protect the cast
         return .{
             .type = sym.type,
@@ -2379,7 +2378,7 @@ fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_name: InternerIdx)
                 .{ .identifier = .{
                     .index = glob.index,
                     .scope = .global,
-                    .module = self.state.modules.getIndex(module_name).?,
+                    .module = module.index,
                 } },
                 span.start,
             ),

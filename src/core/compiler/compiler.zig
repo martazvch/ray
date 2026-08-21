@@ -41,9 +41,6 @@ pub const CompilationUnit = struct {
     compiled_constants: misc.Set(usize),
     render: bool,
 
-    // For disassembler
-    global_mod: *const NativeMod,
-
     const Self = @This();
     const Error = error{ Err, TooManyConst } || std.Io.Writer.Error;
     const CompilerReport = GenReport(CompilerMsg);
@@ -58,7 +55,6 @@ pub const CompilationUnit = struct {
             .errs = .empty,
             .instr_data = undefined,
             .instr_lines = undefined,
-            .global_mod = state.native_reg.getGlobalScope(),
             .constants = state.const_interner.constants.items,
             .line = 0,
             .compiled_constants = .empty,
@@ -296,10 +292,8 @@ const Compiler = struct {
 
             var dis = Disassembler.init(
                 &self.function.chunk,
-                self.manager.state.modules.getFromIndex(self.manager.mod_index),
-                self.manager.global_mod.zig_fns.items,
-                self.manager.global_mod.zig_structs.items,
-                self.manager.global_mod.foreign_fns.items,
+                self.manager.mod_index,
+                &self.manager.state.modules,
             );
             dis.disChunk(&alloc_writer.writer, self.function.name);
 
@@ -634,7 +628,7 @@ const Compiler = struct {
 
         const is_ext = sym_mod != self.manager.mod_index;
         const op: OpCode = switch (data.kind) {
-            .foreign => if (is_ext) .call_foreign_ext else .call_foreign,
+            .@"extern" => if (is_ext) .call_extern_ext else .call_extern,
             .zig, .zig_method => .call_zig,
             .normal, .method, .bound => if (is_ext) .call_ext else .call,
             // Only called at analyzis time
@@ -686,7 +680,7 @@ const Compiler = struct {
         const fn_name = if (data.name) |idx| self.manager.state.interner.getKey(idx).? else "anonymus";
 
         const func = try self.compileFnBody(fn_name, data);
-        self.manager.state.modules.addSymbol(self.manager.mod_index, data.sym_index, func);
+        self.manager.state.modules.setSymbol(self.manager.mod_index, data.sym_index, func);
 
         if (data.captures.len > 0) {
             try self.compileClosure(data, data.sym_index);
@@ -710,7 +704,7 @@ const Compiler = struct {
             // TODO: not all the time
             const fn_name = self.manager.state.interner.getKey(fn_data.name orelse unreachable).?;
             const func = try self.compileFnBody(fn_name, &fn_data);
-            self.manager.state.modules.addSymbol(self.manager.mod_index, fn_data.sym_index, func);
+            self.manager.state.modules.setSymbol(self.manager.mod_index, fn_data.sym_index, func);
         }
     }
 
@@ -737,7 +731,7 @@ const Compiler = struct {
                         const fn_name = self.manager.state.interner.getKey(fn_data.name orelse unreachable).?;
                         const body = try self.compileFnBody(fn_name, &fn_data);
                         vtable.functions[func.index] = body;
-                        self.manager.state.modules.addSymbol(self.manager.mod_index, fn_data.sym_index, body);
+                        self.manager.state.modules.setSymbol(self.manager.mod_index, fn_data.sym_index, body);
                     },
                 }
             }
@@ -801,7 +795,7 @@ const Compiler = struct {
                 ).asObj()),
             };
 
-            self.manager.state.modules.addConstant(self.manager.mod_index, idx, value);
+            self.manager.state.modules.setConstant(self.manager.mod_index, idx, value);
         }
     }
 
@@ -833,7 +827,7 @@ const Compiler = struct {
     }
 
     fn enumDecl(self: *Self, data: *const Instruction.EnumDecl) Error!void {
-        self.manager.state.modules.addSymbol(self.manager.mod_index, data.sym_index, Module.Enum{
+        self.manager.state.modules.setSymbol(self.manager.mod_index, data.sym_index, Module.Enum{
             .name = self.manager.alloc.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
             .tags = data.tags,
             .discriminants = data.discriminants,
@@ -1146,7 +1140,7 @@ const Compiler = struct {
     }
 
     fn structDecl(self: *Self, data: *const Instruction.StructDecl) Error!void {
-        self.manager.state.modules.addSymbol(self.manager.mod_index, data.sym_index, Module.Structure{
+        self.manager.state.modules.setSymbol(self.manager.mod_index, data.sym_index, Module.Structure{
             .name = self.manager.alloc.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
             .type_id = data.type_id,
             .field_count = data.fields_count,
@@ -1206,7 +1200,7 @@ const Compiler = struct {
     }
 
     fn unionDecl(self: *Self, data: *const Instruction.UnionDecl) Error!void {
-        self.manager.state.modules.addSymbol(self.manager.mod_index, data.sym_index, Module.Union{
+        self.manager.state.modules.setSymbol(self.manager.mod_index, data.sym_index, Module.Union{
             .name = self.manager.alloc.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
             .tags = data.tags,
             .type_id = data.type_id,

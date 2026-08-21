@@ -32,10 +32,10 @@ ret_naked
 -- main --
 call index 0, arity 0, set_vars
 
-get_global index 0
+get_global index 0, value null
 call_dyn index 0
 
-get_global index 1
+get_global index 1, value null
 call_dyn index 0
 
 ret_naked

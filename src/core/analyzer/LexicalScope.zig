@@ -42,7 +42,7 @@ pub const Symbol = struct {
     module: ModIndex,
     kind: Kind = .ray,
 
-    pub const Kind = enum { ray, zig, foreign };
+    pub const Kind = enum { ray, zig, @"extern" };
 };
 
 pub const Error = error{ TooManyLocals, AlreadyDeclared };
@@ -185,7 +185,7 @@ pub fn initGlobalScope(self: *Self, allocator: Allocator, state: *State) void {
     const global_mod = state.native_reg.getGlobalScope();
     for ([_]*const Meta{
         &global_mod.zig_fns_meta,
-        &global_mod.foreign_fns_meta,
+        &global_mod.extern_fns_meta,
         &global_mod.zig_structs_meta,
         &state.native_reg.intrinsics_meta,
     }) |reg| {
@@ -349,10 +349,10 @@ pub fn getSymbol(self: *const Self, name: InternerIdx) ?*Symbol {
     return null;
 }
 
-pub fn getSymbolFromType(self: *const Self, ty: *const Type) ?*Symbol {
+pub fn getSymbolFromType(self: *const Self, ty: *const Type) ?Symbol {
     var it = self.iterator();
     while (it.next()) |scope| {
-        if (scope.symbols_type.getPtr(ty)) |sym| {
+        if (scope.symbols_type.get(ty)) |sym| {
             return sym;
         }
     }

@@ -46,14 +46,33 @@ pub fn Union(types: []const std.meta.FieldEnum(All)) type {
     );
 }
 
-pub const Constant = struct {
+pub const Global = struct {
     name: []const u8,
-    desc: ?[]const u8 = null,
+    desc: ?[]const u8,
+    value: Value,
+
+    pub fn init(T: type, name: []const u8, desc: []const u8) Global {
+        checkNonEmptyName(name);
+
+        const field = @field(T, name);
+        const info = @TypeOf(field);
+        const value: Value = switch (info) {
+            Float => .makeFloat(field),
+            Int => .makeInt(field),
+            else => @panic("Native global type not yet implemented: " ++ @typeName(@TypeOf(field))),
+        };
+
+        return .{
+            .name = name,
+            .desc = desc,
+            .value = value,
+        };
+    }
 };
 
 pub const Module = struct {
     name: ?[]const u8 = null,
-    constants: []const Constant = &.{},
+    globals: []const Global = &.{},
     functions: []const FnMeta = &.{},
     structures: []const StructMeta = &.{},
     traits: []const TraitMeta = &.{},

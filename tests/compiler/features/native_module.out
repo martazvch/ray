@@ -19,7 +19,7 @@ ret_naked
 load_const index 3, value 2
 get_local index 0
 mul_float
-call_foreign index 1, arity 1, ret_arg
+call_extern index 1, arity 1, ret_arg
 ret
 
 -- global scope --
@@ -29,10 +29,10 @@ exit_repl
 
 -- main --
 load_const index 3, value 4
-call_foreign_ext index 1, module 3, arity 1
+call_extern_ext index 1, module 3, arity 1, ret_arg
 print
 load_const index 4, value 8
-call_ext index 6, module 3, arity 1
+call_ext index 6, module 3, arity 1, rayFunc
 print
 ret_naked
 

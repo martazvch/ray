@@ -270,12 +270,12 @@ fn call(self: *Self, data: *const Instruction.Call) void {
             if (f.kind == .function) {
                 if (data.module != self.module) {
                     switch (data.kind) {
-                        .foreign => self.indentAndPrintSlice("[Invoke foreign symbol {} module {}]", .{ f.index, data.module.toInt() }),
+                        .@"extern" => self.indentAndPrintSlice("[Invoke extern symbol {} module {}]", .{ f.index, data.module.toInt() }),
                         .zig, .zig_method => self.indentAndPrintSlice("[Invoke Zig symbol {} module {}]", .{ f.index, data.module.toInt() }),
                         else => self.indentAndPrintSlice("[Invoke symbol {} module {}]", .{ f.index, data.module.toInt() }),
                     }
                 } else switch (data.kind) {
-                    .foreign => self.indentAndPrintSlice("[Invoke foreign symbol {}]", .{f.index}),
+                    .@"extern" => self.indentAndPrintSlice("[Invoke extern symbol {}]", .{f.index}),
                     .zig, .zig_method => self.indentAndPrintSlice("[Invoke Zig symbol {}]", .{f.index}),
                     else => self.indentAndPrintSlice("[Invoke symbol {}]", .{f.index}),
                 }
@@ -288,19 +288,19 @@ fn call(self: *Self, data: *const Instruction.Call) void {
         .load_symbol => |sym| {
             if (sym.module != self.module) {
                 switch (data.kind) {
-                    .foreign => self.indentAndPrintSlice("[Call foreign symbol {} module {}]", .{ sym.symbol, sym.module.toInt() }),
+                    .@"extern" => self.indentAndPrintSlice("[Call extern symbol {} module {}]", .{ sym.symbol, sym.module.toInt() }),
                     .zig, .zig_method => self.indentAndPrintSlice("[Call Zig symbol {} module {}]", .{ sym.symbol, sym.module.toInt() }),
                     else => self.indentAndPrintSlice("[Call symbol {} module {}]", .{ sym.symbol, sym.module.toInt() }),
                 }
             } else switch (data.kind) {
-                .foreign => self.indentAndPrintSlice("[Call foreign symbol {}]", .{sym.symbol}),
+                .@"extern" => self.indentAndPrintSlice("[Call extern symbol {}]", .{sym.symbol}),
                 .zig, .zig_method => self.indentAndPrintSlice("[Call Zig symbol {}]", .{sym.symbol}),
                 else => self.indentAndPrintSlice("[Call symbol {}]", .{sym.symbol}),
             }
         },
         .identifier => {
             self.indentAndAppendSlice(switch (data.kind) {
-                .foreign => "[Foreign fn call]",
+                .@"extern" => "[Extern fn call]",
                 .zig, .zig_method => "[Zig fn call]",
                 else => "[Fn call]",
             });

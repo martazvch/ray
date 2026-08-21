@@ -278,36 +278,36 @@ push_true
 load_const index 58, value -360.9
 call index 2, arity 5, method
 
-load_const_ext index 5, module 3
-call_ext index 2, module 3, arity 1
+load_const_ext index 5, module 3, value 56
+call_ext index 2, module 3, arity 1, getInt
 print
 
 load_const index 59, value imported static
-load_const_ext index 3, module 3
+load_const_ext index 3, module 3, value 0
 push_false
 push_false
-call_ext index 0, module 3, arity 4
+call_ext index 0, module 3, arity 4, staticFn
 
 load_const index 59, value imported static
 load_const index 60, value 90
 push_true
 push_false
-call_ext index 0, module 3, arity 4
+call_ext index 0, module 3, arity 4, staticFn
 
-struct_lit_ext index 0, module 3, arity 0
+struct_lit_ext index 0, module 3, arity 0, Def
 get_local index 2
 load_const index 61, value imported method
-load_const_ext index 4, module 3
+load_const_ext index 4, module 3, value 10
 push_true
 push_true
-call_ext index 1, module 3, arity 5
+call_ext index 1, module 3, arity 5, method
 
 get_local index 2
 load_const index 61, value imported method
 load_const index 62, value 180
 push_true
 push_false
-call_ext index 1, module 3, arity 5
+call_ext index 1, module 3, arity 5, method
 
 ret_naked
 

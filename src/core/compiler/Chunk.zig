@@ -43,9 +43,9 @@ pub const OpCode = enum(u8) {
     /// Runtime calling convention dispatch
     call_dyn,
     /// Calls a compiled function within current module
-    call_foreign,
+    call_extern,
     /// Calls a compiled function within an extern module
-    call_foreign_ext,
+    call_extern_ext,
     /// Calling a virtual function on a trait object
     call_virtual,
     /// Calls a non-compiled Zig function
