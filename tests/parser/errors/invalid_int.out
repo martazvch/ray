@@ -1,0 +1,22 @@
+repeated_digit_separator
+trailing_digit_separator
+
+base_prefix_uppercase, B
+invalid_int_binary, 2
+expect_digit_after_base
+repeated_digit_separator
+trailing_digit_separator
+
+base_prefix_uppercase, X
+invalid_int_hexa, P
+invalid_int_hexa, p
+expect_digit_after_base
+repeated_digit_separator
+trailing_digit_separator
+
+base_prefix_uppercase, O
+invalid_int_octal, A
+invalid_int_octal, a
+expect_digit_after_base
+repeated_digit_separator
+trailing_digit_separator

@@ -1,0 +1,47 @@
+fn main() {
+    // Hexa
+    print 0x0 == 0
+    print 0xF == 15
+    print 0xFF == 255
+    print 0xff == 255
+    print 0xFf == 255
+    print 0x10 == 16
+    print 0x1F == 31
+    print 0x100 == 256
+    print 0xFFFF == 65535
+    print 0xDEADBEEF == 3735928559
+    print 0xFF_FF == 65535
+    print 0x00FF == 255
+
+    // Binary
+    print 0b0 == 0
+    print 0b1 == 1
+    print 0b10 == 2
+    print 0b1010 == 10
+    print 0b1111 == 15
+    print 0b11111111 == 255
+    print 0b1000_0000 == 128
+    print 0b0001 == 1
+    print 0b10000000000 == 1024
+
+    // Octal
+    print 0o0 == 0
+    print 0o7 == 7
+    print 0o10 == 8
+    print 0o17 == 15
+    print 0o777 == 511
+    print 0o100 == 64
+    print 0o1_000 == 512
+    print 0o0017 == 15
+
+    // Cross bases
+    print 0xFF == 0b11111111
+    print 0xFF == 0o377
+    print 0xFF == 255
+    print 0x10 == 0o20
+    print 0x10 == 0b10000
+    print 0x10 == 16
+    print 0b1010 == 0xA
+    print 0b1010 == 0o12
+    print 0b1010 == 10
+}

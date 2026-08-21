@@ -153,9 +153,16 @@ pub const Token = struct {
         @"var",
         @"while",
 
+        base_prefix_uppercase,
+        expect_digit_after_base,
         leading_zeroes,
         invalid_float_digit,
         invalid_int_digit,
+        invalid_int_binary,
+        invalid_int_hexa,
+        invalid_int_octal,
+        repeated_digit_separator,
+        trailing_digit_separator,
         unterminated_str,
         unexpected_char,
     };
@@ -172,9 +179,13 @@ const State = enum {
     dot_dot,
     equal,
     float,
+    float_scient,
     greater,
     identifier,
     int,
+    int_binary,
+    int_hexa,
+    int_octal,
     invalid,
     less,
     question_mark,
@@ -208,11 +219,19 @@ pub fn lex(self: *Self, source: [:0]const u8) void {
         // TODO: redo this part. As we lex every thing at once, use arraylist for
         // errors like parser, analyzer, ...? Or use compitme to associate both sides
         switch (tk.tag) {
-            .leading_zeroes => self.errorAt(.leading_zeroes, &tk),
-            .invalid_float_digit => self.errorAt(.{ .invalid_float_digit = .{ .digit = source[tk.span.start] } }, &tk),
-            .invalid_int_digit => self.errorAt(.{ .invalid_int_digit = .{ .digit = source[tk.span.start] } }, &tk),
-            .unterminated_str => self.errorAt(.unterminated_str, &tk),
-            .unexpected_char => self.errorAt(.unexpected_char, &tk),
+            .base_prefix_uppercase => self.errorAt(.{ .base_prefix_uppercase = .{ .base = source[tk.span.start] } }, tk),
+            .expect_digit_after_base => self.errorAt(.expect_digit_after_base, tk),
+            .leading_zeroes => self.errorAt(.leading_zeroes, tk),
+
+            .invalid_float_digit => self.errorAt(.{ .invalid_float_digit = .{ .digit = source[tk.span.start] } }, tk),
+            .invalid_int_digit => self.errorAt(.{ .invalid_int_digit = .{ .digit = source[tk.span.start] } }, tk),
+            .invalid_int_binary => self.errorAt(.{ .invalid_int_binary = .{ .digit = source[tk.span.start] } }, tk),
+            .invalid_int_hexa => self.errorAt(.{ .invalid_int_hexa = .{ .digit = source[tk.span.start] } }, tk),
+            .invalid_int_octal => self.errorAt(.{ .invalid_int_octal = .{ .digit = source[tk.span.start] } }, tk),
+            .repeated_digit_separator => self.errorAt(.repeated_digit_separator, tk),
+            .trailing_digit_separator => self.errorAt(.trailing_digit_separator, tk),
+            .unterminated_str => self.errorAt(.unterminated_str, tk),
+            .unexpected_char => self.errorAt(.unexpected_char, tk),
             else => self.tokens.append(self.allocator, tk) catch oom(),
         }
 
@@ -220,7 +239,7 @@ pub fn lex(self: *Self, source: [:0]const u8) void {
     }
 }
 
-fn errorAt(self: *Self, tag: LexerMsg, token: *const Token) void {
+fn errorAt(self: *Self, tag: LexerMsg, token: Token) void {
     const report = LexerReport.err(tag, token.span.start, token.span.end);
     self.errs.append(self.allocator, report) catch oom();
 }
@@ -346,10 +365,32 @@ pub fn next(self: *Self) Token {
                         }
                     } else if (std.ascii.isAlphabetic((self.source[self.index + 1]))) {
                         self.index += 1;
-                        return .{ .tag = .invalid_int_digit, .span = .{
-                            .start = self.index,
-                            .end = self.index,
-                        } };
+
+                        switch (self.source[self.index]) {
+                            'b' => {
+                                res.tag = .int;
+                                self.index += 1;
+                                continue :state .int_binary;
+                            },
+                            'x' => {
+                                res.tag = .int;
+                                self.index += 1;
+                                continue :state .int_hexa;
+                            },
+                            'o' => {
+                                res.tag = .int;
+                                self.index += 1;
+                                continue :state .int_octal;
+                            },
+                            'B', 'X', 'O' => return .{
+                                .tag = .base_prefix_uppercase,
+                                .span = .{ .start = self.index, .end = self.index },
+                            },
+                            else => return .{ .tag = .invalid_int_digit, .span = .{
+                                .start = self.index,
+                                .end = self.index,
+                            } },
+                        }
                     } else {
                         self.index += 1;
                         switch (self.source[self.index]) {
@@ -486,16 +527,46 @@ pub fn next(self: *Self) Token {
         .float => {
             self.index += 1;
 
+            if (self.skipDigitSep()) |err| {
+                return err;
+            }
+
+            switch (self.source[self.index]) {
+                '0'...'9' => continue :state .float,
+                'e' => {
+                    self.index += 1;
+                    if (self.source[self.index] == '-') {
+                        self.index += 1;
+                    }
+                    continue :state .float_scient;
+                },
+                'E' => return .{
+                    .tag = .base_prefix_uppercase,
+                    .span = .{ .start = self.index, .end = self.index },
+                },
+                'a'...'d', 'f'...'z', 'A'...'D', 'F'...'Z' => return .{
+                    .tag = .invalid_float_digit,
+                    .span = .{ .start = self.index, .end = self.index },
+                },
+                else => res.tag = .float,
+            }
+
+            if (self.checkTrailingDigitSep()) |err| {
+                return err;
+            }
+        },
+        .float_scient => {
             switch (self.source[self.index]) {
                 '0'...'9' => continue :state .float,
                 'a'...'z', 'A'...'Z' => return .{
                     .tag = .invalid_float_digit,
-                    .span = .{
-                        .start = self.index,
-                        .end = self.index,
-                    },
+                    .span = .{ .start = self.index, .end = self.index },
                 },
                 else => res.tag = .float,
+            }
+
+            if (self.checkTrailingDigitSep()) |err| {
+                return err;
             }
         },
         .greater => {
@@ -524,6 +595,10 @@ pub fn next(self: *Self) Token {
             }
         },
         .int => {
+            if (self.skipDigitSep()) |err| {
+                return err;
+            }
+
             switch (self.source[self.index]) {
                 '0'...'9' => {
                     self.index += 1;
@@ -538,12 +613,76 @@ pub fn next(self: *Self) Token {
                 },
                 'a'...'z', 'A'...'Z' => return .{
                     .tag = .invalid_int_digit,
-                    .span = .{
-                        .start = self.index,
-                        .end = self.index,
-                    },
+                    .span = .{ .start = self.index, .end = self.index },
                 },
                 else => {},
+            }
+
+            if (self.checkTrailingDigitSep()) |err| {
+                return err;
+            }
+        },
+        .int_binary => {
+            if (self.skipDigitSep()) |err| {
+                return err;
+            }
+
+            switch (self.source[self.index]) {
+                '0', '1' => {
+                    self.index += 1;
+                    continue :state .int_binary;
+                },
+                '2'...'9', 'a'...'z', 'A'...'Z' => return .{
+                    .tag = .invalid_int_binary,
+                    .span = .{ .start = self.index, .end = self.index },
+                },
+                else => {},
+            }
+
+            if (self.checkDigitAfterBaseAndTrailingSep('b')) |err| {
+                return err;
+            }
+        },
+        .int_hexa => {
+            if (self.skipDigitSep()) |err| {
+                return err;
+            }
+
+            switch (self.source[self.index]) {
+                '0'...'9', 'a'...'f', 'A'...'F' => {
+                    self.index += 1;
+                    continue :state .int_hexa;
+                },
+                'g'...'z', 'G'...'Z' => return .{
+                    .tag = .invalid_int_hexa,
+                    .span = .{ .start = self.index, .end = self.index },
+                },
+                else => {},
+            }
+
+            if (self.checkDigitAfterBaseAndTrailingSep('x')) |err| {
+                return err;
+            }
+        },
+        .int_octal => {
+            if (self.skipDigitSep()) |err| {
+                return err;
+            }
+
+            switch (self.source[self.index]) {
+                '0'...'7' => {
+                    self.index += 1;
+                    continue :state .int_octal;
+                },
+                '8'...'9', 'a'...'z', 'A'...'Z' => return .{
+                    .tag = .invalid_int_octal,
+                    .span = .{ .start = self.index, .end = self.index },
+                },
+                else => {},
+            }
+
+            if (self.checkDigitAfterBaseAndTrailingSep('o')) |err| {
+                return err;
             }
         },
         .invalid => {
@@ -623,6 +762,47 @@ pub fn next(self: *Self) Token {
 
 fn checkAt(self: *const Self, at: usize, char: u8) bool {
     return self.index < self.source.len + at and self.source[self.index + at] == char;
+}
+
+fn skipDigitSep(self: *Self) ?Token {
+    if (self.source[self.index] == '_') {
+        self.index += 1;
+    }
+
+    if (self.source[self.index] == '_') return .{
+        .tag = .repeated_digit_separator,
+        .span = .{ .start = self.index, .end = self.index },
+    };
+
+    return null;
+}
+
+fn checkDigitAfterBaseAndTrailingSep(self: *const Self, base: u8) ?Token {
+    if (self.checkDigitAfterBase(base)) |err| {
+        return err;
+    }
+    if (self.checkTrailingDigitSep()) |err| {
+        return err;
+    }
+    return null;
+}
+
+fn checkDigitAfterBase(self: *const Self, base: u8) ?Token {
+    if (self.source[self.index - 1] == base) return .{
+        .tag = .expect_digit_after_base,
+        .span = .{ .start = self.index, .end = self.index },
+    };
+
+    return null;
+}
+
+fn checkTrailingDigitSep(self: *const Self) ?Token {
+    if (self.source[self.index - 1] == '_') return .{
+        .tag = .trailing_digit_separator,
+        .span = .{ .start = self.index - 1, .end = self.index - 1 },
+    };
+
+    return null;
 }
 
 // ------------

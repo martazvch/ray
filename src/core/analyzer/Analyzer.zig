@@ -2887,7 +2887,7 @@ pub fn intLit(self: *Self, expr: Ast.Int, negate: bool) Result {
     }
 
     const text = self.ast.toSource(span);
-    const value = std.fmt.parseInt(i64, text, 10) catch |e| switch (e) {
+    const value = std.fmt.parseInt(i64, text, 0) catch |e| switch (e) {
         error.Overflow => return self.err(.{ .int_overflow = .{ .value = text } }, span),
         // Unreachable thanks to lexing
         else => unreachable,
