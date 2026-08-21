@@ -279,8 +279,15 @@ pub fn GenReport(comptime T: type) type {
                         const subv = @field(field_info, subf.name);
 
                         switch (@typeInfo(@TypeOf(subv))) {
-                            .int => try writer.print(", {}", .{subv}),
+                            .int => |i| {
+                                if (i.signedness == .unsigned and i.bits == 8) {
+                                    try writer.print(", {c}", .{subv});
+                                } else {
+                                    try writer.print(", {}", .{subv});
+                                }
+                            },
                             .@"enum" => try writer.print(", {t}", .{subv}),
+
                             else => try writer.print(", {s}", .{subv}),
                         }
                     }

@@ -154,6 +154,8 @@ pub const Token = struct {
         @"while",
 
         leading_zeroes,
+        invalid_float_digit,
+        invalid_int_digit,
         unterminated_str,
         unexpected_char,
     };
@@ -207,6 +209,8 @@ pub fn lex(self: *Self, source: [:0]const u8) void {
         // errors like parser, analyzer, ...? Or use compitme to associate both sides
         switch (tk.tag) {
             .leading_zeroes => self.errorAt(.leading_zeroes, &tk),
+            .invalid_float_digit => self.errorAt(.{ .invalid_float_digit = .{ .digit = source[tk.span.start] } }, &tk),
+            .invalid_int_digit => self.errorAt(.{ .invalid_int_digit = .{ .digit = source[tk.span.start] } }, &tk),
             .unterminated_str => self.errorAt(.unterminated_str, &tk),
             .unexpected_char => self.errorAt(.unexpected_char, &tk),
             else => self.tokens.append(self.allocator, tk) catch oom(),
@@ -340,6 +344,12 @@ pub fn next(self: *Self) Token {
                             self.index += 1;
                             continue :state .float;
                         }
+                    } else if (std.ascii.isAlphabetic((self.source[self.index + 1]))) {
+                        self.index += 1;
+                        return .{ .tag = .invalid_int_digit, .span = .{
+                            .start = self.index,
+                            .end = self.index,
+                        } };
                     } else {
                         self.index += 1;
                         switch (self.source[self.index]) {
@@ -478,6 +488,13 @@ pub fn next(self: *Self) Token {
 
             switch (self.source[self.index]) {
                 '0'...'9' => continue :state .float,
+                'a'...'z', 'A'...'Z' => return .{
+                    .tag = .invalid_float_digit,
+                    .span = .{
+                        .start = self.index,
+                        .end = self.index,
+                    },
+                },
                 else => res.tag = .float,
             }
         },
@@ -518,6 +535,13 @@ pub fn next(self: *Self) Token {
                     } else {
                         continue :state .float;
                     }
+                },
+                'a'...'z', 'A'...'Z' => return .{
+                    .tag = .invalid_int_digit,
+                    .span = .{
+                        .start = self.index,
+                        .end = self.index,
+                    },
                 },
                 else => {},
             }

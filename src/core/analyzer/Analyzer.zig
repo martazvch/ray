@@ -2866,30 +2866,37 @@ pub fn boolLit(self: *Self, expr: Ast.Bool) Result {
 }
 
 pub fn floatLit(self: *Self, expr: Ast.Float, negate: bool) Result {
-    const value = std.fmt.parseFloat(f64, self.ast.toSource(expr)) catch blk: {
-        // TODO: error handling, only one possible it's invalid char
-        std.debug.print("Error parsing float\n", .{});
-        break :blk 0;
-    };
+    var span = self.ast.getSpan(expr);
+    if (negate) {
+        span.start -= 1;
+    }
+    // Unreachable thanks to lexing
+    const value = std.fmt.parseFloat(f64, self.ast.toSource(span)) catch unreachable;
 
     return .{
         .type = self.ti.cache.float,
         .ti = .{ .comp_time = true },
-        .instr = self.addConstant(.{ .float = if (negate) -value else value }, self.ast.getSpan(expr).start),
+        .instr = self.addConstant(.{ .float = value }, span.start),
     };
 }
 
 pub fn intLit(self: *Self, expr: Ast.Int, negate: bool) Result {
-    const value = std.fmt.parseInt(i64, self.ast.toSource(expr), 10) catch blk: {
-        // TODO: error handling, only one possible it's invalid char
-        std.debug.print("Error parsing integer\n", .{});
-        break :blk 0;
+    var span = self.ast.getSpan(expr);
+    if (negate) {
+        span.start -= 1;
+    }
+
+    const text = self.ast.toSource(span);
+    const value = std.fmt.parseInt(i64, text, 10) catch |e| switch (e) {
+        error.Overflow => return self.err(.{ .int_overflow = .{ .value = text } }, span),
+        // Unreachable thanks to lexing
+        else => unreachable,
     };
 
     return .{
         .type = self.ti.cache.int,
         .ti = .{ .comp_time = true },
-        .instr = self.addConstant(.{ .int = if (negate) -value else value }, self.ast.getSpan(expr).start),
+        .instr = self.addConstant(.{ .int = value }, span.start),
     };
 }
 

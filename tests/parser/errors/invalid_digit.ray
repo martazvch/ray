@@ -1,0 +1,3 @@
+print 1.234a
+print 12a
+print 0r

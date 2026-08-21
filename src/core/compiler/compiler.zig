@@ -1065,7 +1065,7 @@ const Compiler = struct {
         for (data.arms) |arm| {
             self.writeOp(.dup);
 
-            // TODO: do not specialize those op codes, no need
+            // Specialized because only objects hold a type id
             switch (arm.kind) {
                 .int => self.writeOp(.is_int),
                 .float => self.writeOp(.is_float),

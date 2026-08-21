@@ -53,6 +53,7 @@ pub const AnalyzerMsg = union(enum) {
     implicit_select_invalid_type: struct { found: []const u8 },
     implicit_select_union_tag_with_type: struct { tag: []const u8, expect: []const u8 },
     index_assign_str,
+    int_overflow: struct { value: []const u8 },
     invalid_arithmetic: struct { found: []const u8 },
     invalid_assign_target,
     invalid_call_target,
@@ -191,6 +192,7 @@ pub const AnalyzerMsg = union(enum) {
             .fn_expect_value => |e| writer.print("no value returned from function expecting '{s}'", .{e.expect}),
             .for_iter_non_int_range => writer.writeAll("can't iterate a non-int range"),
             .index_assign_str => writer.writeAll("string type does not support indexing assignment"),
+            .int_overflow => |e| writer.print("literal value is too big to fit inside an integer '{s}'", .{e.value}),
             .invalid_arithmetic => |e| writer.print("invalid arithmetic operation on type '{s}'", .{e.found}),
             .invalid_assign_target => writer.writeAll("invalid assignment target"),
             .invalid_call_target => writer.writeAll("invalid call target, can only call functions and methods"),
@@ -362,11 +364,14 @@ pub const AnalyzerMsg = union(enum) {
                 \\if a union's tag has no payload (no type associated with the tag), implicit selector syntax '.tagName' can be used
                 \\if it has a type, you must use constructor syntax: let value: MyUnion = .tagName(<value>)
             ),
+            .index_assign_str => writer.writeAll("strings are immutable, you can't change the underlying data"),
+            .int_overflow => writer.print("64-bits signed integer can hold value between {} and {}", .{
+                std.math.minInt(i64), std.math.maxInt(i64),
+            }),
             .instance_tag_access => writer.writeAll(
                 \\you can either access declarations on the type name or test tag's value
                 \\with an 'if' statement like: 'if foo == .a {}' or with pattern matching via 'match'.
             ),
-            .index_assign_str => writer.writeAll("strings are immutable, you can't change the underlying data"),
             .invalid_arithmetic => writer.writeAll("expect a numeric type"),
             .invalid_assign_target => writer.writeAll("can only assign to variables"),
             .invalid_call_target => writer.writeAll("change call target to a function or a method or remove the call"),
