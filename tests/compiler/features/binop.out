@@ -137,6 +137,31 @@ ptr_local index 1
 ne_ptr
 pop
 
+get_local index 0
+load_const index 3, value 1
+binary_and
+pop
+
+get_local index 0
+load_const index 3, value 1
+binary_or
+pop
+
+get_local index 0
+load_const index 3, value 1
+binary_xor
+pop
+
+get_local index 0
+load_const index 3, value 1
+shift_left
+pop
+
+get_local index 0
+load_const index 3, value 1
+shift_right
+pop
+
 ret_naked
 
 -- global scope --

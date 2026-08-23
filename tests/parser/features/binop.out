@@ -194,5 +194,32 @@
             "int": "65"
         },
         "op": "??"
+    },
+    "binop": {
+        "lhs": {
+            "identifier": "a"
+        },
+        "rhs": {
+            "int": "1"
+        },
+        "op": "&"
+    },
+    "binop": {
+        "lhs": {
+            "identifier": "a"
+        },
+        "rhs": {
+            "int": "1"
+        },
+        "op": "|"
+    },
+    "binop": {
+        "lhs": {
+            "identifier": "a"
+        },
+        "rhs": {
+            "int": "1"
+        },
+        "op": "^"
     }
 }

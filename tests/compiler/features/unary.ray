@@ -5,4 +5,5 @@ fn main() {
     _ = not true
     _ = not false
     _ = not not not true
+    _ = ~0xffff
 }

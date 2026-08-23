@@ -1,0 +1,59 @@
+fn main() {
+    print "left shift"
+    print 1 << 0 == 1
+    print 1 << 1 == 2
+    print 1 << 4 == 16
+    print 0b0001 << 3 == 0b1000
+    print 0xFF << 4 == 0xFF0
+    print 0 << 5 == 0
+    print 1 << 7 == 128
+    print 1 << 8 == 256
+    print 0x01 << 8 == 0x100 
+
+    print "right shift"
+    print 8 >> 1 == 4
+    print 8 >> 3 == 1
+    print 1 >> 1 == 0
+    print 0xFF >> 4 == 0x0F
+    print 0 >> 5 == 0
+    print 0b1000 >> 3 == 0b0001
+
+    print 0xFF >> 4 == 0x0F
+    print -8 >> 1 == -4
+    print -1 >> 1 == -1
+    print -1 >> 31 == -1
+
+    print "unary"
+    print ~0 == -1
+    print ~-1 == 0
+    print ~0b0000 == -1
+    print ~~5 == 5
+
+    print "xor"
+    print 0b1010 ^ 0b0110 == 0b1100
+    print 0xFF ^ 0xFF == 0x00
+    print 0xFF ^ 0x00 == 0xFF
+    print 0xAAAA ^ 0x5555 == 0xFFFF
+    print 0xF0F0 ^ 0x0F0F == 0xFFFF
+    print 0b1010 ^ 0b1010 ^ 0b1010 == 0b1010
+
+    print "or"
+    print 0b1010 | 0b0110 == 0b1110
+    print 0xF0 | 0x0F == 0xFF
+    print 0x00 | 0x00 == 0x00
+    print 0xFF | 0x00 == 0xFF
+    print 0xFF | 0xFF == 0xFF
+    print 0xAAAA | 0x5555 == 0xFFFF
+    print 0b1000 | 0b0001 == 0b1001
+
+    print "and"
+    print 0b1010 & 0b0110 == 0b0010
+    print 0xFF & 0x0F == 0x0F
+    print 0xFF & 0x00 == 0x00
+    print 0xFF & 0xFF == 0xFF
+    print 0 & 0 == 0
+    print 0b1111 & 0b0000 == 0b0000
+    print 0xF0F0 & 0x0F0F == 0x0000
+    print 0xAAAA & 0x5555 == 0x0000
+    print 0xAAAA & 0xAAAA == 0xAAAA
+}

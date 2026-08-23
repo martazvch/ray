@@ -1,3 +1,4 @@
 invalid_arithmetic, bool
 invalid_arithmetic, null
 invalid_unary, float
+invalid_binary_arithmetic, bool

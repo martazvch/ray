@@ -391,6 +391,11 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
                 .question_mark_question_mark => "??",
                 .star => "*",
                 .slash => "/",
+                .ampersand => "&",
+                .pipe => "|",
+                .hat => "^",
+                .greater_greater => ">>",
+                .less_less => "<<",
                 else => unreachable,
             }, false);
             try self.closeKey(.block, comma);

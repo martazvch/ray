@@ -868,7 +868,10 @@ fn use(self: *Self) Error!Node {
         var items: ArrayList(Ast.Use.ItemAndAlias) = .empty;
 
         while (self.match(.identifier)) {
-            items.append(self.allocator, .{ .item = self.token_idx - 1, .alias = try self.getAlias(.as) }) catch oom();
+            items.append(
+                self.allocator,
+                .{ .item = self.token_idx - 1, .alias = try self.getAlias(.as) },
+            ) catch oom();
 
             if (self.match(.comma)) continue;
             // In case of trailing comma
@@ -930,7 +933,12 @@ fn deferableStmt(self: *Self) Error!Node {
             self.match(.minus_equal) or
             self.match(.star_equal) or
             self.match(.slash_equal) or
-            self.match(.modulo_equal))
+            self.match(.modulo_equal) or
+            self.match(.ampersand_equal) or
+            self.match(.pipe_equal) or
+            self.match(.hat_equal) or
+            self.match(.less_less_equal) or
+            self.match(.greater_greater_equal))
             self.compoundAssignment(assigne)
         else
             .{ .expr = assigne };
@@ -957,6 +965,11 @@ fn compoundAssignment(self: *Self, assigne: *Expr) Error!Node {
             .modulo_equal => .modulo,
             .star_equal => .star,
             .slash_equal => .slash,
+            .ampersand_equal => .ampersand,
+            .pipe_equal => .pipe,
+            .hat_equal => .hat,
+            .greater_greater_equal => .greater_greater,
+            .less_less_equal => .less_less,
             else => unreachable,
         },
         .rhs = value,
@@ -1099,8 +1112,12 @@ const rules = std.enums.directEnumArrayDefault(Token.Tag, Rule, .{ .prec = -1 },
 
     .in = .{ .prec = 25 },
 
-    .equal_equal = .{ .prec = 30, .assoc = .none },
-    .bang_equal = .{ .prec = 30, .assoc = .none },
+    .equal_equal = .{ .prec = 30 },
+    .bang_equal = .{ .prec = 30 },
+
+    .pipe = .{ .prec = 35 },
+    .hat = .{ .prec = 35 },
+    .ampersand = .{ .prec = 35 },
 
     .greater = .{ .prec = 40, .assoc = .none },
     .greater_equal = .{ .prec = 40, .assoc = .none },
@@ -1108,6 +1125,8 @@ const rules = std.enums.directEnumArrayDefault(Token.Tag, Rule, .{ .prec = -1 },
     .less_equal = .{ .prec = 40, .assoc = .none },
 
     .dot_dot = .{ .prec = 50, .assoc = .none },
+    .less_less = .{ .prec = 50 },
+    .greater_greater = .{ .prec = 50 },
 
     .minus = .{ .prec = 60 },
     .plus = .{ .prec = 60 },
@@ -1183,7 +1202,7 @@ fn parseExpr(self: *Self) Error!*Expr {
         .left_bracket => self.array(),
         .left_paren => self.leftParenExprStart(),
         .match => self.matchExpr(),
-        .star, .minus, .not => self.unary(),
+        .star, .minus, .not, .tilde => self.unary(),
         .null => self.literal(.null),
         .pipe => self.closure(),
         .@"return" => self.returnExpr(),

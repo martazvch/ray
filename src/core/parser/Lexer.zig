@@ -72,6 +72,8 @@ pub const Token = struct {
     });
 
     pub const Tag = enum {
+        ampersand,
+        ampersand_equal,
         @"and",
         arrow_small,
         arrow_big,
@@ -105,7 +107,10 @@ pub const Token = struct {
         @"for",
         greater,
         greater_equal,
+        greater_greater,
+        greater_greater_equal,
         hat,
+        hat_equal,
         identifier,
         @"if",
         impl,
@@ -117,6 +122,8 @@ pub const Token = struct {
         left_paren,
         less,
         less_equal,
+        less_less,
+        less_less_equal,
         let,
         match,
         minus,
@@ -128,6 +135,7 @@ pub const Token = struct {
         null,
         @"or",
         pipe,
+        pipe_equal,
         plus,
         plus_equal,
         print,
@@ -144,6 +152,7 @@ pub const Token = struct {
         star_equal,
         string,
         @"struct",
+        tilde,
         trait,
         trap,
         true,
@@ -357,6 +366,31 @@ pub fn next(self: *Self) Token {
                     res.tag = .string;
                     continue :state .string;
                 },
+                '&' => {
+                    self.advance();
+                    if (self.current() == '=') {
+                        self.advance();
+                        res.tag = .ampersand_equal;
+                    } else res.tag = .ampersand;
+                },
+                '|' => {
+                    self.advance();
+                    if (self.current() == '=') {
+                        self.advance();
+                        res.tag = .pipe_equal;
+                    } else res.tag = .pipe;
+                },
+                '~' => {
+                    res.tag = .tilde;
+                    self.advance();
+                },
+                '^' => {
+                    self.advance();
+                    if (self.current() == '=') {
+                        self.advance();
+                        res.tag = .hat_equal;
+                    } else res.tag = .hat;
+                },
                 '0' => {
                     if (self.checkAt(1, '.')) {
                         if (self.checkAt(2, '.')) {
@@ -415,17 +449,9 @@ pub fn next(self: *Self) Token {
                         else => res.tag = .underscore,
                     }
                 },
-                '|' => {
-                    self.advance();
-                    res.tag = .pipe;
-                },
                 '@' => {
                     self.advance();
                     res.tag = .at;
-                },
-                '^' => {
-                    res.tag = .hat;
-                    self.advance();
                 },
                 0 => {
                     if (self.index == self.source.len) {
@@ -571,6 +597,15 @@ pub fn next(self: *Self) Token {
                     res.tag = .greater_equal;
                     self.advance();
                 },
+                '>' => {
+                    self.advance();
+                    res.tag = .greater_greater;
+
+                    if (self.current() == '=') {
+                        self.advance();
+                        res.tag = .greater_greater_equal;
+                    }
+                },
                 else => res.tag = .greater,
             }
         },
@@ -699,6 +734,15 @@ pub fn next(self: *Self) Token {
                 '=' => {
                     res.tag = .less_equal;
                     self.advance();
+                },
+                '<' => {
+                    self.advance();
+                    res.tag = .less_less;
+
+                    if (self.current() == '=') {
+                        self.advance();
+                        res.tag = .less_less_equal;
+                    }
                 },
                 else => res.tag = .less,
             }
@@ -890,15 +934,16 @@ test "numbers" {
 test "tokens" {
     var lexer = Self.init(std.testing.allocator);
     defer lexer.deinit();
-    lexer.lex("(){}.:,=!< ><= >= !=+-*/ += -= *= /= [] | @ % %= !! ? ?? ^");
+    lexer.lex("(){}.:,=!< ><= >= !=+-*/ += -= *= /= [] @ % %= !! ? ?? & | ~ ^ << >> &= |= ^= <<= >>=");
 
     const res = [_]Token.Tag{
-        .left_paren,                  .right_paren, .left_brace, .right_brace,  .dot,          .colon,
-        .comma,                       .equal,       .bang,       .less,         .greater,      .less_equal,
-        .greater_equal,               .bang_equal,  .plus,       .minus,        .star,         .slash,
-        .plus_equal,                  .minus_equal, .star_equal, .slash_equal,  .left_bracket, .right_bracket,
-        .pipe,                        .at,          .modulo,     .modulo_equal, .bang_bang,    .question_mark,
-        .question_mark_question_mark, .hat,
+        .left_paren,      .right_paren, .left_brace,   .right_brace,     .dot,                   .colon,
+        .comma,           .equal,       .bang,         .less,            .greater,               .less_equal,
+        .greater_equal,   .bang_equal,  .plus,         .minus,           .star,                  .slash,
+        .plus_equal,      .minus_equal, .star_equal,   .slash_equal,     .left_bracket,          .right_bracket,
+        .at,              .modulo,      .modulo_equal, .bang_bang,       .question_mark,         .question_mark_question_mark,
+        .ampersand,       .pipe,        .tilde,        .hat,             .less_less,             .greater_greater,
+        .ampersand_equal, .pipe_equal,  .hat_equal,    .less_less_equal, .greater_greater_equal,
     };
 
     for (0..res.len) |i| {

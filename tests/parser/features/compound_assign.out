@@ -78,5 +78,85 @@
                 "op": "%"
             }
         }
+    },
+    "assignment": {
+        "assigne": {
+            "identifier": "a"
+        },
+        "value": {
+            "binop": {
+                "lhs": {
+                    "identifier": "a"
+                },
+                "rhs": {
+                    "int": "1"
+                },
+                "op": "&"
+            }
+        }
+    },
+    "assignment": {
+        "assigne": {
+            "identifier": "a"
+        },
+        "value": {
+            "binop": {
+                "lhs": {
+                    "identifier": "a"
+                },
+                "rhs": {
+                    "int": "1"
+                },
+                "op": "|"
+            }
+        }
+    },
+    "assignment": {
+        "assigne": {
+            "identifier": "a"
+        },
+        "value": {
+            "binop": {
+                "lhs": {
+                    "identifier": "a"
+                },
+                "rhs": {
+                    "int": "1"
+                },
+                "op": "^"
+            }
+        }
+    },
+    "assignment": {
+        "assigne": {
+            "identifier": "a"
+        },
+        "value": {
+            "binop": {
+                "lhs": {
+                    "identifier": "a"
+                },
+                "rhs": {
+                    "int": "1"
+                },
+                "op": "<<"
+            }
+        }
+    },
+    "assignment": {
+        "assigne": {
+            "identifier": "a"
+        },
+        "value": {
+            "binop": {
+                "lhs": {
+                    "identifier": "a"
+                },
+                "rhs": {
+                    "int": "1"
+                },
+                "op": ">>"
+            }
+        }
     }
 }

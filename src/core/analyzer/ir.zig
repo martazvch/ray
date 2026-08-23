@@ -89,6 +89,9 @@ pub const Instruction = struct {
             add_int,
             add_str,
             @"and",
+            binary_and,
+            binary_or,
+            binary_xor,
             bang_bang,
             div_float,
             div_int,
@@ -119,6 +122,8 @@ pub const Instruction = struct {
             ne_str,
             @"or",
             question_mark_question_mark,
+            shift_left,
+            shift_right,
             sub_float,
             sub_int,
         };
@@ -322,7 +327,7 @@ pub const Instruction = struct {
         typ: Type,
         instr: Index,
 
-        pub const Op = enum { minus, bang };
+        pub const Op = enum { minus, bang, tilde };
     };
     pub const UnionDecl = struct {
         name: usize,

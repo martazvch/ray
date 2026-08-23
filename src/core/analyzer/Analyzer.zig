@@ -1601,6 +1601,12 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
 
                 break :instr .{ if (expr.op == .@"and") .@"and" else .@"or", lhs.instr, rhs.instr, self.ti.getCached(.bool) };
             },
+            .ampersand, .pipe, .hat, .tilde, .less_less, .greater_greater => {
+                if (!lhs_type.is(.int)) return self.err(.{ .invalid_binary_arithmetic = .{ .found = self.typeName(lhs_type) } }, lhs_span);
+                if (!rhs_type.is(.int)) return self.err(.{ .invalid_binary_arithmetic = .{ .found = self.typeName(rhs_type) } }, rhs_span);
+
+                break :instr .{ getBinaryArithmeticOp(expr.op), lhs.instr, rhs.instr, self.ti.getCached(.int) };
+            },
             .bang_bang => {
                 const err_ty = lhs.type.as(.error_union) orelse return self.err(
                     .{ .fallback_err_on_non_err = .{ .found = self.typeName(lhs_type) } },
@@ -1673,6 +1679,17 @@ fn getArithmeticOp(op: TokenTag, ty: *const Type) Instr.Binop.Op {
         .less_equal => if (ty.is(.int)) .le_int else .le_float,
         .greater => if (ty.is(.int)) .gt_int else .gt_float,
         .greater_equal => if (ty.is(.int)) .ge_int else .ge_float,
+        else => unreachable,
+    };
+}
+
+fn getBinaryArithmeticOp(op: TokenTag) Instr.Binop.Op {
+    return switch (op) {
+        .ampersand => .binary_and,
+        .pipe => .binary_or,
+        .hat => .binary_xor,
+        .less_less => .shift_left,
+        .greater_greater => .shift_right,
         else => unreachable,
     };
 }
@@ -3552,6 +3569,8 @@ fn unary(self: *Self, expr: *const Ast.Unary, ctx: *Context) Result {
 
     if (op == .star) {
         return self.pointer(expr.expr, span, ctx);
+    } else if (op == .tilde) {
+        return self.binaryNot(expr.expr, span, ctx);
     }
 
     const rhs = switch (expr.expr.*) {
@@ -3606,6 +3625,24 @@ fn pointer(self: *Self, expr: *Expr, span: Span, ctx: *Context) Result {
         .type = self.ti.intern(.{ .pointer = res.type }),
         .ti = res.ti,
         .instr = self.irb.addInstr(.{ .pointer = ref }, span.start),
+    };
+}
+
+fn binaryNot(self: *Self, expr: *Expr, span: Span, ctx: *Context) Result {
+    const res = try self.analyzeExpr(expr, .value, ctx);
+
+    if (!res.type.is(.int)) return self.err(
+        .{ .invalid_binary_arithmetic = .{ .found = self.typeName(res.type) } },
+        span,
+    );
+
+    return .{
+        .type = res.type,
+        .ti = res.ti,
+        .instr = self.irb.addInstr(
+            .{ .unary = .{ .op = .tilde, .typ = .int, .instr = res.instr } },
+            span.start,
+        ),
     };
 }
 

@@ -2,4 +2,5 @@ fn main() {
     -true
     -null
     not -8.2
+    ~true
 }

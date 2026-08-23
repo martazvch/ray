@@ -39,6 +39,8 @@ const Error = error{
     ModuloWith0,
     RangeIndexDecrease,
     UnionUnwrap,
+    ShiftOverflow,
+    ShiftNegative,
 } || Allocator.Error;
 
 pub fn init(self: *Self, io: Io, allocator: Allocator, state: *State) void {
@@ -101,6 +103,8 @@ fn err(self: *Self, kind: Error) Error {
         error.StackOverflow => "stack overflow",
         error.OutOfMemory => "no more memory available",
         error.UnionUnwrap => "trying to unwrap wrong tag from union value",
+        error.ShiftOverflow => "shift overflow integer type",
+        error.ShiftNegative => "can't shift with a negative value",
     };
     stderr.print("Runtime error: {s}\n", .{msg}) catch oom();
 
@@ -197,24 +201,6 @@ fn execute(self: *Self) !void {
                 self.stack.top -= len;
                 self.stack.push(Value.makeObj(array.asObj()));
             },
-            .call_array => {
-                const index = self.frame.readByte();
-                const arity = self.frame.readByte();
-                const array = self.stack.peekRef(arity).obj.as(Obj.Array);
-                const result = array.funcs[index](array, self, (self.stack.top - arity)[0..arity]);
-
-                self.stack.top -= arity + 1;
-                if (result) |res| self.stack.push(res);
-            },
-            .call_string => {
-                const index = self.frame.readByte();
-                const arity = self.frame.readByte();
-                const string = self.stack.peekRef(arity).obj.as(Obj.String);
-                const result = string.funcs[index](string, self, (self.stack.top - arity)[0..arity]);
-
-                self.stack.top -= arity + 1;
-                if (result) |res| self.stack.push(res);
-            },
             .array_set => {
                 const index = self.stack.pop().int;
                 const array = self.stack.pop().obj.as(Obj.Array);
@@ -223,6 +209,27 @@ fn execute(self: *Self) !void {
                 const final = try self.normalizeIndex(array.values.items.len, index);
                 array.values.items[final] = value;
             },
+
+            .binary_and => {
+                const lhs = self.stack.pop().int;
+                const rhs = self.stack.pop().int;
+                self.stack.push(.makeInt(lhs & rhs));
+            },
+            .binary_or => {
+                const lhs = self.stack.pop().int;
+                const rhs = self.stack.pop().int;
+                self.stack.push(.makeInt(lhs | rhs));
+            },
+            .binary_xor => {
+                const lhs = self.stack.pop().int;
+                const rhs = self.stack.pop().int;
+                self.stack.push(.makeInt(lhs ^ rhs));
+            },
+            .binary_neg => {
+                const lhs = self.stack.pop().int;
+                self.stack.push(.makeInt(~lhs));
+            },
+
             .bound_method => {
                 const sym_index = self.frame.readByte();
 
@@ -240,6 +247,7 @@ fn execute(self: *Self) !void {
                 const boxed = Value.makeObj(Obj.Box.create(self, to_box).asObj());
                 self.stack.push(boxed);
             },
+
             .call => {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
@@ -306,6 +314,25 @@ fn execute(self: *Self) !void {
                     },
                 }
             },
+            .call_array => {
+                const index = self.frame.readByte();
+                const arity = self.frame.readByte();
+                const array = self.stack.peekRef(arity).obj.as(Obj.Array);
+                const result = array.funcs[index](array, self, (self.stack.top - arity)[0..arity]);
+
+                self.stack.top -= arity + 1;
+                if (result) |res| self.stack.push(res);
+            },
+            .call_string => {
+                const index = self.frame.readByte();
+                const arity = self.frame.readByte();
+                const string = self.stack.peekRef(arity).obj.as(Obj.String);
+                const result = string.funcs[index](string, self, (self.stack.top - arity)[0..arity]);
+
+                self.stack.top -= arity + 1;
+                if (result) |res| self.stack.push(res);
+            },
+
             .closure => {
                 const captures_count = self.frame.readByte();
                 const closure = Obj.Closure.create(
@@ -683,6 +710,34 @@ fn execute(self: *Self) !void {
                 const index = self.frame.readByte();
                 self.frame.slots[index].obj.as(Obj.Box).value = self.stack.pop();
             },
+
+            .shift_left => {
+                const rhs = self.stack.pop().int;
+                const lhs = self.stack.pop().int;
+
+                if (rhs > std.math.maxInt(u6)) {
+                    return error.ShiftOverflow;
+                }
+                if (rhs < 0) {
+                    return error.ShiftNegative;
+                }
+
+                self.stack.push(.makeInt(lhs << @intCast(rhs)));
+            },
+            .shift_right => {
+                const rhs = self.stack.pop().int;
+                const lhs = self.stack.pop().int;
+
+                if (rhs > std.math.maxInt(u6)) {
+                    return error.ShiftOverflow;
+                }
+                if (rhs < 0) {
+                    return error.ShiftNegative;
+                }
+
+                self.stack.push(.makeInt(lhs >> @intCast(rhs)));
+            },
+
             .store_blk_val => self.frame.blk_val = self.stack.pop(),
             .str_cat => self.strConcat(),
             .str_mul => self.strMul(self.stack.peekRef(0).obj.as(Obj.String), self.stack.peekRef(1).int),

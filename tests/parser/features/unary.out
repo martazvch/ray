@@ -84,5 +84,11 @@
                 }
             }
         }
+    },
+    "unary": {
+        "op": "~",
+        "expr": {
+            "identifier": "a"
+        }
     }
 }

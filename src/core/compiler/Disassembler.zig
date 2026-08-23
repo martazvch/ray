@@ -87,8 +87,17 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .add_int => self.simpleInstruction(writer, name, offset),
         .array_new => self.arrayNew(writer, offset),
         .array_set => self.simpleInstruction(writer, name, offset),
+
+        .binary_and => self.simpleInstruction(writer, name, offset),
+        .binary_or => self.simpleInstruction(writer, name, offset),
+        .binary_xor => self.simpleInstruction(writer, name, offset),
+        .binary_neg => self.simpleInstruction(writer, name, offset),
+        .shift_left => self.simpleInstruction(writer, name, offset),
+        .shift_right => self.simpleInstruction(writer, name, offset),
+
         .bound_method => self.indexInstruction(writer, name, offset),
         .box => self.simpleInstruction(writer, name, offset),
+
         .call => self.call(writer, name, false, false, offset),
         .call_dyn => self.indexInstruction(writer, name, offset),
         .call_array, .call_string => self.callIndexArity(writer, op, offset),
@@ -97,6 +106,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .call_extern_ext => self.callExtern(writer, name, true, offset),
         .call_virtual => self.callIndexArity(writer, op, offset),
         .call_zig => self.call(writer, name, true, true, offset),
+
         .closure => self.indexInstruction(writer, name, offset),
         .deref => self.simpleInstruction(writer, name, offset),
         .div_float => self.simpleInstruction(writer, name, offset),

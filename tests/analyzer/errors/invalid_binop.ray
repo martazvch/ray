@@ -11,5 +11,12 @@ fn main() {
    _ = "str" == true 
    _ = false == 5.6 
    _ = 34 == "str"
+
+    1 & "yes"
+    "yes" & 1
+    1 | "yes"
+    "yes" | 1
+    1 ^ "yes"
+    "yes" ^ 1
 }
 

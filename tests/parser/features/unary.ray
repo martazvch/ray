@@ -5,3 +5,4 @@ not true
 -{add()}
 not if true do "yes" else "no"
 not -add()
+~a

@@ -33,6 +33,14 @@ pub const OpCode = enum(u8) {
     add_float,
     array_new,
     array_set,
+
+    binary_and,
+    binary_or,
+    binary_xor,
+    binary_neg,
+    shift_left,
+    shift_right,
+
     bound_method,
     box,
 

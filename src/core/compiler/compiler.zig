@@ -482,6 +482,9 @@ const Compiler = struct {
                 .add_float => .add_float,
                 .add_int => .add_int,
                 .add_str => .str_cat,
+                .binary_and => .binary_and,
+                .binary_or => .binary_or,
+                .binary_xor => .binary_xor,
                 .bang_bang => .fallback_err,
                 .div_float => .div_float,
                 .div_int => .div_int,
@@ -509,6 +512,8 @@ const Compiler = struct {
                 .ne_ptr => .ne_ptr,
                 .ne_str => .ne_str,
                 .question_mark_question_mark => .fallback_opt,
+                .shift_left => .shift_left,
+                .shift_right => .shift_right,
                 .sub_float => .sub_float,
                 .sub_int => .sub_int,
                 else => unreachable,
@@ -1194,6 +1199,8 @@ const Compiler = struct {
 
         if (data.op == .minus) {
             self.writeOp(if (data.typ == .int) .neg_int else .neg_float);
+        } else if (data.op == .tilde) {
+            self.writeOp(.binary_neg);
         } else {
             self.writeOp(.not);
         }

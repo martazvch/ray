@@ -26,6 +26,10 @@ not
 not
 pop
 
+load_const index 5, value 65535
+binary_neg
+pop
+
 ret_naked
 
 -- global scope --

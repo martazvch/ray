@@ -15,3 +15,7 @@
 "x" in "str"
 failable() !! 65
 nullable() ?? 65
+
+a & 1
+a | 1
+a ^ 1

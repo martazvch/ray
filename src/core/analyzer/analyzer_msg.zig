@@ -55,6 +55,7 @@ pub const AnalyzerMsg = union(enum) {
     index_assign_str,
     int_overflow: struct { value: []const u8 },
     invalid_arithmetic: struct { found: []const u8 },
+    invalid_binary_arithmetic: struct { found: []const u8 },
     invalid_assign_target,
     invalid_call_target,
     invalid_comparison: struct { ty1: []const u8, ty2: []const u8 },
@@ -194,6 +195,7 @@ pub const AnalyzerMsg = union(enum) {
             .index_assign_str => writer.writeAll("string type does not support indexing assignment"),
             .int_overflow => |e| writer.print("literal value is too big to fit inside an integer '{s}'", .{e.value}),
             .invalid_arithmetic => |e| writer.print("invalid arithmetic operation on type '{s}'", .{e.found}),
+            .invalid_binary_arithmetic => |e| writer.print("invalid binary arithmetic operation on type '{s}'", .{e.found}),
             .invalid_assign_target => writer.writeAll("invalid assignment target"),
             .invalid_call_target => writer.writeAll("invalid call target, can only call functions and methods"),
             .invalid_comparison => |e| writer.print("trait 'Eq' must be implemented to compare type '{s}' with '{s}'", .{ e.ty1, e.ty2 }),
@@ -373,6 +375,7 @@ pub const AnalyzerMsg = union(enum) {
                 \\with an 'if' statement like: 'if foo == .a {}' or with pattern matching via 'match'.
             ),
             .invalid_arithmetic => writer.writeAll("expect a numeric type"),
+            .invalid_binary_arithmetic => writer.writeAll("expect an integer"),
             .invalid_assign_target => writer.writeAll("can only assign to variables"),
             .invalid_call_target => writer.writeAll("change call target to a function or a method or remove the call"),
             .invalid_comparison => writer.writeAll("native comparison is only possible for simple native types, otherwise trait 'Eq' must be implemented"),

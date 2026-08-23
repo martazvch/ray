@@ -10,3 +10,10 @@ invalid_comparison, int, bool
 invalid_comparison, str, bool
 invalid_comparison, bool, float
 invalid_comparison, int, str
+
+invalid_binary_arithmetic, str
+invalid_binary_arithmetic, str
+invalid_binary_arithmetic, str
+invalid_binary_arithmetic, str
+invalid_binary_arithmetic, str
+invalid_binary_arithmetic, str
