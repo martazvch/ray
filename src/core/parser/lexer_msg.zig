@@ -2,6 +2,8 @@ const Writer = @import("std").Io.Writer;
 
 pub const LexerMsg = union(enum) {
     base_prefix_uppercase: struct { base: u8 },
+    expect_digit_before_dot,
+    expect_digit_before_separator,
     expect_digit_after_base,
     leading_zeroes,
     invalid_float_digit: struct { digit: u8 },
@@ -22,6 +24,8 @@ pub const LexerMsg = union(enum) {
                 "base prefix must be lower case, change {c} to {c}",
                 .{ e.base, e.base - 32 },
             ),
+            .expect_digit_before_dot => writer.writeAll("expect a digit before dot"),
+            .expect_digit_before_separator => writer.writeAll("expect a digit before '_' separator"),
             .expect_digit_after_base => writer.writeAll("expect a digit after base prefix"),
             .leading_zeroes => writer.writeAll("leading zeros in integer literals are not allowed"),
             .invalid_float_digit => |e| writer.print("invalid float digit '{c}'", .{e.digit}),

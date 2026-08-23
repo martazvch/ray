@@ -1,0 +1,12 @@
+fn main() {
+    print 1e10 == 10000000000.0
+    print 1e0 == 1.0
+    print 1e+10 == 10000000000.0
+    print 1e-3 == 0.001
+    print 1.5e-3 == 0.0015
+    print 6.022e23 == 6.022e23
+    print 2.5e2 == 250.0
+    print 1e2 == 100.0
+    print 0.1e1 == 1.0
+    print 1_000e1_0 == 1000e10 
+}

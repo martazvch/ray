@@ -154,6 +154,8 @@ pub const Token = struct {
         @"while",
 
         base_prefix_uppercase,
+        expect_digit_before_dot,
+        expect_digit_before_separator,
         expect_digit_after_base,
         leading_zeroes,
         invalid_float_digit,
@@ -220,6 +222,8 @@ pub fn lex(self: *Self, source: [:0]const u8) void {
         // errors like parser, analyzer, ...? Or use compitme to associate both sides
         switch (tk.tag) {
             .base_prefix_uppercase => self.errorAt(.{ .base_prefix_uppercase = .{ .base = source[tk.span.start] } }, tk),
+            .expect_digit_before_dot => self.errorAt(.expect_digit_before_dot, tk),
+            .expect_digit_before_separator => self.errorAt(.expect_digit_before_separator, tk),
             .expect_digit_after_base => self.errorAt(.expect_digit_after_base, tk),
             .leading_zeroes => self.errorAt(.leading_zeroes, tk),
 
@@ -255,80 +259,80 @@ pub fn next(self: *Self) Token {
 
     state: switch (State.start) {
         .start => {
-            switch (self.source[self.index]) {
+            switch (self.current()) {
                 'a'...'z', 'A'...'Z' => {
                     res.tag = .identifier;
                     continue :state .identifier;
                 },
                 ' ', '\t', '\r' => {
-                    self.index += 1;
+                    self.advance();
                     res.span.start = self.index;
                     continue :state .start;
                 },
                 '(' => {
                     res.tag = .left_paren;
-                    self.index += 1;
+                    self.advance();
                 },
                 ')' => {
                     res.tag = .right_paren;
-                    self.index += 1;
+                    self.advance();
                 },
                 '{' => {
                     res.tag = .left_brace;
-                    self.index += 1;
+                    self.advance();
                 },
                 '}' => {
                     res.tag = .right_brace;
-                    self.index += 1;
+                    self.advance();
                 },
                 '[' => {
                     res.tag = .left_bracket;
-                    self.index += 1;
+                    self.advance();
                 },
                 ']' => {
                     res.tag = .right_bracket;
-                    self.index += 1;
+                    self.advance();
                 },
                 ',' => {
                     res.tag = .comma;
-                    self.index += 1;
+                    self.advance();
                 },
                 '+' => {
-                    self.index += 1;
-                    if (self.source[self.index] == '=') {
-                        self.index += 1;
+                    self.advance();
+                    if (self.current() == '=') {
+                        self.advance();
                         res.tag = .plus_equal;
                     } else res.tag = .plus;
                 },
                 '-' => {
-                    self.index += 1;
+                    self.advance();
 
-                    switch (self.source[self.index]) {
+                    switch (self.current()) {
                         '>' => {
-                            self.index += 1;
+                            self.advance();
                             res.tag = .arrow_small;
                         },
                         '=' => {
-                            self.index += 1;
+                            self.advance();
                             res.tag = .minus_equal;
                         },
                         else => res.tag = .minus,
                     }
                 },
                 '*' => {
-                    self.index += 1;
+                    self.advance();
 
-                    if (self.source[self.index] == '=') {
-                        self.index += 1;
+                    if (self.current() == '=') {
+                        self.advance();
                         res.tag = .star_equal;
                     } else res.tag = .star;
                 },
                 '%' => {
-                    self.index += 1;
+                    self.advance();
 
-                    switch (self.source[self.index]) {
+                    switch (self.current()) {
                         '=' => {
-                            self.index += 1;
+                            self.advance();
                             res.tag = .modulo_equal;
                         },
                         else => res.tag = .modulo,
@@ -337,11 +341,11 @@ pub fn next(self: *Self) Token {
                 '/' => continue :state .slash,
                 '\n' => {
                     res.tag = .new_line;
-                    self.index += 1;
+                    self.advance();
                 },
                 ':' => {
                     res.tag = .colon;
-                    self.index += 1;
+                    self.advance();
                 },
                 '<' => continue :state .less,
                 '>' => continue :state .greater,
@@ -358,61 +362,52 @@ pub fn next(self: *Self) Token {
                         if (self.checkAt(2, '.')) {
                             // Range syntax like: 0..5
                             res.tag = .int;
-                            self.index += 1;
+                            self.advance();
                         } else {
-                            self.index += 1;
+                            self.index += 2;
                             continue :state .float;
                         }
                     } else if (std.ascii.isAlphabetic((self.source[self.index + 1]))) {
-                        self.index += 1;
+                        self.advance();
 
-                        switch (self.source[self.index]) {
+                        switch (self.current()) {
                             'b' => {
                                 res.tag = .int;
-                                self.index += 1;
+                                self.advance();
                                 continue :state .int_binary;
                             },
                             'x' => {
                                 res.tag = .int;
-                                self.index += 1;
+                                self.advance();
                                 continue :state .int_hexa;
                             },
                             'o' => {
                                 res.tag = .int;
-                                self.index += 1;
+                                self.advance();
                                 continue :state .int_octal;
                             },
-                            'B', 'X', 'O' => return .{
-                                .tag = .base_prefix_uppercase,
-                                .span = .{ .start = self.index, .end = self.index },
-                            },
-                            else => return .{ .tag = .invalid_int_digit, .span = .{
-                                .start = self.index,
-                                .end = self.index,
-                            } },
+                            'B', 'X', 'O' => return self.currentToken(.base_prefix_uppercase),
+                            else => return self.currentToken(.invalid_int_digit),
                         }
                     } else {
-                        self.index += 1;
-                        switch (self.source[self.index]) {
-                            '0'...'9' => return .{
-                                .tag = .leading_zeroes,
-                                .span = .{
-                                    .start = self.index - 1,
-                                    .end = self.index,
-                                },
-                            },
+                        self.advance();
+                        switch (self.current()) {
+                            '0'...'9' => return tokenAt(.leading_zeroes, .{
+                                .start = self.index - 1,
+                                .end = self.index,
+                            }),
                             else => res.tag = .int,
                         }
                     }
                 },
                 '1'...'9' => {
                     res.tag = .int;
-                    self.index += 1;
+                    self.advance();
                     continue :state .int;
                 },
                 '_' => {
-                    self.index += 1;
-                    switch (self.source[self.index]) {
+                    self.advance();
+                    switch (self.current()) {
                         'a'...'z', 'A'...'Z', '0'...'9', '_' => {
                             res.tag = .identifier;
                             continue :state .identifier;
@@ -421,133 +416,128 @@ pub fn next(self: *Self) Token {
                     }
                 },
                 '|' => {
-                    self.index += 1;
+                    self.advance();
                     res.tag = .pipe;
                 },
                 '@' => {
-                    self.index += 1;
+                    self.advance();
                     res.tag = .at;
                 },
                 '^' => {
                     res.tag = .hat;
-                    self.index += 1;
+                    self.advance();
                 },
                 0 => {
                     if (self.index == self.source.len) {
-                        return .{
-                            .tag = .eof,
-                            .span = .{ .start = self.index, .end = self.index },
-                        };
+                        return self.currentToken(.eof);
                     } else continue :state .invalid;
                 },
                 else => {
                     res.tag = .unexpected_char;
-                    self.index += 1;
+                    self.advance();
                 },
             }
         },
         .bang => {
-            self.index += 1;
+            self.advance();
 
-            switch (self.source[self.index]) {
+            switch (self.current()) {
                 '=' => {
                     res.tag = .bang_equal;
-                    self.index += 1;
+                    self.advance();
                 },
                 '!' => {
                     res.tag = .bang_bang;
-                    self.index += 1;
+                    self.advance();
                 },
                 else => res.tag = .bang,
             }
         },
         .question_mark => {
-            self.index += 1;
+            self.advance();
 
-            switch (self.source[self.index]) {
+            switch (self.current()) {
                 '?' => {
                     res.tag = .question_mark_question_mark;
-                    self.index += 1;
+                    self.advance();
                 },
                 else => res.tag = .question_mark,
             }
         },
         .comment => {
-            self.index += 1;
+            self.advance();
 
-            switch (self.source[self.index]) {
+            switch (self.current()) {
                 0 => res.tag = .eof,
                 '\n' => continue :state .start,
                 else => continue :state .comment,
             }
         },
         .dot => {
-            self.index += 1;
+            self.advance();
 
-            switch (self.source[self.index]) {
-                '0'...'9' => continue :state .float,
+            switch (self.current()) {
+                '0'...'9' => {
+                    self.advance();
+                    continue :state .float;
+                },
                 '.' => continue :state .dot_dot,
                 '*' => {
                     res.tag = .dot_star;
-                    self.index += 1;
+                    self.advance();
                 },
                 '?' => {
                     res.tag = .dot_question_mark;
-                    self.index += 1;
+                    self.advance();
                 },
                 else => res.tag = .dot,
             }
         },
         .dot_dot => {
-            self.index += 1;
+            self.advance();
 
-            switch (self.source[self.index]) {
+            switch (self.current()) {
                 '.' => {
                     res.tag = .dot_dot_dot;
-                    self.index += 1;
+                    self.advance();
                 },
                 else => res.tag = .dot_dot,
             }
         },
         .equal => {
-            self.index += 1;
+            self.advance();
 
-            switch (self.source[self.index]) {
+            switch (self.current()) {
                 '=' => {
                     res.tag = .equal_equal;
-                    self.index += 1;
+                    self.advance();
                 },
                 '>' => {
-                    self.index += 1;
+                    self.advance();
                     res.tag = .arrow_big;
                 },
                 else => res.tag = .equal,
             }
         },
         .float => {
-            self.index += 1;
-
             if (self.skipDigitSep()) |err| {
                 return err;
             }
 
-            switch (self.source[self.index]) {
-                '0'...'9' => continue :state .float,
+            switch (self.current()) {
+                '0'...'9' => {
+                    self.advance();
+                    continue :state .float;
+                },
                 'e' => {
-                    self.index += 1;
-                    if (self.source[self.index] == '-') {
-                        self.index += 1;
+                    self.advance();
+                    if (self.current() == '-' or self.current() == '+') {
+                        self.advance();
                     }
                     continue :state .float_scient;
                 },
-                'E' => return .{
-                    .tag = .base_prefix_uppercase,
-                    .span = .{ .start = self.index, .end = self.index },
-                },
-                'a'...'d', 'f'...'z', 'A'...'D', 'F'...'Z' => return .{
-                    .tag = .invalid_float_digit,
-                    .span = .{ .start = self.index, .end = self.index },
-                },
+                'E' => return self.currentToken(.base_prefix_uppercase),
+                'a'...'d', 'f'...'z', 'A'...'D', 'F'...'Z' => return self.currentToken(.invalid_float_digit),
                 else => res.tag = .float,
             }
 
@@ -556,13 +546,17 @@ pub fn next(self: *Self) Token {
             }
         },
         .float_scient => {
-            switch (self.source[self.index]) {
-                '0'...'9' => continue :state .float,
-                'a'...'z', 'A'...'Z' => return .{
-                    .tag = .invalid_float_digit,
-                    .span = .{ .start = self.index, .end = self.index },
+            switch (self.current()) {
+                '0'...'9' => {
+                    self.advance();
+                    continue :state .float;
                 },
+                'a'...'z', 'A'...'Z' => return self.currentToken(.invalid_float_digit),
                 else => res.tag = .float,
+            }
+
+            if (self.prev() == 'e' or self.prev() == '+' or self.prev() == '-') {
+                return self.prevToken(.expect_digit_after_base);
             }
 
             if (self.checkTrailingDigitSep()) |err| {
@@ -570,20 +564,20 @@ pub fn next(self: *Self) Token {
             }
         },
         .greater => {
-            self.index += 1;
+            self.advance();
 
-            switch (self.source[self.index]) {
+            switch (self.current()) {
                 '=' => {
                     res.tag = .greater_equal;
-                    self.index += 1;
+                    self.advance();
                 },
                 else => res.tag = .greater,
             }
         },
         .identifier => {
-            self.index += 1;
+            self.advance();
 
-            switch (self.source[self.index]) {
+            switch (self.current()) {
                 'a'...'z', 'A'...'Z', '_', '0'...'9' => continue :state .identifier,
                 else => {
                     const ident = self.source[res.span.start..self.index];
@@ -599,22 +593,31 @@ pub fn next(self: *Self) Token {
                 return err;
             }
 
-            switch (self.source[self.index]) {
+            switch (self.current()) {
                 '0'...'9' => {
-                    self.index += 1;
+                    self.advance();
                     continue :state .int;
                 },
+                'e' => {
+                    self.advance();
+                    if (self.current() == '-' or self.current() == '+') {
+                        self.advance();
+                    }
+                    continue :state .float_scient;
+                },
+                'E' => return self.currentToken(.base_prefix_uppercase),
                 '.' => {
                     if (self.checkAt(1, '.')) {
                         // Range syntax: 1..3
                     } else {
+                        if (self.prev() == '_') {
+                            return self.prevToken(.expect_digit_before_dot);
+                        }
+                        self.advance();
                         continue :state .float;
                     }
                 },
-                'a'...'z', 'A'...'Z' => return .{
-                    .tag = .invalid_int_digit,
-                    .span = .{ .start = self.index, .end = self.index },
-                },
+                'a'...'d', 'f'...'z', 'A'...'D', 'F'...'Z' => return self.currentToken(.invalid_int_digit),
                 else => {},
             }
 
@@ -627,15 +630,12 @@ pub fn next(self: *Self) Token {
                 return err;
             }
 
-            switch (self.source[self.index]) {
+            switch (self.current()) {
                 '0', '1' => {
-                    self.index += 1;
+                    self.advance();
                     continue :state .int_binary;
                 },
-                '2'...'9', 'a'...'z', 'A'...'Z' => return .{
-                    .tag = .invalid_int_binary,
-                    .span = .{ .start = self.index, .end = self.index },
-                },
+                '2'...'9', 'a'...'z', 'A'...'Z' => return self.currentToken(.invalid_int_binary),
                 else => {},
             }
 
@@ -648,15 +648,12 @@ pub fn next(self: *Self) Token {
                 return err;
             }
 
-            switch (self.source[self.index]) {
+            switch (self.current()) {
                 '0'...'9', 'a'...'f', 'A'...'F' => {
-                    self.index += 1;
+                    self.advance();
                     continue :state .int_hexa;
                 },
-                'g'...'z', 'G'...'Z' => return .{
-                    .tag = .invalid_int_hexa,
-                    .span = .{ .start = self.index, .end = self.index },
-                },
+                'g'...'z', 'G'...'Z' => return self.currentToken(.invalid_int_hexa),
                 else => {},
             }
 
@@ -669,15 +666,12 @@ pub fn next(self: *Self) Token {
                 return err;
             }
 
-            switch (self.source[self.index]) {
+            switch (self.current()) {
                 '0'...'7' => {
-                    self.index += 1;
+                    self.advance();
                     continue :state .int_octal;
                 },
-                '8'...'9', 'a'...'z', 'A'...'Z' => return .{
-                    .tag = .invalid_int_octal,
-                    .span = .{ .start = self.index, .end = self.index },
-                },
+                '8'...'9', 'a'...'z', 'A'...'Z' => return self.currentToken(.invalid_int_octal),
                 else => {},
             }
 
@@ -686,9 +680,9 @@ pub fn next(self: *Self) Token {
             }
         },
         .invalid => {
-            self.index += 1;
+            self.advance();
 
-            switch (self.source[self.index]) {
+            switch (self.current()) {
                 0 => {
                     if (self.index == self.source.len) {
                         res.tag = .eof;
@@ -699,56 +693,53 @@ pub fn next(self: *Self) Token {
             }
         },
         .less => {
-            self.index += 1;
+            self.advance();
 
-            switch (self.source[self.index]) {
+            switch (self.current()) {
                 '=' => {
                     res.tag = .less_equal;
-                    self.index += 1;
+                    self.advance();
                 },
                 else => res.tag = .less,
             }
         },
         .slash => {
-            self.index += 1;
+            self.advance();
 
-            switch (self.source[self.index]) {
+            switch (self.current()) {
                 '/' => continue :state .comment,
                 '=' => {
-                    self.index += 1;
+                    self.advance();
                     res.tag = .slash_equal;
                 },
                 else => res.tag = .slash,
             }
         },
         .string => {
-            self.index += 1;
+            self.advance();
 
-            switch (self.source[self.index]) {
+            switch (self.current()) {
                 0 => {
                     if (self.index == self.source.len) {
                         // For error reporting, one byte length
-                        return .{
-                            .tag = .unterminated_str,
-                            .span = .{
-                                .start = res.span.start,
-                                .end = res.span.start + 1,
-                            },
-                        };
+                        return tokenAt(.unterminated_str, .{
+                            .start = res.span.start,
+                            .end = res.span.start + 1,
+                        });
                     }
                 },
-                '"' => self.index += 1,
+                '"' => self.advance(),
                 '\\' => continue :state .string_escape,
                 else => continue :state .string,
             }
         },
         .string_escape => {
-            self.index += 1;
+            self.advance();
 
-            switch (self.source[self.index]) {
+            switch (self.current()) {
                 0 => res.tag = .eof,
                 '\\' => {
-                    self.index += 1;
+                    self.advance();
                     continue :state .string;
                 },
                 else => continue :state .string,
@@ -760,19 +751,65 @@ pub fn next(self: *Self) Token {
     return res;
 }
 
-fn checkAt(self: *const Self, at: usize, char: u8) bool {
-    return self.index < self.source.len + at and self.source[self.index + at] == char;
+inline fn advance(self: *Self) void {
+    self.index += 1;
+}
+
+inline fn current(self: *const Self) u8 {
+    return self.source[self.index];
+}
+
+inline fn prev(self: *const Self) u8 {
+    return self.source[self.index - 1];
+}
+
+/// Creates specified token with current character's span
+fn currentToken(self: *const Self, tag: Token.Tag) Token {
+    return .{
+        .tag = tag,
+        .span = self.currentSpan(),
+    };
+}
+
+/// Creates specified token with current character's span
+fn prevToken(self: *const Self, tag: Token.Tag) Token {
+    return .{
+        .tag = tag,
+        .span = .{ .start = self.index - 1, .end = self.index - 1 },
+    };
+}
+
+/// Returns span of current character
+fn currentSpan(self: *const Self) Span {
+    return .{
+        .start = self.index,
+        .end = self.index,
+    };
+}
+
+/// Creates specified token with current character's span
+fn tokenAt(tag: Token.Tag, span: Span) Token {
+    return .{
+        .tag = tag,
+        .span = span,
+    };
+}
+
+fn checkAt(self: *const Self, deepth: usize, char: u8) bool {
+    return self.index < self.source.len + deepth and self.source[self.index + deepth] == char;
 }
 
 fn skipDigitSep(self: *Self) ?Token {
-    if (self.source[self.index] == '_') {
-        self.index += 1;
+    if (self.current() == '_') {
+        if (!std.ascii.isAlphanumeric(self.prev())) {
+            return self.prevToken(.expect_digit_before_separator);
+        }
+        self.advance();
     }
 
-    if (self.source[self.index] == '_') return .{
-        .tag = .repeated_digit_separator,
-        .span = .{ .start = self.index, .end = self.index },
-    };
+    if (self.source[self.index] == '_') {
+        return self.currentToken(.repeated_digit_separator);
+    }
 
     return null;
 }
@@ -788,19 +825,17 @@ fn checkDigitAfterBaseAndTrailingSep(self: *const Self, base: u8) ?Token {
 }
 
 fn checkDigitAfterBase(self: *const Self, base: u8) ?Token {
-    if (self.source[self.index - 1] == base) return .{
-        .tag = .expect_digit_after_base,
-        .span = .{ .start = self.index, .end = self.index },
-    };
+    if (self.prev() == base) {
+        return self.currentToken(.expect_digit_after_base);
+    }
 
     return null;
 }
 
 fn checkTrailingDigitSep(self: *const Self) ?Token {
-    if (self.source[self.index - 1] == '_') return .{
-        .tag = .trailing_digit_separator,
-        .span = .{ .start = self.index - 1, .end = self.index - 1 },
-    };
+    if (self.prev() == '_') {
+        return self.prevToken(.trailing_digit_separator);
+    }
 
     return null;
 }
