@@ -1610,7 +1610,7 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
                 );
                 if (err_ty.ok.is(.void)) return self.err(.void_value, lhs_span);
 
-                break :instr .{ .bang_bang, lhs.instr, rhs.instr, self.mergeTypes(&.{ lhs.type, rhs.type }) };
+                break :instr .{ .bang_bang, lhs.instr, rhs.instr, self.mergeTypes(&.{ err_ty.ok, rhs.type }) };
             },
             .question_mark_question_mark => {
                 const opt_ty = lhs.type.as(.optional) orelse return self.err(
@@ -1619,7 +1619,7 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
                 );
                 if (opt_ty.is(.void)) return self.err(.void_value, lhs_span);
 
-                break :instr .{ .question_mark_question_mark, lhs.instr, rhs.instr, self.mergeTypes(&.{ lhs.type, rhs.type }) };
+                break :instr .{ .question_mark_question_mark, lhs.instr, rhs.instr, self.mergeTypes(&.{ opt_ty, rhs.type }) };
             },
             else => unreachable,
         }

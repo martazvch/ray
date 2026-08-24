@@ -11,5 +11,8 @@ fn optional() -> ?int {
 fn main() {
     print failable() !! 85
     print optional() ?? 85
+
+    let a: int = failable() !! 85
+    let b: int = optional() ?? 85
 }
 
