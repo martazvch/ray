@@ -304,7 +304,7 @@ pub const AnalyzerMsg = union(enum) {
                 \\signature like: 'var arr: [int] = []' or initialize the array with at least one value (not possible every time).
                 \\Also, doing 'var arr: [int] = []' is equivalent to 'var arr: [int]'.
             ),
-            .cant_infer_implicit_selector => writer.writeAll("add explicit type annotation 'varibale: type' or use type name in case of structure literals"),
+            .cant_infer_implicit_selector => writer.writeAll("add explicit type annotation 'variable: type' or use type name in case of structure literals"),
             .container_unknown_decl => |e| writer.print("refer to {s}'s declaration to see available tags and declarations", .{e.kind}),
             .dead_code => writer.writeAll("remove unreachable code"),
             .dot_type_on_non_mod => writer.writeAll("check variable declaration to see it's type"),

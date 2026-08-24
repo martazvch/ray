@@ -1,6 +1,14 @@
 struct Human {
     age: int,
     name: str,
+
+    fn new(age: int) -> Self {
+        let name = "Tom"
+        return .{
+            age,
+            name,
+        }
+    }
 }
 
 var answer = 42

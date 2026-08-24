@@ -630,11 +630,7 @@ fn endRayFnDecl(
         fn_type.kind = if (params.is_method) .method else .normal;
 
         const prev_fn_type = ctx.setAndGetPrevious(.fn_type, ty);
-        ctx.decl_type = fn_type.return_type;
-        defer {
-            ctx.fn_type = prev_fn_type;
-            ctx.decl_type = null;
-        }
+        defer ctx.fn_type = prev_fn_type;
 
         const returns = try self.fnBody(node.body, fn_type, &body, span, ctx);
         break :info .{ captures, params, returns };
@@ -1998,6 +1994,7 @@ fn fail(self: *Self, expr: Ast.Fail, ctx: *Context) Result {
         return self.err(.fail_non_failable, span);
     }
     ctx.decl_type = ty.error_union.err;
+    defer ctx.decl_type = null;
 
     var value_res = try self.analyzeExpr(expr.expr, .value, ctx);
 
@@ -3307,6 +3304,9 @@ fn returnExpr(self: *Self, expr: *const Ast.Return, ctx: *Context) Result {
     const span = self.ast.getSpan(expr);
     const fn_type = ctx.fn_type orelse return self.err(.return_outside_fn, span);
     const ty = fn_type.function.return_type;
+
+    ctx.decl_type = ty;
+    defer ctx.decl_type = null;
 
     const exp = expr.expr orelse return .{
         .type = self.ti.getCached(.never),
