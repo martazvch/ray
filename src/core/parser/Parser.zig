@@ -1751,7 +1751,7 @@ fn structLiteral(self: *Self, expr: Ast.StructLiteral.Kind) Error!*Expr {
             return self.errAt(ident, .expect_colon_struct_lit);
         }
 
-        // Either: { x = 3 }  or { x }
+        // Either: { x: 3 }  or { x }
         fields_values.append(self.allocator, .{
             .name = self.token_idx - 1,
             .value = if (self.match(.colon)) try self.parsePrecedenceExpr(0) else null,

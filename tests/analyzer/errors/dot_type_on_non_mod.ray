@@ -10,4 +10,5 @@ fn main() {
     var v = Vec2.new(12, 99)
 
     fn invalid(a: v.x) {}
+    fn invalid2(a: Vec2.new) {}
 }

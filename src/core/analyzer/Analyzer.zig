@@ -2604,6 +2604,15 @@ fn resolveIdentifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool,
         };
     }
 
+    return try self.resolveSymbol(text, span, ctx) orelse self.err(
+        .{ .undeclared_var = .{ .name = text } },
+        span,
+    );
+}
+
+fn resolveSymbol(self: *Self, name_text: []const u8, span: Span, ctx: *const Context) Error!?IdentRes {
+    const name = self.interner.intern(name_text);
+
     // TODO: anonymus enum
     const sym_name = if (name == self.cached_names.Self) b: {
         const ty = ctx.self_type orelse return self.err(.big_self_outside_decl, span);
@@ -2627,7 +2636,16 @@ fn resolveIdentifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool,
         return .{ .type = mod, .kind = .symbol, .instr = 0 };
     }
 
-    return self.err(.{ .undeclared_var = .{ .name = text } }, self.ast.getSpan(token_name));
+    return null;
+}
+
+fn expectSymbol(self: *Self, name_text: []const u8, span: Span, ctx: *const Context) Error!IdentRes {
+    const sym = try self.resolveSymbol(name_text, span, ctx);
+
+    return sym orelse self.err(
+        .{ .undeclared_type = .{ .found = name_text } },
+        span,
+    );
 }
 
 const VariableInstr = struct { variable: *LexScope.Variable, instr: InstrIndex };
@@ -3770,10 +3788,12 @@ pub fn checkAndGetTypeInfo(self: *Self, ty: ?*const Ast.Type, ctx: *const Contex
             if (fields.len > 2) @panic("Nested types are not supported yet");
 
             const module_token = fields[0];
-            const module_infos = try self.resolveIdentifier(module_token, true, ctx);
+            const span = self.ast.getSpan(module_token);
+            const module_text = self.ast.toSource(module_token);
+            const module_infos = try self.expectSymbol(module_text, span, ctx);
             const module_type = module_infos.type.as(.module) orelse return self.err(
                 .{ .dot_type_on_non_mod = .{ .found = self.typeName(module_infos.type) } },
-                self.ast.getSpan(module_token),
+                span,
             );
 
             // If `identifier` returned no error and it's a module, safe unwrap
@@ -3783,7 +3803,7 @@ pub fn checkAndGetTypeInfo(self: *Self, ty: ?*const Ast.Type, ctx: *const Contex
             const symbol_name = self.internToken(symbol_token);
             const final = module.sym_infos.get(symbol_name) orelse return self.err(
                 .{ .missing_symbol_in_module = .{
-                    .module = self.ast.toSource(module_token),
+                    .module = module_text,
                     .symbol = self.ast.toSource(symbol_token),
                 } },
                 self.ast.getSpan(symbol_token),
