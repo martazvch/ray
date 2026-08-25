@@ -1125,14 +1125,19 @@ const Compiler = struct {
 
     fn pointer(self: *Self, instr: Instruction.Pointer) Error!void {
         switch (instr) {
-            .variable => |v| switch (v.scope) {
-                .local => self.writeOpAndByte(.ptr_local, @intCast(v.index)),
-                .global => self.writeOpAndByte(.ptr_global, @intCast(v.index)),
-                .builtin => unreachable,
+            .array => |a| {
+                try self.compileInstr(a.expr);
+                try self.compileInstr(a.index);
+                self.writeOp(.ptr_array);
             },
             .field => |f| {
                 try self.compileInstr(f.structure);
                 self.writeOpAndByte(.ptr_field, @intCast(f.index));
+            },
+            .variable => |v| switch (v.scope) {
+                .local => self.writeOpAndByte(.ptr_local, @intCast(v.index)),
+                .global => self.writeOpAndByte(.ptr_global, @intCast(v.index)),
+                .builtin => unreachable,
             },
         }
     }

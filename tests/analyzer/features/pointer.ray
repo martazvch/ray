@@ -10,5 +10,8 @@ fn main() {
     let foo = Foo{ a: 2, b: "ok" }
     let ref1 = *foo.a
     let ref2 = *foo.b
+
+    let arr = [1, 2, 3]
+    let arrPtr = *arr[1]
 }
 

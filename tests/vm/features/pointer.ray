@@ -26,5 +26,14 @@ fn main() {
     f(*a)
     a = 6
     f(*a)
+
+    let arr = [1, 2, 3]
+    let ptr = *arr[1]
+    print ptr.*
+    print arr
+
+    ptr.* = 99
+    print ptr.*
+    print arr
 }
 

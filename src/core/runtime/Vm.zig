@@ -641,6 +641,12 @@ fn execute(self: *Self) !void {
                 self.stack.pop().print(writer);
                 self.state.config.printFn(self.io, writer.buffered());
             },
+            .ptr_array => {
+                const index = self.stack.pop().int;
+                const array = self.stack.pop().obj.as(Obj.Array);
+                const final = try self.normalizeIndex(array.values.items.len, index);
+                self.stack.push(.makeObj(Obj.Pointer.create(self, &array.values.items[final]).asObj()));
+            },
             .ptr_local => {
                 const idx = self.frame.readByte();
                 self.stack.push(.makeObj(Obj.Pointer.create(self, &self.frame.slots[idx]).asObj()));

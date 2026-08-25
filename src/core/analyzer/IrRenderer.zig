@@ -558,8 +558,17 @@ fn pointer(self: *Self, data: Instruction.Pointer) void {
     self.indent_level += 1;
     defer self.indent_level -= 1;
     switch (data) {
-        .variable => |v| self.identifier(v),
+        .array => |a| {
+            self.indentAndAppendSlice("[Indexing]");
+            self.indent_level += 1;
+            self.indentAndAppendSlice("- index");
+            self.parseInstr(a.index);
+            self.indentAndAppendSlice("- expr");
+            self.parseInstr(a.expr);
+            self.indent_level -= 1;
+        },
         .field => |f| self.getField(f, false),
+        .variable => |v| self.identifier(v),
     }
 }
 

@@ -3629,6 +3629,16 @@ fn pointer(self: *Self, expr: *Expr, span: Span, ctx: *Context) Result {
 
     const ref: Instr.Pointer = switch (self.irb.data(res.instr)) {
         .identifier => |ident| .{ .variable = ident },
+        .indexing => |idx| idx: {
+            if (idx.kind == .str) {
+                return self.err(.invalid_pointer, span);
+            }
+            if (idx.index_kind == .range) {
+                return self.err(.invalid_pointer, span);
+            }
+
+            break :idx .{ .array = .{ .expr = idx.expr, .index = idx.index } };
+        },
         .field => |f| ref: {
             if (f.kind != .field) {
                 return self.err(.invalid_pointer, span);

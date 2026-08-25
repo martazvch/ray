@@ -7,5 +7,11 @@ fn main() {
     let f = *foo
     let b = *(1 + value)
     let c = *Foo
+
+    let s = "Tom"
+    let ptr = *s[0]
+
+    let arr = [1, 2, 3]
+    let ptr = *arr[0..1]
 }
 
