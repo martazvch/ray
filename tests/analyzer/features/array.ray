@@ -37,4 +37,10 @@ fn main() {
     arrOpt[1] = null
 
     arrOpt = [1, null]
+
+    struct Data { x: int }
+    let dataArr: []Data = [
+        .{ x: 1 },
+        .{ x: 2 },
+    ]
 }

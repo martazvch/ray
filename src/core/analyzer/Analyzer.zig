@@ -3412,6 +3412,8 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
         }
         gop.value_ptr.done = true;
 
+        const prev_decl = ctx.decl_type;
+        defer ctx.decl_type = prev_decl;
         self.maybeDeclExtSymAndSetDeclType(f.type, struct_res.ti.ext_mod, ctx);
 
         var res: InstrInfos = if (fv.value) |value|

@@ -9,5 +9,4 @@ fn main() {
     var voidArrVoidVal = []
 
     var voidValueInArray = [1, {}]
-
 }
