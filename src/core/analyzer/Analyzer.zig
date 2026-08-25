@@ -54,6 +54,7 @@ pub const Context = struct {
     in_trap: bool,
     in_trait: bool,
     in_deref: bool,
+    in_field: bool,
     /// To know if we're in an equality, used for implicit selector on unions
     in_eq: bool,
 
@@ -68,6 +69,7 @@ pub const Context = struct {
         .in_trait = false,
         .in_eq = false,
         .in_deref = false,
+        .in_field = false,
     };
 
     pub fn setAndGetPrevious(self: *Context, comptime f: FieldEnum(Context), value: @FieldType(Context, @tagName(f))) @TypeOf(value) {
@@ -2015,6 +2017,9 @@ fn fail(self: *Self, expr: Ast.Fail, ctx: *Context) Result {
 
 pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
     const span = self.ast.getSpan(expr.structure);
+
+    ctx.in_field = true;
+    defer ctx.in_field = false;
     var struct_res = try self.analyzeExpr(expr.structure, .any, ctx);
 
     // Auto-dereference
@@ -2590,7 +2595,10 @@ fn resolveIdentifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool,
         res.variable.initialized = true;
 
         // We can assign to a constant pointer if we're dereferencing it
-        if (ctx.in_assign and !ctx.in_deref and res.variable.constant) return self.err(
+        if (res.variable.constant and
+            ctx.in_assign and
+            !ctx.in_deref and
+            !(ctx.in_field and res.variable.type.is(.pointer))) return self.err(
             .{ .assign_to_constant = .{ .name = text } },
             span,
         );
