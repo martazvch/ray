@@ -198,7 +198,7 @@ pub const Instruction = struct {
         kind: Kind,
         use_index: bool,
 
-        pub const Kind = enum { array, str, range };
+        pub const Kind = enum { array, array_ptr, str, range };
     };
     pub const If = struct {
         cond: Index,

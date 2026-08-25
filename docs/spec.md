@@ -280,7 +280,7 @@ struct User {
 fn foo(user: *User) {
     // Syntax 1
     var id = user.*.id
-    // Syntax 2
+    // Syntax 2 (preferred)
     var id = user.id
 }
 ```
@@ -525,6 +525,54 @@ let id: ?int = 8
 if let i = id {
     // Here `i` is of type int
 }
+```
+
+### For loops
+
+You can iterate over a collection using `for x in ...` syntaxe.
+You can use `range`s, `array`s and `enum`s.
+
+#### Range
+
+To iterate over a range use:
+
+```rust
+for i in 0..10 { ... }
+```
+
+It can be in reversed order:
+
+```rust
+for i in 0..-10 { ... }
+```
+
+#### Array
+
+To iterate over an array you can:
+
+- Iterate only the elements:
+
+```rust
+let arr = [Vec2{...}, Vec2{...}]
+
+for v in arr { ... }
+```
+
+- Iterate over the elements and their index:
+
+```rust
+let arr = [Vec2{...}, Vec2{...}]
+
+for i, v in arr { ... } // 'i' is the index here
+```
+
+- Iterate over the elements and taking a pointer to them:
+
+```rust
+let arr = [Vec2{...}, Vec2{...}]
+
+for v in *arr { ... }
+for i, v in *arr { ... }
 ```
 
 ### Functions

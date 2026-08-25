@@ -697,6 +697,51 @@ pub const ArrIterator = struct {
     }
 };
 
+pub const ArrPtrIterator = struct {
+    values: []Value,
+    index: usize,
+
+    const Self = @This();
+
+    // When creating a pointer iteraor 'for x in *arr {}', it gets a pointer
+    // to 'arr' onto the stack (avoiding a ccopy btw), so we have to access
+    // pointer's child
+    pub fn create(vm: *Vm, parent: Value) *Obj {
+        var self: *Self = vm.gc_alloc.create(Self) catch oom();
+        const ptr = parent.obj.as(Pointer).child;
+        self.values = ptr.obj.as(Array).values.items;
+        self.index = 0;
+
+        return self.iterator(vm, parent).asObj();
+    }
+
+    pub fn asObj(self: *Self) *Obj {
+        return &self.obj;
+    }
+
+    pub fn next(self: *anyopaque, vm: *Vm) Value {
+        const s: *Self = @ptrCast(@alignCast(self));
+        if (s.index == s.values.len) {
+            return .null;
+        }
+
+        defer s.index += 1;
+        return .makeObj(Pointer.create(vm, &s.values[s.index]).asObj());
+    }
+
+    pub fn deinit(self: *anyopaque, allocator: Allocator) void {
+        const s: *Self = @ptrCast(@alignCast(self));
+        allocator.destroy(s);
+    }
+
+    pub fn iterator(self: *Self, vm: *Vm, parent: Value) *Iterator {
+        return Iterator.create(vm, self, &.{
+            .nextFn = next,
+            .deinitFn = deinit,
+        }, parent);
+    }
+};
+
 pub const StrIterator = struct {
     string: *String,
     index: usize,

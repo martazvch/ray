@@ -1,0 +1,20 @@
+struct Foo { x: int }
+
+fn main() {
+    let arr: []Foo = [
+        .{ x: 1 },
+        .{ x: 2 },
+        .{ x: 3 },
+        .{ x: 4 },
+    ]
+
+    for f in arr {
+        print f.x
+    }
+    for f in *arr {
+        f.x *= 10
+    }
+    for f in arr {
+        print f.x
+    }
+}

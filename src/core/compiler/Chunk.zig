@@ -110,6 +110,7 @@ pub const OpCode = enum(u8) {
     is_str,
     is_type,
     iter_new_arr,
+    iter_new_arr_ptr,
     iter_new_range,
     iter_new_str,
     iter_next,

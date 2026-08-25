@@ -439,6 +439,11 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
 
     const kind: Instr.For.Kind, const elem_type = switch (res.type.*) {
         .array => |t| .{ .array, t.child },
+        .pointer => |t| b: {
+            const array_type = t.as(.array) orelse @panic("Can't take pointer of non array");
+
+            break :b .{ .array_ptr, self.ti.intern(.{ .pointer = array_type.child }) };
+        },
         .range => |r| b: {
             if (r != self.ti.getCached(.int)) {
                 return self.err(.for_iter_non_int_range, self.ast.getSpan(node.expr));
@@ -2040,7 +2045,7 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
         },
         .module => |ty| return self.moduleAccess(expr.field, ty),
         .str => return self.runtimeObjFnAccess(.string, struct_res.instr, expr.field, struct_res.type),
-        .structure => |*ty| try self.structureAccess(expr.field, ty, struct_res.ti.is_sym, ctx),
+        .structure => |*ty| try self.structureAccess(expr.field, struct_res.type, ty, struct_res.ti.is_sym, ctx),
         .trait => try self.traitAccess(expr, struct_res.type, struct_res.ti.is_sym),
         .@"union" => |ty| b: {
             const res = try self.unionAccess(struct_res, ty, expr.field);
@@ -2155,7 +2160,7 @@ fn runtimeObjFnAccess(self: *Self, kind: Instr.ObjFn.Kind, instr: InstrIndex, fn
         .string => .{ &self.state.string_fns, self.ti.getCached(.void) },
     };
     const func = map.get(func_name) orelse return self.err(
-        .{ .undeclared_field_access = .{ .name = func_name } },
+        .{ .undeclared_field = .{ .structure = @tagName(kind), .field = func_name } },
         self.ast.getSpan(fn_tk),
     );
 
@@ -2285,7 +2290,8 @@ fn unionAccess(self: *Self, union_info: InstrInfos, ty: Type.Union, tag_tk: Ast.
 fn structureAccess(
     self: *Self,
     field_tk: Ast.TokenIndex,
-    ty: *const Type.Structure,
+    ty: *const Type,
+    struct_type: *const Type.Structure,
     is_symbol: bool,
     ctx: *Context,
 ) Error!AccessResult {
@@ -2293,29 +2299,32 @@ fn structureAccess(
     const field_name = self.interner.intern(text);
 
     // Fields
-    if (ty.fields.getPtr(field_name)) |f| {
+    if (struct_type.fields.getPtr(field_name)) |f| {
         return .{
             .type = f.type,
-            .kind = if (ty.native) .field_native else .field,
-            .index = ty.fields.getIndex(field_name).?,
+            .kind = if (struct_type.native) .field_native else .field,
+            .index = struct_type.fields.getIndex(field_name).?,
         };
     }
     // Functions
     else {
         const func = func: {
             // Own
-            if (ty.functions.get(field_name)) |f| {
+            if (struct_type.functions.get(field_name)) |f| {
                 break :func f;
             }
 
             // Traits
-            for (ty.traits.values()) |trait| {
+            for (struct_type.traits.values()) |trait| {
                 if (trait.funcs.get(field_name)) |f| {
                     break :func f;
                 }
             }
 
-            return self.err(.{ .undeclared_field_access = .{ .name = text } }, self.ast.getSpan(field_tk));
+            return self.err(
+                .{ .undeclared_field = .{ .structure = self.typeName(ty), .field = text } },
+                self.ast.getSpan(field_tk),
+            );
         };
 
         if (ctx.in_call) {

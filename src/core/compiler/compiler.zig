@@ -859,6 +859,7 @@ const Compiler = struct {
         try self.compileInstr(data.expr);
         self.writeOp(switch (data.kind) {
             .array => .iter_new_arr,
+            .array_ptr => .iter_new_arr_ptr,
             .range => .iter_new_range,
             .str => .iter_new_str,
         });
