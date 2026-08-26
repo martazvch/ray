@@ -55,10 +55,10 @@ struct Grid {
     fn display(self) {
         var grid = "\n"
 
-        for i, row in self.cells {
+        for row, i in self.cells {
             var line = ""
 
-            for j, cell in row {
+            for cell, j in row {
                 line += cell.toStr() + (j < self.cells.len() - 1 ? " " : "")
             }
 

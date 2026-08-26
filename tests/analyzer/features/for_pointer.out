@@ -1,18 +1,11 @@
 [Structure declaration Foo]
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
-        [Array]
-            [Structure literal]
-                - structure
-                [Load symbol 0]
-                - args
-                [Constant index 3]
+        [Constant index 7]
+            [Array]
+                [Structure]
                     [Int 1]
-            [Structure literal]
-                - structure
-                [Load symbol 0]
-                - args
-                [Constant index 4]
+                [Structure]
                     [Int 2]
     [For]
     - expr:
@@ -24,7 +17,7 @@
                 [Field access 0]
                     [Deref]
                         [Variable index: 2, scope: local]
-                [Constant index 5]
+                [Constant index 8]
                     [Int 10]
             [Field assignment]
                 [Field access 0]

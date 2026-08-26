@@ -15,25 +15,17 @@
         [Int 42]
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
-        [Structure literal]
-            - structure
-            [Load symbol 0]
-            - args
-            [Constant index 5]
-                [Int 5]
-            [Constant index 3]
-                [String Tom]
-    [Structure literal]
-        - structure
-        [Load symbol 0]
-        - args
-        [Constant index 5]
-            [Int 5]
-        [Constant index 3]
-            [String Tom]
-    [Assignment index: 0, scope: local, cow]
-    [Variable declaration index: 1, scope: local]
         [Constant index 6]
+            [Structure]
+                [Int 5]
+                [String Tom]
+    [Constant index 6]
+        [Structure]
+            [Int 5]
+            [String Tom]
+    [Assignment index: 0, scope: local]
+    [Variable declaration index: 1, scope: local]
+        [Constant index 7]
             [Int 95]
     [Structure literal]
         - structure
@@ -42,7 +34,7 @@
         [Variable index: 1, scope: local]
         [Constant index 3]
             [String Tom]
-    [Assignment index: 0, scope: local, cow]
+    [Assignment index: 0, scope: local]
     [Variable declaration index: 2, scope: local]
         [Constant index 3]
             [String Tom]
@@ -50,24 +42,24 @@
         - structure
         [Load symbol 0]
         - args
-        [Constant index 7]
+        [Constant index 8]
             [Int 6]
         [Variable index: 2, scope: local]
-    [Assignment index: 0, scope: local, cow]
+    [Assignment index: 0, scope: local]
     [Structure literal]
         - structure
         [Load symbol 0]
         - args
         [Variable index: 1, scope: local]
         [Variable index: 2, scope: local]
-    [Assignment index: 0, scope: local, cow]
+    [Assignment index: 0, scope: local]
     [Structure literal]
         - structure
         [Load symbol 0]
         - args
         [Variable index: 1, scope: local]
         [Variable index: 2, scope: local]
-    [Assignment index: 0, scope: local, cow]
+    [Assignment index: 0, scope: local]
     [Structure declaration Local]
     [Variable declaration index: 3, scope: local]
         [Structure literal]

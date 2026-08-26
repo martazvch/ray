@@ -39,8 +39,7 @@
             [Constant index 11]
                 [Int 45]
             - haystack:
-            [Array]
-                [Constant index 12]
+            [Constant index 13]
+                [Array]
                     [Int 43]
-                [Constant index 11]
                     [Int 45]

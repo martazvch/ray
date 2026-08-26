@@ -563,7 +563,7 @@ for v in arr { ... }
 ```rust
 let arr = [Vec2{...}, Vec2{...}]
 
-for i, v in arr { ... } // 'i' is the index here
+for v, i in arr { ... } // 'i' is the index here
 ```
 
 - Iterate over the elements and taking a pointer to them:
@@ -572,7 +572,7 @@ for i, v in arr { ... } // 'i' is the index here
 let arr = [Vec2{...}, Vec2{...}]
 
 for v in *arr { ... }
-for i, v in *arr { ... }
+for v, i in *arr { ... }
 ```
 
 ### Functions

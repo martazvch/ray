@@ -39,6 +39,7 @@ native_reg: NativeRegister,
 strings: std.AutoHashMapUnmanaged(usize, *Obj.String),
 array_fns: ObjFns,
 string_fns: ObjFns,
+
 /// Associated dynamic library to this module. When importing a native module, we open
 /// a subpipeline with the associated library to fetch symbols
 dynlib: ?*NativeLib,
@@ -105,6 +106,7 @@ pub fn new(io: Io, allocator: Allocator, cwd: Io.Dir, config: Config) Self {
         .strings = .empty,
         .array_fns = Obj.Array.getFns(),
         .string_fns = Obj.String.getFns(),
+
         .dynlib = null,
     };
 

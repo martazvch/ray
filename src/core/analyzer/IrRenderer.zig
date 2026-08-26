@@ -90,15 +90,14 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .enum_decl => |*data| self.enumDecl(data),
         .enum_tag => |index| self.indexInstr("Enum tag", index),
         .fail => |data| self.returnInstr("Fail", data),
-        .field => |data| self.getField(data, false),
+        .field => |data| self.getField(data),
         .fn_decl => |*data| self.fnDeclaration(data),
         .for_loop => |data| self.forLoop(data),
         .identifier => |data| self.identifier(data),
         .@"if" => |*data| self.ifInstr(data),
         .import_global => |data| self.importGlobal(data),
         .in => |data| self.in(data),
-        .incr_rc => |index| self.indexInstr("Incr rc", index),
-        .indexing => |data| self.indexing(data, false, false),
+        .indexing => |data| self.indexing(data, false),
         .int_to_float => |index| self.indexInstr("Int to float", index),
         .load_symbol => |data| self.loadSymbol(data),
         .match => |*data| self.match(data),
@@ -147,12 +146,10 @@ fn array(self: *Self, data: Instruction.Array) void {
     }
 }
 
-fn indexing(self: *Self, data: Instruction.Indexing, cow: bool, comptime is_assign: bool) void {
+fn indexing(self: *Self, data: Instruction.Indexing, comptime is_assign: bool) void {
     self.indentAndPrintSlice(if (is_assign) "[Indexing assignment, {t}]" else "[Indexing {t}]", .{data.kind});
     self.indent_level += 1;
     defer self.indent_level -= 1;
-
-    if (cow) self.indentAndAppendSlice("[Cow]");
 
     self.indentAndAppendSlice("- index");
     self.parseInstr(data.index);
@@ -171,9 +168,9 @@ fn assignment(self: *Self, data: *const Instruction.Assignment) void {
             self.parseInstr(deref);
             return;
         },
-        .indexing => |indexing_data| return self.indexing(indexing_data, data.cow, true),
+        .indexing => |indexing_data| return self.indexing(indexing_data, true),
         .identifier => |*variable| .{ variable, false },
-        .field => |member| return self.fieldAssignment(member, data.cow),
+        .field => |member| return self.fieldAssignment(member),
         .unbox => |index| .{ &self.instrs[index].identifier, true },
         else => |got| {
             std.log.debug("Got: {any}", .{got});
@@ -181,17 +178,17 @@ fn assignment(self: *Self, data: *const Instruction.Assignment) void {
         },
     };
 
-    self.indentAndPrintSlice("[Assignment index: {}, scope: {s}{s}{s}]", .{
-        variable_data.index,           @tagName(variable_data.scope),
-        if (data.cow) ", cow" else "", if (unbox) ", unbox" else "",
+    self.indentAndPrintSlice("[Assignment index: {}, scope: {s}{s}]", .{
+        variable_data.index,          @tagName(variable_data.scope),
+        if (unbox) ", unbox" else "",
     });
 }
 
-fn fieldAssignment(self: *Self, data: Instruction.Field, cow: bool) void {
+fn fieldAssignment(self: *Self, data: Instruction.Field) void {
     self.indentAndAppendSlice("[Field assignment]");
     self.indent_level += 1;
     defer self.indent_level -= 1;
-    self.getField(data, cow);
+    self.getField(data);
 }
 
 fn binop(self: *Self, data: *const Instruction.Binop) void {
@@ -339,7 +336,20 @@ fn capture(self: *Self, data: *const Instruction.Capture) void {
 fn constant(self: *Self, data: Instruction.Constant) void {
     self.indentAndPrintSlice("[Constant index {}]", .{data.index.toInt()});
     self.indent_level += 1;
-    switch (self.constants[data.index.toInt()]) {
+    self.constantValue(self.constants[data.index.toInt()]);
+    self.indent_level -= 1;
+}
+
+fn constantValue(self: *Self, cte: Constant) void {
+    switch (cte) {
+        .array => |arr| {
+            self.indentAndAppendSlice("[Array]");
+            self.indent_level += 1;
+            defer self.indent_level -= 1;
+            for (arr.values) |val| {
+                self.constantValue(self.constants[val.toInt()]);
+            }
+        },
         .bool => |c| self.indentAndPrintSlice("[Bool {}]", .{c}),
         .int => |c| self.indentAndPrintSlice("[Int {}]", .{c}),
         .float => |c| self.indentAndPrintSlice("[Float {}]", .{c}),
@@ -347,8 +357,15 @@ fn constant(self: *Self, data: Instruction.Constant) void {
         .string => |c| self.indentAndPrintSlice("[String {s}]", .{self.interner.getKey(c).?}),
         .enum_lit => |c| self.tagLiteral(c, .@"enum"),
         .union_lit => |c| self.tagLiteral(c, .@"union"),
+        .struct_lit => |s| {
+            self.indentAndAppendSlice("[Structure]");
+            self.indent_level += 1;
+            defer self.indent_level -= 1;
+            for (s.values) |val| {
+                self.constantValue(self.constants[val.toInt()]);
+            }
+        },
     }
-    self.indent_level -= 1;
 }
 
 fn tagLiteral(self: *Self, data: Constant.TagLit, comptime kind: enum { @"enum", @"union" }) void {
@@ -365,10 +382,10 @@ fn continueInstr(self: *Self, data: Instruction.Continue) void {
     self.indentAndPrintSlice("[Continue depth: {}, pop: {}]", .{ data.depth, data.pop_count });
 }
 
-fn getField(self: *Self, data: Instruction.Field, cow: bool) void {
+fn getField(self: *Self, data: Instruction.Field) void {
     self.indentAndPrintSlice(
         "[Field access {}{s}]",
-        .{ data.index, if (cow) ", cow" else if (data.kind == .field_native) ", native" else "" },
+        .{ data.index, if (data.kind == .field_native) ", native" else "" },
     );
     self.indent_level += 1;
     defer self.indent_level -= 1;
@@ -559,7 +576,7 @@ fn pointer(self: *Self, data: Instruction.Pointer) void {
             self.parseInstr(a.expr);
             self.indent_level -= 1;
         },
-        .field => |f| self.getField(f, false),
+        .field => |f| self.getField(f),
         .variable => |v| self.identifier(v),
     }
 }

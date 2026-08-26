@@ -19,9 +19,7 @@ in_range_float
 print
 
 load_const index 11, value 45
-load_const index 12, value 43
-load_const index 11, value 45
-array_new length 2, type_id x
+load_const index 13, value [43, 45]
 in_array
 print
 

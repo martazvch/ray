@@ -259,10 +259,8 @@ fn assignment(self: *Self, node: *const Ast.Assignment, ctx: *Context) StmtResul
     var value_res = try self.analyzeExpr(node.value, .value, ctx);
     _ = try self.performTypeCoercion(assigne.type, &value_res, false, self.ast.getSpan(node.value));
 
-    self.checkWrap(&value_res.instr, value_res.ti.heap);
-
     return self.irb.addInstr(
-        .{ .assignment = .{ .assigne = assigne.instr, .value = value_res.instr, .cow = assigne.type.isHeap() } },
+        .{ .assignment = .{ .assigne = assigne.instr, .value = value_res.instr } },
         span.start,
     );
 }
@@ -467,7 +465,6 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
     if (index_interned) |interned| {
         try self.forwardDeclareVariable(interned, self.ti.getCached(.int), false, self.ast.getSpan(node.index_binding.?));
     }
-
     try self.forwardDeclareVariable(binding, elem_type, false, self.ast.getSpan(node.binding));
 
     const prev_in_for = ctx.setAndGetPrevious(.in_for, true);
@@ -962,13 +959,6 @@ fn expectAssignableValue(self: *Self, expr: *const Ast.Expr, ctx: *Context) Resu
     return value_res orelse self.err(.assign_type, span);
 }
 
-/// Wraps the instruction inside `incr_rc` if `heap` is true
-fn checkWrap(self: *Self, instr: *InstrIndex, heap: bool) void {
-    if (heap) {
-        instr.* = self.irb.wrapInstr(.incr_rc, instr.*);
-    }
-}
-
 fn varDecl(self: *Self, node: *const Ast.VarDecl, ctx: *Context) StmtResult {
     const span = self.ast.getSpan(node.name);
     const name = self.internToken(node.name);
@@ -980,7 +970,6 @@ fn varDecl(self: *Self, node: *const Ast.VarDecl, ctx: *Context) StmtResult {
     const value_res = if (node.value) |value| v: {
         var value_res = try self.expectAssignableValue(value, ctx);
         checked_type = try self.performTypeCoercion(checked_type, &value_res, false, self.ast.getSpan(value));
-        self.checkWrap(&value_res.instr, value_res.ti.heap);
 
         // For now, we don't accept anything other than scalar constants
         if (self.scope.isGlobal() and self.irb.getInstr(value_res.instr) != .constant) {
@@ -1444,6 +1433,7 @@ fn checkNotVoid(self: *Self, ty: *const Type, span: Span) Error!void {
 }
 
 fn array(self: *Self, expr: *const Ast.Array, ctx: *Context) Result {
+    const span = self.ast.getSpan(expr);
     var pure = true;
     var values = ArrayList(InstrIndex).initCapacity(self.alloc, expr.values.len) catch oom();
     var types: Set(*const Type) = .empty;
@@ -1459,26 +1449,48 @@ fn array(self: *Self, expr: *const Ast.Array, ctx: *Context) Result {
 
     for (expr.values) |val| {
         const val_res = try self.analyzeExpr(val, .value, ctx);
-        var val_instr = val_res.instr;
+        const val_instr = val_res.instr;
         types.add(self.alloc, val_res.type) catch oom();
 
-        self.checkWrap(&val_instr, val_res.ti.heap);
         pure = pure and val_res.ti.comp_time;
         values.appendAssumeCapacity(val_instr);
     }
     const ty = self.ti.intern(.{ .array = .{ .child = self.mergeTypes(types.keys()) } });
+    const type_id = self.ti.typeId(ty);
 
-    return .{
-        .type = ty,
-        .ti = .{ .comp_time = pure },
-        .instr = self.irb.addInstr(
+    const instr = if (pure)
+        self.arrayConstant(values.items, type_id, span.start)
+    else
+        self.irb.addInstr(
             .{ .array = .{
                 .values = values.toOwnedSlice(self.alloc) catch oom(),
                 .type_id = self.ti.typeId(ty),
             } },
-            self.ast.getSpan(expr).start,
-        ),
+            span.start,
+        );
+
+    return .{
+        .type = ty,
+        .ti = .{ .comp_time = pure },
+        .instr = instr,
     };
+}
+
+fn arrayConstant(self: *Self, instrs: []const InstrIndex, type_id: type_mod.TypeId, offset: usize) InstrIndex {
+    var vals = ArrayList(ConstIdx).initCapacity(self.alloc, instrs.len) catch oom();
+    for (instrs) |instr| {
+        vals.appendAssumeCapacity(self.irb.getConstantIdx(instr));
+    }
+
+    return self.irb.addInstr(
+        .{ .constant = .{
+            .index = self.state.addConstant(self.alloc, .{ .array = .{
+                .type_id = type_id,
+                .values = vals.toOwnedSlice(self.alloc) catch oom(),
+            } }),
+        } },
+        offset,
+    );
 }
 
 /// `pop_offset` is used to pop that amount less variables at scope closure
@@ -1637,7 +1649,7 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
                     ),
                 };
 
-                if (lhs_type.is(.float) or rhs_type.is(.float)) {
+                if (ty.is(.float)) {
                     self.warn(.float_equal, self.ast.getSpan(expr));
                 }
 
@@ -1677,10 +1689,81 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
         }
     };
 
+    const instr = if (lhs.ti.comp_time and rhs.ti.comp_time)
+        self.foldBinop(op, lhs_instr, rhs_instr, lhs_span.start)
+    else
+        self.irb.addInstr(.{ .binop = .{ .op = op, .lhs = lhs_instr, .rhs = rhs_instr } }, lhs_span.start);
+
     return .{
         .type = ty,
         .ti = .{ .comp_time = lhs.ti.comp_time and rhs.ti.comp_time },
-        .instr = self.irb.addInstr(.{ .binop = .{ .op = op, .lhs = lhs_instr, .rhs = rhs_instr } }, lhs_span.start),
+        .instr = instr,
+    };
+}
+
+// TODO: errors
+fn foldBinop(self: *Self, op: Instr.Binop.Op, lhs: InstrIndex, rhs: InstrIndex, offset: usize) InstrIndex {
+    const lval = self.getConstant(lhs);
+    const rval = self.getConstant(rhs);
+
+    return switch (op) {
+        .sub_int => self.addConstant(.{ .int = lval.int - rval.int }, offset),
+        .add_int => self.addConstant(.{ .int = lval.int + rval.int }, offset),
+        .mul_int => self.addConstant(.{ .int = lval.int * rval.int }, offset),
+        .div_int => div: {
+            if (rval.int == 0) {
+                @panic("div by 0");
+            }
+            break :div self.addConstant(.{ .int = @divFloor(lval.int, rval.int) }, offset);
+        },
+
+        .sub_float => self.addConstant(.{ .float = lval.float - rval.float }, offset),
+        .add_float => self.addConstant(.{ .float = lval.float + rval.float }, offset),
+        .mul_float => self.addConstant(.{ .float = lval.float * rval.float }, offset),
+        .div_float => self.addConstant(.{ .float = lval.float / rval.float }, offset),
+
+        .eq_int => self.addConstant(.{ .bool = lval.int == rval.int }, offset),
+        .eq_float => self.addConstant(.{ .bool = lval.float == rval.float }, offset),
+        .ne_int => self.addConstant(.{ .bool = lval.int != rval.int }, offset),
+        .ne_float => self.addConstant(.{ .bool = lval.float != rval.float }, offset),
+        .eq_bool => self.addConstant(.{ .bool = lval.bool == rval.bool }, offset),
+        .ne_bool => self.addConstant(.{ .bool = lval.bool != rval.bool }, offset),
+        .eq_str => self.addConstant(.{ .bool = lval.string == rval.string }, offset),
+        .ne_str => self.addConstant(.{ .bool = lval.string != rval.string }, offset),
+
+        .mod_int => self.addConstant(.{ .int = @mod(lval.int, rval.int) }, offset),
+        .mod_float => self.addConstant(.{ .float = @mod(lval.float, rval.float) }, offset),
+
+        .@"and" => self.addConstant(.{ .bool = lval.bool and rval.bool }, offset),
+        .@"or" => self.addConstant(.{ .bool = lval.bool or rval.bool }, offset),
+
+        .binary_and => self.addConstant(.{ .int = lval.int & rval.int }, offset),
+        .binary_or => self.addConstant(.{ .int = lval.int | rval.int }, offset),
+        .binary_xor => self.addConstant(.{ .int = lval.int ^ rval.int }, offset),
+        .shift_left => shift: {
+            if (rval.int > std.math.maxInt(u6)) {
+                @panic("Too big shift");
+            }
+            break :shift self.addConstant(.{ .int = lval.int << @intCast(rval.int) }, offset);
+        },
+        .shift_right => shift: {
+            if (rval.int > std.math.maxInt(u6)) {
+                @panic("Too big shift");
+            }
+            break :shift self.addConstant(.{ .int = lval.int >> @intCast(rval.int) }, offset);
+        },
+
+        .gt_float => self.addConstant(.{ .bool = lval.float > rval.float }, offset),
+        .ge_float => self.addConstant(.{ .bool = lval.float >= rval.float }, offset),
+        .lt_float => self.addConstant(.{ .bool = lval.float < rval.float }, offset),
+        .le_float => self.addConstant(.{ .bool = lval.float <= rval.float }, offset),
+
+        .gt_int => self.addConstant(.{ .bool = lval.int > rval.int }, offset),
+        .ge_int => self.addConstant(.{ .bool = lval.int >= rval.int }, offset),
+        .lt_int => self.addConstant(.{ .bool = lval.int < rval.int }, offset),
+        .le_int => self.addConstant(.{ .bool = lval.int <= rval.int }, offset),
+
+        .add_str, .bang_bang, .eq_null, .eq_ptr, .mul_str, .ne_null, .ne_ptr, .question_mark_question_mark => unreachable,
     };
 }
 
@@ -1708,11 +1791,19 @@ fn binopArithmeticCoercion(
     }
 
     if (lhs_type.is(.float) and rhs_type.is(.int)) {
-        return .{ lhs.instr, self.irb.wrapInstr(.int_to_float, rhs.instr), lhs_type };
+        return .{ lhs.instr, self.castIntToFloat(rhs), lhs_type };
     }
 
     // Last case as `isNumeric` ensure that it's either a `float` or an `int`
-    return .{ self.irb.wrapInstr(.int_to_float, lhs.instr), rhs.instr, rhs_type };
+    return .{ self.castIntToFloat(lhs), rhs.instr, rhs_type };
+}
+
+fn castIntToFloat(self: *Self, info: InstrInfos) InstrIndex {
+    if (info.ti.comp_time) {
+        const cte = self.getConstant(info.instr).int;
+        return self.addConstant(.{ .float = @floatFromInt(cte) }, self.irb.instrOffset(info.instr));
+    }
+    return self.irb.wrapInstr(.int_to_float, info.instr);
 }
 
 fn getArithmeticOp(op: TokenTag, ty: *const Type) Instr.Binop.Op {
@@ -1744,11 +1835,11 @@ fn overloadedBinop(self: *Self, op: TokenTag, lhs: InstrInfos, rhs: *InstrInfos,
     const op_fn = struct_type.functions.getPtr(op_name) orelse return null;
 
     const fn_type = &op_fn.type.function;
+    _ = try self.performTypeCoercion(fn_type.params.values()[1].type, rhs, false, rhs_span);
+
     var args = ArrayList(Instr.Arg).initCapacity(self.alloc, 2) catch oom();
     args.appendAssumeCapacity(.{ .instr = lhs.instr });
     args.appendAssumeCapacity(.{ .instr = rhs.instr });
-
-    _ = try self.performTypeCoercion(fn_type.params.values()[1].type, rhs, false, rhs_span);
 
     return .{
         .type = fn_type.return_type,
@@ -1791,7 +1882,15 @@ fn binopComparisonCoercion(
     const rhs_type = rhs.type;
 
     if (lhs_type.isNumeric() and rhs_type.isNumeric()) {
-        return .{ lhs.instr, rhs.instr, lhs_type };
+        if (lhs_type == rhs_type) {
+            return .{ lhs.instr, rhs.instr, lhs_type };
+        }
+
+        if (lhs_type.is(.float) and rhs_type.is(.int)) {
+            return .{ lhs.instr, self.castIntToFloat(rhs), lhs_type };
+        }
+
+        return .{ self.castIntToFloat(lhs), rhs.instr, rhs_type };
     }
 
     if (lhs_type == rhs_type) {
@@ -1829,7 +1928,8 @@ fn binopComparisonCoercion(
             // When building an union, we'll land on `union_constr`: `myUnion == .tagName(value)`
             if (expr.rhs.* == .implicit_selector or self.isUnionLit(rhs.instr)) {
                 return .{
-                    self.irb.wrapInstr(.union_tag, lhs.instr),
+                    // self.irb.wrapInstr(.union_tag, lhs.instr),
+                    self.unionTagLiteral(lhs),
                     getTag(self, rhs.instr, .@"union", self.ast.getSpan(rhs.instr).start),
                     self.ti.getCached(.int),
                 };
@@ -1870,6 +1970,14 @@ pub fn isUnionLit(self: *const Self, instr: ir.Index) bool {
     const cte_instr = self.irb.getInstr(instr);
     if (cte_instr != .constant) return false;
     return self.state.const_interner.get(cte_instr.constant.index) == .union_lit;
+}
+
+fn unionTagLiteral(self: *Self, info: InstrInfos) InstrIndex {
+    if (info.ti.comp_time) {
+        const cte = self.getConstant(info.instr).union_lit;
+        return self.addConstant(.{ .int = @intCast(cte.tag_index) }, self.irb.instrOffset(info.instr));
+    }
+    return self.irb.wrapInstr(.union_tag, info.instr);
 }
 
 fn getComparisonOp(op: TokenTag, ty: *const Type) Instr.Binop.Op {
@@ -2585,8 +2693,9 @@ fn fnArgsList(
         var value = try self.analyzeExpr(arg.value, .value, ctx);
         _ = try self.performTypeCoercion(param_res.info.type, &value, false, span);
 
-        self.checkWrap(&value.instr, false);
-        if (param_res.info.captured) value.instr = self.irb.wrapPreviousInstr(.box);
+        if (param_res.info.captured) {
+            value.instr = self.irb.wrapPreviousInstr(.box);
+        }
 
         instrs[param_res.index] = .{ .instr = value.instr };
 
@@ -2699,7 +2808,7 @@ fn resolveIdentifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool,
         return .{
             .type = res.variable.type,
             .kind = .variable,
-            .comp_time = res.variable.comp_time,
+            .comp_time = false,
             .instr = res.instr,
             .module = res.variable.ext_mod,
         };
@@ -2831,14 +2940,12 @@ fn ifExpr(self: *Self, expr: *const Ast.If, expect: ExprResKind, ctx: *Context) 
 
     // Analyze then branch
     var then_res = try self.analyzeNode(&expr.then, expect, ctx);
-    self.checkWrap(&then_res.instr, then_res.ti.heap);
     pure = pure and then_res.ti.comp_time;
 
     var else_res: ?InstrInfos = null;
 
     if (expr.@"else") |*n| {
-        var else_res_tmp = try self.analyzeNode(n, expect, ctx);
-        self.checkWrap(&else_res_tmp.instr, else_res_tmp.ti.heap);
+        const else_res_tmp = try self.analyzeNode(n, expect, ctx);
         pure = pure and else_res_tmp.ti.comp_time;
         else_res = else_res_tmp;
     } else if (expect == .value) {
@@ -2850,9 +2957,10 @@ fn ifExpr(self: *Self, expr: *const Ast.If, expect: ExprResKind, ctx: *Context) 
 
     const branch_res = try self.checkIfBranches(&then_res, &else_res, expr, expect);
 
+    // TODO: branch elimination
     return .{
         .type = branch_res,
-        .ti = .{ .comp_time = pure },
+        .ti = .{ .comp_time = false },
         .cf = if (branch_res.is(.never)) .@"return" else .none,
         .instr = self.irb.addInstr(
             .{ .@"if" = .{
@@ -3041,7 +3149,7 @@ pub fn identifier(self: *Self, expr: Ast.Identifier, ctx: *Context) Result {
         .ti = .{
             .heap = res.type.isHeap(),
             .is_sym = res.kind == .symbol,
-            .comp_time = res.comp_time,
+            .comp_time = false,
             .ext_mod = res.module,
         },
         .instr = res.instr,
@@ -3516,16 +3624,15 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
             const res = try self.expectVariableIdentifier(fv.name);
             break :b .{
                 .type = res.variable.type,
-                .ti = .{ .heap = res.variable.type.isHeap(), .comp_time = res.variable.comp_time },
+                .ti = .{ .heap = res.variable.type.isHeap(), .comp_time = false },
                 .instr = res.instr,
             };
         };
 
-        comp_time = comp_time and res.ti.comp_time;
         const value_span = if (fv.value) |val| self.ast.getSpan(val) else field_span;
         _ = try self.performTypeCoercion(f.type, &res, false, value_span);
+        comp_time = comp_time and res.ti.comp_time;
 
-        self.checkWrap(&res.instr, res.ti.heap);
         values[field_index] = .{ .instr = res.instr };
     }
 
@@ -3539,17 +3646,43 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
 
     if (self.errs.items.len > err_count) return error.Err;
 
+    const instr = if (struct_type.native)
+        try self.callInitOnNativeStruct(&struct_type, values, struct_res.ti.ext_mod, span)
+    else if (comp_time)
+        self.structLitConstant(struct_res.instr, values, span.start)
+    else
+        self.irb.addInstr(
+            .{ .struct_literal = .{ .structure = struct_res.instr, .values = values } },
+            span.start,
+        );
+
     return .{
         .type = struct_res.type,
         .ti = .{ .comp_time = comp_time, .ext_mod = struct_res.ti.ext_mod },
-        .instr = if (struct_type.native)
-            try self.callInitOnNativeStruct(&struct_type, values, struct_res.ti.ext_mod, span)
-        else
-            self.irb.addInstr(
-                .{ .struct_literal = .{ .structure = struct_res.instr, .values = values } },
-                span.start,
-            ),
+        .instr = instr,
     };
+}
+
+fn structLitConstant(self: *Self, struct_instr: InstrIndex, instrs: []const Instr.Arg, offset: usize) InstrIndex {
+    var vals = ArrayList(ConstIdx).initCapacity(self.alloc, instrs.len) catch oom();
+    for (instrs) |instr| {
+        switch (instr) {
+            .instr => |i| vals.appendAssumeCapacity(self.irb.getConstantIdx(i)),
+            .default => |def| vals.appendAssumeCapacity(def.constant),
+        }
+    }
+
+    const parent = self.irb.getInstr(struct_instr).load_symbol;
+
+    return self.irb.addInstr(
+        .{ .constant = .{
+            .index = self.state.addConstant(self.alloc, .{ .struct_lit = .{
+                .parent = .{ .symbol = parent.symbol, .module = parent.module },
+                .values = vals.toOwnedSlice(self.alloc) catch oom(),
+            } }),
+        } },
+        offset,
+    );
 }
 
 /// This function extract the inner type (?T -> T) and declares it as an extern symbol if it
@@ -3713,18 +3846,35 @@ fn unary(self: *Self, expr: *const Ast.Unary, ctx: *Context) Result {
         }
     }
 
-    return .{
-        .type = ty,
-        .ti = rhs.ti,
-        .instr = self.irb.addInstr(
+    const instr: InstrIndex = if (rhs.ti.comp_time)
+        self.unaryConstant(rhs, span.start)
+    else
+        self.irb.addInstr(
             .{ .unary = .{
                 .op = if (op == .not) .bang else .minus,
                 .typ = if (ty.is(.int)) .int else .float,
                 .instr = rhs.instr,
             } },
             span.start,
-        ),
+        );
+
+    return .{
+        .type = ty,
+        .ti = rhs.ti,
+        .instr = instr,
     };
+}
+
+fn unaryConstant(self: *Self, info: InstrInfos, offset: usize) InstrIndex {
+    const cte = self.getConstant(info.instr);
+
+    if (info.type.is(.int)) {
+        return self.addConstant(.{ .int = -cte.int }, offset);
+    } else if (info.type.is(.bool)) {
+        return self.addConstant(.{ .bool = !cte.bool }, offset);
+    } else {
+        return self.addConstant(.{ .float = -cte.float }, offset);
+    }
 }
 
 fn overloadedUnary(self: *Self, rhs: InstrInfos, rhs_span: Span) ?Result {
@@ -3793,20 +3943,28 @@ fn pointer(self: *Self, expr: *Expr, span: Span, ctx: *Context) Result {
 }
 
 fn binaryNot(self: *Self, expr: *Expr, span: Span, ctx: *Context) Result {
-    const res = try self.analyzeExpr(expr, .value, ctx);
+    const rhs = try switch (expr.*) {
+        .int => |i| self.intLit(i, false),
+        else => self.analyzeExpr(expr, .value, ctx),
+    };
 
-    if (!res.type.is(.int)) return self.err(
-        .{ .invalid_binary_arithmetic = .{ .found = self.typeName(res.type) } },
+    if (!rhs.type.is(.int)) return self.err(
+        .{ .invalid_binary_arithmetic = .{ .found = self.typeName(rhs.type) } },
         span,
     );
 
-    return .{
-        .type = res.type,
-        .ti = res.ti,
-        .instr = self.irb.addInstr(
-            .{ .unary = .{ .op = .tilde, .typ = .int, .instr = res.instr } },
+    const instr = if (rhs.ti.comp_time)
+        self.addConstant(.{ .int = ~self.getConstant(rhs.instr).int }, span.start)
+    else
+        self.irb.addInstr(
+            .{ .unary = .{ .op = .tilde, .typ = .int, .instr = rhs.instr } },
             span.start,
-        ),
+        );
+
+    return .{
+        .type = rhs.type,
+        .ti = rhs.ti,
+        .instr = instr,
     };
 }
 
@@ -4102,7 +4260,7 @@ fn checkTypeCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, de
     if (value.is(.never)) return decl;
 
     if (decl.is(.float) and value.is(.int)) {
-        value_info.instr = self.irb.wrapInstr(.int_to_float, value_info.instr);
+        value_info.instr = self.castIntToFloat(value_info.*);
         return self.ti.getCached(.float);
     }
 
@@ -4319,6 +4477,7 @@ fn checkTraitObj(self: *Self, decl: *const Type, trait: *const Type.Trait, value
             } },
             self.irb.instrOffset(value_info.instr),
         );
+        value_info.ti.comp_time = false;
 
         return t.trait;
     }

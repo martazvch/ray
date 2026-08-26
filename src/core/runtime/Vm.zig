@@ -405,12 +405,6 @@ fn execute(self: *Self) !void {
                 const field_idx = self.frame.readByte();
                 self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.Instance).fields[field_idx];
             },
-            .get_field_cow => {
-                const field_idx = self.frame.readByte();
-                const field = &self.stack.peekRef(0).obj.as(Obj.Instance).fields[field_idx];
-                field.obj = self.cow(field.obj);
-                self.stack.peekRef(0).* = field.*;
-            },
             .get_field_native => {
                 const field_idx = self.frame.readByte();
                 self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.NativeObj).getField(self, field_idx);
@@ -419,11 +413,9 @@ fn execute(self: *Self) !void {
                 const idx = self.frame.readByte();
                 self.stack.push(self.frame.module.globals[idx]);
             },
-            .get_global_cow => {
+            .get_global_dup => {
                 const idx = self.frame.readByte();
-                const value = &self.frame.module.globals[idx];
-                value.obj = self.cow(value.obj);
-                self.stack.push(value.*);
+                self.stack.push(self.frame.module.globals[idx].deepCopy(self));
             },
             .get_global_ext => {
                 const index = self.frame.readByte();
@@ -432,35 +424,29 @@ fn execute(self: *Self) !void {
             },
             // TODO: see if same compiler bug as get_global
             .get_local => self.stack.push(self.frame.slots[self.frame.readByte()]),
-            .get_local_cow => {
-                const index = self.frame.readByte();
-                const value = &self.frame.slots[index];
-                value.obj = self.cow(value.obj);
-                self.stack.push(value.*);
-            },
+            .get_local_dup => self.stack.push(self.frame.slots[self.frame.readByte()].deepCopy(self)),
             .get_enum_tag => self.stack.peekRef(0).* = .makeInt(self.stack.peek(0).obj.as(Obj.EnumInstance).tag_id),
             .get_union_tag => self.stack.peekRef(0).* = .makeInt(self.stack.peek(0).obj.as(Obj.UnionInstance).tag_id),
             .gt_float => self.stack.push(Value.makeBool(self.stack.pop().float < self.stack.pop().float)),
             .gt_int => self.stack.push(Value.makeBool(self.stack.pop().int < self.stack.pop().int)),
-            .incr_ref => self.stack.peekRef(0).obj.ref_count += 1,
             .index_arr => {
                 const index = self.stack.pop().int;
                 const array = self.stack.pop().obj.as(Obj.Array);
                 const final = try self.normalizeIndex(array.values.items.len, index);
                 self.stack.push(array.values.items[final]);
             },
-            .index_arr_cow => {
+            .index_arr_dup => {
                 const index = self.stack.pop().int;
                 const array = self.stack.pop().obj.as(Obj.Array);
                 const final = try self.normalizeIndex(array.values.items.len, index);
-
-                var value = array.values.items[final];
-                value.obj = self.cow(value.obj);
-                self.stack.push(value);
+                self.stack.push(array.values.items[final].deepCopy(self));
             },
             .index_range_arr => {
                 const index = self.stack.pop().range_int;
-                const array = self.stack.pop().obj.as(Obj.Array);
+                const obj = self.stack.pop().obj;
+                const array = obj.as(Obj.Array);
+                self.gc.pushTmpRoot(obj);
+                defer self.gc.popTmpRoot();
                 const start, const end = try self.checkRangeIndex(array.values.items.len, index);
                 self.stack.push(.makeObj(Obj.Array.create(self, array.obj.type_id, array.values.items[start..end]).asObj()));
             },
@@ -564,7 +550,7 @@ fn execute(self: *Self) !void {
             .le_float => self.stack.push(Value.makeBool(self.stack.pop().float >= self.stack.pop().float)),
             .le_int => self.stack.push(Value.makeBool(self.stack.pop().int >= self.stack.pop().int)),
             .load_blk_val => self.stack.push(self.frame.blk_val),
-            .load_const => self.stack.push(self.frame.readConstant(wide)),
+            .load_const => self.stack.push(self.frame.readConstant(wide).deepCopy(self)),
             .load_const_ext => {
                 const const_index = self.frame.readByte();
                 const mod_index = self.frame.readByte();
@@ -644,7 +630,10 @@ fn execute(self: *Self) !void {
             },
             .ptr_array => {
                 const index = self.stack.pop().int;
-                const array = self.stack.pop().obj.as(Obj.Array);
+                const obj = self.stack.pop().obj;
+                const array = obj.as(Obj.Array);
+                self.gc.pushTmpRoot(obj);
+                defer self.gc.popTmpRoot();
                 const final = try self.normalizeIndex(array.values.items.len, index);
                 self.stack.push(.makeObj(Obj.Pointer.create(self, &array.values.items[final]).asObj()));
             },
@@ -847,17 +836,6 @@ fn structLit(instance: *Obj.Instance, arity: usize, stack: *Stack) void {
 
     stack.top -= arity;
     stack.push(Value.makeObj(instance.asObj()));
-}
-
-/// Checks clone on write
-/// TODO: move this to Obj
-fn cow(self: *Self, obj: *Obj) *Obj {
-    if (obj.ref_count > 0) {
-        obj.ref_count -= 1;
-        return obj.deepCopy(self);
-    }
-
-    return obj;
 }
 
 // PERF: check if a length is 0 and just return the string?

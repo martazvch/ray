@@ -33,12 +33,11 @@
         [Variable index: 0, scope: local]
     [Call symbol 1]
     [Variable declaration index: 1, scope: local]
-        [Incr rc]
-            [Trait object]
-                - variable
-                [Variable index: 0, scope: local]
-                - vtable
-                0
+        [Trait object]
+            - variable
+            [Variable index: 0, scope: local]
+            - vtable
+            0
     [Field access 0]
         [Variable index: 1, scope: local]
     [Call virtual 0]

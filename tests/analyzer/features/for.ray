@@ -17,7 +17,7 @@ fn main() {
         print c
     }
 
-    for i, v in [] {
+    for v, i in [] {
         print i
     }
 

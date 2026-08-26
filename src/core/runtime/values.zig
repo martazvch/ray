@@ -74,8 +74,8 @@ pub const Value = union(enum) {
 
     pub fn deepCopy(self: Self, vm: *Vm) Self {
         return switch (self) {
-            .bool, .float, .int, .null, .range_float, .range_int => self,
-            .obj => |obj| Self.makeObj(obj.deepCopy(vm)),
+            .obj => |obj| .makeObj(obj.deepCopy(vm)),
+            else => self,
         };
     }
 

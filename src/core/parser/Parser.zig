@@ -1015,18 +1015,14 @@ fn discard(self: *Self) Error!Node {
 fn forLoop(self: *Self) Error!Node {
     const for_tk = self.token_idx - 1;
     const label = self.ctx.setAndGetPrevious(.label, null);
-    var index_token: ?TokenIndex = null;
-    var binding_token: TokenIndex = undefined;
 
     try self.expect(.identifier, .expect_identifier_for_binding);
-    const first = self.token_idx - 1;
+    const binding_token = self.token_idx - 1;
+    var index_token: ?TokenIndex = null;
 
     if (self.match(.comma)) {
         try self.expect(.identifier, .expect_identifier_for_binding);
-        index_token = first;
-        binding_token = self.token_idx - 1;
-    } else {
-        binding_token = first;
+        index_token = self.token_idx - 1;
     }
 
     try self.expect(.in, .expect_in);
@@ -1039,8 +1035,8 @@ fn forLoop(self: *Self) Error!Node {
 
     return .{ .for_loop = .{
         .for_tk = for_tk,
-        .index_binding = index_token,
         .binding = binding_token,
+        .index_binding = index_token,
         .expr = expr,
         .body = body.block,
     } };
@@ -1773,7 +1769,7 @@ fn structLiteral(self: *Self, expr: Ast.StructLiteral.Kind) Error!*Expr {
         if (!self.match(.comma)) break;
         self.skipNewLines();
     }
-    try self.expect(.right_brace, .expectBraceAfter("structure's name"));
+    try self.expect(.right_brace, .expectBraceAfter("structure literal values"));
 
     struct_lit.* = .{ .struct_literal = .{
         .structure = expr,

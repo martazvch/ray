@@ -1,4 +1,8 @@
+fn getInt() -> int {
+    return 5
+}
+
 fn main() {
-    1 + 1.
-    1. + 2
+    getInt() + 1.
+    1. + getInt()
 }

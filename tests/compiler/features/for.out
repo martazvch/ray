@@ -56,9 +56,9 @@ array_new length 2, type_id x
 iter_new_arr
 iter_next_index
 jump_null 90 -> 103
-get_local index 3
-print
 get_local index 4
+print
+get_local index 3
 print
 pop2
 loop 100 -> 89

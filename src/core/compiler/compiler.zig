@@ -139,8 +139,14 @@ const Compiler = struct {
     const CompilerReport = GenReport(CompilerMsg);
     // TODO: could make a generic construct with only flags like this (share with other contexts)
     const Context = struct {
-        cow: bool = false,
         in_cf: bool = false,
+
+        // No duplication for:
+        // all lvalue:  lvalue = ...
+        // all invoke:  p.speak()          ---   a = p.speak()
+        // all bound:   p.speak            ---   a = p.speak
+        // all pointer: *foo.a == *foo.a
+        dup: bool = true,
 
         pub fn setAndGetPrev(self: *Context, comptime f: FieldEnum(Context), value: @FieldType(Context, @tagName(f))) @TypeOf(value) {
             const prev = @field(self, @tagName(f));
@@ -224,9 +230,9 @@ const Compiler = struct {
         // BUG: Protect the cast, we can't have more than 256 variable to lookup for now
         self.writeOpAndByte(
             if (variable.scope == .local)
-                if (self.state.cow) .get_local_cow else .get_local
+                if (self.state.dup) .get_local_dup else .get_local
             else if (variable.scope == .global)
-                if (self.state.cow) .get_global_cow else .get_global
+                if (self.state.dup) .get_global_dup else .get_global
             else
                 unreachable,
             @intCast(variable.index),
@@ -367,7 +373,6 @@ const Compiler = struct {
             .@"if" => |*data| self.ifInstr(data),
             .import_global => |data| self.importGlobal(data),
             .in => |data| self.in(data),
-            .incr_rc => |index| self.wrappedInstr(.incr_ref, index),
             .indexing => |data| self.indexing(data),
             .int_to_float => |index| self.wrappedInstr(.int_to_float, index),
 
@@ -426,10 +431,7 @@ const Compiler = struct {
     }
 
     fn arrayAssign(self: *Self, data: Instruction.Indexing) Error!void {
-        const prev = self.state.setAndGetPrev(.cow, true);
         try self.compileInstr(data.expr);
-        self.state.cow = prev;
-
         try self.compileInstr(data.index);
         self.writeOp(.array_set);
     }
@@ -437,8 +439,9 @@ const Compiler = struct {
     fn assignment(self: *Self, data: *const Instruction.Assignment) Error!void {
         try self.compileInstr(data.value);
 
-        // TODO: no use of data.cow?
-        const variable_data, const unbox = switch (self.manager.instr_data[data.assigne]) {
+        self.state.dup = false;
+        defer self.state.dup = true;
+        const variable_data, const unbox = switch (self.at(data.assigne)) {
             .deref => |deref| {
                 try self.compileInstr(deref);
                 self.writeOp(.ptr_store);
@@ -447,7 +450,7 @@ const Compiler = struct {
             .identifier => |*variable| .{ variable, false },
             .indexing => |indexing_data| return self.arrayAssign(indexing_data),
             .field => |*field_data| return self.fieldAssignment(field_data),
-            .unbox => |index| .{ &self.manager.instr_data[index].identifier, true },
+            .unbox => |index| .{ &self.at(index).identifier, true },
             else => unreachable,
         };
 
@@ -464,8 +467,6 @@ const Compiler = struct {
     }
 
     fn fieldAssignment(self: *Self, data: *const Instruction.Field) Error!void {
-        self.state.cow = true;
-        defer self.state.cow = false;
         try self.compileInstr(data.structure);
         self.writeOpAndByte(.set_field, @intCast(data.index));
     }
@@ -567,6 +568,9 @@ const Compiler = struct {
 
     // TODO: protext cast
     fn boundMethod(self: *Self, data: Instruction.BoundMethod) Error!void {
+        const prev_dup = self.state.setAndGetPrev(.dup, false);
+        defer self.state.dup = prev_dup;
+
         try self.compileInstr(data.structure);
         self.writeOpAndByte(.bound_method, @intCast(data.index));
     }
@@ -609,6 +613,9 @@ const Compiler = struct {
     }
 
     fn invoke(self: *Self, data: *const Instruction.Call, callee: Instruction.Field) Error!void {
+        const prev_dup = self.state.setAndGetPrev(.dup, false);
+        defer self.state.dup = prev_dup;
+
         try self.compileInstr(callee.structure);
         try self.callSymbol(data, 1, callee.index, data.module);
     }
@@ -650,6 +657,9 @@ const Compiler = struct {
     }
 
     fn callObjFn(self: *Self, data: Instruction.ObjFn, args: []const Instruction.Arg) Error!void {
+        const prev_dup = self.state.setAndGetPrev(.dup, false);
+        defer self.state.dup = prev_dup;
+
         try self.compileInstr(data.obj);
         try self.compileArgs(args);
         self.writeOpAndByte(if (data.kind == .array) .call_array else .call_string, @intCast(data.fn_index));
@@ -770,6 +780,21 @@ const Compiler = struct {
         const gop = self.manager.compiled_constants.getOrPut(self.manager.alloc, idx) catch oom();
         if (!gop.found_existing) {
             const value = switch (cte) {
+                .array => |arr| arr: {
+                    var vals = ArrayList(Value).initCapacity(self.manager.alloc, arr.values.len) catch oom();
+                    for (arr.values) |val| {
+                        try self.compileConstant(val);
+                        vals.appendAssumeCapacity(
+                            self.manager.state.modules.getConstant(self.manager.mod_index, val.toInt()),
+                        );
+                    }
+
+                    break :arr Value.makeObj(Obj.Array.createComptime(
+                        self.manager.alloc,
+                        @intCast(arr.type_id),
+                        vals.toOwnedSlice(self.manager.alloc) catch oom(),
+                    ).asObj());
+                },
                 .bool => |c| Value.makeBool(c),
                 .int => |val| Value.makeInt(val),
                 .float => |val| Value.makeFloat(val),
@@ -792,6 +817,26 @@ const Compiler = struct {
                     @intCast(val.tag_index),
                     .null_,
                 ).asObj()),
+                .struct_lit => |s| s: {
+                    var vals = ArrayList(Value).initCapacity(self.manager.alloc, s.values.len) catch oom();
+                    for (s.values) |val| {
+                        try self.compileConstant(val);
+                        vals.appendAssumeCapacity(
+                            self.manager.state.modules.getConstant(self.manager.mod_index, val.toInt()),
+                        );
+                    }
+
+                    break :s Value.makeObj(Obj.Instance.createComptime(
+                        self.manager.alloc,
+                        self.manager.state.modules.getSymbol(
+                            s.parent.module,
+                            s.parent.symbol,
+                            .structure,
+                        ),
+                        vals.toOwnedSlice(self.manager.alloc) catch oom(),
+                    ).asObj());
+                },
+
                 .null => Value.null_,
                 .string => |val| Value.makeObj(Obj.String.comptimeCopy(
                     self.manager.alloc,
@@ -845,9 +890,7 @@ const Compiler = struct {
     fn field(self: *Self, data: *const Instruction.Field) Error!void {
         try self.compileInstr(data.structure);
         self.writeOpAndByte(
-            if (self.state.cow)
-                .get_field_cow
-            else if (data.kind == .field_native)
+            if (data.kind == .field_native)
                 .get_field_native
             else
                 .get_field,
@@ -960,21 +1003,21 @@ const Compiler = struct {
     }
 
     fn indexing(self: *Self, data: Instruction.Indexing) Error!void {
+        const prev_dup = self.state.setAndGetPrev(.dup, false);
         try self.compileInstr(data.expr);
+        self.state.dup = prev_dup;
 
         // Index, we deactivate cow for index because never wanted but could be triggered by a multiple array
         // access inside an array assignment
-        const prev = self.state.setAndGetPrev(.cow, false);
         try self.compileInstr(data.index);
-        self.state.cow = prev;
 
         const op: OpCode = switch (data.index_kind) {
             .scalar => switch (data.kind) {
-                .array => if (self.state.cow) .index_arr_cow else .index_arr,
+                .array => if (self.state.dup) .index_arr_dup else .index_arr,
                 .str => .index_str,
             },
             .range => switch (data.kind) {
-                .array => if (self.state.cow) .index_arr_cow else .index_range_arr,
+                .array => .index_range_arr,
                 .str => .index_range_str,
             },
         };
@@ -1127,11 +1170,15 @@ const Compiler = struct {
     fn pointer(self: *Self, instr: Instruction.Pointer) Error!void {
         switch (instr) {
             .array => |a| {
+                const prev_dup = self.state.setAndGetPrev(.dup, false);
                 try self.compileInstr(a.expr);
+                self.state.dup = prev_dup;
                 try self.compileInstr(a.index);
                 self.writeOp(.ptr_array);
             },
             .field => |f| {
+                const prev_dup = self.state.setAndGetPrev(.dup, false);
+                defer self.state.dup = prev_dup;
                 try self.compileInstr(f.structure);
                 self.writeOpAndByte(.ptr_field, @intCast(f.index));
             },

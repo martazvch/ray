@@ -37,7 +37,6 @@ pub const Instruction = struct {
         identifier: Variable,
         @"if": If,
         in: In,
-        incr_rc: Index,
         indexing: Indexing,
         int_to_float: Index,
         import_global: ImportGlobal,
@@ -136,7 +135,6 @@ pub const Instruction = struct {
     pub const Assignment = struct {
         assigne: Index,
         value: Index,
-        cow: bool,
     };
     pub const Block = struct {
         instrs: []const Index,

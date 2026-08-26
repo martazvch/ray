@@ -30,7 +30,6 @@
         [Return]
             [Constant index 5]
                 [String x]
-
 [Structure declaration Cell]
     - default values
     [Constant index 3]
@@ -95,7 +94,7 @@
             [Load symbol 0]
             - tag
             1
-    [Assignment index: 0, scope: local, cow]
+    [Assignment index: 0, scope: local]
     [Print]
         [Variable index: 0, scope: local]
     [Call symbol 1]
@@ -115,12 +114,18 @@
                 - tag
                 0
     [Variable declaration index: 1, scope: local]
-        [Structure literal]
-            - structure
-            [Load symbol 0]
-            - args
-            [Default field constant index 3]
-            [Default field constant index 6]
+        [Constant index 10]
+            [Structure]
+                [Enum create]
+                    - symbol
+                    [Load symbol 0]
+                    - tag
+                    0
+                [Enum create]
+                    - symbol
+                    [Load symbol 0]
+                    - tag
+                    1
     [Constant index 6]
         [Enum create]
             - symbol
@@ -128,7 +133,7 @@
             - tag
             1
     [Field assignment]
-        [Field access 0, cow]
+        [Field access 0]
             [Variable index: 1, scope: local]
     [Print]
         [Field access 0]
@@ -154,17 +159,14 @@
         [Binop type: eq_int]
             [Enum tag]
                 [Variable index: 0, scope: local]
-            [Constant index 10]
+            [Constant index 11]
                 [Int 2]
     [Pop]
         [Binop type: eq_int]
             [Enum tag]
                 [Variable index: 0, scope: local]
-            [Constant index 10]
+            [Constant index 11]
                 [Int 2]
     [Pop]
-        [Binop type: eq_int]
-            [Constant index 10]
-                [Int 2]
-            [Constant index 10]
-                [Int 2]
+        [Constant index 0]
+            [Bool true]

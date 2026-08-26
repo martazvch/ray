@@ -2,7 +2,7 @@ for v in arr {
     print v
 }
 
-for i, v in arr {}
+for v, i in arr {}
 
 loop: for v in arr {}
 

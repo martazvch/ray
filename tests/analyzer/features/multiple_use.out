@@ -43,7 +43,6 @@
 [Variable declaration index: 1, scope: global]
     [Constant index 7]
         [String math]
-
 [Structure declaration Point]
     [Function declaration move]
         [Binop type: add_int]
@@ -117,16 +116,11 @@
     [Print]
         [Field access 1]
             [Variable index: 0, scope: local]
-
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
-        [Structure literal]
-            - structure
-            [Load symbol 0 module 4]
-            - args
-            [Constant index 3]
+        [Constant index 5]
+            [Structure]
                 [Int 1]
-            [Constant index 4]
                 [Int 90]
     [Field access 1]
         [Variable index: 0, scope: local]
@@ -136,10 +130,9 @@
             - structure
             [Load symbol 1 module 4]
             - args
-            [Constant index 5]
+            [Constant index 6]
                 [Int 10]
-            [Incr rc]
-                [Variable index: 0, scope: local]
+            [Variable index: 0, scope: local]
     [Print]
         [Field access 0]
             [Field access 1]
@@ -168,7 +161,7 @@
         [Print]
             [Call symbol 1 module 5]
                 - args
-                [Constant index 6]
+                [Constant index 7]
                     [String local import]
         [Field access 1]
             [Variable index: 0, scope: local]
@@ -176,9 +169,9 @@
         [Print]
             [Call symbol 0 module 5]
                 - args
-                [Constant index 7]
-                    [String just ]
                 [Constant index 8]
+                    [String just ]
+                [Constant index 9]
                     [String concaneted]
     [Variable declaration index: 3, scope: local]
         [Field access 3]

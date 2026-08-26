@@ -5,9 +5,8 @@
 [Function declaration f]
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
-        [Structure literal]
-            - structure
-            [Load symbol 0]
+        [Constant index 3]
+            [Structure]
     [Call symbol 0]
         - args
         [Trait object]

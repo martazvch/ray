@@ -3,22 +3,15 @@ load_const index 3, value 2
 ret
 
 -- main --
-load_const index 4, value 1
-load_const index 3, value 2
-load_const index 5, value 3
-array_new length 3, type_id x
-
-load_const index 4, value 1
-load_const index 3, value 2
-array_new length 2, type_id x
-
-load_const index 6, value 6
-load_const index 7, value 7
+load_const index 6, value [1, 2, 3]
+load_const index 7, value [1, 2]
+load_const index 8, value 6
+load_const index 9, value 7
 call index 0, arity 0, getIdx
 array_new length 3, type_id x
 struct_lit index 0, arity 1, Foo
 
-get_local index 0
+get_local_dup index 0
 load_const index 4, value 1
 index_arr
 print

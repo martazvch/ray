@@ -4,6 +4,8 @@ const ArrayList = std.ArrayList;
 
 const ir = @import("ir.zig");
 const Instruction = ir.Instruction;
+const TypeId = @import("types.zig").TypeId;
+const ModIdx = @import("../pipeline/ModuleManager.zig").Index;
 const misc = @import("misc");
 const oom = misc.oom;
 
@@ -16,7 +18,12 @@ pub const Constant = union(enum) {
     int: i64,
     float: f64,
     bool: bool,
+    array: struct { type_id: TypeId, values: []const ConstIdx },
     enum_lit: TagLit,
+    struct_lit: struct {
+        parent: struct { symbol: usize, module: ModIdx },
+        values: []const ConstIdx,
+    },
     union_lit: TagLit,
     null,
     string: misc.Interner.Index,
@@ -81,6 +88,12 @@ fn hash(data: Constant) u64 {
     hasher.update(asBytes(&@intFromEnum(data)));
 
     switch (data) {
+        .array => |arr| {
+            hasher.update(asBytes(&arr.type_id));
+            for (arr.values) |v| {
+                hasher.update(asBytes(&v));
+            }
+        },
         .bool => |*i| hasher.update(asBytes(i)),
         .int => |*i| hasher.update(asBytes(i)),
         .float => |*f| hasher.update(asBytes(f)),
@@ -91,6 +104,13 @@ fn hash(data: Constant) u64 {
             hasher.update(@tagName(data));
             hasher.update(asBytes(&e.sym.symbol));
             hasher.update(asBytes(&e.tag_index));
+        },
+        .struct_lit => |s| {
+            hasher.update(asBytes(&s.parent.symbol));
+            hasher.update(asBytes(&s.parent.module));
+            for (s.values) |v| {
+                hasher.update(asBytes(&v));
+            }
         },
     }
 

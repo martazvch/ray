@@ -80,12 +80,18 @@
         [Call symbol 1]
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
-        [Structure literal]
-            - structure
-            [Load symbol 0]
-            - args
-            [Default field constant index 3]
-            [Default field constant index 6]
+        [Constant index 9]
+            [Structure]
+                [Enum create]
+                    - symbol
+                    [Load symbol 0]
+                    - tag
+                    0
+                [Enum create]
+                    - symbol
+                    [Load symbol 0]
+                    - tag
+                    1
     [Print]
         [Field access 0]
             [Variable index: 0, scope: local]

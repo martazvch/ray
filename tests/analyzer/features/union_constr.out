@@ -23,14 +23,14 @@
         - arg
         [Constant index 6]
             [Float 1.2]
-    [Assignment index: 0, scope: local, cow]
+    [Assignment index: 0, scope: local]
     [Constant index 7]
         [Union create]
             - symbol
             [Load symbol 0]
             - tag
             2
-    [Assignment index: 0, scope: local, cow]
+    [Assignment index: 0, scope: local]
     [Union constructor]
         [Union create]
             - symbol
@@ -44,4 +44,4 @@
                 [Load symbol 0]
                 - tag
                 1
-    [Assignment index: 0, scope: local, cow]
+    [Assignment index: 0, scope: local]

@@ -109,9 +109,8 @@
             [Constant index 9]
                 [Int 5]
     [Variable declaration index: 0, scope: local]
-        [Structure literal]
-            - structure
-            [Load symbol 0]
+        [Constant index 11]
+            [Structure]
     [Field access 11]
         [Variable index: 0, scope: local]
     [Call symbol 11]

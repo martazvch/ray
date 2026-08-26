@@ -27,9 +27,8 @@
             [Call symbol 4]
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
-        [Structure literal]
-            - structure
-            [Load symbol 0]
+        [Constant index 5]
+            [Structure]
     [Field access 2]
         [Variable index: 0, scope: local]
     [Call symbol 2]
@@ -37,9 +36,8 @@
         [Variable index: 0, scope: local]
     [Call symbol 3]
     [Variable declaration index: 1, scope: local]
-        [Structure literal]
-            - structure
-            [Load symbol 1]
+        [Constant index 6]
+            [Structure]
     [Field access 4]
         [Variable index: 1, scope: local]
     [Call symbol 4]

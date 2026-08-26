@@ -24,7 +24,6 @@ kind: Kind,
 next: ?*Obj,
 type_id: TypeId,
 is_marked: bool = false,
-ref_count: usize = 0,
 
 const Obj = @This();
 
@@ -170,6 +169,14 @@ pub const Array = struct {
         for (values) |val| {
             obj.values.appendAssumeCapacity(val);
         }
+
+        return obj;
+    }
+
+    pub fn createComptime(allocator: Allocator, type_id: TypeId, values: []Value) *Self {
+        const obj = Obj.allocateComptime(allocator, Self, type_id);
+        obj.values = .fromOwnedSlice(values);
+        obj.funcs = getApiFns(Self);
 
         return obj;
     }
@@ -515,6 +522,14 @@ pub const Instance = struct {
         return obj;
     }
 
+    pub fn createComptime(alloc: Allocator, parent: *const Module.Structure, fields: []const Value) *Self {
+        const obj = Obj.allocateComptime(alloc, Self, parent.type_id);
+        obj.parent = parent;
+        obj.fields = alloc.dupe(Value, fields) catch oom();
+
+        return obj;
+    }
+
     pub fn asObj(self: *Self) *Obj {
         return &self.obj;
     }
@@ -609,6 +624,10 @@ pub const UnionInstance = struct {
 
     pub fn deinit(self: *Self, vm: *Vm) void {
         vm.gc_alloc.destroy(self);
+    }
+
+    pub fn deepCopy(self: *Self, vm: *Vm) *Self {
+        return create(vm, self.parent, self.tag_id, self.payload);
     }
 };
 
@@ -910,11 +929,10 @@ pub const Pointer = struct {
 pub fn deepCopy(self: *Obj, vm: *Vm) *Obj {
     return switch (self.kind) {
         .array => self.as(Array).deepCopy(vm).asObj(),
-        // TODO:
-        .enum_instance, .@"error", .union_instance => @panic("TODO"),
+        .@"error", .union_instance => self.as(UnionInstance).deepCopy(vm).asObj(),
         .instance => self.as(Instance).deepCopy(vm).asObj(),
         // Immutable, shallow copy ok
-        .box, .closure, .function, .iterator, .extern_fn, .native_zfn, .native_obj, .string, .trait_obj, .pointer => self,
+        .box, .closure, .enum_instance, .function, .iterator, .extern_fn, .native_zfn, .native_obj, .string, .trait_obj, .pointer => self,
     };
 }
 
@@ -923,7 +941,7 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
         .array => self.as(Array).deinit(vm),
         .box => self.as(Box).deinit(vm),
         .closure => self.as(Closure).deinit(vm),
-        .enum_instance, .@"error" => self.as(EnumInstance).deinit(vm),
+        .enum_instance => self.as(EnumInstance).deinit(vm),
         .function => {
             const function = self.as(Function);
             function.deinit(vm);
@@ -951,7 +969,7 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
         .pointer => self.as(Pointer).deinit(vm),
         .string => self.as(String).deinit(vm.gc_alloc),
         .trait_obj => self.as(TraitObj).deinit(vm),
-        .union_instance => self.as(UnionInstance).deinit(vm),
+        .@"error", .union_instance => self.as(UnionInstance).deinit(vm),
     }
 }
 pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {

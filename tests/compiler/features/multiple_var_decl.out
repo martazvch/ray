@@ -18,11 +18,7 @@ load_const index 7, value 5
 load_const index 8, value 6
 load_const index 9, value 7
 
-load_const index 4, value 1
-load_const index 10, value 56
-load_const index 11, value 2
-sub_int
-mul_int
+load_const index 12, value 54
 call index 0, arity 0, add
 
 ret_naked

@@ -2,11 +2,8 @@
     [Print]
         [If]
         - condition:
-            [Binop type: or]
-                [Constant index 0]
-                    [Bool true]
-                [Constant index 1]
-                    [Bool false]
+            [Constant index 0]
+                [Bool true]
         - then:
             [Constant index 3]
                 [Int 1]

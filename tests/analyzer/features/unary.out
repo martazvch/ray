@@ -12,6 +12,5 @@
             [Constant index 4]
                 [Int -5]
     [Pop]
-        [Unary tilde]
-            [Constant index 5]
-                [Int 65535]
+        [Constant index 6]
+            [Int -65536]

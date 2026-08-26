@@ -126,21 +126,19 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .get_capt_frame => self.indexInstruction(writer, name, offset),
         .get_capt_local => self.indexInstruction(writer, name, offset),
         .get_field => self.getMember(writer, name, offset),
-        .get_field_cow => self.getMember(writer, name, offset),
         .get_field_native => self.getMember(writer, name, offset),
         .get_global => self.getGlobal(writer, false, false, offset),
-        .get_global_cow => self.getGlobal(writer, true, false, offset),
-        .get_global_ext => self.getGlobal(writer, false, true, offset),
+        .get_global_dup => self.getGlobal(writer, false, true, offset),
+        .get_global_ext => self.getGlobal(writer, true, false, offset),
         .get_local => self.indexInstruction(writer, name, offset),
-        .get_local_cow => self.indexInstruction(writer, name, offset),
+        .get_local_dup => self.indexInstruction(writer, name, offset),
         .get_enum_tag => self.simpleInstruction(writer, name, offset),
         .get_union_tag => self.simpleInstruction(writer, name, offset),
         .gt_float => self.simpleInstruction(writer, name, offset),
         .gt_int => self.simpleInstruction(writer, name, offset),
-        .incr_ref => self.simpleInstruction(writer, name, offset),
         .index_arr => self.simpleInstruction(writer, name, offset),
+        .index_arr_dup => self.simpleInstruction(writer, name, offset),
         .index_range_arr => self.simpleInstruction(writer, name, offset),
-        .index_arr_cow => self.simpleInstruction(writer, name, offset),
         .index_range_str => self.simpleInstruction(writer, name, offset),
         .index_str => self.simpleInstruction(writer, name, offset),
         .in_array => self.simpleInstruction(writer, name, offset),
@@ -305,15 +303,10 @@ fn arrayNew(self: *Self, writer: *Writer, offset: usize) Writer.Error!usize {
     return offset + 1 + len.bytes + 2;
 }
 
-fn getGlobal(self: *Self, writer: *Writer, cow: bool, ext: bool, offset: usize) Writer.Error!usize {
+fn getGlobal(self: *Self, writer: *Writer, ext: bool, dup: bool, offset: usize) Writer.Error!usize {
     const index = self.chunk.code.items[offset + 1];
     const module = if (ext) self.chunk.code.items[offset + 2] else self.module.toInt();
-    const text = if (cow)
-        "get_global_cow"
-    else if (ext)
-        "get_global_ext"
-    else
-        "get_global";
+    const text = if (ext) "get_global_ext" else if (dup) "get_global_dup" else "get_global";
 
     if (self.render_mode == .@"test") {
         if (ext) {
