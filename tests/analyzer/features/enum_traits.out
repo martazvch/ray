@@ -31,7 +31,7 @@
                 1
     [Field access 1]
         [Variable index: 0, scope: local]
-    [Invoke symbol 1]
+    [Call symbol 1]
     [Variable declaration index: 1, scope: local]
         [Incr rc]
             [Trait object]
@@ -41,4 +41,4 @@
                 0
     [Field access 0]
         [Variable index: 1, scope: local]
-    [Invoke virtual 0]
+    [Call virtual 0]

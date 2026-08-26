@@ -21,6 +21,7 @@ pub const ParserMsg = union(enum) {
     expect_expr: struct { found: []const u8 },
     expect_field_type_or_default,
     expect_fn_end_container: struct { kind: []const u8 },
+    expect_fn_name,
     expect_identifier_for_binding,
     expect_in,
     expect_name: struct { name: []const u8 },
@@ -93,6 +94,7 @@ pub const ParserMsg = union(enum) {
             .expect_expr => |e| writer.print("expected expression, found \"{s}\"", .{e.found}),
             .expect_field_type_or_default => writer.writeAll("structure fileds must be typed or have a default value"),
             .expect_fn_end_container => writer.writeAll("expect functions declaration or nothing"),
+            .expect_fn_name => writer.writeAll("expect function's name"),
             .expect_identifier_for_binding => writer.writeAll("expect an identifier to bind the curretn value of the loop"),
             .expect_in => writer.writeAll("expect 'in' keyword to declare the 'for' loop"),
             .expect_name => |e| writer.print("expect {s}'s name", .{e.name}),
@@ -184,6 +186,7 @@ pub const ParserMsg = union(enum) {
             .expect_paren_after_fn_params => writer.writeAll("add an closing parenthesis ')' between function's parameters and return type"),
             .expect_field_type_or_default => writer.writeAll("add a type to the field like: 'field: type' or add a default value like: 'field = value'"),
             .expect_fn_end_container => |e| writer.print("a {s} must end its declaration with functions, nothing more", .{e.kind}),
+            .expect_fn_name => writer.writeAll("function's name can be any identifier or the tokens '-', '+', '*' and '/' for operator overloading"),
             .expect_name => writer.writeAll("define an identifier after keyword"),
             .expect_identifier_for_binding, .expect_in => writer.writeAll(
                 "'for' loop syntax is: for <identifier> in <expression> { ... }",

@@ -1,4 +1,4 @@
-expect_name, function
+expect_fn_name
 expect_paren_after_fn_name
 expect_name, parameter
 expect_name, parameter

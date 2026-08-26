@@ -7,4 +7,4 @@
     [Print]
         [Field access 3]
             [Variable index: 0, scope: local]
-        [Invoke Zig symbol 3 module 0]
+        [Call Zig symbol 3 module 0]

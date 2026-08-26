@@ -119,7 +119,7 @@
     [Print]
         [Field access 1]
             [Variable index: 0, scope: local]
-        [Invoke symbol 1]
+        [Call symbol 1]
             - args
             [Default param constant index 4]
     [Print]

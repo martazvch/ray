@@ -332,8 +332,7 @@ fn enumTag(self: *Self) Error!Ast.EnumDecl.Tag {
 }
 
 fn fnDecl(self: *Self, is_extern: bool) Error!Node {
-    try self.expect(.identifier, .expectName("function"));
-    const name = self.token_idx - 1;
+    const name = try self.expectFnName();
 
     try self.expect(.left_paren, .expect_paren_after_fn_name);
     self.skipNewLines();
@@ -369,6 +368,19 @@ fn fnDecl(self: *Self, is_extern: bool) Error!Node {
         .is_closure = false,
         .is_extern = is_extern,
     } };
+}
+
+fn expectFnName(self: *Self) Error!TokenIndex {
+    if (self.match(.identifier) or
+        self.match(.minus) or
+        self.match(.plus) or
+        self.match(.star) or
+        self.match(.slash))
+    {
+        return self.token_idx - 1;
+    }
+
+    return self.errAtCurrent(.expect_fn_name);
 }
 
 fn fnParams(self: *Self, is_closure: bool) Error![]Ast.VarDecl {

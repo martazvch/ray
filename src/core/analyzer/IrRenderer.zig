@@ -268,36 +268,14 @@ fn call(self: *Self, data: *const Instruction.Call) void {
             self.parseInstr(data.callee);
 
             if (f.kind == .function) {
-                if (data.module != self.module) {
-                    switch (data.kind) {
-                        .@"extern" => self.indentAndPrintSlice("[Invoke extern symbol {} module {}]", .{ f.index, data.module.toInt() }),
-                        .zig, .zig_method => self.indentAndPrintSlice("[Invoke Zig symbol {} module {}]", .{ f.index, data.module.toInt() }),
-                        else => self.indentAndPrintSlice("[Invoke symbol {} module {}]", .{ f.index, data.module.toInt() }),
-                    }
-                } else switch (data.kind) {
-                    .@"extern" => self.indentAndPrintSlice("[Invoke extern symbol {}]", .{f.index}),
-                    .zig, .zig_method => self.indentAndPrintSlice("[Invoke Zig symbol {}]", .{f.index}),
-                    else => self.indentAndPrintSlice("[Invoke symbol {}]", .{f.index}),
-                }
+                self.callSymbol(data, f.index, data.module);
             } else if (f.kind == .virtual) {
-                self.indentAndPrintSlice("[Invoke virtual {}]", .{f.index});
+                self.indentAndPrintSlice("[Call virtual {}]", .{f.index});
             } else if (f.kind == .field) {
-                self.indentAndPrintSlice("[Invoke field {}]", .{f.index});
+                self.indentAndPrintSlice("[Call field {}]", .{f.index});
             }
         },
-        .load_symbol => |sym| {
-            if (sym.module != self.module) {
-                switch (data.kind) {
-                    .@"extern" => self.indentAndPrintSlice("[Call extern symbol {} module {}]", .{ sym.symbol, sym.module.toInt() }),
-                    .zig, .zig_method => self.indentAndPrintSlice("[Call Zig symbol {} module {}]", .{ sym.symbol, sym.module.toInt() }),
-                    else => self.indentAndPrintSlice("[Call symbol {} module {}]", .{ sym.symbol, sym.module.toInt() }),
-                }
-            } else switch (data.kind) {
-                .@"extern" => self.indentAndPrintSlice("[Call extern symbol {}]", .{sym.symbol}),
-                .zig, .zig_method => self.indentAndPrintSlice("[Call Zig symbol {}]", .{sym.symbol}),
-                else => self.indentAndPrintSlice("[Call symbol {}]", .{sym.symbol}),
-            }
-        },
+        .load_symbol => |sym| self.callSymbol(data, sym.symbol, sym.module),
         .identifier => {
             self.indentAndAppendSlice(switch (data.kind) {
                 .@"extern" => "[Extern fn call]",
@@ -320,6 +298,20 @@ fn call(self: *Self, data: *const Instruction.Call) void {
     self.indent_level += 1;
     defer self.indent_level -= 1;
     self.argsList("param", data.args);
+}
+
+fn callSymbol(self: *Self, data: *const Instruction.Call, index: usize, module: ModIndex) void {
+    if (module != self.module) {
+        switch (data.kind) {
+            .@"extern" => self.indentAndPrintSlice("[Call extern symbol {} module {}]", .{ index, module.toInt() }),
+            .zig, .zig_method => self.indentAndPrintSlice("[Call Zig symbol {} module {}]", .{ index, module.toInt() }),
+            else => self.indentAndPrintSlice("[Call symbol {} module {}]", .{ index, module.toInt() }),
+        }
+    } else switch (data.kind) {
+        .@"extern" => self.indentAndPrintSlice("[Call extern symbol {}]", .{index}),
+        .zig, .zig_method => self.indentAndPrintSlice("[Call Zig symbol {}]", .{index}),
+        else => self.indentAndPrintSlice("[Call symbol {}]", .{index}),
+    }
 }
 
 fn argsList(self: *Self, kind: []const u8, args: []const Instruction.Arg) void {

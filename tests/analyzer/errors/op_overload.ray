@@ -1,0 +1,22 @@
+struct Vec2 {
+    x, y: int,
+
+    fn +(self, other, other2: Self) -> Self {
+        return .{
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+
+    fn -(self) -> Self {
+        return .{
+            x: self.x,
+            y: self.y,
+        }
+    }
+
+    fn *(self, other: Self) {}
+}
+
+fn main() {}
+

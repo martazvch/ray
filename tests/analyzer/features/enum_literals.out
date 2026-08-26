@@ -57,7 +57,7 @@
     [Print]
         [Field access 0]
             [Variable index: 0, scope: local]
-        [Invoke symbol 0]
+        [Call symbol 0]
 [Function declaration markerStuff2]
     - default params
     [Constant index 6]
@@ -70,7 +70,7 @@
     [Print]
         [Field access 0]
             [Variable index: 0, scope: local]
-        [Invoke symbol 0]
+        [Call symbol 0]
 [Function declaration getMarker, returns]
     [Return]
         [Constant index 6]

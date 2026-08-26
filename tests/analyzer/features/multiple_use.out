@@ -130,7 +130,7 @@
                 [Int 90]
     [Field access 1]
         [Variable index: 0, scope: local]
-    [Invoke symbol 1 module 4]
+    [Call symbol 1 module 4]
     [Variable declaration index: 1, scope: local]
         [Structure literal]
             - structure
@@ -172,7 +172,7 @@
                     [String local import]
         [Field access 1]
             [Variable index: 0, scope: local]
-        [Invoke symbol 1 module 4]
+        [Call symbol 1 module 4]
         [Print]
             [Call symbol 0 module 5]
                 - args
@@ -183,12 +183,12 @@
     [Variable declaration index: 3, scope: local]
         [Field access 3]
             [Variable index: 1, scope: local]
-        [Invoke symbol 3 module 4]
+        [Call symbol 3 module 4]
             - args
             [Variable index: 0, scope: local]
     [Field access 1]
         [Variable index: 3, scope: local]
-    [Invoke symbol 1 module 4]
+    [Call symbol 1 module 4]
     [Print]
         [Field access 0]
             [Field access 1]

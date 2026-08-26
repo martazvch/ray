@@ -43,7 +43,7 @@
         [Function declaration method1]
             [Field access 10]
                 [Variable index: 0, scope: local]
-            [Invoke symbol 10]
+            [Call symbol 10]
 [Structure declaration Baz]
     - traits
         Foo, vtable 1:
@@ -84,7 +84,7 @@
         [Function declaration method1]
             [Field access 16]
                 [Variable index: 0, scope: local]
-            [Invoke symbol 16]
+            [Call symbol 16]
 [Function declaration main]
     [Call symbol 9]
     [Call symbol 14]
@@ -114,4 +114,4 @@
             [Load symbol 0]
     [Field access 11]
         [Variable index: 0, scope: local]
-    [Invoke symbol 11]
+    [Call symbol 11]

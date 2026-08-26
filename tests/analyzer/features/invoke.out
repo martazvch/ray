@@ -28,11 +28,11 @@
         [Null]
     [Field access 0]
         [Variable index: 0, scope: local]
-    [Invoke symbol 0]
+    [Call symbol 0]
     [Discard]
         [Field access 1]
             [Variable index: 0, scope: local]
-        [Invoke symbol 1]
+        [Call symbol 1]
             - args
             [Constant index 5]
                 [Int 10]

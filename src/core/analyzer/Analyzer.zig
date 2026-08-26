@@ -139,6 +139,10 @@ cached_names: struct {
     Self: usize,
     init: usize,
     IsEnum: usize,
+    minus: usize,
+    plus: usize,
+    star: usize,
+    slash: usize,
 },
 
 pub fn init(io: std.Io, alloc: Allocator, state: *State) Self {
@@ -167,6 +171,10 @@ pub fn init(io: std.Io, alloc: Allocator, state: *State) Self {
             .Self = state.interner.intern("Self"),
             .init = state.interner.intern("init"),
             .IsEnum = state.interner.intern("IsEnum"),
+            .minus = state.interner.intern("-"),
+            .plus = state.interner.intern("+"),
+            .star = state.interner.intern("*"),
+            .slash = state.interner.intern("/"),
         },
     };
 }
@@ -315,7 +323,7 @@ fn containerFnDecls(
 
     for (decls) |*f| {
         const fn_name = self.internToken(f.name);
-        const fn_res = try self.fnDeclaration(f, ctx);
+        const fn_res = self.fnDeclaration(f, ctx) catch continue;
         func_instrs.appendAssumeCapacity(fn_res.instr);
         funcs.putAssumeCapacity(fn_name, fn_res.sym);
     }
@@ -653,6 +661,8 @@ fn endRayFnDecl(
 
     if (name == self.cached_names.main and self.scope.isGlobal()) {
         self.main = sym_index;
+    } else if (self.isOpOverloadFn(name)) {
+        try self.validateOverloadedOperatorFn(ty, span);
     }
 
     return .{
@@ -670,6 +680,26 @@ fn endRayFnDecl(
         ),
         .sym = self.scope.getSymbol(name).?.*,
     };
+}
+
+fn isOpOverloadFn(self: *const Self, name: InternerIdx) bool {
+    return name == self.cached_names.minus or
+        name == self.cached_names.plus or
+        name == self.cached_names.star or
+        name == self.cached_names.slash;
+}
+
+fn validateOverloadedOperatorFn(self: *Self, ty: *const Type, span: Span) Error!void {
+    const fn_type = &ty.function;
+
+    if (fn_type.params.count() != 2) return self.err(
+        .{ .op_overload_arg_count = .{ .expect = 2, .found = fn_type.params.count() } },
+        span,
+    );
+    if (fn_type.return_type.is(.void)) return self.err(
+        .op_overload_void_return,
+        span,
+    );
 }
 
 fn endExternFnDecl(
@@ -841,7 +871,6 @@ fn fnBody(
     var returns = false;
     const len = nodes.len;
 
-    // var instrs: ArrayList(InstrIndex) = .empty;
     body_instrs.ensureTotalCapacity(self.alloc, nodes.len) catch oom();
 
     for (nodes, 0..) |*n, i| {
@@ -1536,7 +1565,7 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
     const prev_eq = ctx.setAndGetPrevious(.in_eq, expr.op == .equal_equal or expr.op == .bang_bang);
     defer ctx.in_eq = prev_eq;
 
-    const rhs = try self.analyzeExpr(expr.rhs, .value, ctx);
+    var rhs = try self.analyzeExpr(expr.rhs, .value, ctx);
 
     const lhs_type = lhs.type;
     const rhs_type = rhs.type;
@@ -1566,6 +1595,10 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
     const op: Instr.Binop.Op, const lhs_instr, const rhs_instr, const ty = instr: {
         switch (expr.op) {
             .plus, .slash, .star, .minus, .modulo => {
+                if (self.overloadedBinop(expr.op, lhs, &rhs, lhs_span, rhs_span)) |ovreloaded| {
+                    return ovreloaded;
+                }
+
                 const lhs_instr, const rhs_instr, const ty = self.binopArithmeticCoercion(lhs, rhs) catch |e| return switch (e) {
                     error.NonNumLsh => self.err(.{ .invalid_arithmetic = .{ .found = self.typeName(lhs.type) } }, lhs_span),
                     error.NonNumRhs => self.err(.{ .invalid_arithmetic = .{ .found = self.typeName(rhs.type) } }, rhs_span),
@@ -1684,6 +1717,48 @@ fn getArithmeticOp(op: TokenTag, ty: *const Type) Instr.Binop.Op {
         .greater_equal => if (ty.is(.int)) .ge_int else .ge_float,
         else => unreachable,
     };
+}
+
+fn overloadedBinop(self: *Self, op: TokenTag, lhs: InstrInfos, rhs: *InstrInfos, lhs_span: Span, rhs_span: Span) ?Result {
+    const struct_type = lhs.type.as(.structure) orelse return null;
+
+    const op_name = switch (op) {
+        .minus => self.cached_names.minus,
+        .plus => self.cached_names.plus,
+        .star => self.cached_names.star,
+        .slash => self.cached_names.slash,
+        else => unreachable,
+    };
+
+    if (struct_type.functions.getPtr(op_name)) |f| {
+        const fn_type = &f.type.function;
+        var args = ArrayList(Instr.Arg).initCapacity(self.alloc, 2) catch oom();
+        args.appendAssumeCapacity(.{ .instr = lhs.instr });
+        args.appendAssumeCapacity(.{ .instr = rhs.instr });
+
+        _ = try self.performTypeCoercion(fn_type.params.values()[1].type, rhs, false, rhs_span);
+
+        return .{
+            .type = fn_type.return_type,
+            .ti = .{ .ext_mod = lhs.ti.ext_mod },
+            .instr = self.irb.addInstr(
+                .{
+                    .call = .{
+                        .callee = self.irb.addInstr(
+                            .{ .load_symbol = .{ .symbol = @intCast(f.index), .module = f.module } },
+                            lhs_span.start,
+                        ),
+                        .args = args.toOwnedSlice(self.alloc) catch oom(),
+                        .module = self.getExtModOrCurrent(lhs.ti.ext_mod),
+                        .kind = f.type.function.kind,
+                    },
+                },
+                lhs_span.start,
+            ),
+        };
+    }
+
+    return null;
 }
 
 fn getBinaryArithmeticOp(op: TokenTag) Instr.Binop.Op {

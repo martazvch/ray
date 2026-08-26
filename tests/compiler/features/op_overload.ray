@@ -1,0 +1,41 @@
+struct Vec2 {
+    x, y: int,
+
+    fn +(self, other: Self) -> Self {
+        return .{
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+
+    fn -(self, other: Self) -> Self {
+        return .{
+            x: self.x - other.x,
+            y: self.y - other.y,
+        }
+    }
+
+    fn *(self, other: Self) -> Self {
+        return .{
+            x: self.x * other.x,
+            y: self.y * other.y,
+        }
+    }
+
+    fn /(self, other: Self) -> Self {
+        return .{
+            x: self.x / other.x,
+            y: self.y / other.y,
+        }
+    }
+}
+
+fn main() {
+    let v1 = Vec2{ x: 4, y: 12 }
+    let v2 = Vec2{ x: 2, y: 4 }
+
+    let add = v1 + v2
+    let sub = v1 - v2
+    let mul = v1 * v2
+    let div = v1 / v2
+}
