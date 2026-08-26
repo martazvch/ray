@@ -143,6 +143,7 @@ cached_names: struct {
     plus: usize,
     star: usize,
     slash: usize,
+    minus_unary: usize,
 },
 
 pub fn init(io: std.Io, alloc: Allocator, state: *State) Self {
@@ -175,6 +176,7 @@ pub fn init(io: std.Io, alloc: Allocator, state: *State) Self {
             .plus = state.interner.intern("+"),
             .star = state.interner.intern("*"),
             .slash = state.interner.intern("/"),
+            .minus_unary = state.interner.intern("-."),
         },
     };
 }
@@ -322,10 +324,9 @@ fn containerFnDecls(
     func_instrs.ensureTotalCapacity(self.alloc, decls.len) catch oom();
 
     for (decls) |*f| {
-        const fn_name = self.internToken(f.name);
         const fn_res = self.fnDeclaration(f, ctx) catch continue;
         func_instrs.appendAssumeCapacity(fn_res.instr);
-        funcs.putAssumeCapacity(fn_name, fn_res.sym);
+        funcs.putAssumeCapacity(fn_res.sym.name, fn_res.sym);
     }
 
     return func_instrs.toOwnedSlice(self.alloc) catch oom();
@@ -601,7 +602,16 @@ fn enumDescriminant(self: *Self, tag: Ast.EnumDecl.Tag, ctx: *Context) Error!?Di
 const FnDeclRes = struct { instr: usize, sym: LexScope.Symbol };
 
 fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDeclRes {
-    const name = self.internToken(node.name);
+    const name_text = name: {
+        if (self.ast.token_tags[node.name] == .minus)
+            break :name if (node.params.len == 1)
+                "-."
+            else
+                "-"
+        else
+            break :name self.ast.toSource(node.name);
+    };
+    const name = self.interner.intern(name_text);
 
     var buf: [1024]u8 = undefined;
     const container_name = self.interner.internKeepRef(self.alloc, self.containers.render(&buf, .{ .sep = "." }));
@@ -611,7 +621,7 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
     const sym_index = try self.declareSymbol(name, interned, self.ast.getSpan(node.name));
     self.scope.open(self.alloc, null, .{ .barrier = true });
 
-    self.containers.append(self.alloc, self.ast.toSource(node.name));
+    self.containers.append(self.alloc, name_text);
     defer _ = self.containers.pop();
 
     if (node.is_extern) {
@@ -662,7 +672,7 @@ fn endRayFnDecl(
     if (name == self.cached_names.main and self.scope.isGlobal()) {
         self.main = sym_index;
     } else if (self.isOpOverloadFn(name)) {
-        try self.validateOverloadedOperatorFn(ty, span);
+        try self.validateOverloadedOperatorFn(ty, name, span);
     }
 
     return .{
@@ -684,16 +694,18 @@ fn endRayFnDecl(
 
 fn isOpOverloadFn(self: *const Self, name: InternerIdx) bool {
     return name == self.cached_names.minus or
+        name == self.cached_names.minus_unary or
         name == self.cached_names.plus or
         name == self.cached_names.star or
         name == self.cached_names.slash;
 }
 
-fn validateOverloadedOperatorFn(self: *Self, ty: *const Type, span: Span) Error!void {
+fn validateOverloadedOperatorFn(self: *Self, ty: *const Type, name: InternerIdx, span: Span) Error!void {
     const fn_type = &ty.function;
 
-    if (fn_type.params.count() != 2) return self.err(
-        .{ .op_overload_arg_count = .{ .expect = 2, .found = fn_type.params.count() } },
+    const expect: usize = if (name == self.cached_names.minus_unary) 1 else 2;
+    if (fn_type.params.count() != expect) return self.err(
+        .{ .op_overload_arg_count = .{ .expect = expect, .found = fn_type.params.count() } },
         span,
     );
     if (fn_type.return_type.is(.void)) return self.err(
@@ -1729,36 +1741,33 @@ fn overloadedBinop(self: *Self, op: TokenTag, lhs: InstrInfos, rhs: *InstrInfos,
         .slash => self.cached_names.slash,
         else => unreachable,
     };
+    const op_fn = struct_type.functions.getPtr(op_name) orelse return null;
 
-    if (struct_type.functions.getPtr(op_name)) |f| {
-        const fn_type = &f.type.function;
-        var args = ArrayList(Instr.Arg).initCapacity(self.alloc, 2) catch oom();
-        args.appendAssumeCapacity(.{ .instr = lhs.instr });
-        args.appendAssumeCapacity(.{ .instr = rhs.instr });
+    const fn_type = &op_fn.type.function;
+    var args = ArrayList(Instr.Arg).initCapacity(self.alloc, 2) catch oom();
+    args.appendAssumeCapacity(.{ .instr = lhs.instr });
+    args.appendAssumeCapacity(.{ .instr = rhs.instr });
 
-        _ = try self.performTypeCoercion(fn_type.params.values()[1].type, rhs, false, rhs_span);
+    _ = try self.performTypeCoercion(fn_type.params.values()[1].type, rhs, false, rhs_span);
 
-        return .{
-            .type = fn_type.return_type,
-            .ti = .{ .ext_mod = lhs.ti.ext_mod },
-            .instr = self.irb.addInstr(
-                .{
-                    .call = .{
-                        .callee = self.irb.addInstr(
-                            .{ .load_symbol = .{ .symbol = @intCast(f.index), .module = f.module } },
-                            lhs_span.start,
-                        ),
-                        .args = args.toOwnedSlice(self.alloc) catch oom(),
-                        .module = self.getExtModOrCurrent(lhs.ti.ext_mod),
-                        .kind = f.type.function.kind,
-                    },
+    return .{
+        .type = fn_type.return_type,
+        .ti = .{ .ext_mod = lhs.ti.ext_mod },
+        .instr = self.irb.addInstr(
+            .{
+                .call = .{
+                    .callee = self.irb.addInstr(
+                        .{ .load_symbol = .{ .symbol = @intCast(op_fn.index), .module = op_fn.module } },
+                        lhs_span.start,
+                    ),
+                    .args = args.toOwnedSlice(self.alloc) catch oom(),
+                    .module = self.getExtModOrCurrent(lhs.ti.ext_mod),
+                    .kind = fn_type.kind,
                 },
-                lhs_span.start,
-            ),
-        };
-    }
-
-    return null;
+            },
+            lhs_span.start,
+        ),
+    };
 }
 
 fn getBinaryArithmeticOp(op: TokenTag) Instr.Binop.Op {
@@ -3695,8 +3704,13 @@ fn unary(self: *Self, expr: *const Ast.Unary, ctx: *Context) Result {
     if (op == .not and !ty.is(.bool)) {
         return self.err(.{ .invalid_unary = .{ .found = self.typeName(ty) } }, span);
     }
-    if (op == .minus and !ty.isNumeric()) {
-        return self.err(.{ .invalid_arithmetic = .{ .found = self.typeName(ty) } }, span);
+    if (op == .minus) {
+        if (!ty.isNumeric()) {
+            if (self.overloadedUnary(rhs, span)) |ovreloaded| {
+                return ovreloaded;
+            }
+            return self.err(.{ .invalid_arithmetic = .{ .found = self.typeName(ty) } }, span);
+        }
     }
 
     return .{
@@ -3709,6 +3723,34 @@ fn unary(self: *Self, expr: *const Ast.Unary, ctx: *Context) Result {
                 .instr = rhs.instr,
             } },
             span.start,
+        ),
+    };
+}
+
+fn overloadedUnary(self: *Self, rhs: InstrInfos, rhs_span: Span) ?Result {
+    const struct_type = rhs.type.as(.structure) orelse return null;
+    const op_fn = struct_type.functions.getPtr(self.cached_names.minus_unary) orelse return null;
+    const fn_type = &op_fn.type.function;
+
+    var args = ArrayList(Instr.Arg).initCapacity(self.alloc, 1) catch oom();
+    args.appendAssumeCapacity(.{ .instr = rhs.instr });
+
+    return .{
+        .type = fn_type.return_type,
+        .ti = .{ .ext_mod = rhs.ti.ext_mod },
+        .instr = self.irb.addInstr(
+            .{
+                .call = .{
+                    .callee = self.irb.addInstr(
+                        .{ .load_symbol = .{ .symbol = @intCast(op_fn.index), .module = op_fn.module } },
+                        rhs_span.start,
+                    ),
+                    .args = args.toOwnedSlice(self.alloc) catch oom(),
+                    .module = self.getExtModOrCurrent(rhs.ti.ext_mod),
+                    .kind = fn_type.kind,
+                },
+            },
+            rhs_span.start,
         ),
     };
 }

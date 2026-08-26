@@ -31,6 +31,18 @@
                         [Variable index: 0, scope: local]
                     [Field access 1]
                         [Variable index: 1, scope: local]
+    [Function declaration -., returns]
+        [Return]
+            [Structure literal]
+                - structure
+                [Load symbol 0]
+                - args
+                [Unary minus]
+                    [Field access 0]
+                        [Variable index: 0, scope: local]
+                [Unary minus]
+                    [Field access 1]
+                        [Variable index: 0, scope: local]
     [Function declaration *, returns]
         [Return]
             [Structure literal]
@@ -93,12 +105,16 @@
             [Variable index: 0, scope: local]
             [Variable index: 1, scope: local]
     [Variable declaration index: 4, scope: local]
-        [Call symbol 2]
-            - args
-            [Variable index: 0, scope: local]
-            [Variable index: 1, scope: local]
-    [Variable declaration index: 5, scope: local]
         [Call symbol 3]
             - args
             [Variable index: 0, scope: local]
             [Variable index: 1, scope: local]
+    [Variable declaration index: 5, scope: local]
+        [Call symbol 4]
+            - args
+            [Variable index: 0, scope: local]
+            [Variable index: 1, scope: local]
+    [Variable declaration index: 6, scope: local]
+        [Call symbol 2]
+            - args
+            [Variable index: 0, scope: local]
