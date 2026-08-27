@@ -169,3 +169,13 @@ imported method
 180
 true
 false
+
+// Complex
+8
+<enum Buz.bb>
+[5, 6]
+
+65
+<enum Buz.aa>
+[5, 6]
+

@@ -916,6 +916,9 @@ fn fnBody(
 
 /// Kind has to be either `param` or `field`
 fn defaultValue(self: *Self, decl_type: *const Type, val: *const Expr, kind: anytype, ctx: *Context) Error!struct { InstrInfos, ?ConstIdx } {
+    const prev_decl = ctx.setAndGetPrevious(.decl_type, decl_type);
+    defer ctx.decl_type = prev_decl;
+
     var value_res = try self.analyzeExpr(val, .value, ctx);
     value_res.type = try self.performTypeCoercion(decl_type, &value_res, false, self.ast.getSpan(val));
 

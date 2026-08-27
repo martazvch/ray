@@ -19,9 +19,9 @@ fn copy(a = 5) -> int {
 
 fn default(c: str, a, b = 7, d, e: bool=false) { }
 
-struct Foo { a: int }
+struct Baz { a: int }
 enum Bar { aa, bb }
-fn complexDefault(a: Foo = .{ a: 8 }, bar: Bar = .bb, arr: []int = [5, 6]) {
+fn complexDefault(a: Baz = .{ a: 8 }, bar: Bar = .bb, arr: []int = [5, 6]) {
 
 }
 

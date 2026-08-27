@@ -41,6 +41,14 @@ struct Foo {
     }
 }
 
+struct Baz { a: int }
+enum Buz { aa, bb }
+fn complexDefault(baz: Baz = .{ a: 8 }, buz: Buz = .bb, arr: []int = [5, 6]) {
+    print baz.a
+    print buz
+    print arr
+}
+
 fn main() {
     // Free function
     function("first", 1, 2, 24.5)
@@ -92,5 +100,8 @@ fn main() {
     var imported = default_val.Def{}
     imported.method("imported method")
     imported.method("imported method", d: false, b: 180)
+
+    complexDefault()
+    complexDefault(buz: .aa, baz: .{a: 65})
 }
 
