@@ -2883,6 +2883,7 @@ fn variableIdentifier(self: *Self, name: InternerIdx, span: Span) ?VariableInstr
         .{ .identifier = .{ .index = variable.index + scope_offset, .scope = switch (variable.kind) {
             .local => .local,
             .global => .global,
+            .param => .param,
         } } },
         span.start,
     );
@@ -4525,6 +4526,7 @@ fn declareVariable(self: *Self, name: InternerIdx, ty: *const Type, conf: VarCon
         conf.constant,
         conf.comp_time,
         conf.ext_mod,
+        conf.is_fn_param,
     ) catch |e| switch (e) {
         error.TooManyLocals => self.err(.too_many_locals, span),
         error.AlreadyDeclared => switch (conf.is_fn_param) {

@@ -229,12 +229,13 @@ const Compiler = struct {
 
         // BUG: Protect the cast, we can't have more than 256 variable to lookup for now
         self.writeOpAndByte(
-            if (variable.scope == .local)
-                if (self.state.dup) .get_local_dup else .get_local
-            else if (variable.scope == .global)
-                if (self.state.dup) .get_global_dup else .get_global
-            else
-                unreachable,
+            switch (variable.scope) {
+                .local => if (self.state.dup) .get_local_dup else .get_local,
+                .global => if (self.state.dup) .get_global_dup else .get_global,
+                // Parameters are already copied before call
+                .param => .get_local,
+                .builtin => unreachable,
+            },
             @intCast(variable.index),
         );
     }
@@ -1182,7 +1183,7 @@ const Compiler = struct {
                 self.writeOpAndByte(.ptr_field, @intCast(f.index));
             },
             .variable => |v| switch (v.scope) {
-                .local => self.writeOpAndByte(.ptr_local, @intCast(v.index)),
+                .local, .param => self.writeOpAndByte(.ptr_local, @intCast(v.index)),
                 .global => self.writeOpAndByte(.ptr_global, @intCast(v.index)),
                 .builtin => unreachable,
             },

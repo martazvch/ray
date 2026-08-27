@@ -14,8 +14,8 @@ print
 ret_naked
 
 -- getVecFromPos --
-get_local_dup index 0
-get_local_dup index 1
+get_local index 0
+get_local index 1
 struct_lit index 0, arity 2, Vec2
 ret
 
@@ -28,7 +28,7 @@ load_const index 4, value 12
 ret
 
 -- getIntDef --
-get_local_dup index 0
+get_local index 0
 ret
 
 -- global scope --
@@ -39,13 +39,13 @@ exit_repl
 -- move --
 get_local index 0
 get_field_dup index 0
-get_local_dup index 1
+get_local index 1
 add_int
 get_local index 0
 set_field index 0
 get_local index 0
 get_field_dup index 1
-get_local_dup index 1
+get_local index 1
 add_int
 get_local index 0
 set_field index 1
@@ -95,14 +95,14 @@ exit_repl
 // ---- simple_str ----
 
 -- concat --
-get_local_dup index 0
-get_local_dup index 1
+get_local index 0
+get_local index 1
 str_cat
 ret
 
 -- quote --
 load_const index 3, value '
-get_local_dup index 0
+get_local index 0
 str_cat
 load_const index 3, value '
 str_cat

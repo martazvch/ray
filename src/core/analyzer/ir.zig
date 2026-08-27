@@ -2,7 +2,7 @@ const TagLit = @import("ConstantInterner.zig").Constant.TagLit;
 const ConstIdx = @import("ConstantInterner.zig").ConstIdx;
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
 
-pub const Scope = enum { builtin, global, local };
+pub const Scope = enum { builtin, global, local, param };
 pub const Type = enum(u2) { float, int };
 
 pub const Index = usize;

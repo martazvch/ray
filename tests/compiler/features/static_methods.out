@@ -1,13 +1,13 @@
 //---- test.ray ----
 
 -- new --
-get_local_dup index 0
+get_local index 0
 struct_lit index 0, arity 1, Vec1
 ret
 
 -- new --
-get_local_dup index 0
-get_local_dup index 1
+get_local index 0
+get_local index 1
 struct_lit index 2, arity 2, Vec2
 ret
 

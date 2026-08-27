@@ -14,8 +14,8 @@ print
 ret_naked
 
 -- getVecFromPos --
-get_local_dup index 0
-get_local_dup index 1
+get_local index 0
+get_local index 1
 struct_lit index 0, arity 2, Vec2
 ret
 
@@ -28,7 +28,7 @@ load_const index 4, value 12
 ret
 
 -- getIntDef --
-get_local_dup index 0
+get_local index 0
 ret
 
 -- global scope --

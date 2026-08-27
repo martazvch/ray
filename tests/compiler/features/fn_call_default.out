@@ -21,7 +21,7 @@ print
 ret_naked
 
 -- getInt --
-get_local_dup index 0
+get_local index 0
 ret
 
 -- global scope --

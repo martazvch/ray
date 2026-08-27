@@ -1,5 +1,5 @@
 -- failable --
-get_local_dup index 0
+get_local index 0
 load_const index 3, value 10
 lt_int
 jump_false 5 -> 15
@@ -9,7 +9,7 @@ ret
 pop
 jump 12 -> 33
 pop
-get_local_dup index 0
+get_local index 0
 load_const index 4, value 20
 gt_int
 jump_false 21 -> 32

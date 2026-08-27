@@ -5,7 +5,7 @@ ret_naked
 ret_naked
 
 -- add3 --
-get_local_dup index 0
+get_local index 0
 ret
 
 -- add4 --
@@ -13,10 +13,10 @@ ret_naked
 
 -- add5 --
 load_const index 3, value 1
-get_local_dup index 0
+get_local index 0
 get_local_dup index 2
 add_int
-get_local_dup index 1
+get_local index 1
 ret
 
 -- main --

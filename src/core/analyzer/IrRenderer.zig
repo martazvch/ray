@@ -439,8 +439,8 @@ fn identifier(self: *Self, data: Instruction.Variable) void {
             data.index, data.scope, mod.toInt(),
         });
     } else {
-        self.indentAndPrintSlice("[Variable index: {}, scope: {t}]", .{
-            data.index, data.scope,
+        self.indentAndPrintSlice("[Variable index: {}, scope: {s}]", .{
+            data.index, if (data.scope == .global) "global" else "local",
         });
     }
 }

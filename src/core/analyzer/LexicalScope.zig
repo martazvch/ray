@@ -21,7 +21,7 @@ const Self = @This();
 pub const Variable = struct {
     name: InternerIdx,
     type: *const Type,
-    kind: enum { local, global },
+    kind: enum { local, global, param },
     initialized: bool,
     used: bool = false,
     index: Index,
@@ -231,6 +231,7 @@ pub fn declareVar(
     constant: bool,
     comp_time: bool,
     ext_mode: ?ModIndex,
+    is_param: bool,
 ) Error!usize {
     const index = self.current.variables.count();
     if (index == 255 and !self.isGlobal()) {
@@ -240,7 +241,7 @@ pub fn declareVar(
     const variable: Variable = .{
         .name = name,
         .type = ty,
-        .kind = if (self.isGlobal()) .global else .local,
+        .kind = if (is_param) .param else if (self.isGlobal()) .global else .local,
         .initialized = initialized,
         .index = index,
         .captured = captured,

@@ -3,7 +3,7 @@ load_const index 4, value <instance of Point>
 ret
 
 -- getVec --
-get_local_dup index 0
+get_local index 0
 struct_lit index 1, arity 1, Vec2
 ret
 

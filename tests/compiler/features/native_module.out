@@ -17,7 +17,7 @@ ret_naked
 
 -- rayFunc --
 load_const index 3, value 2
-get_local_dup index 0
+get_local index 0
 mul_float
 call_extern index 1, arity 1, ret_arg
 ret

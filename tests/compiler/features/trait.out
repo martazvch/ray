@@ -4,13 +4,13 @@ print
 ret_naked
 
 -- withDefault --
-get_local_dup index 0
+get_local index 0
 load_const index 7, value 9
 eq_int
 ret
 
 -- withDefaultNoBody --
-get_local_dup index 0
+get_local index 0
 load_const index 8, value 2
 eq_int
 ret
@@ -36,7 +36,7 @@ print
 ret_naked
 
 -- withDefaultNoBody --
-get_local_dup index 0
+get_local index 0
 load_const index 9, value 5
 eq_int
 ret
@@ -47,7 +47,7 @@ print
 ret_naked
 
 -- withDefault --
-get_local_dup index 0
+get_local index 0
 load_const index 4, value 1
 eq_int
 ret
