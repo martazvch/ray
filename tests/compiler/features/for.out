@@ -83,11 +83,10 @@ load_const index 17, value -8
 range_new_int
 iter_new_range
 iter_next
-jump_null 125 -> 135
+jump_null 125 -> 134
 get_local index 3
-print
-pop
-loop 132 -> 124
+pop2
+loop 131 -> 124
 pop2
 
 ret_naked

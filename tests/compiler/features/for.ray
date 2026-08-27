@@ -31,6 +31,6 @@ fn main() {
     }
 
     for i in -8..-5 {
-        print i
+        let a = i
     }
 }

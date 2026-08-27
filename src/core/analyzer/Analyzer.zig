@@ -441,6 +441,7 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
         self.interner.intern("@iter"),
         undefined,
         false,
+        false,
         undefined,
     );
 
@@ -463,9 +464,9 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
     };
 
     if (index_interned) |interned| {
-        try self.forwardDeclareVariable(interned, self.ti.getCached(.int), false, self.ast.getSpan(node.index_binding.?));
+        try self.forwardDeclareVariable(interned, self.ti.getCached(.int), false, false, self.ast.getSpan(node.index_binding.?));
     }
-    try self.forwardDeclareVariable(binding, elem_type, false, self.ast.getSpan(node.binding));
+    try self.forwardDeclareVariable(binding, elem_type, false, true, self.ast.getSpan(node.binding));
 
     const prev_in_for = ctx.setAndGetPrevious(.in_for, true);
     defer ctx.in_for = prev_in_for;
@@ -2884,6 +2885,7 @@ fn variableIdentifier(self: *Self, name: InternerIdx, span: Span) ?VariableInstr
             .local => .local,
             .global => .global,
             .param => .param,
+            .iter => .iter,
         } } },
         span.start,
     );
@@ -3469,7 +3471,7 @@ fn pattern(self: *Self, pat: Ast.Pattern, ctx: *Context) Result {
             const value_res = try self.analyzeExpr(v.expr, .value, ctx);
             if (v.alias) |alias| {
                 const binding = self.internToken(alias);
-                _ = try self.forwardDeclareVariable(binding, value_res.type, false, self.ast.getSpan(alias));
+                _ = try self.forwardDeclareVariable(binding, value_res.type, false, false, self.ast.getSpan(alias));
             }
 
             return value_res;
@@ -3491,7 +3493,7 @@ fn nullablePattern(self: *Self, pat: Ast.Pattern.Nullable, ctx: *Context) Result
 
     // TODO: be sure that it's in the correct scope
     const binding = self.internToken(pat.binding);
-    _ = try self.forwardDeclareVariable(binding, ty, false, self.ast.getSpan(pat.binding));
+    _ = try self.forwardDeclareVariable(binding, ty, false, false, self.ast.getSpan(pat.binding));
 
     return .{
         .type = self.ti.cache.bool,
@@ -3798,7 +3800,7 @@ fn trapIdent(self: *Self, binding: Ast.Trap.Binding, err_type: Type.ErrorUnion, 
     if (binding.token) |token| {
         const err_name = self.internToken(token);
         const binding_span = self.ast.getSpan(token);
-        _ = try self.forwardDeclareVariable(err_name, err_type.err, false, binding_span);
+        _ = try self.forwardDeclareVariable(err_name, err_type.err, false, false, binding_span);
     }
     return self.analyzeExpr(binding.body, expect, ctx);
 }
@@ -4542,8 +4544,8 @@ fn declareVariable(self: *Self, name: InternerIdx, ty: *const Type, conf: VarCon
     };
 }
 
-fn forwardDeclareVariable(self: *Self, name: InternerIdx, ty: *const Type, captured: bool, span: Span) Error!void {
-    return self.scope.declareVarInFutureScope(self.alloc, name, ty, captured) catch self.err(.too_many_locals, span);
+fn forwardDeclareVariable(self: *Self, name: InternerIdx, ty: *const Type, captured: bool, is_iter: bool, span: Span) Error!void {
+    return self.scope.declareVarInFutureScope(self.alloc, name, ty, captured, is_iter) catch self.err(.too_many_locals, span);
 }
 
 fn openContainer(self: *Self, name: Ast.TokenIndex) Error!void {

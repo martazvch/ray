@@ -234,7 +234,8 @@ const Compiler = struct {
                 .global => if (self.state.dup) .get_global_dup else .get_global,
                 // Parameters are already copied before call
                 .param => .get_local,
-                .builtin => unreachable,
+                // Iterator is already copied by `next` method, so accessing it doesn't require a copy
+                .iter => .get_local,
             },
             @intCast(variable.index),
         );
@@ -1183,9 +1184,8 @@ const Compiler = struct {
                 self.writeOpAndByte(.ptr_field, @intCast(f.index));
             },
             .variable => |v| switch (v.scope) {
-                .local, .param => self.writeOpAndByte(.ptr_local, @intCast(v.index)),
+                .local, .param, .iter => self.writeOpAndByte(.ptr_local, @intCast(v.index)),
                 .global => self.writeOpAndByte(.ptr_global, @intCast(v.index)),
-                .builtin => unreachable,
             },
         }
     }

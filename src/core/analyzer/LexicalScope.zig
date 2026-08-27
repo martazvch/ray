@@ -21,7 +21,7 @@ const Self = @This();
 pub const Variable = struct {
     name: InternerIdx,
     type: *const Type,
-    kind: enum { local, global, param },
+    kind: enum { local, global, param, iter },
     initialized: bool,
     used: bool = false,
     index: Index,
@@ -259,14 +259,21 @@ pub fn declareVar(
     return index;
 }
 
-pub fn declareVarInFutureScope(self: *Self, allocator: Allocator, name: InternerIdx, ty: *const Type, captured: bool) error{TooManyLocals}!void {
+pub fn declareVarInFutureScope(
+    self: *Self,
+    allocator: Allocator,
+    name: InternerIdx,
+    ty: *const Type,
+    captured: bool,
+    is_iter: bool,
+) error{TooManyLocals}!void {
     const index = self.current.forwarded.count();
     if (index == 255) return error.TooManyLocals;
 
     self.current.forwarded.put(allocator, name, .{
         .name = name,
         .type = ty,
-        .kind = .local,
+        .kind = if (is_iter) .iter else .local,
         .initialized = true,
         .index = index,
         .captured = captured,
