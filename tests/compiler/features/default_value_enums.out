@@ -39,9 +39,7 @@ print
 ret_naked
 
 -- main --
-load_const index 3, value <enum Marker.cross>
-load_const index 6, value <enum Marker.circle>
-struct_lit index 0, arity 2, Cell
+load_const index 9, value <instance of Cell>
 get_local index 0
 get_field index 0
 print

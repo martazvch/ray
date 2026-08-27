@@ -71,7 +71,7 @@ pop2
 
 load_const index 3, value 0
 
-get_local index 0
+get_local_dup index 0
 load_const index 9, value 4
 lt_int
 jump_false 120 -> 130
@@ -80,7 +80,7 @@ loop 124 -> 115
 loop 127 -> 115
 pop
 
-get_local index 0
+get_local_dup index 0
 load_const index 9, value 4
 lt_int
 jump_false 136 -> 146
@@ -89,13 +89,13 @@ loop 140 -> 131
 loop 143 -> 131
 pop
 
-get_local index 0
+get_local_dup index 0
 load_const index 6, value 6
 lt_int
 jump_false 152 -> 179
 pop
 
-get_local index 0
+get_local_dup index 0
 load_const index 9, value 4
 lt_int
 jump_false 161 -> 175
@@ -109,13 +109,13 @@ pop
 loop 176 -> 147
 pop
 
-get_local index 0
+get_local_dup index 0
 load_const index 9, value 4
 lt_int
 jump_false 185 -> 215
 pop
 load_const index 7, value 1
-get_local index 0
+get_local_dup index 0
 load_const index 9, value 4
 lt_int
 jump_false 196 -> 210

@@ -1,12 +1,9 @@
 -- main --
 push_true
-jump_true 1 -> 6
-pop
-push_false
-jump_false 6 -> 15
+jump_false 1 -> 10
 pop
 load_const index 3, value 1
-jump 12 -> 18
+jump 7 -> 13
 pop
 load_const index 4, value 0
 print

@@ -1,163 +1,175 @@
 -- main --
 load_const index 3, value 1
-load_const index 4, value -2
+load_const index 4, value 2
+load_const index 5, value foo
+get_local_dup index 0
+get_local_dup index 0
+neg_int
 add_int
 pop
 
-load_const index 5, value 1
-load_const index 6, value -2
+get_local_dup index 1
+get_local_dup index 1
+neg_float
 add_float
 pop
 
-load_const index 7, value foo
-load_const index 8, value  bar
+get_local_dup index 2
+get_local_dup index 2
 str_cat
 pop
 
-load_const index 9, value 12.5
-load_const index 10, value -78.2
+get_local_dup index 1
+get_local_dup index 1
+neg_float
 sub_float
 pop
 
-load_const index 11, value 12
-load_const index 12, value -78
+get_local_dup index 0
+get_local_dup index 0
+neg_int
 sub_int
 pop
 
-load_const index 13, value 12
-load_const index 14, value -56
+get_local_dup index 1
+get_local_dup index 1
+neg_float
 mul_float
 pop
 
-load_const index 11, value 12
-load_const index 15, value -56
+get_local_dup index 0
+get_local_dup index 0
+neg_int
 mul_int
 pop
 
-load_const index 16, value 2
-load_const index 7, value foo
+get_local_dup index 0
+get_local_dup index 2
 str_mul
 pop
 
-load_const index 17, value 4
-load_const index 7, value foo
+get_local_dup index 0
+get_local_dup index 2
 str_mul
 pop
 
-load_const index 18, value 6.789
-load_const index 19, value -1
+get_local_dup index 1
+get_local_dup index 1
+neg_float
 div_float
 pop
 
-load_const index 20, value 6
-load_const index 21, value -1
+get_local_dup index 0
+get_local_dup index 0
+neg_int
 div_int
 pop
 
-load_const index 22, value 5
-load_const index 23, value 3
+get_local_dup index 0
+get_local_dup index 0
 gt_int
 pop
 
-load_const index 24, value 23
-load_const index 25, value 32
+get_local_dup index 1
+get_local_dup index 1
 gt_float
 pop
 
-load_const index 26, value 5
-load_const index 27, value 3
+get_local_dup index 1
+get_local_dup index 1
 ge_float
 pop
 
-load_const index 28, value 8
-load_const index 29, value 9
+get_local_dup index 0
+get_local_dup index 0
 ge_int
 pop
 
-load_const index 13, value 12
-load_const index 14, value -56
+get_local_dup index 1
+get_local_dup index 1
+neg_float
 lt_float
 pop
 
-load_const index 11, value 12
-load_const index 15, value -56
+get_local_dup index 0
+get_local_dup index 0
+neg_int
 lt_int
 pop
 
-load_const index 30, value 34
-load_const index 22, value 5
+get_local_dup index 0
+get_local_dup index 0
 le_int
 pop
 
-load_const index 31, value 34
-load_const index 26, value 5
+get_local_dup index 1
+get_local_dup index 1
 le_float
 pop
 
-load_const index 22, value 5
-load_const index 23, value 3
+get_local_dup index 0
+get_local_dup index 0
 eq_int
 pop
 
-load_const index 26, value 5
-load_const index 27, value 3
+get_local_dup index 1
+get_local_dup index 1
 eq_float
 pop
 
-load_const index 22, value 5
-load_const index 23, value 3
+get_local_dup index 0
+get_local_dup index 0
 ne_int
 pop
 
-load_const index 26, value 5
-load_const index 27, value 3
+get_local_dup index 1
+get_local_dup index 1
 ne_float
 pop
 
-load_const index 3, value 1
-load_const index 23, value 3
+get_local_dup index 0
+get_local_dup index 0
 mod_int
 pop
 
-load_const index 32, value 1.2
-load_const index 33, value 4.3
+get_local_dup index 1
+get_local_dup index 1
 mod_float
 pop
 
 load_const index 3, value 1
-load_const index 16, value 2
-
-ptr_local index 0
-ptr_local index 1
+load_const index 6, value 2
+ptr_local index 3
+ptr_local index 4
 eq_ptr
 pop
 
-ptr_local index 0
-ptr_local index 1
+ptr_local index 3
+ptr_local index 4
 ne_ptr
 pop
 
-get_local index 0
+get_local_dup index 3
 load_const index 3, value 1
 binary_and
 pop
 
-get_local index 0
+get_local_dup index 3
 load_const index 3, value 1
 binary_or
 pop
 
-get_local index 0
+get_local_dup index 3
 load_const index 3, value 1
 binary_xor
 pop
 
-get_local index 0
+get_local_dup index 3
 load_const index 3, value 1
 shift_left
 pop
 
-get_local index 0
+get_local_dup index 3
 load_const index 3, value 1
 shift_right
 pop

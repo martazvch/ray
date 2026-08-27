@@ -1,32 +1,36 @@
 -- main --
-load_const index 3, value -1
+load_const index 3, value 1
+load_const index 4, value 65.82
+push_true
+load_const index 5, value 65535
+
+get_local_dup index 0
+neg_int
 pop
 
-load_const index 3, value -1
+get_local_dup index 0
+neg_int
 neg_int
 neg_int
 neg_int
 pop
 
-load_const index 4, value -65.82
+get_local_dup index 1
+neg_float
 neg_float
 pop
 
-push_true
+get_local_dup index 2
 not
 pop
 
-push_false
-not
-pop
-
-push_true
+get_local_dup index 2
 not
 not
 not
 pop
 
-load_const index 5, value 65535
+get_local_dup index 3
 binary_neg
 pop
 

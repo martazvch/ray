@@ -1,9 +1,14 @@
+struct Foo { a: int }
+enum Bar { aa, bb }
 struct Vec2 {
     a, b: float,
     x = 8,
     y: bool,
     z, w: str = "yup",
     c: ?int = 3,
+    foo: Foo = .{ a: 8 },
+    bar: Bar = .bb,
+    arr: []bool = [true, false],
 }
 
 fn main() {

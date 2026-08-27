@@ -12,9 +12,7 @@ push_null
 pop
 
 load_const index 4, value 1
-load_const index 5, value 3
-load_const index 6, value 4
-add_int
+load_const index 7, value 7
 pop
 load_const index 3, value 5
 get_local index 1
@@ -22,10 +20,10 @@ print
 pop2
 
 load_const index 7, value 7
-get_local index 0
+get_local_dup index 0
 store_blk_val
 pop
-jump 33 -> 37
+jump 30 -> 34
 pop
 
 load_blk_val
@@ -33,10 +31,10 @@ load_const index 8, value 67
 load_const index 9, value just chillin
 load_const index 7, value 7
 load_const index 10, value 90
-get_local index 3
+get_local_dup index 3
 store_blk_val
 popn index 4
-jump 51 -> 56
+jump 48 -> 53
 
 popn index 4
 load_blk_val

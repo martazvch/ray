@@ -1,9 +1,15 @@
+struct Foo { a: int }
+enum Bar { aa, bb }
+
 struct Vec2 {
     a, b: float,
     x: int = 8,
     y: bool,
     z, w = "yup",
     aa, bb = false,
+    foo: Foo = .{ a: 8 },
+    bar: Bar = .bb,
+    arr: []bool = [true, false],
 
     fn display(self) {
         print self.a
@@ -14,6 +20,9 @@ struct Vec2 {
         print self.w
         print self.aa
         print self.bb
+        print self.foo
+        print self.bar
+        print self.arr
     }
 }
 

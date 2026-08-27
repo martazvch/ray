@@ -1,6 +1,6 @@
 -- main --
 load_const index 3, value 1
-get_local index 0
+get_local_dup index 0
 eq_null
 jump_false 5 -> 15
 pop
@@ -8,7 +8,7 @@ load_const index 4, value oui
 print
 jump 12 -> 16
 pop
-get_local index 0
+get_local_dup index 0
 eq_null
 jump_false 19 -> 29
 pop
@@ -16,7 +16,7 @@ load_const index 4, value oui
 print
 jump 26 -> 30
 pop
-get_local index 0
+get_local_dup index 0
 ne_null
 jump_false 33 -> 43
 pop
@@ -24,7 +24,7 @@ load_const index 4, value oui
 print
 jump 40 -> 44
 pop
-get_local index 0
+get_local_dup index 0
 ne_null
 jump_false 47 -> 57
 pop

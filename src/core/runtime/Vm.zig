@@ -405,6 +405,10 @@ fn execute(self: *Self) !void {
                 const field_idx = self.frame.readByte();
                 self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.Instance).fields[field_idx];
             },
+            .get_field_dup => {
+                const field_idx = self.frame.readByte();
+                self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.Instance).fields[field_idx].deepCopy(self);
+            },
             .get_field_native => {
                 const field_idx = self.frame.readByte();
                 self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.NativeObj).getField(self, field_idx);

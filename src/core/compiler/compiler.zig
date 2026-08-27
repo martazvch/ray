@@ -364,7 +364,7 @@ const Compiler = struct {
             .discard => |index| self.wrappedInstr(.pop, index),
 
             .enum_decl => |*data| self.enumDecl(data),
-            .enum_tag => |index| self.wrappedInstr(.get_enum_tag, index),
+            .enum_tag => |index| self.getTag(index, .@"enum"),
             .fail => |data| self.returnInstr(data),
             .field => |*data| self.field(data),
             .fn_decl => |*data| self.compileFn(data),
@@ -396,7 +396,7 @@ const Compiler = struct {
 
             .pointer => |index| self.pointer(index),
             .pop => |index| self.wrappedInstr(.pop, index),
-            .print => |index| self.wrappedInstr(.print, index),
+            .print => |index| self.wrappedInstrNoDup(.print, index),
             .range => |data| self.range(data),
             .@"return" => |data| self.returnInstr(data),
             .struct_decl => |*data| self.structDecl(data),
@@ -408,7 +408,7 @@ const Compiler = struct {
             .unbox => |index| self.wrappedInstr(.unbox, index),
             .union_constr => |data| self.unionConstr(data),
             .union_decl => |*data| self.unionDecl(data),
-            .union_tag => |index| self.wrappedInstr(.get_union_tag, index),
+            .union_tag => |index| self.getTag(index, .@"union"),
             .union_unwrap => |data| self.unionUnwrap(data),
             .var_decl => |*data| self.varDecl(data),
             .@"while" => |data| self.whileInstr(data),
@@ -417,8 +417,20 @@ const Compiler = struct {
         };
     }
 
+    /// Compiles an instruction while desactivating duplication state
+    fn compileInstrNoDup(self: *Self, instr: usize) Error!void {
+        const prev_dup = self.state.setAndGetPrev(.dup, false);
+        defer self.state.dup = prev_dup;
+        try self.compileInstr(instr);
+    }
+
     fn wrappedInstr(self: *Self, op: OpCode, index: usize) Error!void {
         try self.compileInstr(index);
+        self.writeOp(op);
+    }
+
+    fn wrappedInstrNoDup(self: *Self, op: OpCode, index: usize) Error!void {
+        try self.compileInstrNoDup(index);
         self.writeOp(op);
     }
 
@@ -549,7 +561,7 @@ const Compiler = struct {
     }
 
     fn getTag(self: *Self, instr: usize, kind: enum { @"enum", @"union" }) Error!void {
-        try self.compileInstr(instr);
+        try self.compileInstrNoDup(instr);
         self.writeOp(if (kind == .@"enum") .get_enum_tag else .get_union_tag);
     }
 
@@ -568,10 +580,7 @@ const Compiler = struct {
 
     // TODO: protext cast
     fn boundMethod(self: *Self, data: Instruction.BoundMethod) Error!void {
-        const prev_dup = self.state.setAndGetPrev(.dup, false);
-        defer self.state.dup = prev_dup;
-
-        try self.compileInstr(data.structure);
+        try self.compileInstrNoDup(data.structure);
         self.writeOpAndByte(.bound_method, @intCast(data.index));
     }
 
@@ -606,22 +615,20 @@ const Compiler = struct {
         }
 
         // For functions bounded to runtime values (including structure fields)
-        try self.compileInstr(data.callee);
+        try self.compileInstrNoDup(data.callee);
         try self.compileArgs(data.args);
         // TODO: protect cast
         self.writeOpAndByte(.call_dyn, @intCast(data.args.len));
     }
 
     fn invoke(self: *Self, data: *const Instruction.Call, callee: Instruction.Field) Error!void {
-        const prev_dup = self.state.setAndGetPrev(.dup, false);
-        defer self.state.dup = prev_dup;
-
-        try self.compileInstr(callee.structure);
+        try self.compileInstrNoDup(callee.structure);
         try self.callSymbol(data, 1, callee.index, data.module);
     }
 
     fn virtualCall(self: *Self, data: *const Instruction.Call, callee: Instruction.Field) Error!void {
-        try self.compileInstr(callee.structure);
+        // Trait object don't have to be cloned they don't contain anything
+        try self.compileInstrNoDup(callee.structure);
         try self.compileArgs(data.args);
         self.writeOpAndByte(.call_virtual, @intCast(callee.index));
         // We add one because we invoke the virtual on the trait object so as `callSymbol`, we add 1
@@ -888,18 +895,19 @@ const Compiler = struct {
     }
 
     fn field(self: *Self, data: *const Instruction.Field) Error!void {
-        try self.compileInstr(data.structure);
+        try self.compileInstrNoDup(data.structure);
+
         self.writeOpAndByte(
             if (data.kind == .field_native)
                 .get_field_native
-            else
-                .get_field,
+            else if (self.state.dup) .get_field_dup else .get_field,
             @intCast(data.index),
         );
     }
 
     fn forLoop(self: *Self, data: Instruction.For) Error!void {
-        try self.compileInstr(data.expr);
+        // Values are copied by `next` function on iterator
+        try self.compileInstrNoDup(data.expr);
         self.writeOp(switch (data.kind) {
             .array => .iter_new_arr,
             .array_ptr => .iter_new_arr_ptr,
@@ -1003,13 +1011,8 @@ const Compiler = struct {
     }
 
     fn indexing(self: *Self, data: Instruction.Indexing) Error!void {
-        const prev_dup = self.state.setAndGetPrev(.dup, false);
-        try self.compileInstr(data.expr);
-        self.state.dup = prev_dup;
-
-        // Index, we deactivate cow for index because never wanted but could be triggered by a multiple array
-        // access inside an array assignment
-        try self.compileInstr(data.index);
+        try self.compileInstrNoDup(data.expr);
+        try self.compileInstrNoDup(data.index);
 
         const op: OpCode = switch (data.index_kind) {
             .scalar => switch (data.kind) {
@@ -1030,7 +1033,7 @@ const Compiler = struct {
         } else if (data.kind == .@"union") {
             try self.getTag(data.expr, .@"union");
         } else {
-            try self.compileInstr(data.expr);
+            try self.compileInstrNoDup(data.expr);
         }
 
         var exit_jumps = ArrayList(usize).initCapacity(self.manager.alloc, data.arms.len) catch oom();
@@ -1107,7 +1110,7 @@ const Compiler = struct {
 
     // TODO: do as Parser, provide a `armFn` and make a common `matchArm` for both value and type match
     fn matchType(self: *Self, data: Instruction.MatchType) Error!void {
-        try self.compileInstr(data.expr);
+        try self.compileInstrNoDup(data.expr);
 
         var exit_jumps = ArrayList(usize).initCapacity(self.manager.alloc, data.arms.len) catch oom();
 
@@ -1170,16 +1173,12 @@ const Compiler = struct {
     fn pointer(self: *Self, instr: Instruction.Pointer) Error!void {
         switch (instr) {
             .array => |a| {
-                const prev_dup = self.state.setAndGetPrev(.dup, false);
-                try self.compileInstr(a.expr);
-                self.state.dup = prev_dup;
+                try self.compileInstrNoDup(a.expr);
                 try self.compileInstr(a.index);
                 self.writeOp(.ptr_array);
             },
             .field => |f| {
-                const prev_dup = self.state.setAndGetPrev(.dup, false);
-                defer self.state.dup = prev_dup;
-                try self.compileInstr(f.structure);
+                try self.compileInstrNoDup(f.structure);
                 self.writeOpAndByte(.ptr_field, @intCast(f.index));
             },
             .variable => |v| switch (v.scope) {
@@ -1227,7 +1226,8 @@ const Compiler = struct {
     }
 
     fn traitObj(self: *Self, data: Instruction.TraitObj) Error!void {
-        try self.compileInstr(data.variable);
+        // No need to duplicate because it's gonna be a pointer to an object
+        try self.compileInstrNoDup(data.variable);
         // TODO: error
         self.writeOpAndByte(.trait_obj, @intCast(data.vtable_index));
     }

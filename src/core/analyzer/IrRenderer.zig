@@ -524,6 +524,7 @@ fn match(self: *Self, data: *const Instruction.Match) void {
         self.indentAndAppendSlice("- wildcard:");
         self.indent_level += 1;
         self.parseInstr(wc);
+        self.indent_level -= 1;
     }
 }
 

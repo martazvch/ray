@@ -1,3 +1,5 @@
 fn main() {
-    if true and false do print "yes"
+    let b = false
+    b and b
+    b or b
 }

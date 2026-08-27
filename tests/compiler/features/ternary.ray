@@ -1,4 +1,4 @@
 fn main() {
-    print (true or false) ? 1 : 0
+    print true ? 1 : 0
 }
 

@@ -1,66 +1,64 @@
 -- main --
-load_const index 3, value 1
-load_const index 4, value 2
-load_const index 5, value 3
-array_new length 3, type_id x
+load_const index 6, value [1, 2, 3]
 get_local index 0
 load_const index 3, value 1
 index_arr
 print
+
 get_local index 0
-load_const index 6, value -1
+load_const index 7, value -1
 index_arr
 print
+
 get_local index 0
 load_const index 3, value 1
-load_const index 7, value 0
+load_const index 8, value 0
 range_new_int
 index_range_arr
 print
-load_const index 3, value 1
-load_const index 4, value 2
-load_const index 5, value 3
-array_new length 3, type_id x
-load_const index 8, value 4
-load_const index 9, value 5
-load_const index 10, value 6
-array_new length 3, type_id x
-array_new length 2, type_id x
+
+load_const index 13, value [[1, 2, 3], [4, 5, 6]]
 get_local index 1
 load_const index 3, value 1
 index_arr
 print
+
 get_local index 1
 load_const index 3, value 1
 index_arr
 load_const index 4, value 2
 index_arr
 print
+
 get_local index 1
 load_const index 3, value 1
-load_const index 7, value 0
+load_const index 8, value 0
 range_new_int
 index_range_arr
 print
+
 get_local index 1
-load_const index 7, value 0
+load_const index 8, value 0
 index_arr
 load_const index 4, value 2
 load_const index 3, value 1
 range_new_int
 index_range_arr
 print
-load_const index 11, value Tom
+
+load_const index 14, value Tom
 get_local index 2
 load_const index 3, value 1
 index_str
 print
+
 get_local index 2
 load_const index 4, value 2
 load_const index 3, value 1
 range_new_int
 index_range_str
 print
+
 ret_naked
 
 -- global scope --

@@ -1,23 +1,19 @@
 -- main --
-load_const index 3, value 1
-struct_lit index 0, arity 1, Foo
-load_const index 4, value 2
-struct_lit index 0, arity 1, Foo
-array_new length 2, type_id x
+load_const index 7, value [<instance of Foo>, <instance of Foo>]
 ptr_local index 0
 iter_new_arr_ptr
 iter_next
-jump_null 18 -> 38
+jump_null 6 -> 26
 get_local index 2
 deref
-get_field index 0
-load_const index 5, value 10
+get_field_dup index 0
+load_const index 8, value 10
 mul_int
-get_local_cow index 2
+get_local index 2
 deref
 set_field index 0
 pop
-loop 35 -> 17
+loop 23 -> 5
 pop2
 ret_naked
 

@@ -21,14 +21,16 @@ call_virtual index 0, arity 2
 ret_naked
 
 -- main --
-struct_lit index 0, arity 0, Bar
+load_const index 6, value <instance of Bar>
 get_local index 0
 trait_obj index 0
 call index 3, arity 1, f
-struct_lit index 1, arity 0, Baz
+
+load_const index 7, value <instance of Baz>
 get_local index 1
 trait_obj index 1
 call index 3, arity 1, f
+
 ret_naked
 
 -- global scope --

@@ -1,11 +1,33 @@
 fn main() {
-    _ = 1 - 2
-    _ = 5.6 + 4.
-    _ = "steak" * 3
-    _ = 5 * "house"
-    _ = "juicy " + "orange"
-    4 % 6
-    4.5 % 1.2
+    let i = 1
+    let f = 2.
+    let s = "foo"
+
+    _ = i + -i
+    _ = f + -f
+    _ = s + s
+    _ = f - -f
+    _ = i - -i
+    _ = f * -f
+    _ = i * -i
+    _ = i * s
+    _ = s * i
+    _ = f / -f
+    _ = i / -i
+    _ = i > i
+    _ = f > f
+    _ = f >= f
+    _ = i >= i
+    _ = f < -f
+    _ = i < -i
+    _ = i <= i
+    _ = f <= f
+    _ = i == i
+    _ = f == f
+    _ = i != i
+    _ = f != f
+    i % i
+    f % f
 
     let a = 1
     let b = 2

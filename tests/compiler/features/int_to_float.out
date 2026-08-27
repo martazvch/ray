@@ -1,13 +1,7 @@
 -- main --
-load_const index 3, value 1
-int_to_float
-load_const index 4, value 1
-add_float
-pop
-load_const index 4, value 1
 load_const index 5, value 2
-int_to_float
-add_float
+pop
+load_const index 7, value 3
 pop
 ret_naked
 

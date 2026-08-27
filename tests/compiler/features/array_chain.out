@@ -1,65 +1,20 @@
 -- main --
 load_const index 4, value 1
+load_const index 11, value <instance of Point>
+load_const index 21, value <instance of Point>
+load_const index 31, value <instance of Point>
+load_const index 41, value <instance of Point>
 
-load_const index 4, value 1
-load_const index 5, value 2
-load_const index 4, value 1
-load_const index 5, value 2
+get_local_dup index 1
+get_local_dup index 2
 array_new length 2, type_id x
-load_const index 6, value 3
-load_const index 7, value 4
-array_new length 2, type_id x
-array_new length 2, type_id x
-struct_lit index 0, arity 3, Point
-
-load_const index 8, value 5
-load_const index 9, value 6
-load_const index 10, value 7
-load_const index 11, value 8
-array_new length 2, type_id x
-load_const index 12, value 9
-load_const index 13, value 10
-array_new length 2, type_id x
-array_new length 2, type_id x
-struct_lit index 0, arity 3, Point
-
-load_const index 14, value 11
-load_const index 15, value 12
-load_const index 16, value 13
-load_const index 17, value 14
-array_new length 2, type_id x
-load_const index 18, value 15
-load_const index 19, value 16
-array_new length 2, type_id x
-array_new length 2, type_id x
-struct_lit index 0, arity 3, Point
-
-load_const index 20, value 17
-load_const index 21, value 18
-load_const index 22, value 19
-load_const index 23, value 20
-array_new length 2, type_id x
-load_const index 24, value 21
-load_const index 25, value 22
-array_new length 2, type_id x
-array_new length 2, type_id x
-struct_lit index 0, arity 3, Point
-
-get_local index 1
-incr_ref
-get_local index 2
-incr_ref
-array_new length 2, type_id x
-get_local index 3
-incr_ref
-get_local index 4
-incr_ref
+get_local_dup index 3
+get_local_dup index 4
 array_new length 2, type_id x
 array_new length 2, type_id x
 struct_lit index 1, arity 1, Poly
 
-get_local index 5
-incr_ref
+get_local_dup index 5
 load_const index 3, value object
 struct_lit index 2, arity 2, Object
 
@@ -68,7 +23,7 @@ get_field index 0
 get_field index 0
 load_const index 4, value 1
 index_arr
-load_const index 26, value 0
+load_const index 42, value 0
 index_arr
 print
 
@@ -77,7 +32,7 @@ get_field index 0
 get_field index 0
 get_local index 0
 index_arr
-load_const index 26, value 0
+load_const index 42, value 0
 index_arr
 get_field index 0
 print
@@ -87,10 +42,10 @@ get_field index 0
 get_field index 0
 load_const index 4, value 1
 index_arr
-load_const index 26, value 0
+load_const index 42, value 0
 index_arr
 get_field index 2
-load_const index 26, value 0
+load_const index 42, value 0
 index_arr
 print
 
@@ -99,7 +54,7 @@ get_field index 0
 get_field index 0
 load_const index 4, value 1
 index_arr
-load_const index 26, value 0
+load_const index 42, value 0
 index_arr
 get_field index 2
 get_local index 0
@@ -108,18 +63,16 @@ load_const index 4, value 1
 index_arr
 print
 
-load_const index 27, value 55
-load_const index 28, value 66
-array_new length 2, type_id x
-get_local_cow index 6
-get_field_cow index 0
-get_field_cow index 0
+load_const index 45, value [55, 66]
+get_local index 6
+get_field index 0
+get_field index 0
 load_const index 4, value 1
-index_arr_cow
-load_const index 26, value 0
-index_arr_cow
-get_field_cow index 2
-load_const index 26, value 0
+index_arr
+load_const index 42, value 0
+index_arr
+get_field index 2
+load_const index 42, value 0
 array_set
 
 ret_naked

@@ -1,13 +1,16 @@
 -- main --
-push_true
-jump_false 1 -> 6
-pop
 push_false
-jump_false 6 -> 16
+
+get_local_dup index 0
+jump_false 3 -> 9
 pop
-load_const index 3, value yes
-print
-jump 13 -> 17
+get_local_dup index 0
+pop
+
+get_local_dup index 0
+jump_true 12 -> 18
+pop
+get_local_dup index 0
 pop
 
 ret_naked

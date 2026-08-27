@@ -1,9 +1,7 @@
 -- main --
-load_const index 3, value Tom
-struct_lit index 0, arity 1, Person
-
-load_const index 4, value Martin
-get_local_cow index 0
+load_const index 4, value <instance of Person>
+load_const index 5, value Martin
+get_local index 0
 set_field index 0
 ret_naked
 

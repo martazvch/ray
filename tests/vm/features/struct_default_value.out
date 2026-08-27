@@ -6,7 +6,9 @@ yup
 yup
 false
 false
-
+<instance of Foo>
+<enum Bar.bb>
+[true, false]
 3.3
 99.99
 7
@@ -15,3 +17,6 @@ yup
 Tom
 false
 false
+<instance of Foo>
+<enum Bar.bb>
+[true, false]

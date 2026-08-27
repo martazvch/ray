@@ -693,14 +693,14 @@ pub const ArrIterator = struct {
         return &self.obj;
     }
 
-    pub fn next(self: *anyopaque, _: *Vm) Value {
+    pub fn next(self: *anyopaque, vm: *Vm) Value {
         const s: *Self = @ptrCast(@alignCast(self));
         if (s.index == s.values.len) {
             return .null;
         }
 
         defer s.index += 1;
-        return s.values[s.index];
+        return s.values[s.index].deepCopy(vm);
     }
 
     pub fn deinit(self: *anyopaque, allocator: Allocator) void {

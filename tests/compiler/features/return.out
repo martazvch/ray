@@ -6,7 +6,7 @@ load_const index 3, value 5
 ret
 
 -- mul --
-get_local index 0
+get_local_dup index 0
 call index 1, arity 0, sub
 mul_int
 ret

@@ -24,33 +24,36 @@ get_enum_tag
 load_const index 4, value 0
 eq_int
 pop
+
 load_const index 4, value 0
 get_local index 0
 get_enum_tag
 eq_int
 pop
-load_const index 4, value 0
-load_const index 10, value 1
-eq_int
+
+push_false
 pop
+
 get_local index 1
 get_enum_tag
 load_const index 4, value 0
 ne_int
 pop
+
 load_const index 4, value 0
 get_local index 1
 get_enum_tag
 ne_int
 pop
-load_const index 4, value 0
-load_const index 10, value 1
-ne_int
+
+push_true
 pop
+
 call index 0, arity 0, init
 get_local index 2
 call index 1, arity 1, toStr
 print
+
 ret_naked
 
 -- global scope --

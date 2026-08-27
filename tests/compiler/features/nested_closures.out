@@ -23,7 +23,7 @@ ret_naked
 
 -- nested --
 push_null
-get_local index 0
+get_local_dup index 0
 unbox
 
 load_fn index 3, nested2

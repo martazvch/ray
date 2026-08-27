@@ -6,9 +6,9 @@
 fn main() {
     if true do print "yes"
 
-    if true and false { print "yes" }
+    if true  { print "yes" }
 
-    if true and false { print "yes" } else { print "no" }
+    if false { print "yes" } else { print "no" }
 
     var a = if true { break 1 } else { break 2 }
 

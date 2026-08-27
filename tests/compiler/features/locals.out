@@ -9,7 +9,7 @@ load_const index 8, value assign sub
 set_local index 2
 pop
 
-get_local index 0
+get_local_dup index 0
 set_local index 1
 pop2
 

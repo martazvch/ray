@@ -4,13 +4,13 @@ print
 ret_naked
 
 -- withDefault --
-get_local index 0
+get_local_dup index 0
 load_const index 7, value 9
 eq_int
 ret
 
 -- withDefaultNoBody --
-get_local index 0
+get_local_dup index 0
 load_const index 8, value 2
 eq_int
 ret
@@ -36,7 +36,7 @@ print
 ret_naked
 
 -- withDefaultNoBody --
-get_local index 0
+get_local_dup index 0
 load_const index 9, value 5
 eq_int
 ret
@@ -47,7 +47,7 @@ print
 ret_naked
 
 -- withDefault --
-get_local index 0
+get_local_dup index 0
 load_const index 4, value 1
 eq_int
 ret
@@ -79,7 +79,7 @@ print
 load_const index 9, value 5
 call index 13, arity 1, withDefaultNoBody
 print
-struct_lit index 0, arity 0, Bar
+load_const index 11, value <instance of Bar>
 get_local index 0
 call index 11, arity 1, method1
 ret_naked

@@ -1,3 +1,8 @@
+[Structure declaration Foo]
+[Enum declaration Bar]
+    - tags
+    aa: 0
+    bb: 1
 [Structure declaration Vec2]
     - default values
     [Constant index 3]
@@ -8,9 +13,22 @@
         [String yup]
     [Constant index 5]
         [Int 3]
+    [Constant index 6]
+        [Structure]
+            [Int 8]
+    [Constant index 7]
+        [Enum create]
+            - symbol
+            [Load symbol 0]
+            - tag
+            1
+    [Constant index 8]
+        [Array]
+            [Bool true]
+            [Bool false]
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
-        [Constant index 8]
+        [Constant index 11]
             [Structure]
                 [Float 1]
                 [Float 2]
@@ -19,7 +37,17 @@
                 [String yup]
                 [String yup]
                 [Int 3]
-    [Constant index 12]
+                [Structure]
+                    [Int 8]
+                [Enum create]
+                    - symbol
+                    [Load symbol 0]
+                    - tag
+                    1
+                [Array]
+                    [Bool true]
+                    [Bool false]
+    [Constant index 15]
         [Structure]
             [Float 3]
             [Float 99]
@@ -28,4 +56,14 @@
             [String yup]
             [String yup]
             [Int 3]
+            [Structure]
+                [Int 8]
+            [Enum create]
+                - symbol
+                [Load symbol 0]
+                - tag
+                1
+            [Array]
+                [Bool true]
+                [Bool false]
     [Assignment index: 0, scope: local]

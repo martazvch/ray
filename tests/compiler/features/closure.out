@@ -21,10 +21,10 @@ load_fn index 2, get
 get_capt_local index 0
 closure index 1
 
-get_local index 1
+get_local_dup index 1
 set_global index 0
 
-get_local index 2
+get_local_dup index 2
 set_global index 1
 
 ret_naked

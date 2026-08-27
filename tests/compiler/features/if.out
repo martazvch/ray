@@ -6,91 +6,72 @@ load_const index 3, value yes
 print
 jump 8 -> 12
 pop
-
 push_true
-jump_false 13 -> 18
-pop
-push_false
-jump_false 18 -> 28
+jump_false 13 -> 23
 pop
 load_const index 3, value yes
 print
-jump 25 -> 29
-pop
-
-push_true
-jump_false 30 -> 35
+jump 20 -> 24
 pop
 push_false
-jump_false 35 -> 45
+jump_false 25 -> 35
 pop
 load_const index 3, value yes
 print
-jump 42 -> 49
+jump 32 -> 39
 pop
 load_const index 4, value no
 print
-
 push_true
-jump_false 50 -> 64
+jump_false 40 -> 54
 pop
 load_const index 5, value 1
 store_blk_val
-jump 57 -> 60
+jump 47 -> 50
 load_blk_val
-jump 61 -> 72
+jump 51 -> 62
 pop
 load_const index 6, value 2
 store_blk_val
-jump 68 -> 71
+jump 58 -> 61
 load_blk_val
-
 push_true
 store_blk_val
-jump 74 -> 77
+jump 64 -> 67
 load_blk_val
-jump_false 78 -> 90
+jump_false 68 -> 77
 pop
-load_const index 7, value 5
-load_const index 8, value 6
-add_int
-jump 87 -> 93
+load_const index 9, value 11
+jump 74 -> 80
 pop
 load_const index 5, value 1
-
-push_true
-not
+push_false
 store_blk_val
-jump 96 -> 99
+jump 82 -> 85
 load_blk_val
-jump_false 100 -> 117
+jump_false 86 -> 100
 pop
-load_const index 7, value 5
-load_const index 8, value 6
-add_int
+load_const index 9, value 11
 store_blk_val
-jump 110 -> 113
+jump 93 -> 96
 load_blk_val
-jump 114 -> 142
+jump 97 -> 125
 pop
-
 load_const index 5, value 1
 get_local index 2
 print
 load_const index 7, value 5
 set_local index 2
-get_local index 0
-get_local index 1
+get_local_dup index 0
+get_local_dup index 1
 add_int
-get_local index 2
+get_local_dup index 2
 add_int
 store_blk_val
 pop
-jump 137 -> 141
+jump 120 -> 124
 pop
 load_blk_val
-
 ret_naked
-
 -- global scope --
 call index 0, arity 0, main

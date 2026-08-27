@@ -12,7 +12,7 @@ print
 push_false
 jump_false 16 -> 29
 pop
-get_local index 0
+get_local_dup index 0
 load_const index 6, value 2
 add_int
 ret
@@ -83,7 +83,7 @@ ret
 push_true
 jump_false 1 -> 12
 pop
-get_local index 0
+get_local_dup index 0
 ret
 pop
 jump 9 -> 13
@@ -101,7 +101,7 @@ jump_false 1 -> 8
 pop
 jump 5 -> 13
 pop
-get_local index 0
+get_local_dup index 0
 ret
 pop
 

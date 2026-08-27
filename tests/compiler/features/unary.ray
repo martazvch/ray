@@ -1,9 +1,13 @@
 fn main() {
-    _ = -1
-    _ = ----1
-    _ = --65.82
-    _ = not true
-    _ = not false
-    _ = not not not true
-    _ = ~0xffff
+    let i = 1
+    let f = 65.82
+    let b = true
+    let ib = 0xffff
+
+    _ = -i
+    _ = ----i
+    _ = --f
+    _ = not b
+    _ = not not not b
+    _ = ~ib
 }

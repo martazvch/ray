@@ -78,39 +78,39 @@
                 - wildcard:
                     [Constant index 10]
                         [Int 4]
-        [Trap match]
+    [Trap match]
+    - lhs
+        [Call symbol 0]
+            - args
+            [Constant index 11]
+                [Int 25]
+    - rhs
+        [Match union]
+        - expression:
+            [Variable index: 0, scope: local]
+        - arms:
+            - expr:
+                [Constant index 6]
+                    [Union create]
+                        - symbol
+                        [Load symbol 0]
+                        - tag
+                        0
+            - body:
+                [Print]
+                    [Constant index 9]
+                        [Int 1]
+            - wildcard:
+                [Print]
+                    [Constant index 10]
+                        [Int 4]
+    [Print]
+        [Trap expr]
         - lhs
             [Call symbol 0]
                 - args
-                [Constant index 11]
-                    [Int 25]
+                [Constant index 7]
+                    [Int 15]
         - rhs
-            [Match union]
-            - expression:
-                [Variable index: 0, scope: local]
-            - arms:
-                - expr:
-                    [Constant index 6]
-                        [Union create]
-                            - symbol
-                            [Load symbol 0]
-                            - tag
-                            0
-                - body:
-                    [Print]
-                        [Constant index 9]
-                            [Int 1]
-                - wildcard:
-                    [Print]
-                        [Constant index 10]
-                            [Int 4]
-            [Print]
-                [Trap expr]
-                - lhs
-                    [Call symbol 0]
-                        - args
-                        [Constant index 7]
-                            [Int 15]
-                - rhs
-                    [Block pop count: 1, is_expr: false]
-                        [Return]
+            [Block pop count: 1, is_expr: false]
+                [Return]

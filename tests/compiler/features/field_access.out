@@ -1,18 +1,16 @@
 -- main --
-load_const index 3, value Vodka
-push_false
-struct_lit index 0, arity 2, Pet
+load_const index 4, value <instance of Pet>
+load_const index 5, value 5
+load_const index 6, value Tom
 
-load_const index 4, value 5
-load_const index 5, value Tom
-get_local index 0
-incr_ref
+get_local_dup index 0
 struct_lit index 1, arity 3, Human
 
 get_local index 1
 get_field index 2
 get_field index 1
 print
+
 ret_naked
 
 -- global scope --
