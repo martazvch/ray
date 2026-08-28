@@ -60,8 +60,6 @@ const Data = struct {
         .init(Self, "name", ""),
     };
 
-    const accessors = zffi.makeAccessors(Self);
-
     pub fn init(vm: *Vm, value1: i64, value2: f64, value3: bool, name: []const u8) *Self {
         return new(vm, value1, value2, value3, name);
     }
@@ -72,7 +70,7 @@ const Data = struct {
     }
 
     pub fn getField(self: *anyopaque, vm: *Vm, index: usize) Value {
-        return accessors[index].get(self, vm);
+        return zffi.getField(Self, self, vm, index);
     }
 
     // From method

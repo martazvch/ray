@@ -31,8 +31,6 @@ const File = struct {
         .init(Self, "path", ""),
     };
 
-    const accessors = zffi.makeAccessors(Self);
-
     pub fn readAll(self: *Self, vm: *Vm) []const u8 {
         var reader = self.fd.reader(vm.io, &.{});
         const interface = &reader.interface;
@@ -50,7 +48,7 @@ const File = struct {
     }
 
     pub fn getField(self: *anyopaque, vm: *Vm, index: usize) Value {
-        return accessors[index].get(self, vm);
+        return zffi.getField(Self, self, vm, index);
     }
 };
 

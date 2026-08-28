@@ -212,27 +212,21 @@ pub const VTable = struct {
     }
 };
 
-pub const FieldAccessor = struct {
-    get: *const fn (*anyopaque, *Vm) Value,
-};
-
-pub fn makeAccessors(T: type) []const FieldAccessor {
+pub fn getField(T: type, self: *anyopaque, vm: *Vm, index: usize) Value {
     const fields = @field(T, "fields");
-    comptime var accessors: [fields.len]FieldAccessor = undefined;
-
     inline for (fields, 0..) |field, i| {
-        accessors[i] = .{
-            .get = struct {
-                fn get(self: *anyopaque, vm: *Vm) Value {
-                    const s: *T = @ptrCast(@alignCast(self));
-                    return toValue(vm, @field(s, field.name), .{ .copy_str = true });
-                }
-            }.get,
-        };
-    }
+        if (i == index) {
+            const raw = @as([*]const u8, @ptrCast(self));
+            const offset = @offsetOf(T, field.name);
 
-    const copy = accessors;
-    return &copy;
+            return toValue(
+                vm,
+                @as(*const field.type, @ptrCast(@alignCast(raw + offset))).*,
+                .{ .copy_str = true },
+            );
+        }
+    }
+    unreachable;
 }
 
 pub fn makeObj(T: type, name: []const u8, value: *anyopaque, vm: *Vm) *T {
