@@ -2,8 +2,8 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
+const cffi = @import("../ffi/cffi.zig");
 const zffi = @import("../ffi/zffi.zig");
-const ffi = @import("../ffi/ffi.zig");
 const MapNameType = @import("../analyzer/types.zig").MapNameType;
 const Type = @import("../analyzer/types.zig").Type;
 const TypeInterner = @import("../analyzer/types.zig").TypeInterner;
@@ -345,12 +345,12 @@ fn zigToRay(self: *Self, alloc: Allocator, T: type, interner: *Interner, ti: *Ty
 }
 
 /// Declares in global scope, used when not declaring via a module
-pub fn registerExternFnInGlobal(self: *Self, alloc: Allocator, proto: *const ffi.FnProto, interner: *Interner, ti: *TypeInterner) Registered {
+pub fn registerExternFnInGlobal(self: *Self, alloc: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) Registered {
     self.current = self.getGlobalScope();
     return self.registerExternFn(alloc, proto, interner, ti);
 }
 
-fn registerExternFn(self: *Self, alloc: Allocator, proto: *const ffi.FnProto, interner: *Interner, ti: *TypeInterner) Registered {
+fn registerExternFn(self: *Self, alloc: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) Registered {
     const fn_type = externFnToRay(alloc, proto, interner, ti);
     const name_str = std.mem.span(proto.name);
     const fn_name = interner.intern(name_str);
@@ -367,7 +367,7 @@ fn registerExternFn(self: *Self, alloc: Allocator, proto: *const ffi.FnProto, in
     return .{ .index = self.current.extern_fns.items.len - 1, .type = fn_type };
 }
 
-pub fn externFnToRay(alloc: Allocator, proto: *const ffi.FnProto, interner: *Interner, ti: *TypeInterner) *const Type {
+pub fn externFnToRay(alloc: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) *const Type {
     var params: Type.Function.ParamsMap = .empty;
     params.ensureTotalCapacity(alloc, proto.params.len - 1) catch oom();
 
@@ -399,7 +399,7 @@ pub fn externFnToRay(alloc: Allocator, proto: *const ffi.FnProto, interner: *Int
     return ti.intern(.{ .function = ty });
 }
 
-fn cTypeToRay(ty: ffi.cType, ti: *TypeInterner) *const Type {
+fn cTypeToRay(ty: cffi.cType, ti: *TypeInterner) *const Type {
     return switch (ty) {
         .void => ti.getCached(.void),
         .int => ti.getCached(.int),

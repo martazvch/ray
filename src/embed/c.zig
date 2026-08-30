@@ -7,9 +7,9 @@ const State = core.State;
 pub const Config = State.Config;
 const Pipeline = core.Pipeline;
 pub const Vm = core.Vm;
-const ffi = core.ffi;
-const cVm = ffi.cVm;
-const Fn = ffi.Fn;
+const cffi = core.cffi;
+const cVm = cffi.cVm;
+const Fn = cffi.Fn;
 
 const oom = @import("misc").oom;
 
@@ -72,7 +72,7 @@ pub export fn rayDeinitVm(opaque_vm: *cVm) void {
     allocator.destroy(vm);
 }
 
-pub export fn rayRegisterFn(opaque_vm: *cVm, func: ffi.FnProto) void {
+pub export fn rayRegisterFn(opaque_vm: *cVm, func: cffi.FnProto) void {
     const vm: *Vm = @ptrCast(@alignCast(opaque_vm));
     vm.state.registerCFn(allocator, func);
 }

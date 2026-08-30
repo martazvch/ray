@@ -15,7 +15,7 @@ const ObjFns = type_mod.ObjFns;
 const Chunk = @import("../compiler/Chunk.zig");
 const Module = @import("../pipeline/ModuleManager.zig").Module;
 const zffi = @import("../ffi/zffi.zig");
-const ffi = @import("../ffi/ffi.zig");
+const cffi = @import("../ffi/cffi.zig");
 const oom = @import("misc").oom;
 const Value = @import("values.zig").Value;
 const Vm = @import("Vm.zig");
@@ -478,12 +478,12 @@ pub const ZigFn = struct {
 pub const ExternFn = struct {
     obj: Obj,
     name: []const u8,
-    function: ffi.Fn,
+    function: cffi.Fn,
     returns: bool,
 
     const Self = @This();
 
-    pub fn create(allocator: Allocator, name: []const u8, function: ffi.Fn, returns: bool) *Self {
+    pub fn create(allocator: Allocator, name: []const u8, function: cffi.Fn, returns: bool) *Self {
         const obj = Obj.allocateComptime(allocator, Self, undefined);
         obj.name = name;
         obj.function = function;

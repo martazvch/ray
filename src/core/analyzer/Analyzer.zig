@@ -24,7 +24,7 @@ const Constant = @import("ConstantInterner.zig").Constant;
 const Pipeline = @import("../pipeline/pipeline.zig");
 const State = @import("../pipeline/State.zig");
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
-const ffi = @import("../ffi/ffi.zig");
+const cffi = @import("../ffi/cffi.zig");
 const Value = @import("../runtime/values.zig").Value;
 const ExternFn = @import("../runtime/Obj.zig").ExternFn;
 
@@ -738,7 +738,7 @@ fn endExternFnDecl(
 
     const name_sentinel = self.alloc.dupeZ(u8, name_text) catch oom();
     defer self.alloc.free(name_sentinel);
-    const func = lib.lookup(ffi.Fn, name_sentinel) orelse return self.err(
+    const func = lib.lookup(cffi.Fn, name_sentinel) orelse return self.err(
         .{ .extern_fn_not_in_lib = .{ .name = name_text } },
         span,
     );
@@ -1260,11 +1260,11 @@ fn use(self: *Self, node: *const Ast.Use) StmtResult {
     const path = path: switch (result) {
         .dynlib => |*dynlib| {
             const interned = self.interner.intern(dynlib.path);
-            const handcheck = dynlib.lib.lookup(ffi.Handcheck, "handcheck") orelse return self.err(
+            const handcheck = dynlib.lib.lookup(cffi.Handcheck, "handcheck") orelse return self.err(
                 .{ .dynlib_not_module = .{ .name = self.ast.toSource(dynlib.token) } },
                 self.ast.getSpan(dynlib.token),
             );
-            handcheck(&ffi.api);
+            handcheck(&cffi.api);
 
             const prev_dynlib = self.state.dynlib;
             self.state.dynlib = &dynlib.lib;

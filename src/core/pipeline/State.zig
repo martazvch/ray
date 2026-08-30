@@ -14,8 +14,8 @@ const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
 const ConstInterner = @import("../analyzer/ConstantInterner.zig");
 const ConstIdx = ConstInterner.ConstIdx;
 const Constant = ConstInterner.Constant;
+const cffi = @import("../ffi/cffi.zig");
 const zffi = @import("../ffi/zffi.zig");
-const ffi = @import("../ffi/ffi.zig");
 const NativeLib = @import("../analyzer/NativeLib.zig");
 const SymbolTable = @import("SymbolTable.zig");
 
@@ -169,7 +169,7 @@ pub fn registerFn(self: *Self, allocator: Allocator, func: zffi.FnMeta) void {
 }
 
 /// Used by embedded
-pub fn registerCFn(self: *Self, allocator: Allocator, func: ffi.FnProto) void {
+pub fn registerCFn(self: *Self, allocator: Allocator, func: cffi.FnProto) void {
     _ = self.native_reg.registerExternFnInGlobal(allocator, &func, &self.interner, &self.type_interner);
 }
 

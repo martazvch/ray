@@ -1,4 +1,4 @@
-#include "../../../src/core/ffi/ray_ext.h"
+#include "../../../src/core/ffi/ray_api.h"
 #include <math.h>
 #include <stdio.h>
 
