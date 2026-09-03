@@ -428,6 +428,7 @@ fn containerTraitImpls(
 }
 
 fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
+    const span = self.ast.getSpan(node.expr);
     const binding = self.internToken(node.binding);
     const index_interned = if (node.index_binding) |index|
         self.internToken(index)
@@ -448,19 +449,22 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
     const kind: Instr.For.Kind, const elem_type = switch (res.type.*) {
         .array => |t| .{ .array, t.child },
         .pointer => |t| b: {
-            const array_type = t.as(.array) orelse @panic("Can't take pointer of non array");
+            const array_type = t.as(.array) orelse return self.err(
+                .{ .for_iter_ptr_non_array = .{ .found = self.typeName(t) } },
+                span,
+            );
 
             break :b .{ .array_ptr, self.ti.intern(.{ .pointer = array_type.child }) };
         },
         .range => |r| b: {
             if (r != self.ti.getCached(.int)) {
-                return self.err(.for_iter_non_int_range, self.ast.getSpan(node.expr));
+                return self.err(.for_iter_non_int_range, span);
             }
 
             break :b .{ .range, self.ti.getCached(.int) };
         },
         .str => .{ .str, res.type },
-        else => |*t| return self.err(.{ .iter_non_iterable = .{ .found = self.typeName(t) } }, self.ast.getSpan(node.expr)),
+        else => |*t| return self.err(.{ .iter_non_iterable = .{ .found = self.typeName(t) } }, span),
     };
 
     if (index_interned) |interned| {

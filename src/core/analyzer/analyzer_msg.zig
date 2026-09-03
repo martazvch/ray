@@ -50,6 +50,7 @@ pub const AnalyzerMsg = union(enum) {
     float_equal,
     fn_expect_value: struct { expect: []const u8 },
     for_iter_non_int_range,
+    for_iter_ptr_non_array: struct { found: []const u8 },
     implicit_select_no_type,
     implicit_select_invalid_type: struct { found: []const u8 },
     implicit_select_union_tag_with_type: struct { tag: []const u8, expect: []const u8 },
@@ -197,6 +198,7 @@ pub const AnalyzerMsg = union(enum) {
             .float_equal => writer.writeAll("floating-point values equality is unsafe"),
             .fn_expect_value => |e| writer.print("no value returned from function expecting '{s}'", .{e.expect}),
             .for_iter_non_int_range => writer.writeAll("can't iterate a non-int range"),
+            .for_iter_ptr_non_array => |e| writer.print("can't take pointer of a non-array value, found: {s}", .{e.found}),
             .index_assign_str => writer.writeAll("string type does not support indexing assignment"),
             .int_overflow => |e| writer.print("literal value is too big to fit inside an integer '{s}'", .{e.value}),
             .invalid_arithmetic => |e| writer.print("invalid arithmetic operation on type '{s}'", .{e.found}),
@@ -366,6 +368,7 @@ pub const AnalyzerMsg = union(enum) {
                 \\              1.2..5.6 => ...
                 \\           }
             ),
+            .for_iter_ptr_non_array => writer.writeAll("only arrays can be iterated over while taking a pointer to the element"),
             .implicit_select_no_type => writer.writeAll(
                 \\to use implicit selector syntax, you must provide a type so that the compiler can infer it.
                 \\use either: 'var foo: Foo = .a' or a variable with already known type"

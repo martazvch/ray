@@ -1,3 +1,4 @@
 iter_non_iterable, int
 iter_non_iterable, Foo
 for_iter_non_int_range
+for_iter_ptr_non_array, str
