@@ -24,6 +24,7 @@ const Constant = @import("ConstantInterner.zig").Constant;
 const Pipeline = @import("../pipeline/pipeline.zig");
 const State = @import("../pipeline/State.zig");
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
+const CLayout = @import("../pipeline/ModuleManager.zig").Module.CStructure.Layout;
 const cffi = @import("../ffi/cffi.zig");
 const Value = @import("../runtime/values.zig").Value;
 const CFn = @import("../runtime/Obj.zig").CFn;
@@ -498,7 +499,7 @@ fn enumDecl(self: *Self, node: *const Ast.EnumDecl, ctx: *Context) StmtResult {
     const name = self.internToken(name_tk);
 
     const interned = self.ti.newEnum(.{ .name = name, .container = container_name });
-    const sym_index = try self.declareSymbol(name, interned, span);
+    const sym_index = try self.declareSymbol(name, interned, false, span);
 
     ctx.self_type = interned;
     defer ctx.self_type = null;
@@ -617,10 +618,13 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
 
     var buf: [1024]u8 = undefined;
     const container_name = self.interner.internKeepRef(self.alloc, self.containers.render(&buf, .{ .sep = "." }));
-    const interned = self.ti.newFunction(.{ .name = name, .container = container_name });
+    const interned = self.ti.newFunction(
+        .{ .name = name, .container = container_name },
+        if (node.is_extern) .c else .normal,
+    );
 
     // Forward declaration in outer scope for recursion
-    const sym_index = try self.declareSymbol(name, interned, self.ast.getSpan(node.name));
+    const sym_index = try self.declareSymbol(name, interned, node.is_extern, self.ast.getSpan(node.name));
     self.scope.open(self.alloc, null, .{ .barrier = true });
 
     self.containers.append(self.alloc, name_text);
@@ -654,7 +658,9 @@ fn endRayFnDecl(
         const fn_type = &ty.function;
         fn_type.params = params.decls;
         fn_type.return_type = try self.checkAndGetType(node.return_type, ctx);
-        fn_type.kind = if (params.is_method) .method else .normal;
+        if (params.is_method) {
+            fn_type.kind = .method;
+        }
 
         const prev_fn_type = ctx.setAndGetPrevious(.fn_type, ty);
         defer ctx.fn_type = prev_fn_type;
@@ -733,7 +739,6 @@ fn endExternFnDecl(
     const fn_type = &ty.function;
     fn_type.params = params.decls;
     fn_type.return_type = return_ty;
-    fn_type.kind = .c;
 
     const lib = self.state.dynlib orelse return self.err(
         .{ .extern_fn_not_in_rayn = .{ .name = name_text } },
@@ -746,20 +751,15 @@ fn endExternFnDecl(
         .{ .extern_fn_not_in_lib = .{ .name = name_text } },
         span,
     );
-    const returns = !return_ty.is(.void);
-    const obj_func = CFn.create(self.alloc, name_text, func, returns);
-    self.state.modules.addCFn(self.alloc, self.mod_index, obj_func);
 
     return .{
         .instr = self.irb.addInstr(
-            .{ .fn_decl = .{
+            .{ .cfn_decl = .{
+                .func = func,
                 .sym_index = sym_index,
                 .type_id = self.ti.typeId(ty),
                 .name = name,
-                .body = &.{},
-                .defaults = params.defaults,
-                .captures = &.{},
-                .returns = returns,
+                .returns = !return_ty.is(.void),
             } },
             span.start,
         ),
@@ -1037,16 +1037,23 @@ fn structDecl(self: *Self, node: *const Ast.StructDecl, ctx: *Context) StmtResul
     var buf: [1024]u8 = undefined;
     const container_name = self.interner.internKeepRef(self.alloc, self.containers.render(&buf, .{ .sep = "." }));
 
-    const interned = self.ti.newStruct(.{ .name = name, .container = container_name });
+    const interned = self.ti.newStruct(
+        .{ .name = name, .container = container_name },
+        if (node.is_extern) .c else .ray,
+    );
     const ty = &interned.structure;
 
     ctx.self_type = interned;
     defer ctx.self_type = null;
 
-    const sym_index = try self.declareSymbol(name, interned, span);
+    const sym_index = try self.declareSymbol(name, interned, node.is_extern, span);
 
     try self.openContainer(node.name);
     defer self.closeContainer();
+
+    if (node.is_extern) {
+        return self.endCStructDecl(node, name, sym_index, interned, ty, ctx);
+    }
 
     const default_fields = try self.structureFields(node.fields, ty, ctx);
     const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
@@ -1100,6 +1107,70 @@ fn structureFields(self: *Self, fields: []const Ast.VarDecl, ty: *Type.Structure
     return default_fields.toOwnedSlice(self.alloc) catch oom();
 }
 
+fn endCStructDecl(
+    self: *Self,
+    node: *const Ast.StructDecl,
+    name: InternerIdx,
+    sym_index: usize,
+    ty: *const Type,
+    struct_type: *Type.Structure,
+    ctx: *Context,
+) StmtResult {
+    if (node.functions.len > 0) @panic("");
+    if (node.traits.len > 0) @panic("");
+
+    return self.irb.addInstr(
+        .{ .cstruct_decl = .{
+            .name = name,
+            .sym_index = sym_index,
+            .type_id = self.ti.typeId(ty),
+            .layout = try self.cStructFields(node.fields, struct_type, ctx),
+        } },
+        self.ast.getSpan(node).start,
+    );
+}
+
+fn cStructFields(self: *Self, fields: []const Ast.VarDecl, ty: *Type.Structure, ctx: *Context) Error!CLayout {
+    ty.fields.ensureUnusedCapacity(self.alloc, fields.len) catch oom();
+    var offset: usize = 0;
+    var max_align: usize = 1;
+    var cfields = ArrayList(CLayout.Field).initCapacity(self.alloc, fields.len) catch oom();
+
+    for (fields) |f| {
+        if (f.value != null) @panic("");
+
+        const field_name = self.internToken(f.name);
+        const gop = ty.fields.getOrPutAssumeCapacity(field_name);
+        if (gop.found_existing) return self.err(
+            .{ .already_declared_field = .{ .name = self.ast.toSource(f.name) } },
+            self.ast.getSpan(f.name),
+        );
+
+        const field_type = try self.checkAndGetType(f.typ, ctx);
+        gop.value_ptr.* = .{ .type = field_type, .default = null };
+        const cfield = try self.cField(field_type);
+
+        offset = std.mem.alignForward(usize, offset, cfield.size);
+        cfields.appendAssumeCapacity(.{ .offset = offset, .tag = cfield.tag });
+        offset += cfield.size;
+        max_align = @max(max_align, cfield.size);
+    }
+
+    return .{
+        .alignment = max_align,
+        .size = std.mem.alignForward(usize, offset, max_align),
+        .fields = cfields.toOwnedSlice(self.alloc) catch oom(),
+    };
+}
+
+fn cField(self: *Self, ty: *const Type) Error!struct { size: usize, tag: CLayout.Field.Tag } {
+    _ = self; // autofix
+    return switch (ty.*) {
+        .u8 => .{ .size = @sizeOf(u8), .tag = .u8 },
+        else => @panic("not C-ABI compatible type in c structure"),
+    };
+}
+
 fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult {
     const span = self.ast.getSpan(node);
     const name = self.internToken(node.name);
@@ -1118,7 +1189,7 @@ fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult 
     ctx.in_trait = true;
     defer ctx.in_trait = false;
 
-    const sym_index = try self.declareSymbol(name, interned, span);
+    const sym_index = try self.declareSymbol(name, interned, false, span);
 
     try self.openContainer(node.name);
     defer self.closeContainer();
@@ -1183,7 +1254,7 @@ fn unionDecl(self: *Self, node: *const Ast.UnionDecl, ctx: *Context) StmtResult 
     const span = self.ast.getSpan(name_tk);
     const interned = self.ti.newUnion(.{ .name = name, .container = container_name }, node.is_err);
 
-    const sym_index = try self.declareSymbol(name, interned, span);
+    const sym_index = try self.declareSymbol(name, interned, false, span);
 
     ctx.self_type = interned;
     defer ctx.self_type = null;
@@ -1274,7 +1345,7 @@ fn use(self: *Self, node: *const Ast.Use) StmtResult {
                 .{ .dynlib_not_module = .{ .name = self.ast.toSource(dynlib.token) } },
                 self.ast.getSpan(dynlib.token),
             );
-            handcheck(&cffi.api);
+            handcheck(&cffi.api, self.state.modules.modules.count());
 
             const prev_dynlib = self.state.dynlib;
             self.state.dynlib = &dynlib.lib;
@@ -1394,7 +1465,7 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
         .@"if" => |*e| self.ifExpr(e, expect, ctx),
         .implicit_selector => |e| self.implicitSelector(e, ctx),
         .indexing => |*e| self.indexing(e, ctx),
-        .int => |e| self.intLit(e, false),
+        .int => |e| self.intLit(e, false, ctx),
         .match => |e| self.match(e, expect, ctx),
         .null => |e| self.nullLit(e),
         .pattern => |e| self.pattern(e, ctx),
@@ -2066,7 +2137,7 @@ fn closure(self: *Self, expr: *const Ast.FnDecl, ctx: *Context) Result {
     const interned = self.ti.intern(.{ .function = closure_type });
 
     // TODO: create an anonymus name generator mechanism
-    const sym_index = try self.declareSymbol(self.interner.intern("azert"), interned, span);
+    const sym_index = try self.declareSymbol(self.interner.intern("azert"), interned, false, span);
 
     const offset = span.start;
 
@@ -2268,7 +2339,7 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
 
     const is_static = field_res.kind == .function and struct_res.ti.is_sym;
 
-    if (!is_static and field_res.kind != .field and field_res.kind != .field_native and !ctx.in_call and !ctx.in_assign) {
+    if (!is_static and field_res.kind != .ray and field_res.kind != .zig and field_res.kind != .c and !ctx.in_call and !ctx.in_assign) {
         return self.boundMethod(field_res.type, field_res.index, struct_res.instr, span);
     }
 
@@ -2507,7 +2578,11 @@ fn structureAccess(
     if (struct_type.fields.getPtr(field_name)) |f| {
         return .{
             .type = f.type,
-            .kind = if (struct_type.native) .field_native else .field,
+            .kind = switch (struct_type.lang) {
+                .ray => .ray,
+                .zig => .zig,
+                .c => .c,
+            },
             .index = struct_type.fields.getIndex(field_name).?,
         };
     }
@@ -2597,7 +2672,7 @@ fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_name: InternerIdx)
                 .{ .load_symbol = .{
                     .module = sym.module,
                     .symbol = @intCast(sym.index),
-                    .kind = if (module.native) .zig else .ray,
+                    .lang = sym.lang,
                 } },
                 span.start,
             ),
@@ -2931,7 +3006,7 @@ fn builtinSymbol(self: *Self, name: InternerIdx, span: Span) ?struct { sym: *Lex
             .{ .load_symbol = .{
                 .symbol = @intCast(sym.index),
                 .module = sym.module,
-                .kind = .zig,
+                .lang = .zig,
             } },
             span.start,
         ),
@@ -3136,7 +3211,7 @@ pub fn floatLit(self: *Self, expr: Ast.Float, negate: bool) Result {
     };
 }
 
-pub fn intLit(self: *Self, expr: Ast.Int, negate: bool) Result {
+pub fn intLit(self: *Self, expr: Ast.Int, negate: bool, ctx: *const Context) Result {
     var span = self.ast.getSpan(expr);
     if (negate) {
         span.start -= 1;
@@ -3148,9 +3223,22 @@ pub fn intLit(self: *Self, expr: Ast.Int, negate: bool) Result {
         // Unreachable thanks to lexing
         else => unreachable,
     };
+    var ty = self.ti.getCached(.int);
+
+    if (ctx.decl_type) |decl| {
+        switch (decl.*) {
+            .u8 => {
+                if (value > std.math.maxInt(u8)) {
+                    @panic("");
+                }
+                ty = self.ti.getCached(.u8);
+            },
+            else => {},
+        }
+    }
 
     return .{
-        .type = self.ti.cache.int,
+        .type = ty,
         .ti = .{ .comp_time = true },
         .instr = self.addConstant(.{ .int = value }, span.start),
     };
@@ -3661,13 +3749,22 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
 
     if (self.errs.items.len > err_count) return error.Err;
 
-    const instr = if (struct_type.native)
+    const instr = if (struct_type.lang == .zig)
         try self.callInitOnNativeStruct(&struct_type, values, struct_res.ti.ext_mod, span)
     else if (comp_time)
-        self.structLitConstant(struct_res.instr, values, span.start)
+        self.structLitConstant(
+            struct_res.instr,
+            values,
+            struct_type.lang,
+            span.start,
+        )
     else
         self.irb.addInstr(
-            .{ .struct_literal = .{ .structure = struct_res.instr, .values = values } },
+            .{ .struct_literal = .{
+                .structure = struct_res.instr,
+                .values = values,
+                .lang = struct_type.lang,
+            } },
             span.start,
         );
 
@@ -3678,7 +3775,7 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
     };
 }
 
-fn structLitConstant(self: *Self, struct_instr: InstrIndex, instrs: []const Instr.Arg, offset: usize) InstrIndex {
+fn structLitConstant(self: *Self, struct_instr: InstrIndex, instrs: []const Instr.Arg, lang: type_mod.Language, offset: usize) InstrIndex {
     var vals = ArrayList(ConstIdx).initCapacity(self.alloc, instrs.len) catch oom();
     for (instrs) |instr| {
         switch (instr) {
@@ -3694,6 +3791,7 @@ fn structLitConstant(self: *Self, struct_instr: InstrIndex, instrs: []const Inst
             .index = self.state.addConstant(self.alloc, .{ .struct_lit = .{
                 .parent = .{ .symbol = parent.symbol, .module = parent.module },
                 .values = vals.toOwnedSlice(self.alloc) catch oom(),
+                .lang = lang,
             } }),
         } },
         offset,
@@ -3730,7 +3828,7 @@ fn callInitOnNativeStruct(
         .{ .load_symbol = .{
             .symbol = @intCast(init_fn.index),
             .module = self.getExtModOrCurrent(mod),
-            .kind = .zig,
+            .lang = .zig,
         } },
         span.start,
     );
@@ -3843,7 +3941,7 @@ fn unary(self: *Self, expr: *const Ast.Unary, ctx: *Context) Result {
     }
 
     const rhs = switch (expr.expr.*) {
-        .int => |i| return self.intLit(i, true),
+        .int => |i| return self.intLit(i, true, ctx),
         .float => |f| return self.floatLit(f, true),
         else => try self.analyzeExpr(expr.expr, .value, ctx),
     };
@@ -3941,7 +4039,7 @@ fn pointer(self: *Self, expr: *Expr, span: Span, ctx: *Context) Result {
             break :idx .{ .array = .{ .expr = idx.expr, .index = idx.index } };
         },
         .field => |f| ref: {
-            if (f.kind != .field) {
+            if (f.kind != .ray) {
                 return self.err(.invalid_pointer, span);
             }
 
@@ -3959,7 +4057,7 @@ fn pointer(self: *Self, expr: *Expr, span: Span, ctx: *Context) Result {
 
 fn binaryNot(self: *Self, expr: *Expr, span: Span, ctx: *Context) Result {
     const rhs = try switch (expr.*) {
-        .int => |i| self.intLit(i, false),
+        .int => |i| self.intLit(i, false, ctx),
         else => self.analyzeExpr(expr, .value, ctx),
     };
 
@@ -4598,8 +4696,8 @@ pub fn getConstant(self: *const Self, instr: InstrIndex) Constant {
     return self.state.getConstant(self.irb.getConstantIdx(instr));
 }
 
-fn declareSymbol(self: *Self, name: InternerIdx, ty: *const Type, span: Span) Error!usize {
-    return self.scope.declareSymbol(self.alloc, name, self.mod_index, ty) catch self.err(
+fn declareSymbol(self: *Self, name: InternerIdx, ty: *const Type, is_c: bool, span: Span) Error!usize {
+    return self.scope.declareSymbol(self.alloc, name, self.mod_index, ty, if (is_c) .c else .ray) catch self.err(
         .{ .already_declared = .{ .name = self.interner.getKey(name).? } },
         span,
     );

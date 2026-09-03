@@ -264,14 +264,14 @@ fn execute(self: *Self) !void {
             .call_c => {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const obj = self.frame.module.c_funcs.items[index];
+                const obj = self.frame.module.c_funcs[index];
                 self.callC(obj, arity);
             },
             .call_c_ext => {
                 const index = self.frame.readByte();
                 const module = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const obj = self.modules[module].c_funcs.items[index];
+                const obj = self.modules[module].c_funcs[index];
                 self.callC(obj, arity);
             },
             .call_virtual => {
@@ -409,9 +409,13 @@ fn execute(self: *Self) !void {
                 const field_idx = self.frame.readByte();
                 self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.Structure).fields[field_idx].deepCopy(self);
             },
-            .get_field_native => {
+            .get_field_zig => {
                 const field_idx = self.frame.readByte();
                 self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.ZigStructure).getField(self, field_idx);
+            },
+            .get_field_c => {
+                const field_idx = self.frame.readByte();
+                self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.CStructure).getField(field_idx);
             },
             .get_global => {
                 const idx = self.frame.readByte();
@@ -701,6 +705,12 @@ fn execute(self: *Self) !void {
                 const value = self.stack.pop();
                 instance.fields[field_idx] = value;
             },
+            .set_field_c => {
+                const field_idx = self.frame.readByte();
+                const instance = self.stack.pop().obj.as(Obj.CStructure);
+                const value = self.stack.pop();
+                instance.setField(field_idx, value);
+            },
             .set_global => {
                 const idx = self.frame.readByte();
                 self.frame.module.globals[idx] = self.stack.pop();
@@ -761,6 +771,15 @@ fn execute(self: *Self) !void {
                 const instance = Obj.Structure.create(self, &self.modules[mod_index].structs[index]);
                 structLit(instance, arity, &self.stack);
             },
+            .struct_lit_c => {
+                const index = self.frame.readByte();
+                const mod_index = self.frame.readByte();
+                const arity = self.frame.readByte();
+                const layout = self.modules[mod_index].c_structs[index].layout;
+                const cstruct = Obj.CStructure.create(self, layout);
+                cstructLit(cstruct, arity, &self.stack);
+            },
+
             .sub_float => {
                 const rhs = self.stack.pop().float;
                 self.stack.peekRef(0).float -= rhs;
@@ -837,9 +856,16 @@ fn structLit(instance: *Obj.Structure, arity: usize, stack: *Stack) void {
     for (0..arity) |i| {
         instance.fields[i] = stack.peek(arity - i - 1);
     }
-
     stack.top -= arity;
     stack.push(Value.makeObj(instance.asObj()));
+}
+
+fn cstructLit(cstruct: *Obj.CStructure, arity: usize, stack: *Stack) void {
+    for (0..arity) |i| {
+        cstruct.setField(i, stack.peek(arity - i - 1));
+    }
+    stack.top -= arity;
+    stack.push(Value.makeObj(cstruct.asObj()));
 }
 
 // PERF: check if a length is 0 and just return the string?

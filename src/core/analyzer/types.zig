@@ -24,6 +24,11 @@ pub const TraitImpl = struct {
     funcs: ArrayMapNameSym,
 };
 pub const TraitMap = ArrayMap(InternerIdx, TraitImpl);
+pub const Language = enum {
+    ray,
+    zig,
+    c,
+};
 
 pub const Type = union(enum) {
     any,
@@ -46,6 +51,9 @@ pub const Type = union(enum) {
     structure: Structure,
     trait: Trait,
     @"union": Union,
+
+    // C types
+    u8,
 
     pub const Array = struct {
         child: *const Type,
@@ -221,7 +229,7 @@ pub const Type = union(enum) {
         fields: FieldsMap,
         functions: MapNameSym,
         traits: TraitMap,
-        native: bool,
+        lang: Language,
 
         pub const FieldsMap = ArrayMap(InternerIdx, Field);
         pub const Field = struct {
@@ -351,6 +359,7 @@ pub const Type = union(enum) {
 
         switch (self) {
             .any, .never, .void, .int, .float, .bool, .str, .null => {},
+            .u8 => {},
             .array => |ty| ty.child.hash(allocator, hasher),
             .@"enum" => |*ty| {
                 if (ty.loc) |loc| {
@@ -416,6 +425,7 @@ pub const Type = union(enum) {
 
         switch (self.*) {
             .any, .never, .int, .float, .bool, .str, .null, .void, .range => return @tagName(self.*),
+            .u8 => return @tagName(self.*),
             .array => |ty| {
                 errdefer oom();
 
@@ -500,7 +510,10 @@ pub const TypeInterner = struct {
     ids: Set(*const Type),
     cache: Cache,
 
-    const scalar_list: []const Type = &.{ .any, .float, .int, .bool, .str, .null, .void, .never };
+    const scalar_list: []const Type = &.{
+        .any, .float, .int, .bool, .str, .null, .void, .never,
+        .u8,
+    };
     const trait_list: []const []const u8 = &.{"IsEnum"};
 
     pub const Cache = CreateCache();
@@ -579,12 +592,12 @@ pub const TypeInterner = struct {
         return @intCast(self.ids.getIndex(ty).?);
     }
 
-    pub fn newFunction(self: *TypeInterner, loc: Type.Loc) *Type {
+    pub fn newFunction(self: *TypeInterner, loc: Type.Loc, kind: Type.Function.Kind) *Type {
         return self.intern(.{ .function = .{
             .loc = loc,
             .params = .empty,
             .return_type = undefined,
-            .kind = undefined,
+            .kind = kind,
         } });
     }
 
@@ -597,13 +610,13 @@ pub const TypeInterner = struct {
         } });
     }
 
-    pub fn newStruct(self: *TypeInterner, loc: Type.Loc) *Type {
+    pub fn newStruct(self: *TypeInterner, loc: Type.Loc, lang: Language) *Type {
         return self.intern(.{ .structure = .{
             .loc = loc,
             .fields = .empty,
             .functions = .empty,
             .traits = .empty,
-            .native = false,
+            .lang = lang,
         } });
     }
 

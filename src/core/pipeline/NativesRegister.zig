@@ -118,7 +118,7 @@ fn registerStruct(self: *Self, alloc: Allocator, comptime zstruct: zffi.StructMe
         .fields = .empty,
         .functions = .empty,
         .traits = .empty,
-        .native = true,
+        .lang = .zig,
     };
     s.fields.ensureTotalCapacity(alloc, zstruct.fields.len) catch oom();
     s.functions.ensureTotalCapacity(alloc, zstruct.functions.len) catch oom();
@@ -204,6 +204,7 @@ fn registerZigFn(self: *Self, alloc: Allocator, comptime func: *const zffi.FnMet
         .type = fn_type,
         .index = self.current.zig_funcs.items.len,
         .module = .toIndex(self.current.index),
+        .lang = .zig,
     };
 
     self.current.zig_funcs.append(alloc, .create(alloc, func.name, func.function)) catch oom();

@@ -5,6 +5,7 @@ const ArrayList = std.ArrayList;
 const ir = @import("ir.zig");
 const Instruction = ir.Instruction;
 const TypeId = @import("types.zig").TypeId;
+const Language = @import("types.zig").Language;
 const ModIdx = @import("../pipeline/ModuleManager.zig").Index;
 const misc = @import("misc");
 const oom = misc.oom;
@@ -20,13 +21,16 @@ pub const Constant = union(enum) {
     bool: bool,
     array: struct { type_id: TypeId, values: []const ConstIdx },
     enum_lit: TagLit,
-    struct_lit: struct {
-        parent: struct { symbol: usize, module: ModIdx },
-        values: []const ConstIdx,
-    },
+    struct_lit: StructLit,
     union_lit: TagLit,
     null,
     string: misc.Interner.Index,
+
+    pub const StructLit = struct {
+        parent: struct { symbol: usize, module: ModIdx },
+        values: []const ConstIdx,
+        lang: Language,
+    };
 
     pub const TagLit = struct {
         sym: Instruction.LoadSymbol,
@@ -106,6 +110,7 @@ fn hash(data: Constant) u64 {
             hasher.update(asBytes(&e.tag_index));
         },
         .struct_lit => |s| {
+            hasher.update(asBytes(&s.lang));
             hasher.update(asBytes(&s.parent.symbol));
             hasher.update(asBytes(&s.parent.module));
             for (s.values) |v| {

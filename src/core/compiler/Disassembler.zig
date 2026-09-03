@@ -127,7 +127,8 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .get_capt_local => self.indexInstruction(writer, name, offset),
         .get_field => self.getMember(writer, name, offset),
         .get_field_dup => self.getMember(writer, name, offset),
-        .get_field_native => self.getMember(writer, name, offset),
+        .get_field_zig => self.getMember(writer, name, offset),
+        .get_field_c => self.getMember(writer, name, offset),
         .get_global => self.getGlobal(writer, false, false, offset),
         .get_global_dup => self.getGlobal(writer, false, true, offset),
         .get_global_ext => self.getGlobal(writer, true, false, offset),
@@ -206,15 +207,17 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .ret => self.simpleInstruction(writer, name, offset),
         .ret_naked => self.simpleInstruction(writer, name, offset),
         .set_field => self.indexInstruction(writer, name, offset),
+        .set_field_c => self.indexInstruction(writer, name, offset),
         .set_global => self.indexInstruction(writer, name, offset),
         .set_local => self.indexInstruction(writer, name, offset),
         .set_local_box => self.indexInstruction(writer, name, offset),
         .store_blk_val => self.simpleInstruction(writer, name, offset),
         .str_cat => self.simpleInstruction(writer, name, offset),
         .str_mul => self.simpleInstruction(writer, name, offset),
-        .struct_lit => self.structLiteral(writer, name, false, offset),
-        .struct_lit_ext => self.structLiteral(writer, name, true, offset),
-        .struct_lit_zig => self.structLiteral(writer, name, false, offset),
+        .struct_lit => self.structLiteral(writer, name, false, false, offset),
+        .struct_lit_ext => self.structLiteral(writer, name, true, false, offset),
+        .struct_lit_zig => self.structLiteral(writer, name, true, false, offset),
+        .struct_lit_c => self.structLiteral(writer, name, true, true, offset),
         .sub_float => self.simpleInstruction(writer, name, offset),
         .sub_int => self.simpleInstruction(writer, name, offset),
         .swap_pop => self.simpleInstruction(writer, name, offset),
@@ -458,25 +461,28 @@ fn callIndexArity(self: *Self, writer: *Writer, op: OpCode, offset: usize) Write
     return offset + 3;
 }
 
-fn structLiteral(self: *Self, writer: *Writer, name: []const u8, ext: bool, offset: usize) Writer.Error!usize {
+fn structLiteral(self: *Self, writer: *Writer, name: []const u8, ext: bool, is_c: bool, offset: usize) Writer.Error!usize {
     const ext_offset = @intFromBool(ext);
 
     const index = self.chunk.code.items[offset + 1];
     const module = if (ext) self.chunk.code.items[offset + 2] else self.module.toInt();
     const arity = self.chunk.code.items[offset + 2 + ext_offset];
-    const sym = self.modules.getSymbol(.toIndex(module), index, .structure);
+    const sym_name = if (is_c)
+        self.modules.getSymbol(.toIndex(module), index, .c_struct).name
+    else
+        self.modules.getSymbol(.toIndex(module), index, .structure).name;
 
     if (self.render_mode == .@"test") {
         if (ext) {
-            try writer.print("{s} index {}, module {}, arity {}, {s}\n", .{ name, index, module, arity, sym.name });
+            try writer.print("{s} index {}, module {}, arity {}, {s}\n", .{ name, index, module, arity, sym_name });
         } else {
-            try writer.print("{s} index {}, arity {}, {s}\n", .{ name, index, arity, sym.name });
+            try writer.print("{s} index {}, arity {}, {s}\n", .{ name, index, arity, sym_name });
         }
     } else {
         if (ext) {
-            try writer.print("{s:<20} index {:>4}, module {:>4}, arity {:>4}, {s}\n", .{ name, index, module, arity, sym.name });
+            try writer.print("{s:<20} index {:>4}, module {:>4}, arity {:>4}, {s}\n", .{ name, index, module, arity, sym_name });
         } else {
-            try writer.print("{s:<20} index {:>4}, arity {:>4}, {s}\n", .{ name, index, arity, sym.name });
+            try writer.print("{s:<20} index {:>4}, arity {:>4}, {s}\n", .{ name, index, arity, sym_name });
         }
     }
 

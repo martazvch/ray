@@ -1,6 +1,9 @@
 const TagLit = @import("ConstantInterner.zig").Constant.TagLit;
 const ConstIdx = @import("ConstantInterner.zig").ConstIdx;
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
+const CLayout = @import("../pipeline/ModuleManager.zig").Module.CStructure.Layout;
+const cffi = @import("../ffi/cffi.zig");
+const Language = @import("types.zig").Language;
 
 pub const Scope = enum {
     global,
@@ -40,6 +43,7 @@ pub const Instruction = struct {
         fail: Return,
         field: Field,
         fn_decl: FnDecl,
+        cfn_decl: CFnDecl,
         for_loop: For,
         identifier: Variable,
         @"if": If,
@@ -58,6 +62,7 @@ pub const Instruction = struct {
         range: Range,
         @"return": Return,
         struct_decl: StructDecl,
+        cstruct_decl: CStructDecl,
         struct_literal: StructLiteral,
         trait_decl: TraitDecl,
         trait_obj: TraitObj,
@@ -183,7 +188,7 @@ pub const Instruction = struct {
         index: usize,
         kind: Kind,
 
-        pub const Kind = enum { field, field_native, function, virtual };
+        pub const Kind = enum { ray, zig, c, function, virtual };
     };
     pub const FnDecl = struct {
         sym_index: SymbolIndex,
@@ -192,6 +197,15 @@ pub const Instruction = struct {
         body: []const Index,
         defaults: []const Index,
         captures: []const Capture,
+        returns: bool,
+
+        pub const Capture = struct { index: usize, local: bool };
+    };
+    pub const CFnDecl = struct {
+        func: cffi.Fn,
+        sym_index: SymbolIndex,
+        type_id: TypeId,
+        name: usize,
         returns: bool,
 
         pub const Capture = struct { index: usize, local: bool };
@@ -219,9 +233,7 @@ pub const Instruction = struct {
     pub const LoadSymbol = struct {
         symbol: u8,
         module: ModIndex,
-        kind: Kind = .ray,
-
-        pub const Kind = enum { ray, zig };
+        lang: Language = .ray,
     };
     pub const Match = struct {
         expr: Index,
@@ -284,9 +296,16 @@ pub const Instruction = struct {
         functions: []const Index,
         traits: []const Trait,
     };
+    pub const CStructDecl = struct {
+        name: usize,
+        sym_index: SymbolIndex,
+        type_id: TypeId,
+        layout: CLayout,
+    };
     pub const StructLiteral = struct {
         structure: Index,
         values: []const Arg,
+        lang: Language,
     };
     pub const TraitDecl = struct {
         name: usize,

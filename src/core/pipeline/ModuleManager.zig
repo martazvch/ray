@@ -33,13 +33,15 @@ pub const Module = struct {
     globals_infos: VariableMap = .empty,
 
     /// Compiled objects
+    funcs: []*Obj.Function = &.{},
+    zig_funcs: []*Obj.ZigFn = &.{},
+    c_funcs: []*Obj.CFn = &.{},
+
+    structs: []Structure = &.{},
+    c_structs: []CStructure = &.{},
     enums: []Enum = &.{},
     unions: []Union = &.{},
-    funcs: []*Obj.Function = &.{},
-    structs: []Structure = &.{},
 
-    zig_funcs: []*Obj.ZigFn = &.{},
-    c_funcs: std.ArrayList(*Obj.CFn) = .empty,
     vtables: []VTable = &.{},
 
     pub const Enum = struct {
@@ -60,6 +62,25 @@ pub const Module = struct {
         name: []const u8,
         type_id: TypeId,
         field_count: usize,
+    };
+
+    pub const CStructure = struct {
+        name: []const u8,
+        type_id: TypeId,
+        layout: Layout,
+
+        pub const Layout = struct {
+            size: usize,
+            alignment: usize,
+            fields: []const Field,
+
+            pub const Field = struct {
+                offset: usize,
+                tag: Tag,
+
+                pub const Tag = enum { u8 };
+            };
+        };
     };
 
     pub const VTable = struct {
@@ -136,7 +157,7 @@ pub fn registerSymsFromNativeMod(self: *Self, allocator: Allocator, index: Index
     const mod = self.getFromIndex(index);
     mod.globals = native_mod.globals.items;
     mod.zig_funcs = native_mod.zig_funcs.items;
-    mod.c_funcs = native_mod.c_funcs;
+    mod.c_funcs = native_mod.c_funcs.items;
 }
 
 /// Used between analyzis and compilation as we know the exact number of symbols
@@ -150,7 +171,9 @@ pub fn ensureCompileSizes(self: *Self, allocator: Allocator, index: Index, state
     mod.enums = try allocator.realloc(mod.enums, state.lex_scope.enum_count);
     mod.unions = try allocator.realloc(mod.unions, state.lex_scope.union_count);
     mod.funcs = try allocator.realloc(mod.funcs, state.lex_scope.func_count);
+    mod.c_funcs = try allocator.realloc(mod.c_funcs, state.lex_scope.cfunc_count);
     mod.structs = try allocator.realloc(mod.structs, state.lex_scope.struct_count);
+    mod.c_structs = try allocator.realloc(mod.c_structs, state.lex_scope.cstruct_count);
     mod.vtables = try allocator.realloc(mod.vtables, state.lex_scope.vtable_count);
 }
 
@@ -168,15 +191,12 @@ pub fn setSymbol(self: *Self, module_index: Index, sym_index: usize, value: anyt
         Module.Enum => module.enums,
         Module.Union => module.unions,
         *Obj.Function => module.funcs,
+        *Obj.CFn => module.c_funcs,
         Module.Structure => module.structs,
+        Module.CStructure => module.c_structs,
         else => @compileError("Can only add symbols defined in compiled module, found " ++ @typeName(@TypeOf(value))),
     };
     array[sym_index] = value;
-}
-
-pub fn addCFn(self: *Self, alloc: Allocator, mod_index: Index, value: *Obj.CFn) void {
-    const module = self.getFromIndex(mod_index);
-    module.c_funcs.append(alloc, value) catch oom();
 }
 
 pub fn getSymbol(
@@ -189,6 +209,7 @@ pub fn getSymbol(
         c_func,
         zig_func,
         structure,
+        c_struct,
         @"union",
     },
 ) switch (kind) {
@@ -197,15 +218,17 @@ pub fn getSymbol(
     .c_func => *Obj.CFn,
     .zig_func => *Obj.ZigFn,
     .structure => *const Module.Structure,
+    .c_struct => *const Module.CStructure,
     .@"union" => *const Module.Union,
 } {
     const mod = self.getFromIndex(mod_index);
     return switch (kind) {
         .@"enum" => &mod.enums[sym_index],
         .function => mod.funcs[sym_index],
-        .c_func => mod.c_funcs.items[sym_index],
+        .c_func => mod.c_funcs[sym_index],
         .zig_func => mod.zig_funcs[sym_index],
         .structure => &mod.structs[sym_index],
+        .c_struct => &mod.c_structs[sym_index],
         .@"union" => &mod.unions[sym_index],
     };
 }

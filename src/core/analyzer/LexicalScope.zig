@@ -5,6 +5,7 @@ const AutoArrayHashMapUnmanaged = std.AutoArrayHashMapUnmanaged;
 const AutoHashMapUnmanaged = std.AutoHashMapUnmanaged;
 
 const Type = @import("types.zig").Type;
+const Language = @import("types.zig").Language;
 const InstrIndex = @import("ir.zig").Index;
 const Span = @import("../parser/Lexer.zig").Span;
 const State = @import("../pipeline/State.zig");
@@ -40,9 +41,7 @@ pub const Symbol = struct {
     type: *const Type,
     index: usize,
     module: ModIndex,
-    kind: Kind = .ray,
-
-    pub const Kind = enum { ray, zig, c };
+    lang: Language = .ray,
 };
 
 pub const Error = error{ TooManyLocals, AlreadyDeclared };
@@ -58,7 +57,9 @@ native_mods: AutoHashMapUnmanaged(InternerIdx, SymbolMap),
 
 enum_count: usize,
 func_count: usize,
+cfunc_count: usize,
 struct_count: usize,
+cstruct_count: usize,
 trait_count: usize,
 union_count: usize,
 vtable_count: usize,
@@ -79,7 +80,9 @@ pub const empty: Self = .{
 
     .enum_count = 0,
     .func_count = 0,
+    .cfunc_count = 0,
     .struct_count = 0,
+    .cstruct_count = 0,
     .trait_count = 0,
     .union_count = 0,
     .vtable_count = 0,
@@ -301,24 +304,18 @@ pub fn getVarInCurrentScopeAt(self: *const Self, index: usize) *Variable {
 }
 
 /// Declares a symbol in current scope
-pub const SymKind = enum {
-    function,
-    @"enum",
-    structure,
-    trait,
-    @"union",
-};
 pub fn declareSymbol(
     self: *Self,
     allocator: Allocator,
     name: InternerIdx,
     module: ModIndex,
     ty: *const Type,
+    lang: Language,
 ) Error!usize {
     const index = switch (ty.*) {
         .@"enum" => &self.enum_count,
-        .function => &self.func_count,
-        .structure => &self.struct_count,
+        .function => if (lang == .c) &self.cfunc_count else &self.func_count,
+        .structure => if (lang == .c) &self.cstruct_count else &self.struct_count,
         .trait => &self.trait_count,
         .@"union" => &self.union_count,
         else => unreachable,
@@ -334,6 +331,7 @@ pub fn declareSymbol(
         .type = ty,
         .index = index.*,
         .module = module,
+        .lang = lang,
     };
     gop.value_ptr.* = symbol;
     self.current.symbols_type.put(allocator, ty, symbol) catch oom();

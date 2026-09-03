@@ -10,7 +10,8 @@ const Interner = misc.Interner;
 const oom = misc.oom;
 
 pub const cVm = opaque {};
-pub const Handcheck = *const fn (*const cApi) callconv(.c) void;
+pub const CStruct = opaque {};
+pub const Handcheck = *const fn (*const cApi, Index) callconv(.c) void;
 pub const Fn = *const fn (*cVm) callconv(.c) void;
 const Index = usize;
 
@@ -24,9 +25,10 @@ const cApi = extern struct {
     set_str: *const fn (*cVm, Index, [*c]const u8) callconv(.c) void,
     get_str: *const fn (*const cVm, Index) callconv(.c) [*c]const u8,
 
-    set_struct: *const fn (*cVm, Index, *anyopaque) callconv(.c) void,
+    new_struct: *const fn (*cVm, Index, Index) callconv(.c) *CStruct,
+    struct_bytes: *const fn (*CStruct) callconv(.c) [*c]u8,
+    set_struct: *const fn (*cVm, Index, *CStruct) callconv(.c) void,
     get_struct: *const fn (*cVm, Index) callconv(.c) *CStruct,
-    get_field_u8: *const fn (*const CStruct, Index) callconv(.c) u8,
 
     get_enum_tag: *const fn (*const cVm, Index) callconv(.c) i64,
 };
@@ -41,9 +43,10 @@ pub const api: cApi = .{
     .set_str = setStr,
     .get_str = getStr,
 
+    .new_struct = newStruct,
+    .struct_bytes = structBytes,
     .set_struct = setStruct,
     .get_struct = getStruct,
-    .get_field_u8 = getFieldU8,
 
     .get_enum_tag = getEnumTag,
 };
@@ -68,8 +71,6 @@ pub const FnProto = extern struct {
         ty: cType,
     };
 };
-
-pub const CStruct = opaque {};
 
 fn setFloat(c_vm: *cVm, index: Index, value: f64) callconv(.c) void {
     const vm: *Vm = @ptrCast(@alignCast(c_vm));
@@ -111,14 +112,24 @@ fn getStr(c_vm: *const cVm, index: Index) callconv(.c) [*c]const u8 {
     return vm.frame.slots[index].obj.as(Obj.String).chars.ptr;
 }
 
-fn setStruct(c_vm: *cVm, index: Index, value: *anyopaque) callconv(.c) void {
+fn newStruct(c_vm: *cVm, module: Index, symbol: Index) callconv(.c) *CStruct {
     const vm: *Vm = @ptrCast(@alignCast(c_vm));
-    vm.frame.slots[index] = .makeObj(Obj.ZigStructure.create(vm, "", value, undefined).asObj());
+    return @ptrCast(Obj.CStructure.create(vm, vm.modules[module].c_structs[symbol].layout));
+}
+
+fn structBytes(cstruct: *CStruct) callconv(.c) [*c]u8 {
+    const obj: *Obj.CStructure = @ptrCast(@alignCast(cstruct));
+    return @ptrCast(obj.bytes);
+}
+
+fn setStruct(c_vm: *cVm, index: Index, value: *CStruct) callconv(.c) void {
+    const vm: *Vm = @ptrCast(@alignCast(c_vm));
+    vm.frame.slots[index] = .makeObj(@as(*Obj.CStructure, @ptrCast(@alignCast(value))).asObj());
 }
 
 fn getStruct(c_vm: *const cVm, index: Index) callconv(.c) *CStruct {
     const vm: *const Vm = @ptrCast(@alignCast(c_vm));
-    return @ptrCast(vm.frame.slots[index].obj.as(Obj.Structure));
+    return @ptrCast(vm.frame.slots[index].obj.as(Obj.CStructure));
 }
 
 fn getFieldU8(c_struct: *const CStruct, index: Index) callconv(.c) u8 {

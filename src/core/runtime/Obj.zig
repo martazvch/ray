@@ -30,36 +30,38 @@ const Obj = @This();
 const Kind = enum {
     array,
     box,
-    cfunction,
     closure,
     @"enum",
     @"error",
     function,
+    cfunction,
+    zig_function,
     iterator,
     pointer,
     string,
     structure,
+    c_structure,
+    zig_structure,
     trait_obj,
     @"union",
-    zig_function,
-    zig_structure,
 
     pub fn fromType(T: type) Kind {
         return switch (T) {
             Array => .array,
             Box => .box,
-            CFn => .cfunction,
             Closure => .closure,
             Enum => .@"enum",
             Function => .function,
+            CFn => .cfunction,
+            ZigFn => .zig_function,
             Iterator => .iterator,
             Pointer => .pointer,
             String => .string,
             Structure => .structure,
+            CStructure => .c_structure,
+            ZigStructure => .zig_structure,
             TraitObj => .trait_obj,
             Union => .@"union",
-            ZigFn => .zig_function,
-            ZigStructure => .zig_structure,
             else => @compileError(@typeName(T) ++ " isn't a runtime object type"),
         };
     }
@@ -539,6 +541,7 @@ pub const Structure = struct {
         vm.gc.pushTmpRoot(obj.asObj());
         defer vm.gc.popTmpRoot();
 
+        // TODO: Still needed?
         obj.fields.len = 0;
         for (self.fields, 0..) |*field, i| {
             const value = field.deepCopy(vm);
@@ -551,6 +554,81 @@ pub const Structure = struct {
 
     pub fn deinit(self: *Self, allocator: Allocator) void {
         allocator.free(self.fields);
+        allocator.destroy(self);
+    }
+};
+
+pub const CStructure = struct {
+    obj: Obj,
+    name: []const u8,
+    bytes: []u8,
+    layout: Module.CStructure.Layout,
+
+    const Self = @This();
+
+    pub fn create(vm: *Vm, layout: Module.CStructure.Layout) *Self {
+        const obj = Obj.allocate(vm, Self, undefined);
+        obj.name = undefined;
+        obj.layout = layout;
+        // obj.bytes = vm.gc_alloc.alignedAlloc(u8, layout.alignment, layout.size) catch oom();
+        obj.bytes = vm.gc_alloc.alloc(u8, layout.size) catch oom();
+
+        return obj;
+    }
+
+    pub fn createComptime(alloc: Allocator, parent: *const Module.CStructure, fields: []const Value) *Self {
+        const obj = Obj.allocateComptime(alloc, Self, parent.type_id);
+        obj.name = parent.name;
+        obj.layout = parent.layout;
+        // obj.bytes = alloc.alignedAlloc(u8, parent.layout.alignment, parent.layout.size) catch oom();
+        obj.bytes = alloc.alloc(u8, parent.layout.size) catch oom();
+
+        for (fields, 0..) |field, i| {
+            obj.setField(i, field);
+        }
+
+        return obj;
+    }
+
+    pub fn getField(self: *const Self, index: usize) Value {
+        const f = self.layout.fields[index];
+        const p = self.bytes.ptr + f.offset;
+
+        return switch (f.tag) {
+            .u8 => .makeInt(@as(*const u8, @ptrCast(p)).*),
+            // .i32 => .makeInt(@as(*const i32, @ptrCast(@alignCast(p))).*),
+            // .f32 => .makeFloat(@as(*const f32, @ptrCast(@alignCast(p))).*),
+            // .ptr => .makeInt(@intFromPtr(@as(*const *anyopaque, @ptrCast(@alignCast(p))).*)),
+        };
+    }
+
+    pub fn setField(self: *Self, index: usize, value: Value) void {
+        const f = self.layout.fields[index];
+        const p = self.bytes.ptr + f.offset;
+
+        switch (f.tag) {
+            .u8 => @as(*u8, @ptrCast(p)).* = @intCast(value.int),
+            // .i32 => @as(*i32, @ptrCast(@alignCast(p))).* = @intCast(value.int),
+            // .f32 => @as(*f32, @ptrCast(@alignCast(p))).* = @floatCast(value.float),
+            // .ptr => @as(**anyopaque, @ptrCast(@alignCast(p))).* = @ptrFromInt(@as(usize, @intCast(value.int))),
+        }
+    }
+
+    pub fn asObj(self: *Self) *Obj {
+        return &self.obj;
+    }
+
+    pub fn deepCopy(self: *Self, vm: *Vm) *Self {
+        var obj = Self.create(vm, self.layout);
+        vm.gc.pushTmpRoot(obj.asObj());
+        defer vm.gc.popTmpRoot();
+        @memcpy(obj.bytes, self.bytes);
+
+        return obj;
+    }
+
+    pub fn deinit(self: *Self, allocator: Allocator) void {
+        allocator.free(self.bytes);
         allocator.destroy(self);
     }
 };
@@ -931,6 +1009,7 @@ pub fn deepCopy(self: *Obj, vm: *Vm) *Obj {
         .array => self.as(Array).deepCopy(vm).asObj(),
         .@"error", .@"union" => self.as(Union).deepCopy(vm).asObj(),
         .structure => self.as(Structure).deepCopy(vm).asObj(),
+        .c_structure => self.as(CStructure).deepCopy(vm).asObj(),
         // Immutable, shallow copy ok
         .box, .closure, .@"enum", .function, .iterator, .cfunction, .zig_function, .zig_structure, .string, .trait_obj, .pointer => self,
     };
@@ -946,14 +1025,6 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
             const function = self.as(Function);
             function.deinit(vm);
         },
-        .structure => {
-            const instance = self.as(Structure);
-            instance.deinit(vm.gc_alloc);
-        },
-        .iterator => {
-            const iterator = self.as(Iterator);
-            iterator.deinit(vm.gc_alloc);
-        },
         .cfunction => {
             const function = self.as(CFn);
             function.deinit(vm.gc_alloc);
@@ -962,12 +1033,24 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
             const function = self.as(ZigFn);
             function.deinit(vm.gc_alloc);
         },
+        .iterator => {
+            const iterator = self.as(Iterator);
+            iterator.deinit(vm.gc_alloc);
+        },
+        .pointer => self.as(Pointer).deinit(vm),
+        .string => self.as(String).deinit(vm.gc_alloc),
+        .structure => {
+            const instance = self.as(Structure);
+            instance.deinit(vm.gc_alloc);
+        },
+        .c_structure => {
+            const object = self.as(CStructure);
+            object.deinit(vm.gc_alloc);
+        },
         .zig_structure => {
             const object = self.as(ZigStructure);
             object.deinit(vm);
         },
-        .pointer => self.as(Pointer).deinit(vm),
-        .string => self.as(String).deinit(vm.gc_alloc),
         .trait_obj => self.as(TraitObj).deinit(vm),
         .@"error", .@"union" => self.as(Union).deinit(vm),
     }
@@ -1008,13 +1091,14 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
             const function = self.as(Function);
             try writer.print("<function {s}>", .{function.name});
         },
-        .structure => try writer.print("<structure {s}>", .{self.as(Structure).parent.name}),
-        .iterator => try writer.writeAll("<iterator>"),
         .cfunction => try writer.print("<c function {s}>", .{self.as(CFn).name}),
         .zig_function => try writer.print("<zig function {s}>", .{self.as(ZigFn).name}),
-        .zig_structure => try writer.print("<zig structure {s}>", .{self.as(ZigStructure).name}),
+        .iterator => try writer.writeAll("<iterator>"),
         .pointer => try writer.print("<pointer 0x{x}>", .{@intFromPtr(self.as(Pointer).child)}),
         .string => try writer.print("{s}", .{self.as(String).chars}),
+        .structure => try writer.print("<structure {s}>", .{self.as(Structure).parent.name}),
+        .c_structure => try writer.print("<c structure {s}>", .{self.as(CStructure).name}),
+        .zig_structure => try writer.print("<zig structure {s}>", .{self.as(ZigStructure).name}),
         .trait_obj => try writer.print("<trait obj {s}>", .{self.as(TraitObj).vtable.name}),
         .@"union", .@"error" => {
             const instance = self.as(Union);

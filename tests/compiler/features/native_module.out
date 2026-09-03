@@ -1,20 +1,5 @@
 //---- cmodule ----
 
--- ret_no_arg --
-
--- ret_arg --
-
--- ret_args --
-
--- void_no_arg --
-ret_naked
-
--- void_arg --
-ret_naked
-
--- void_args --
-ret_naked
-
 -- rayFunc --
 load_const index 3, value 2
 get_local index 0
@@ -32,7 +17,7 @@ load_const index 3, value 4
 call_c_ext index 1, module 3, arity 1, ret_arg
 print
 load_const index 4, value 8
-call_ext index 6, module 3, arity 1, rayFunc
+call_ext index 0, module 3, arity 1, rayFunc
 print
 ret_naked
 

@@ -142,7 +142,7 @@ pub fn Num(T: type) type {
                         break :b .{ res, .unit(constantValue(ana, res.instr)) };
                     },
                     .int => |e| {
-                        const res = try ana.intLit(e, false);
+                        const res = try ana.intLit(e, false, ctx);
                         break :b .{ res, .unit(constantValue(ana, res.instr)) };
                     },
                     .binop => |e| {
@@ -177,7 +177,7 @@ pub fn Num(T: type) type {
                                     span,
                                 );
 
-                                break :res ana.intLit(i, true);
+                                break :res ana.intLit(i, true, ctx);
                             },
                             .float => |f| res: {
                                 if (T != f64) return ana.err(

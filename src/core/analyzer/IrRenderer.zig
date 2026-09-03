@@ -92,6 +92,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .fail => |data| self.returnInstr("Fail", data),
         .field => |data| self.getField(data),
         .fn_decl => |*data| self.fnDeclaration(data),
+        .cfn_decl => |*data| self.cFnDeclaration(data),
         .for_loop => |data| self.forLoop(data),
         .identifier => |data| self.identifier(data),
         .@"if" => |*data| self.ifInstr(data),
@@ -111,6 +112,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .pointer => |data| self.pointer(data),
         .@"return" => |data| self.returnInstr("Return", data),
         .struct_decl => |*data| self.structDecl(data),
+        .cstruct_decl => |*data| self.cStructDecl(data),
         .struct_literal => |*data| self.structLiteral(data),
         .trait_decl => |data| self.traitDecl(data),
         .trait_obj => |data| self.traitObj(data),
@@ -267,7 +269,7 @@ fn call(self: *Self, data: *const Instruction.Call) void {
                 self.callSymbol(data, f.index, data.module);
             } else if (f.kind == .virtual) {
                 self.indentAndPrintSlice("[Call virtual {}]", .{f.index});
-            } else if (f.kind == .field) {
+            } else if (f.kind == .ray) {
                 self.indentAndPrintSlice("[Call field {}]", .{f.index});
             }
         },
@@ -384,7 +386,7 @@ fn continueInstr(self: *Self, data: Instruction.Continue) void {
 fn getField(self: *Self, data: Instruction.Field) void {
     self.indentAndPrintSlice(
         "[Field access {}{s}]",
-        .{ data.index, if (data.kind == .field_native) ", native" else "" },
+        .{ data.index, if (data.kind == .zig) ", native" else "" },
     );
     self.indent_level += 1;
     defer self.indent_level -= 1;
@@ -418,6 +420,13 @@ fn fnDeclaration(self: *Self, data: *const Instruction.FnDecl) void {
             self.indentAndPrintSlice("[Capture index: {}, is_local: {}]", .{ capt.index, capt.local });
         }
     }
+}
+
+fn cFnDeclaration(self: *Self, data: *const Instruction.CFnDecl) void {
+    self.indentAndPrintSlice("[C function declaration {s}{s}]", .{
+        self.interner.getKey(data.name).?,
+        if (data.returns) ", returns" else "",
+    });
 }
 
 fn forLoop(self: *Self, data: Instruction.For) void {
@@ -485,7 +494,7 @@ fn intInstr(self: *Self, data: isize) void {
 }
 
 fn loadSymbol(self: *Self, data: Instruction.LoadSymbol) void {
-    const native = if (data.kind == .ray) "" else "native ";
+    const native = if (data.lang == .ray) "" else "native ";
 
     if (data.module != self.module) {
         self.indentAndPrintSlice("[Load {s}symbol {} module {}]", .{
@@ -609,6 +618,12 @@ fn structDecl(self: *Self, data: *const Instruction.StructDecl) void {
         self.parseInstr(func);
     }
     self.traitImpls(data.traits);
+}
+
+fn cStructDecl(self: *Self, data: *const Instruction.CStructDecl) void {
+    self.indentAndPrintSlice("[C structure declaration {s}, size {}, alignment {}]", .{
+        self.interner.getKey(data.name).?, data.layout.size, data.layout.alignment,
+    });
 }
 
 fn structLiteral(self: *Self, data: *const Instruction.StructLiteral) void {

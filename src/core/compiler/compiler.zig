@@ -343,7 +343,7 @@ const Compiler = struct {
         }
     }
 
-    fn zigSymbolAccess(self: *Self, comptime op: OpCode, sym_data: Instruction.LoadSymbol) void {
+    fn nonRaySymbolAccess(self: *Self, comptime op: OpCode, sym_data: Instruction.LoadSymbol) void {
         self.writeOpAndByte(op, sym_data.symbol);
         self.writeByte(@intCast(sym_data.module.toInt()));
     }
@@ -370,7 +370,8 @@ const Compiler = struct {
             .enum_tag => |index| self.getTag(index, .@"enum"),
             .fail => |data| self.returnInstr(data),
             .field => |*data| self.field(data),
-            .fn_decl => |*data| self.compileFn(data),
+            .fn_decl => |*data| self.fnDecl(data),
+            .cfn_decl => |*data| self.cFnDecl(data),
             .for_loop => |data| self.forLoop(data),
             .identifier => |*data| self.identifier(data),
             .@"if" => |*data| self.ifInstr(data),
@@ -379,9 +380,10 @@ const Compiler = struct {
             .int_to_float => |index| self.wrappedInstr(.int_to_float, index),
 
             // Standalone 'load_symbol' can only mean that we're loading a function to bind it to a runtime value
-            .load_symbol => |data| switch (data.kind) {
+            .load_symbol => |data| switch (data.lang) {
                 .ray => self.symbolAccess(.load_fn, data),
-                .zig => self.zigSymbolAccess(.load_fn_zig, data),
+                .zig => self.nonRaySymbolAccess(.load_fn_zig, data),
+                .c => @panic("TODO"),
             },
 
             .match => |*data| self.match(data),
@@ -402,6 +404,7 @@ const Compiler = struct {
             .range => |data| self.range(data),
             .@"return" => |data| self.returnInstr(data),
             .struct_decl => |*data| self.structDecl(data),
+            .cstruct_decl => |*data| self.cStructDecl(data),
             .struct_literal => |*data| self.structLiteral(data),
             .trait_decl => |data| self.traitDecl(data),
             .trait_obj => |data| self.traitObj(data),
@@ -480,7 +483,11 @@ const Compiler = struct {
 
     fn fieldAssignment(self: *Self, data: *const Instruction.Field) Error!void {
         try self.compileInstr(data.structure);
-        self.writeOpAndByte(.set_field, @intCast(data.index));
+        if (data.kind == .c) {
+            self.writeOpAndByte(.set_field_c, @intCast(data.index));
+        } else {
+            self.writeOpAndByte(.set_field, @intCast(data.index));
+        }
     }
 
     fn binop(self: *Self, data: *const Instruction.Binop) Error!void {
@@ -601,8 +608,9 @@ const Compiler = struct {
                 .function => return self.invoke(data, f),
                 .virtual => return self.virtualCall(data, f),
                 // If we call a field holding a function it is dynamically resolved by 'call_dyn'
-                .field => {},
-                .field_native => unreachable,
+                .ray => {},
+                // No methods on those
+                .c, .zig => unreachable,
             },
             .load_symbol => |sym| {
                 return self.callSymbol(data, 0, sym.symbol, sym.module);
@@ -698,7 +706,7 @@ const Compiler = struct {
         return compiler.end();
     }
 
-    fn compileFn(self: *Self, data: *const Instruction.FnDecl) Error!void {
+    fn fnDecl(self: *Self, data: *const Instruction.FnDecl) Error!void {
         const fn_name = if (data.name) |idx| self.manager.state.interner.getKey(idx).? else "anonymus";
 
         const func = try self.compileFnBody(fn_name, data);
@@ -717,6 +725,12 @@ const Compiler = struct {
         }
 
         self.writeOpAndByte(.closure, @intCast(data.captures.len));
+    }
+
+    fn cFnDecl(self: *Self, data: *const Instruction.CFnDecl) Error!void {
+        const fn_name = self.manager.state.interner.getKey(data.name).?;
+        const func = Obj.CFn.create(self.manager.alloc, fn_name, data.func, data.returns);
+        self.manager.state.modules.setSymbol(self.manager.mod_index, data.sym_index, func);
     }
 
     fn containerFnDecls(self: *Self, decls: []const ir.Index) Error!void {
@@ -833,15 +847,28 @@ const Compiler = struct {
                         );
                     }
 
-                    break :s Value.makeObj(Obj.Structure.createComptime(
-                        self.manager.alloc,
-                        self.manager.state.modules.getSymbol(
-                            s.parent.module,
-                            s.parent.symbol,
-                            .structure,
-                        ),
-                        vals.toOwnedSlice(self.manager.alloc) catch oom(),
-                    ).asObj());
+                    const obj = if (s.lang == .ray)
+                        Obj.Structure.createComptime(
+                            self.manager.alloc,
+                            self.manager.state.modules.getSymbol(
+                                s.parent.module,
+                                s.parent.symbol,
+                                .structure,
+                            ),
+                            vals.toOwnedSlice(self.manager.alloc) catch oom(),
+                        ).asObj()
+                    else
+                        Obj.CStructure.createComptime(
+                            self.manager.alloc,
+                            self.manager.state.modules.getSymbol(
+                                s.parent.module,
+                                s.parent.symbol,
+                                .c_struct,
+                            ),
+                            vals.toOwnedSlice(self.manager.alloc) catch oom(),
+                        ).asObj();
+
+                    break :s Value.makeObj(obj);
                 },
 
                 .null => Value.null_,
@@ -898,9 +925,12 @@ const Compiler = struct {
         try self.compileInstrNoDup(data.structure);
 
         self.writeOpAndByte(
-            if (data.kind == .field_native)
-                .get_field_native
-            else if (self.state.dup) .get_field_dup else .get_field,
+            switch (data.kind) {
+                .ray => if (self.state.dup) .get_field_dup else .get_field,
+                .zig => .get_field_zig,
+                .c => .get_field_c,
+                else => unreachable,
+            },
             @intCast(data.index),
         );
     }
@@ -1200,14 +1230,23 @@ const Compiler = struct {
         try self.containerTraitDecls(data.traits);
     }
 
+    fn cStructDecl(self: *Self, data: *const Instruction.CStructDecl) Error!void {
+        self.manager.state.modules.setSymbol(self.manager.mod_index, data.sym_index, Module.CStructure{
+            .name = self.manager.alloc.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
+            .type_id = data.type_id,
+            .layout = data.layout,
+        });
+    }
+
     // TODO: protect cast
     fn structLiteral(self: *Self, data: *const Instruction.StructLiteral) Error!void {
         try self.compileArgs(data.values);
 
         switch (self.at(data.structure)) {
-            .load_symbol => |sym| switch (sym.kind) {
+            .load_symbol => |sym| switch (sym.lang) {
                 .ray => self.symbolAccess(.struct_lit, sym),
-                .zig => self.zigSymbolAccess(.struct_lit_zig, sym),
+                .zig => self.nonRaySymbolAccess(.struct_lit_zig, sym),
+                .c => self.nonRaySymbolAccess(.struct_lit_c, sym),
             },
             else => unreachable,
         }
