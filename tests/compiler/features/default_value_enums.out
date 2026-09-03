@@ -39,7 +39,7 @@ print
 ret_naked
 
 -- main --
-load_const index 9, value <instance of Cell>
+load_const index 9, value <structure Cell>
 get_local index 0
 get_field index 0
 print

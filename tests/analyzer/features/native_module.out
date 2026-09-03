@@ -7,7 +7,7 @@
 [Function declaration void_args]
 [Function declaration rayFunc, returns]
     [Return]
-        [Call extern symbol 1]
+        [Call c symbol 1]
             - args
             [Binop type: mul_float]
                 [Constant index 3]
@@ -17,7 +17,7 @@
 //-- test.ray --
 [Function declaration main]
     [Print]
-        [Call extern symbol 1 module 3]
+        [Call c symbol 1 module 3]
             - args
             [Constant index 3]
                 [Float 4]

@@ -12,7 +12,7 @@ deref
 print
 
 load_const index 4, value 9
-load_const index 6, value <instance of Bar>
+load_const index 6, value <structure Bar>
 ptr_local index 3
 ptr_local index 4
 ptr_local index 3

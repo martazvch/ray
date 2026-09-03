@@ -42,7 +42,7 @@ pub const Symbol = struct {
     module: ModIndex,
     kind: Kind = .ray,
 
-    pub const Kind = enum { ray, zig, @"extern" };
+    pub const Kind = enum { ray, zig, c };
 };
 
 pub const Error = error{ TooManyLocals, AlreadyDeclared };
@@ -184,8 +184,8 @@ pub fn initGlobalScope(self: *Self, allocator: Allocator, state: *State) void {
 
     const global_mod = state.native_reg.getGlobalScope();
     for ([_]*const Meta{
-        &global_mod.zig_fns_meta,
-        &global_mod.extern_fns_meta,
+        &global_mod.zig_funcs_meta,
+        &global_mod.c_funcs_meta,
         &global_mod.zig_structs_meta,
         &state.native_reg.intrinsics_meta,
     }) |reg| {
@@ -368,6 +368,8 @@ pub fn getSymbolFromType(self: *const Self, ty: *const Type) ?Symbol {
     return null;
 }
 
+/// Decalres a symbol that comes from another module in current scope to have access to it.
+/// Doesn't increment symbols count as they belong to another module
 pub fn declareExternSymbol(self: *Self, allocator: Allocator, name: InternerIdx, symbol: Symbol) void {
     self.current.symbols.put(allocator, name, symbol) catch oom();
     self.current.symbols_type.put(allocator, symbol.type, symbol) catch oom();

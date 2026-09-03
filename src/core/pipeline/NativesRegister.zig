@@ -31,14 +31,14 @@ pub const NativeModule = struct {
     globals_meta: VariableMap = .empty,
 
     /// Native Zig functions used at runtime
-    zig_fns: ArrayList(*Obj.ZigFn) = .empty,
+    zig_funcs: ArrayList(*Obj.ZigFn) = .empty,
     /// Native Zig functions translated to Ray's type system for compilation
-    zig_fns_meta: Meta = .empty,
+    zig_funcs_meta: Meta = .empty,
 
-    /// Extern functions used at runtime
-    extern_fns: ArrayList(*Obj.ExternFn) = .empty,
-    /// Extern functions translated to Ray's type system for compilation
-    extern_fns_meta: Meta = .empty,
+    /// C functions used at runtime
+    c_funcs: ArrayList(*Obj.CFn) = .empty,
+    /// C functions translated to Ray's type system for compilation
+    c_funcs_meta: Meta = .empty,
 
     /// Native structures used at runtime
     zig_structs: ArrayList(Module.Structure) = .empty,
@@ -193,7 +193,7 @@ pub fn registerZigFnInGlobal(self: *Self, alloc: Allocator, comptime func: *cons
 fn registerZigFn(self: *Self, alloc: Allocator, comptime func: *const zffi.FnMeta, interner: *Interner, ti: *TypeInterner) Registered {
     const fn_type = self.fnZigToRay(alloc, func, interner, ti);
     const fn_name = interner.intern(func.name);
-    const gop = self.current.zig_fns_meta.getOrPut(alloc, fn_name) catch oom();
+    const gop = self.current.zig_funcs_meta.getOrPut(alloc, fn_name) catch oom();
 
     // TODO: Error
     if (gop.found_existing) {
@@ -202,13 +202,13 @@ fn registerZigFn(self: *Self, alloc: Allocator, comptime func: *const zffi.FnMet
     gop.value_ptr.* = .{
         .name = fn_name,
         .type = fn_type,
-        .index = self.current.zig_fns.items.len,
+        .index = self.current.zig_funcs.items.len,
         .module = .toIndex(self.current.index),
     };
 
-    self.current.zig_fns.append(alloc, .create(alloc, func.name, func.function)) catch oom();
+    self.current.zig_funcs.append(alloc, .create(alloc, func.name, func.function)) catch oom();
 
-    return .{ .index = self.current.zig_fns.items.len - 1, .type = fn_type };
+    return .{ .index = self.current.zig_funcs.items.len - 1, .type = fn_type };
 }
 
 // TODO: Errors
@@ -327,7 +327,7 @@ fn zigToRay(self: *Self, alloc: Allocator, T: type, interner: *Interner, ti: *Ty
                 return ti.intern(.{ .inline_union = .{ .types = childs.toOwnedSlice(alloc) catch oom() } });
             },
             .pointer => |ptr| switch (ptr.child) {
-                Obj.EnumInstance => ti.getCached(.IsEnum),
+                Obj.Enum => ti.getCached(.IsEnum),
                 else => self.zigToRay(alloc, ptr.child, interner, ti),
             },
             .@"struct" => {
@@ -345,29 +345,29 @@ fn zigToRay(self: *Self, alloc: Allocator, T: type, interner: *Interner, ti: *Ty
 }
 
 /// Declares in global scope, used when not declaring via a module
-pub fn registerExternFnInGlobal(self: *Self, alloc: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) Registered {
+pub fn registerCFnInGlobal(self: *Self, alloc: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) Registered {
     self.current = self.getGlobalScope();
-    return self.registerExternFn(alloc, proto, interner, ti);
+    return self.registerCFn(alloc, proto, interner, ti);
 }
 
-fn registerExternFn(self: *Self, alloc: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) Registered {
-    const fn_type = externFnToRay(alloc, proto, interner, ti);
+fn registerCFn(self: *Self, alloc: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) Registered {
+    const fn_type = cFnToRay(alloc, proto, interner, ti);
     const name_str = std.mem.span(proto.name);
     const fn_name = interner.intern(name_str);
-    self.current.extern_fns_meta.put(alloc, fn_name, .{
+    self.current.c_funcs_meta.put(alloc, fn_name, .{
         .name = fn_name,
         .type = fn_type,
-        .index = self.current.extern_fns_meta.count(),
+        .index = self.current.c_funcs_meta.count(),
         .module = .toIndex(self.current.index),
     }) catch oom();
-    const native = Obj.ExternFn.create(alloc, name_str, proto.func, proto.return_type != .void);
+    const native = Obj.CFn.create(alloc, name_str, proto.func, proto.return_type != .void);
 
-    self.current.extern_fns.append(alloc, native) catch oom();
+    self.current.c_funcs.append(alloc, native) catch oom();
 
-    return .{ .index = self.current.extern_fns.items.len - 1, .type = fn_type };
+    return .{ .index = self.current.c_funcs.items.len - 1, .type = fn_type };
 }
 
-pub fn externFnToRay(alloc: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) *const Type {
+pub fn cFnToRay(alloc: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) *const Type {
     var params: Type.Function.ParamsMap = .empty;
     params.ensureTotalCapacity(alloc, proto.params.len - 1) catch oom();
 
@@ -387,7 +387,7 @@ pub fn externFnToRay(alloc: Allocator, proto: *const cffi.FnProto, interner: *In
 
     // TODO: handle container name properly
     const ty: Type.Function = .{
-        .kind = .@"extern",
+        .kind = .c,
         .loc = .{
             .name = interner.intern(std.mem.span(proto.name)),
             .container = interner.intern("std"),

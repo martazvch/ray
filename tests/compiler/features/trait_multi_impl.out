@@ -19,13 +19,13 @@ call index 4, arity 1, speak
 ret_naked
 
 -- main --
-load_const index 5, value <instance of Bar>
+load_const index 5, value <structure Bar>
 get_local index 0
 call index 2, arity 1, speak
 get_local index 0
 call index 3, arity 1, other
 
-load_const index 6, value <instance of Baz>
+load_const index 6, value <structure Baz>
 get_local index 1
 call index 4, arity 1, speak
 get_local index 1

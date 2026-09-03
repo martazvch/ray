@@ -649,7 +649,7 @@ const Compiler = struct {
 
         const is_ext = sym_mod != self.manager.mod_index;
         const op: OpCode = switch (data.kind) {
-            .@"extern" => if (is_ext) .call_extern_ext else .call_extern,
+            .c => if (is_ext) .call_c_ext else .call_c,
             .zig, .zig_method => .call_zig,
             .normal, .method, .bound => if (is_ext) .call_ext else .call,
             // Only called at analyzis time
@@ -807,7 +807,7 @@ const Compiler = struct {
                 .bool => |c| Value.makeBool(c),
                 .int => |val| Value.makeInt(val),
                 .float => |val| Value.makeFloat(val),
-                .enum_lit => |val| Value.makeObj(Obj.EnumInstance.create(
+                .enum_lit => |val| Value.makeObj(Obj.Enum.create(
                     self.manager.alloc,
                     self.manager.state.modules.getSymbol(
                         val.sym.module,
@@ -816,7 +816,7 @@ const Compiler = struct {
                     ),
                     @intCast(val.tag_index),
                 ).asObj()),
-                .union_lit => |val| Value.makeObj(Obj.UnionInstance.createComptime(
+                .union_lit => |val| Value.makeObj(Obj.Union.createComptime(
                     self.manager.alloc,
                     self.manager.state.modules.getSymbol(
                         val.sym.module,
@@ -835,7 +835,7 @@ const Compiler = struct {
                         );
                     }
 
-                    break :s Value.makeObj(Obj.Instance.createComptime(
+                    break :s Value.makeObj(Obj.Structure.createComptime(
                         self.manager.alloc,
                         self.manager.state.modules.getSymbol(
                             s.parent.module,

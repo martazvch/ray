@@ -9,10 +9,6 @@ const options = @import("options");
 const CompiledModule = @import("../compiler/compiler.zig").CompiledModule;
 const oom = @import("misc").oom;
 const Obj = @import("Obj.zig");
-const Array = Obj.Array;
-const Function = Obj.Function;
-const Structure = Obj.Structure;
-const Instance = Obj.Instance;
 const Value = @import("values.zig").Value;
 const Vm = @import("Vm.zig");
 
@@ -135,7 +131,7 @@ fn blackenObject(self: *Self, obj: *Obj) Allocator.Error!void {
 
     switch (obj.kind) {
         .array => {
-            const array = obj.as(Array);
+            const array = obj.as(Obj.Array);
             try self.markArray(array.values.items);
         },
         .box => {
@@ -146,15 +142,15 @@ fn blackenObject(self: *Self, obj: *Obj) Allocator.Error!void {
             const closure = obj.as(Obj.Closure);
             try self.markArray(closure.captures);
         },
-        .instance => {
-            const instance = obj.as(Instance);
+        .structure => {
+            const instance = obj.as(Obj.Structure);
             try self.markArray(instance.fields);
         },
         .iterator => if (obj.as(Obj.Iterator).parent) |*p| try self.markValue(p),
         .pointer => try self.markValue(obj.as(Obj.Pointer).child),
-        .union_instance => try self.markValue(&obj.as(Obj.UnionInstance).payload),
+        .@"union" => try self.markValue(&obj.as(Obj.Union).payload),
         .trait_obj => try self.markObject(obj.as(Obj.TraitObj).data),
-        .native_zfn => {},
+        .zig_function => {},
         // TODO: see why we can't mark functions and structure unreachable
         // I think they should not be reachable because only allocated at comptime
         // so not in Vm's linked list of obj

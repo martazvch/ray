@@ -1,5 +1,5 @@
 -- main --
-load_const index 7, value [<instance of Foo>, <instance of Foo>]
+load_const index 7, value [<structure Foo>, <structure Foo>]
 ptr_local index 0
 iter_new_arr_ptr
 iter_next

@@ -153,7 +153,7 @@ load_const index 40, value 1110
 load_const index 38, value 110
 load_const index 39, value 10.1
 call index 3, arity 4, staticFn
-load_const index 41, value <instance of Bar>
+load_const index 41, value <structure Bar>
 get_local_dup index 0
 struct_lit index 1, arity 1, Foo
 get_local index 1
@@ -260,7 +260,7 @@ load_const index 61, value 90
 push_true
 push_false
 call_ext index 0, module 3, arity 4, staticFn
-load_const index 62, value <instance of Def>
+load_const index 62, value <structure Def>
 get_local index 2
 load_const index 63, value imported method
 load_const_ext index 4, module 3, value 10

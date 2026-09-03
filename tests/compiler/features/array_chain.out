@@ -1,9 +1,9 @@
 -- main --
 load_const index 4, value 1
-load_const index 11, value <instance of Point>
-load_const index 21, value <instance of Point>
-load_const index 31, value <instance of Point>
-load_const index 41, value <instance of Point>
+load_const index 11, value <structure Point>
+load_const index 21, value <structure Point>
+load_const index 31, value <structure Point>
+load_const index 41, value <structure Point>
 
 get_local_dup index 1
 get_local_dup index 2

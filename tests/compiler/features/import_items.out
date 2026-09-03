@@ -94,9 +94,9 @@ exit_repl
 //---- test.ray ----
 
 -- main --
-load_const index 5, value <instance of Vec2>
-load_const index 8, value <instance of Point>
-load_const index 11, value <instance of Vec2>
+load_const index 5, value <structure Vec2>
+load_const index 8, value <structure Point>
+load_const index 11, value <structure Vec2>
 pop
 
 ret_naked

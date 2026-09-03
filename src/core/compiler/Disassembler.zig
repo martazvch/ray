@@ -102,8 +102,8 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .call_dyn => self.indexInstruction(writer, name, offset),
         .call_array, .call_string => self.callIndexArity(writer, op, offset),
         .call_ext => self.call(writer, name, false, true, offset),
-        .call_extern => self.callExtern(writer, name, false, offset),
-        .call_extern_ext => self.callExtern(writer, name, true, offset),
+        .call_c => self.callC(writer, name, false, offset),
+        .call_c_ext => self.callC(writer, name, true, offset),
         .call_virtual => self.callIndexArity(writer, op, offset),
         .call_zig => self.call(writer, name, true, true, offset),
 
@@ -399,7 +399,7 @@ fn call(self: *Self, writer: *Writer, name: []const u8, native: bool, ext: bool,
     const arity = self.chunk.code.items[offset + 2 + ext_offset];
 
     const fn_name = if (native)
-        self.modules.getSymbol(.toIndex(module), index, .function_zig).name
+        self.modules.getSymbol(.toIndex(module), index, .zig_func).name
     else
         self.modules.getSymbol(.toIndex(module), index, .function).name;
 
@@ -420,13 +420,13 @@ fn call(self: *Self, writer: *Writer, name: []const u8, native: bool, ext: bool,
     return offset + 3 + ext_offset;
 }
 
-fn callExtern(self: *Self, writer: *Writer, name: []const u8, ext: bool, offset: usize) Writer.Error!usize {
+fn callC(self: *Self, writer: *Writer, name: []const u8, ext: bool, offset: usize) Writer.Error!usize {
     const ext_offset = @intFromBool(ext);
 
     const index = self.chunk.code.items[offset + 1];
     const module = if (ext) self.chunk.code.items[offset + 2] else self.module.toInt();
     const arity = self.chunk.code.items[offset + 2 + ext_offset];
-    const fn_name = self.modules.getSymbol(.toIndex(module), index, .function_extern).name;
+    const fn_name = self.modules.getSymbol(.toIndex(module), index, .c_func).name;
 
     if (self.render_mode == .@"test") {
         if (ext) {

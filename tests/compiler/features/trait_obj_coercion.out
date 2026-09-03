@@ -16,7 +16,7 @@ call_virtual index 0, arity 2
 ret_naked
 
 -- gen --
-load_const index 5, value <instance of Bar>
+load_const index 5, value <structure Bar>
 trait_obj index 0
 ret
 
@@ -25,7 +25,7 @@ call index 3, arity 0, gen
 load_const index 6, value 5
 call_virtual index 0, arity 2
 
-load_const index 7, value <instance of Bar>
+load_const index 7, value <structure Bar>
 trait_obj index 0
 
 get_local index 0
@@ -40,7 +40,7 @@ get_field index 0
 load_const index 9, value 56
 call_virtual index 0, arity 2
 
-load_const index 5, value <instance of Bar>
+load_const index 5, value <structure Bar>
 trait_obj index 0
 struct_lit index 1, arity 1, Baz
 set_local index 1

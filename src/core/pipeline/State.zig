@@ -170,7 +170,7 @@ pub fn registerFn(self: *Self, allocator: Allocator, func: zffi.FnMeta) void {
 
 /// Used by embedded
 pub fn registerCFn(self: *Self, allocator: Allocator, func: cffi.FnProto) void {
-    _ = self.native_reg.registerExternFnInGlobal(allocator, &func, &self.interner, &self.type_interner);
+    _ = self.native_reg.registerCFnInGlobal(allocator, &func, &self.interner, &self.type_interner);
 }
 
 /// Used after analyzer to register module's public symbols' information

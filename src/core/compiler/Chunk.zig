@@ -48,12 +48,12 @@ pub const OpCode = enum(u8) {
     call,
     /// Calls a ray function within an extern module
     call_ext,
+    /// Calls a c function within current module
+    call_c,
+    /// Calls a c function within an extern module
+    call_c_ext,
     /// Runtime calling convention dispatch
     call_dyn,
-    /// Calls a compiled function within current module
-    call_extern,
-    /// Calls a compiled function within an extern module
-    call_extern_ext,
     /// Calling a virtual function on a trait object
     call_virtual,
     /// Calls a non-compiled Zig function

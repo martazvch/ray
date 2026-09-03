@@ -235,7 +235,7 @@ fn execute(self: *Self) !void {
 
                 const closure = Obj.Closure.create(
                     self,
-                    self.frame.module.functions[sym_index],
+                    self.frame.module.funcs[sym_index],
                     (self.stack.top - 1)[0..1],
                 );
                 // Discard the function
@@ -252,27 +252,27 @@ fn execute(self: *Self) !void {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
                 self.frame = try self.frame_stack.newKeepMod();
-                self.frame.call(self.frame.module.functions[index], &self.stack, arity, self.modules);
+                self.frame.call(self.frame.module.funcs[index], &self.stack, arity, self.modules);
             },
             .call_ext => {
                 const index = self.frame.readByte();
                 const module = self.frame.readByte();
                 const arity = self.frame.readByte();
                 self.frame = try self.frame_stack.newKeepMod();
-                self.frame.call(self.modules[module].functions[index], &self.stack, arity, self.modules);
+                self.frame.call(self.modules[module].funcs[index], &self.stack, arity, self.modules);
             },
-            .call_extern => {
+            .call_c => {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const obj = self.frame.module.extern_funcs.items[index];
-                self.callExtern(obj, arity);
+                const obj = self.frame.module.c_funcs.items[index];
+                self.callC(obj, arity);
             },
-            .call_extern_ext => {
+            .call_c_ext => {
                 const index = self.frame.readByte();
                 const module = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const obj = self.modules[module].extern_funcs.items[index];
-                self.callExtern(obj, arity);
+                const obj = self.modules[module].c_funcs.items[index];
+                self.callC(obj, arity);
             },
             .call_virtual => {
                 const index = self.frame.readByte();
@@ -300,7 +300,7 @@ fn execute(self: *Self) !void {
                 const callee = self.stack.peekRef(args_count).obj;
 
                 switch (callee.kind) {
-                    .native_zfn => {
+                    .zig_function => {
                         const native = callee.as(Obj.ZigFn).function;
                         const result = native(self, (self.stack.top - args_count)[0..args_count]);
 
@@ -403,15 +403,15 @@ fn execute(self: *Self) !void {
             },
             .get_field => {
                 const field_idx = self.frame.readByte();
-                self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.Instance).fields[field_idx];
+                self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.Structure).fields[field_idx];
             },
             .get_field_dup => {
                 const field_idx = self.frame.readByte();
-                self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.Instance).fields[field_idx].deepCopy(self);
+                self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.Structure).fields[field_idx].deepCopy(self);
             },
             .get_field_native => {
                 const field_idx = self.frame.readByte();
-                self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.NativeObj).getField(self, field_idx);
+                self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.ZigStructure).getField(self, field_idx);
             },
             .get_global => {
                 const idx = self.frame.readByte();
@@ -429,8 +429,8 @@ fn execute(self: *Self) !void {
             // TODO: see if same compiler bug as get_global
             .get_local => self.stack.push(self.frame.slots[self.frame.readByte()]),
             .get_local_dup => self.stack.push(self.frame.slots[self.frame.readByte()].deepCopy(self)),
-            .get_enum_tag => self.stack.peekRef(0).* = .makeInt(self.stack.peek(0).obj.as(Obj.EnumInstance).tag_id),
-            .get_union_tag => self.stack.peekRef(0).* = .makeInt(self.stack.peek(0).obj.as(Obj.UnionInstance).tag_id),
+            .get_enum_tag => self.stack.peekRef(0).* = .makeInt(self.stack.peek(0).obj.as(Obj.Enum).tag_id),
+            .get_union_tag => self.stack.peekRef(0).* = .makeInt(self.stack.peek(0).obj.as(Obj.Union).tag_id),
             .gt_float => self.stack.push(Value.makeBool(self.stack.pop().float < self.stack.pop().float)),
             .gt_int => self.stack.push(Value.makeBool(self.stack.pop().int < self.stack.pop().int)),
             .index_arr => {
@@ -567,13 +567,13 @@ fn execute(self: *Self) !void {
             },
             .load_fn => {
                 const symbol_idx = self.frame.readByte();
-                self.stack.push(.makeObj(self.frame.module.functions[symbol_idx].asObj()));
+                self.stack.push(.makeObj(self.frame.module.funcs[symbol_idx].asObj()));
             },
             .load_fn_ext => {
                 const symbol_index = self.frame.readByte();
                 const module_index = self.frame.readByte();
                 const module = self.modules[module_index];
-                self.stack.push(.makeObj(module.functions[symbol_index].asObj()));
+                self.stack.push(.makeObj(module.funcs[symbol_index].asObj()));
             },
             .loop => {
                 const jump = self.frame.readShort();
@@ -651,7 +651,7 @@ fn execute(self: *Self) !void {
             },
             .ptr_field => {
                 const idx = self.frame.readByte();
-                const field = &self.stack.pop().obj.as(Obj.Instance).fields[idx];
+                const field = &self.stack.pop().obj.as(Obj.Structure).fields[idx];
                 self.stack.push(.makeObj(Obj.Pointer.create(self, field).asObj()));
             },
             .ptr_store => {
@@ -697,7 +697,7 @@ fn execute(self: *Self) !void {
             },
             .set_field => {
                 const field_idx = self.frame.readByte();
-                const instance = self.stack.pop().obj.as(Obj.Instance);
+                const instance = self.stack.pop().obj.as(Obj.Structure);
                 const value = self.stack.pop();
                 instance.fields[field_idx] = value;
             },
@@ -744,21 +744,21 @@ fn execute(self: *Self) !void {
             .struct_lit => {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const instance = Obj.Instance.create(self, &self.frame.module.structures[index]);
+                const instance = Obj.Structure.create(self, &self.frame.module.structs[index]);
                 structLit(instance, arity, &self.stack);
             },
             .struct_lit_ext => {
                 const index = self.frame.readByte();
                 const mod_index = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const instance = Obj.Instance.create(self, &self.modules[mod_index].structures[index]);
+                const instance = Obj.Structure.create(self, &self.modules[mod_index].structs[index]);
                 structLit(instance, arity, &self.stack);
             },
             .struct_lit_zig => {
                 const index = self.frame.readByte();
                 const mod_index = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const instance = Obj.Instance.create(self, &self.modules[mod_index].structures[index]);
+                const instance = Obj.Structure.create(self, &self.modules[mod_index].structs[index]);
                 structLit(instance, arity, &self.stack);
             },
             .sub_float => {
@@ -789,7 +789,7 @@ fn execute(self: *Self) !void {
             .union_constr => {
                 const index = self.frame.readByte();
                 const tag = self.frame.readByte();
-                self.stack.push(.makeObj(Obj.UnionInstance.create(
+                self.stack.push(.makeObj(Obj.Union.create(
                     self,
                     &self.frame.module.unions[index],
                     tag,
@@ -800,7 +800,7 @@ fn execute(self: *Self) !void {
                 const index = self.frame.readByte();
                 const module = self.frame.readByte();
                 const tag = self.frame.readByte();
-                self.stack.push(.makeObj(Obj.UnionInstance.create(
+                self.stack.push(.makeObj(Obj.Union.create(
                     self,
                     &self.modules[module].unions[index],
                     tag,
@@ -809,7 +809,7 @@ fn execute(self: *Self) !void {
             },
             .union_unwrap => {
                 const index = self.frame.readByte();
-                const u = self.stack.pop().obj.as(Obj.UnionInstance);
+                const u = self.stack.pop().obj.as(Obj.Union);
                 if (index != u.tag_id) return self.err(error.UnionUnwrap);
                 self.stack.push(u.payload);
             },
@@ -818,7 +818,7 @@ fn execute(self: *Self) !void {
     }
 }
 
-fn callExtern(self: *Self, obj: *Obj.ExternFn, arity: usize) void {
+fn callC(self: *Self, obj: *Obj.CFn, arity: usize) void {
     const base = self.stack.top - arity;
     const prev_slot = self.frame.slots;
     defer self.frame.slots = prev_slot;
@@ -833,7 +833,7 @@ fn callExtern(self: *Self, obj: *Obj.ExternFn, arity: usize) void {
     }
 }
 
-fn structLit(instance: *Obj.Instance, arity: usize, stack: *Stack) void {
+fn structLit(instance: *Obj.Structure, arity: usize, stack: *Stack) void {
     for (0..arity) |i| {
         instance.fields[i] = stack.peek(arity - i - 1);
     }

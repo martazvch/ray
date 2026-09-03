@@ -1,27 +1,27 @@
-<instance of Human>
+<structure Human>
 5
 Tom
 
-<instance of Human>
+<structure Human>
 5
 Tom
 
-<instance of Human>
+<structure Human>
 95
 Tom
 
-<instance of Human>
+<structure Human>
 6
 Martin
 
-<instance of Human>
+<structure Human>
 95
 Martin
 
-<instance of Human>
+<structure Human>
 95
 Martin
 
-<instance of Local>
+<structure Local>
 42
 

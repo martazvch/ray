@@ -15,15 +15,16 @@ pub const Fn = *const fn (*cVm) callconv(.c) void;
 const Index = usize;
 
 const cApi = extern struct {
-    get_float: *const fn (*const cVm, Index) callconv(.c) f64,
     set_float: *const fn (*cVm, Index, f64) callconv(.c) void,
-    get_int: *const fn (*const cVm, Index) callconv(.c) i64,
+    get_float: *const fn (*const cVm, Index) callconv(.c) f64,
     set_int: *const fn (*cVm, Index, i64) callconv(.c) void,
-    get_bool: *const fn (*const cVm, Index) callconv(.c) bool,
+    get_int: *const fn (*const cVm, Index) callconv(.c) i64,
     set_bool: *const fn (*cVm, Index, bool) callconv(.c) void,
-    get_str: *const fn (*const cVm, Index) callconv(.c) [*c]const u8,
+    get_bool: *const fn (*const cVm, Index) callconv(.c) bool,
     set_str: *const fn (*cVm, Index, [*c]const u8) callconv(.c) void,
+    get_str: *const fn (*const cVm, Index) callconv(.c) [*c]const u8,
 
+    set_struct: *const fn (*cVm, Index, *anyopaque) callconv(.c) void,
     get_struct: *const fn (*cVm, Index) callconv(.c) *CStruct,
     get_field_u8: *const fn (*const CStruct, Index) callconv(.c) u8,
 
@@ -31,15 +32,16 @@ const cApi = extern struct {
 };
 
 pub const api: cApi = .{
-    .get_float = getFloat,
     .set_float = setFloat,
-    .get_int = getInt,
+    .get_float = getFloat,
     .set_int = setInt,
-    .get_bool = getBool,
+    .get_int = getInt,
     .set_bool = setBool,
-    .get_str = getStr,
+    .get_bool = getBool,
     .set_str = setStr,
+    .get_str = getStr,
 
+    .set_struct = setStruct,
     .get_struct = getStruct,
     .get_field_u8 = getFieldU8,
 
@@ -109,17 +111,22 @@ fn getStr(c_vm: *const cVm, index: Index) callconv(.c) [*c]const u8 {
     return vm.frame.slots[index].obj.as(Obj.String).chars.ptr;
 }
 
+fn setStruct(c_vm: *cVm, index: Index, value: *anyopaque) callconv(.c) void {
+    const vm: *Vm = @ptrCast(@alignCast(c_vm));
+    vm.frame.slots[index] = .makeObj(Obj.ZigStructure.create(vm, "", value, undefined).asObj());
+}
+
 fn getStruct(c_vm: *const cVm, index: Index) callconv(.c) *CStruct {
     const vm: *const Vm = @ptrCast(@alignCast(c_vm));
-    return @ptrCast(vm.frame.slots[index].obj.as(Obj.Instance));
+    return @ptrCast(vm.frame.slots[index].obj.as(Obj.Structure));
 }
 
 fn getFieldU8(c_struct: *const CStruct, index: Index) callconv(.c) u8 {
-    const s: *const Obj.Instance = @ptrCast(@alignCast(c_struct));
+    const s: *const Obj.Structure = @ptrCast(@alignCast(c_struct));
     return @intCast(s.fields[index].int);
 }
 
 fn getEnumTag(c_vm: *const cVm, index: Index) callconv(.c) i64 {
     const vm: *const Vm = @ptrCast(@alignCast(c_vm));
-    return vm.frame.slots[index].obj.as(Obj.EnumInstance).payload;
+    return vm.frame.slots[index].obj.as(Obj.Enum).payload;
 }

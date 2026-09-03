@@ -18,7 +18,7 @@ get_field_dup index 0
 ret
 
 -- main --
-load_const index 5, value <instance of Human>
+load_const index 5, value <structure Human>
 
 push_null
 get_local index 0

@@ -79,7 +79,7 @@ print
 load_const index 9, value 5
 call index 13, arity 1, withDefaultNoBody
 print
-load_const index 11, value <instance of Bar>
+load_const index 11, value <structure Bar>
 get_local index 0
 call index 11, arity 1, method1
 ret_naked

@@ -1,7 +1,7 @@
 -- main --
-load_const index 5, value <instance of Human>
+load_const index 5, value <structure Human>
 
-load_const index 5, value <instance of Human>
+load_const index 5, value <structure Human>
 set_local index 0
 
 load_const index 6, value 95

@@ -6,7 +6,7 @@ yup
 yup
 false
 false
-<instance of Foo>
+<structure Foo>
 <enum Bar.bb>
 [true, false]
 3.3
@@ -17,6 +17,6 @@ yup
 Tom
 false
 false
-<instance of Foo>
+<structure Foo>
 <enum Bar.bb>
 [true, false]

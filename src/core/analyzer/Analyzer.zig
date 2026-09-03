@@ -26,7 +26,7 @@ const State = @import("../pipeline/State.zig");
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
 const cffi = @import("../ffi/cffi.zig");
 const Value = @import("../runtime/values.zig").Value;
-const ExternFn = @import("../runtime/Obj.zig").ExternFn;
+const CFn = @import("../runtime/Obj.zig").CFn;
 
 const type_mod = @import("types.zig");
 const Type = type_mod.Type;
@@ -729,7 +729,7 @@ fn endExternFnDecl(
     const fn_type = &ty.function;
     fn_type.params = params.decls;
     fn_type.return_type = return_ty;
-    fn_type.kind = .@"extern";
+    fn_type.kind = .c;
 
     const lib = self.state.dynlib orelse return self.err(
         .{ .extern_fn_not_in_rayn = .{ .name = name_text } },
@@ -743,8 +743,8 @@ fn endExternFnDecl(
         span,
     );
     const returns = !return_ty.is(.void);
-    const obj_func = ExternFn.create(self.alloc, name_text, func, returns);
-    self.state.modules.setExternFn(self.alloc, self.mod_index, obj_func);
+    const obj_func = CFn.create(self.alloc, name_text, func, returns);
+    self.state.modules.addCFn(self.alloc, self.mod_index, obj_func);
 
     return .{
         .instr = self.irb.addInstr(

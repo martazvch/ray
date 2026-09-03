@@ -1,5 +1,5 @@
 -- getPt --
-load_const index 4, value <instance of Point>
+load_const index 4, value <structure Point>
 ret
 
 -- getVec --
@@ -8,7 +8,7 @@ struct_lit index 1, arity 1, Vec2
 ret
 
 -- main --
-load_const index 6, value <instance of Vec2>
+load_const index 6, value <structure Vec2>
 
 get_local index 0
 call index 0, arity 1, getPt

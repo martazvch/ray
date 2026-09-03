@@ -35,11 +35,11 @@ pub const Module = struct {
     /// Compiled objects
     enums: []Enum = &.{},
     unions: []Union = &.{},
-    functions: []*Obj.Function = &.{},
+    funcs: []*Obj.Function = &.{},
+    structs: []Structure = &.{},
+
     zig_funcs: []*Obj.ZigFn = &.{},
-    extern_funcs: std.ArrayList(*Obj.ExternFn) = .empty,
-    structures: []Structure = &.{},
-    zig_structs: []Structure = &.{},
+    c_funcs: std.ArrayList(*Obj.CFn) = .empty,
     vtables: []VTable = &.{},
 
     pub const Enum = struct {
@@ -130,14 +130,13 @@ pub fn registerGlobalsInfo(self: *Self, allocator: Allocator, index: Index, glob
 /// After creating a native module, we have both compiled functions and symbols informations
 /// Adds the informations and the compiled objects
 pub fn registerSymsFromNativeMod(self: *Self, allocator: Allocator, index: Index, native_mod: *const NativeMod) void {
-    self.registerSymsInfo(allocator, index, &native_mod.zig_fns_meta);
+    self.registerSymsInfo(allocator, index, &native_mod.zig_funcs_meta);
     self.registerGlobalsInfo(allocator, index, &native_mod.globals_meta);
 
     const mod = self.getFromIndex(index);
     mod.globals = native_mod.globals.items;
-    mod.zig_funcs = native_mod.zig_fns.items;
-    mod.extern_funcs = native_mod.extern_fns;
-    mod.zig_structs = native_mod.zig_structs.items;
+    mod.zig_funcs = native_mod.zig_funcs.items;
+    mod.c_funcs = native_mod.c_funcs;
 }
 
 /// Used between analyzis and compilation as we know the exact number of symbols
@@ -150,8 +149,8 @@ pub fn ensureCompileSizes(self: *Self, allocator: Allocator, index: Index, state
     mod.constants = try allocator.realloc(mod.constants, state.const_interner.constants.items.len);
     mod.enums = try allocator.realloc(mod.enums, state.lex_scope.enum_count);
     mod.unions = try allocator.realloc(mod.unions, state.lex_scope.union_count);
-    mod.functions = try allocator.realloc(mod.functions, state.lex_scope.func_count);
-    mod.structures = try allocator.realloc(mod.structures, state.lex_scope.struct_count);
+    mod.funcs = try allocator.realloc(mod.funcs, state.lex_scope.func_count);
+    mod.structs = try allocator.realloc(mod.structs, state.lex_scope.struct_count);
     mod.vtables = try allocator.realloc(mod.vtables, state.lex_scope.vtable_count);
 }
 
@@ -168,16 +167,16 @@ pub fn setSymbol(self: *Self, module_index: Index, sym_index: usize, value: anyt
     const array = switch (@TypeOf(value)) {
         Module.Enum => module.enums,
         Module.Union => module.unions,
-        *Obj.Function => module.functions,
-        Module.Structure => module.structures,
+        *Obj.Function => module.funcs,
+        Module.Structure => module.structs,
         else => @compileError("Can only add symbols defined in compiled module, found " ++ @typeName(@TypeOf(value))),
     };
     array[sym_index] = value;
 }
 
-pub fn setExternFn(self: *Self, alloc: Allocator, mod_index: Index, value: *Obj.ExternFn) void {
+pub fn addCFn(self: *Self, alloc: Allocator, mod_index: Index, value: *Obj.CFn) void {
     const module = self.getFromIndex(mod_index);
-    module.extern_funcs.append(alloc, value) catch oom();
+    module.c_funcs.append(alloc, value) catch oom();
 }
 
 pub fn getSymbol(
@@ -187,26 +186,26 @@ pub fn getSymbol(
     comptime kind: enum {
         @"enum",
         function,
-        function_extern,
-        function_zig,
+        c_func,
+        zig_func,
         structure,
         @"union",
     },
 ) switch (kind) {
     .@"enum" => *const Module.Enum,
     .function => *Obj.Function,
-    .function_extern => *Obj.ExternFn,
-    .function_zig => *Obj.ZigFn,
+    .c_func => *Obj.CFn,
+    .zig_func => *Obj.ZigFn,
     .structure => *const Module.Structure,
     .@"union" => *const Module.Union,
 } {
     const mod = self.getFromIndex(mod_index);
     return switch (kind) {
         .@"enum" => &mod.enums[sym_index],
-        .function => mod.functions[sym_index],
-        .function_extern => mod.extern_funcs.items[sym_index],
-        .function_zig => mod.zig_funcs[sym_index],
-        .structure => &mod.structures[sym_index],
+        .function => mod.funcs[sym_index],
+        .c_func => mod.c_funcs.items[sym_index],
+        .zig_func => mod.zig_funcs[sym_index],
+        .structure => &mod.structs[sym_index],
         .@"union" => &mod.unions[sym_index],
     };
 }

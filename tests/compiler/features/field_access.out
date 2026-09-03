@@ -1,5 +1,5 @@
 -- main --
-load_const index 4, value <instance of Pet>
+load_const index 4, value <structure Pet>
 load_const index 5, value 5
 load_const index 6, value Tom
 

@@ -13,7 +13,7 @@ pub const Int = i64;
 pub const Float = f64;
 pub const Bool = bool;
 pub const Str = []const u8;
-pub const Enum = *Obj.EnumInstance;
+pub const Enum = *Obj.Enum;
 
 pub const All = union(enum) {
     bool: Bool,
@@ -230,7 +230,7 @@ pub fn getField(T: type, self: *anyopaque, vm: *Vm, index: usize) Value {
 }
 
 pub fn makeObj(T: type, name: []const u8, value: *anyopaque, vm: *Vm) *T {
-    const obj = Obj.NativeObj.create(vm, name, value, .init(T));
+    const obj = Obj.ZigStructure.create(vm, name, value, .init(T));
     return @ptrCast(@alignCast(&obj.child));
 }
 
@@ -289,9 +289,9 @@ pub fn makeNative(func: anytype) Fn {
                 .pointer => |ptr| return switch (ptr.child) {
                     u8 => value.obj.as(Obj.String).chars,
                     anyopaque => @compileError("Can't use *anyopaque in functions"),
-                    Obj.EnumInstance => value.asObj().?.as(Obj.EnumInstance),
+                    Obj.Enum => value.asObj().?.as(Obj.Enum),
                     // All other native zig structures are wrapped in NativeObj
-                    else => @ptrCast(@alignCast(value.asObj().?.as(Obj.NativeObj).child)),
+                    else => @ptrCast(@alignCast(value.asObj().?.as(Obj.ZigStructure).child)),
                 },
                 else => @compileError("FFI: Unsupported type in auto conversion: " ++ @typeName(T)),
             };
@@ -305,7 +305,7 @@ pub fn makeNative(func: anytype) Fn {
                 .float => |v| createUnionIfField(U, "float", v),
                 .obj => |v| switch (v.kind) {
                     .string => createUnionIfField(U, "str", v.as(Obj.String).chars),
-                    .enum_instance => createUnionIfField(U, "enum", v.as(Obj.EnumInstance)),
+                    .@"enum" => createUnionIfField(U, "enum", v.as(Obj.Enum)),
                     else => unreachable,
                 },
 
@@ -351,7 +351,7 @@ fn toValue(vm: *Vm, value: anytype, config: Config) Value {
             },
             else => {
                 const native = @as(
-                    *Obj.NativeObj,
+                    *Obj.ZigStructure,
                     @alignCast(@fieldParentPtr(
                         "child",
                         @as(**anyopaque, @ptrCast(@alignCast(value))),

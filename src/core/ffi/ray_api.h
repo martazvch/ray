@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define UNUSED(expr) ((void)expr)
+#define UNUSED(expr) (void)(expr)
 
 // #ifdef _WIN32
 //     // #ifdef RAY_BUILDING_DLL
@@ -45,19 +45,21 @@ typedef void (*RaySetFloat)(RayVm *const, Index, double);
 typedef void (*RaySetInt)(RayVm *const, Index, int64_t);
 typedef void (*RaySetBool)(RayVm *const, Index, bool);
 typedef void (*RaySetStr)(RayVm *const, Index, const char *);
+typedef void (*RaySetStruct)(const RayVm *const, Index, CStruct *);
 
 // ----------------
 //  Function table
 typedef struct {
-    RayGetFloat get_float;
     RaySetFloat set_float;
-    RayGetInt get_int;
+    RayGetFloat get_float;
     RaySetInt set_int;
-    RayGetBool get_bool;
+    RayGetInt get_int;
     RaySetBool set_bool;
-    RayGetStr get_str;
+    RayGetBool get_bool;
     RaySetStr set_str;
+    RayGetStr get_str;
 
+    RaySetStruct set_struct;
     RayGetStruct get_struct;
     RayGetU8 get_field_u8;
 
