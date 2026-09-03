@@ -1,0 +1,4 @@
+shift_overflow, 63, 100
+shift_overflow, 63, 200
+div_by_zero
+div_by_zero

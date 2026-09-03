@@ -37,7 +37,7 @@ exit_repl
 //---- test ----
 
 -- main --
-get_global index 1, value math
+get_global_ext index 1, module 3, value math
 print
 get_global_ext index 0, module 3, value 8
 print

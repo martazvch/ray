@@ -1,4 +1,3 @@
-[Import global index 0, symbol index 0 module 1]
 [Function declaration main]
     [Print]
         [Call Zig symbol 13 module 1]
@@ -12,7 +11,7 @@
     [Print]
         [Call Zig symbol 14 module 1]
             - args
-            [Variable index: 0, scope: global]
+            [Variable index: 0, scope: global, module 1]
     [Print]
         [Call Zig symbol 14 module 1]
             - args

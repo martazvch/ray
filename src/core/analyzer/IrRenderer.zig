@@ -95,7 +95,6 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .for_loop => |data| self.forLoop(data),
         .identifier => |data| self.identifier(data),
         .@"if" => |*data| self.ifInstr(data),
-        .import_global => |data| self.importGlobal(data),
         .in => |data| self.in(data),
         .indexing => |data| self.indexing(data, false),
         .int_to_float => |index| self.indexInstr("Int to float", index),
@@ -179,7 +178,7 @@ fn assignment(self: *Self, data: *const Instruction.Assignment) void {
     };
 
     self.indentAndPrintSlice("[Assignment index: {}, scope: {s}{s}]", .{
-        variable_data.index,          @tagName(variable_data.scope),
+        variable_data.index,          @tagName(variable_data.kind),
         if (unbox) ", unbox" else "",
     });
 }
@@ -434,14 +433,19 @@ fn forLoop(self: *Self, data: Instruction.For) void {
 }
 
 fn identifier(self: *Self, data: Instruction.Variable) void {
-    if (data.module) |mod| {
-        self.indentAndPrintSlice("[Variable index: {}, scope: {t}, module {}]", .{
-            data.index, data.scope, mod.toInt(),
-        });
-    } else {
-        self.indentAndPrintSlice("[Variable index: {}, scope: {s}]", .{
-            data.index, if (data.scope == .global) "global" else "local",
-        });
+    switch (data.kind) {
+        .local => {
+            self.indentAndPrintSlice("[Variable index: {}, scope: local]", .{data.index});
+        },
+        .global => |d| {
+            if (d.module) |mod| {
+                self.indentAndPrintSlice("[Variable index: {}, scope: global, module {}]", .{
+                    data.index, mod.toInt(),
+                });
+            } else {
+                self.indentAndPrintSlice("[Variable index: {}, scope: global]", .{data.index});
+            }
+        },
     }
 }
 
@@ -464,13 +468,6 @@ fn ifInstr(self: *Self, data: *const Instruction.If) void {
         self.parseInstr(instr);
         self.indent_level -= 1;
     }
-}
-
-fn importGlobal(self: *Self, data: Instruction.ImportGlobal) void {
-    self.indentAndPrintSlice(
-        "[Import global index {}, symbol index {} module {}]",
-        .{ data.index, data.import.index, data.import.module.toInt() },
-    );
 }
 
 fn in(self: *Self, data: Instruction.In) void {
@@ -718,7 +715,7 @@ fn unionUnwrap(self: *Self, data: Instruction.UnionUnwrap) void {
 fn varDecl(self: *Self, data: *const Instruction.VarDecl) void {
     self.indentAndPrintSlice("[Variable declaration index: {}, scope: {t}]", .{
         data.variable.index,
-        data.variable.scope,
+        data.variable.kind,
     });
 
     self.indent_level += 1;

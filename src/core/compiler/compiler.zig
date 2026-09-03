@@ -220,25 +220,26 @@ const Compiler = struct {
 
     /// Emits the corresponding `get_global` or `get_local` with the correct index
     fn emitGetVar(self: *Self, variable: *const Instruction.Variable) void {
-        if (variable.module) |mod| {
-            std.debug.assert(variable.scope == .global);
-            self.writeOpAndByte(.get_global_ext, @intCast(variable.index));
-            self.writeByte(@intCast(mod.toInt()));
-            return;
-        }
-
         // BUG: Protect the cast, we can't have more than 256 variable to lookup for now
-        self.writeOpAndByte(
-            switch (variable.scope) {
-                .local => if (self.state.dup) .get_local_dup else .get_local,
-                .global => if (self.state.dup) .get_global_dup else .get_global,
-                // Parameters are already copied before call
-                .param => .get_local,
-                // Iterator is already copied by `next` method, so accessing it doesn't require a copy
-                .iter => .get_local,
+        switch (variable.kind) {
+            .local => |d| {
+                self.writeOpAndByte(
+                    if (d.duplicable and self.state.dup) .get_local_dup else .get_local,
+                    @intCast(variable.index),
+                );
             },
-            @intCast(variable.index),
-        );
+            .global => |d| {
+                if (d.module) |mod| {
+                    self.writeOpAndByte(.get_global_ext, @intCast(variable.index));
+                    self.writeByte(@intCast(mod.toInt()));
+                } else {
+                    self.writeOpAndByte(
+                        if (self.state.dup) .get_global_dup else .get_global,
+                        @intCast(variable.index),
+                    );
+                }
+            },
+        }
     }
 
     fn emitJump(self: *Self, kind: OpCode) usize {
@@ -373,7 +374,6 @@ const Compiler = struct {
             .for_loop => |data| self.forLoop(data),
             .identifier => |*data| self.identifier(data),
             .@"if" => |*data| self.ifInstr(data),
-            .import_global => |data| self.importGlobal(data),
             .in => |data| self.in(data),
             .indexing => |data| self.indexing(data),
             .int_to_float => |index| self.wrappedInstr(.int_to_float, index),
@@ -470,12 +470,10 @@ const Compiler = struct {
 
         // BUG: Protect the cast, we can't have more than 256 variable to lookup for now
         self.writeOpAndByte(
-            if (variable_data.scope == .global)
-                .set_global
-            else if (variable_data.scope == .local)
-                if (unbox) .set_local_box else .set_local
-            else
-                unreachable,
+            switch (variable_data.kind) {
+                .local => if (unbox) .set_local_box else .set_local,
+                .global => .set_global,
+            },
             @intCast(variable_data.index),
         );
     }
@@ -994,12 +992,6 @@ const Compiler = struct {
         try self.patchJump(else_jump);
     }
 
-    /// Doesn't emit anything, global values are known at comptime, so we just transfert the constant
-    fn importGlobal(self: *Self, data: Instruction.ImportGlobal) Error!void {
-        const value = self.manager.state.modules.getGlobal(data.import.module, data.import.index);
-        self.manager.state.modules.setGlobal(self.manager.mod_index, data.index, value);
-    }
-
     fn in(self: *Self, data: Instruction.In) Error!void {
         try self.compileInstr(data.needle);
         try self.compileInstr(data.haystack);
@@ -1183,8 +1175,8 @@ const Compiler = struct {
                 try self.compileInstrNoDup(f.structure);
                 self.writeOpAndByte(.ptr_field, @intCast(f.index));
             },
-            .variable => |v| switch (v.scope) {
-                .local, .param, .iter => self.writeOpAndByte(.ptr_local, @intCast(v.index)),
+            .variable => |v| switch (v.kind) {
+                .local => self.writeOpAndByte(.ptr_local, @intCast(v.index)),
                 .global => self.writeOpAndByte(.ptr_global, @intCast(v.index)),
             },
         }
@@ -1294,7 +1286,7 @@ const Compiler = struct {
 
     fn varDecl(self: *Self, data: *const Instruction.VarDecl) Error!void {
         // TODO: Protect the cast, we can't have more than 256 variable to lookup for now
-        if (data.variable.scope == .global) {
+        if (data.variable.kind == .global) {
             const value: Value = value: {
                 const value_instr = data.value orelse break :value .null_;
                 const const_index = self.at(value_instr).constant.index;

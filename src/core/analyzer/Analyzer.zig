@@ -1000,7 +1000,13 @@ fn varDecl(self: *Self, node: *const Ast.VarDecl, ctx: *Context) StmtResult {
         .{ .var_decl = .{
             .box = node.meta.captured,
             .value = if (value_res) |v| v.instr else null,
-            .variable = .{ .index = decl_index, .scope = if (self.scope.isGlobal()) .global else .local },
+            .variable = .{
+                .index = decl_index,
+                .kind = if (self.scope.isGlobal())
+                    .{ .global = .{ .module = null } }
+                else
+                    .{ .local = .{ .duplicable = true } },
+            },
         } },
         span.start,
     );
@@ -1314,27 +1320,19 @@ fn use(self: *Self, node: *const Ast.Use) StmtResult {
 
             // Symbols
             if (mod.sym_infos.get(item_name)) |sym| {
-                // TODO: error
-                if (!sym.type.is(.function) and !sym.type.is(.structure) and !sym.type.is(.@"enum")) {
-                    @panic("Import not supported yet");
+                if (sym.type.is(.function) or sym.type.is(.structure) or sym.type.is(.@"enum")) {
+                    self.scope.declareExternSymbol(self.alloc, item_interned, sym);
+                    continue;
                 }
-
-                self.scope.declareExternSymbol(self.alloc, item_interned, sym);
             }
             // Global variables
             else if (mod.globals_infos.get(item_name)) |cte| {
-                const index = try self.declareVariable(item_name, cte.type, .{ .comp_time = true }, span);
-
-                return self.irb.addInstr(
-                    .{ .import_global = .{
-                        .index = index,
-                        .import = .{ .index = cte.index, .module = mod.index },
-                    } },
-                    span.start,
-                );
+                _ = try self.declareVariable(item_name, cte.type, .{ .ext_mod = mod.index }, span);
+                continue;
             }
+
             // Missing
-            else return self.err(
+            return self.err(
                 .{ .missing_symbol_in_module = .{
                     .module = self.ast.toSource(node.names[node.names.len - 1]),
                     .symbol = self.ast.toSource(item.item),
@@ -1694,7 +1692,7 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
     };
 
     const instr = if (lhs.ti.comp_time and rhs.ti.comp_time)
-        self.foldBinop(op, lhs_instr, rhs_instr, lhs_span.start)
+        try self.foldBinop(op, lhs_instr, rhs_instr, lhs_span, rhs_span)
     else
         self.irb.addInstr(.{ .binop = .{ .op = op, .lhs = lhs_instr, .rhs = rhs_instr } }, lhs_span.start);
 
@@ -1705,8 +1703,8 @@ fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
     };
 }
 
-// TODO: errors
-fn foldBinop(self: *Self, op: Instr.Binop.Op, lhs: InstrIndex, rhs: InstrIndex, offset: usize) InstrIndex {
+fn foldBinop(self: *Self, op: Instr.Binop.Op, lhs: InstrIndex, rhs: InstrIndex, lhs_span: Span, rhs_span: Span) Error!InstrIndex {
+    const offset = lhs_span.start;
     const lval = self.getConstant(lhs);
     const rval = self.getConstant(rhs);
 
@@ -1716,7 +1714,7 @@ fn foldBinop(self: *Self, op: Instr.Binop.Op, lhs: InstrIndex, rhs: InstrIndex, 
         .mul_int => self.addConstant(.{ .int = lval.int * rval.int }, offset),
         .div_int => div: {
             if (rval.int == 0) {
-                @panic("div by 0");
+                return self.err(.div_by_zero, rhs_span);
             }
             break :div self.addConstant(.{ .int = @divFloor(lval.int, rval.int) }, offset);
         },
@@ -1724,7 +1722,12 @@ fn foldBinop(self: *Self, op: Instr.Binop.Op, lhs: InstrIndex, rhs: InstrIndex, 
         .sub_float => self.addConstant(.{ .float = lval.float - rval.float }, offset),
         .add_float => self.addConstant(.{ .float = lval.float + rval.float }, offset),
         .mul_float => self.addConstant(.{ .float = lval.float * rval.float }, offset),
-        .div_float => self.addConstant(.{ .float = lval.float / rval.float }, offset),
+        .div_float => div: {
+            if (rval.float == 0) {
+                return self.err(.div_by_zero, rhs_span);
+            }
+            break :div self.addConstant(.{ .float = lval.float / rval.float }, offset);
+        },
 
         .eq_int => self.addConstant(.{ .bool = lval.int == rval.int }, offset),
         .eq_float => self.addConstant(.{ .bool = lval.float == rval.float }, offset),
@@ -1745,15 +1748,17 @@ fn foldBinop(self: *Self, op: Instr.Binop.Op, lhs: InstrIndex, rhs: InstrIndex, 
         .binary_or => self.addConstant(.{ .int = lval.int | rval.int }, offset),
         .binary_xor => self.addConstant(.{ .int = lval.int ^ rval.int }, offset),
         .shift_left => shift: {
-            if (rval.int > std.math.maxInt(u6)) {
-                @panic("Too big shift");
-            }
+            if (rval.int > std.math.maxInt(u6)) return self.err(
+                .{ .shift_overflow = .{ .max = std.math.maxInt(u6), .found = rval.int } },
+                rhs_span,
+            );
             break :shift self.addConstant(.{ .int = lval.int << @intCast(rval.int) }, offset);
         },
         .shift_right => shift: {
-            if (rval.int > std.math.maxInt(u6)) {
-                @panic("Too big shift");
-            }
+            if (rval.int > std.math.maxInt(u6)) return self.err(
+                .{ .shift_overflow = .{ .max = std.math.maxInt(u6), .found = rval.int } },
+                rhs_span,
+            );
             break :shift self.addConstant(.{ .int = lval.int >> @intCast(rval.int) }, offset);
         },
 
@@ -2601,8 +2606,7 @@ fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_name: InternerIdx)
             .instr = self.irb.addInstr(
                 .{ .identifier = .{
                     .index = glob.index,
-                    .scope = .global,
-                    .module = module.index,
+                    .kind = .{ .global = .{ .module = module.index } },
                 } },
                 span.start,
             ),
@@ -2879,14 +2883,15 @@ fn expectVariableIdentifier(self: *Self, token_name: Ast.TokenIndex) Error!Varia
 fn variableIdentifier(self: *Self, name: InternerIdx, span: Span) ?VariableInstr {
     const variable, const scope_offset = self.scope.getVariable(name) orelse return null;
 
-    // TODO: use scope directly instead of this shenanigan
     var instr = self.irb.addInstr(
-        .{ .identifier = .{ .index = variable.index + scope_offset, .scope = switch (variable.kind) {
-            .local => .local,
-            .global => .global,
-            .param => .param,
-            .iter => .iter,
-        } } },
+        .{ .identifier = .{
+            .index = variable.index + scope_offset,
+            .kind = switch (variable.kind) {
+                .global => .{ .global = .{ .module = variable.ext_mod } },
+                .local => .{ .local = .{ .duplicable = true } },
+                .param, .iter => .{ .local = .{ .duplicable = false } },
+            },
+        } },
         span.start,
     );
 

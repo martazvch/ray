@@ -5,7 +5,7 @@ print
 load_const index 3, value 0
 call_zig index 13, module 1, arity 1, cos
 print
-get_global index 0, value 2.718281828459045
+get_global_ext index 0, module 1, value 2.718281828459045
 call_zig index 14, module 1, arity 1, sin
 print
 load_const index 3, value 0

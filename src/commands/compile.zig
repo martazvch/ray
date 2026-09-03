@@ -224,7 +224,7 @@ fn transpileInstr(self: *Self, instr: usize, interner: *const misc.Interner) !vo
             }
         },
         .identifier => |n| {
-            const variable = self.lex_scope.getVariable(if (n.scope == .global) .global else .local, n.index);
+            const variable = self.lex_scope.getVariable(if (n.kind == .global) .global else .local, n.index);
             self.appendSlice(interner.getKey(variable.name).?, .none);
         },
         .load_symbol => |n| {
@@ -237,7 +237,7 @@ fn transpileInstr(self: *Self, instr: usize, interner: *const misc.Interner) !vo
             try self.transpileInstr(n.structure, interner);
 
             const variable = switch (self.irb.instructions.items(.data)[n.structure]) {
-                .identifier => |ident| self.lex_scope.getVariable(if (ident.scope == .global) .global else .local, ident.index),
+                .identifier => |ident| self.lex_scope.getVariable(if (ident.kind == .global) .global else .local, ident.index),
                 else => |e| {
                     std.log.debug("Got: {any}", .{e});
                     @panic("Not yet supported");
@@ -338,7 +338,7 @@ fn transpileInstr(self: *Self, instr: usize, interner: *const misc.Interner) !vo
             // std.log.debug("VarDecl: {any}", .{n});
 
             const variable = self.lex_scope.getVariable(
-                if (n.variable.scope == .global) .global else .local,
+                if (n.variable.kind == .global) .global else .local,
                 n.variable.index,
             );
             const var_name = interner.getKey(variable.name).?;
