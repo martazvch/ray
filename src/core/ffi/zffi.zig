@@ -383,16 +383,10 @@ pub fn ArgsTuple(comptime FnType: type) struct { type, usize } {
     else
         @compileError("Either first or second argument of functions must be of type *Vm");
 
-    var args_type: [fn_infos.params.len]type = undefined;
-
-    inline for (fn_infos.params, 0..) |arg, i| {
-        args_type[i] = arg.type.?;
-    }
-
     var field_types: [fn_infos.params.len]type = undefined;
 
-    for (args_type, 0..) |T, i| {
-        field_types[i] = T;
+    for (fn_infos.params, 0..) |arg, i| {
+        field_types[i] = arg.type.?;
     }
 
     return .{
