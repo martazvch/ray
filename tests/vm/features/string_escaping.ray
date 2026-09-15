@@ -1,0 +1,4 @@
+fn main() {
+    print "Tom\tMartin"
+    print "A\nB\\C\"DE\{"
+}

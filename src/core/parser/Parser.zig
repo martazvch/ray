@@ -1514,6 +1514,7 @@ fn string(self: *Self) Error!*Expr {
                 '"' => final.append(self.allocator, '"') catch oom(),
                 'r' => final.append(self.allocator, '\r') catch oom(),
                 '\\' => final.append(self.allocator, '\\') catch oom(),
+                '{' => final.append(self.allocator, '{') catch oom(),
                 else => return self.errAtPrev(
                     .{ .unknow_char_escape = .{ .found = no_quotes[i .. i + 1] } },
                 ),
