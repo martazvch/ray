@@ -14,6 +14,7 @@ source: [:0]const u8,
 index: usize,
 tokens: std.MultiArrayList(Token),
 errs: ArrayList(LexerReport),
+modes: ArrayList(enum { normal, interp }),
 allocator: Allocator,
 
 const Self = @This();
@@ -199,7 +200,6 @@ const State = enum {
     slash,
     start,
     string,
-    string_escape,
 };
 
 pub fn init(allocator: Allocator) Self {
@@ -208,6 +208,7 @@ pub fn init(allocator: Allocator) Self {
         .index = 0,
         .tokens = .{},
         .errs = .empty,
+        .modes = .empty,
         .allocator = allocator,
     };
 }
@@ -215,6 +216,7 @@ pub fn init(allocator: Allocator) Self {
 pub fn deinit(self: *Self) void {
     self.tokens.deinit(self.allocator);
     self.errs.deinit(self.allocator);
+    self.modes.deinit(self.allocator);
 }
 
 pub fn lex(self: *Self, source: [:0]const u8) void {
@@ -769,16 +771,8 @@ pub fn next(self: *Self) Token {
                     }
                 },
                 '"' => self.advance(),
-                '\\' => continue :state .string_escape,
-                else => continue :state .string,
-            }
-        },
-        .string_escape => {
-            self.advance();
-
-            switch (self.current()) {
-                0 => res.tag = .eof,
                 '\\' => {
+                    // Consider anything as a valid escape, check is done in parser
                     self.advance();
                     continue :state .string;
                 },

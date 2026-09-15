@@ -65,6 +65,7 @@ pub const ParserMsg = union(enum) {
     typed_self,
     unclosed_brace,
     unclosed_paren,
+    unknow_char_escape: struct { found: []const u8 },
     wrong_value_count_var_decl: struct { expect: usize },
 
     const Self = @This();
@@ -131,6 +132,7 @@ pub const ParserMsg = union(enum) {
             .typed_self => writer.writeAll("can't specify a type for 'self', it's a keyword whose type is known by the compiler"),
             .unclosed_brace => writer.writeAll("unclosed brace"),
             .unclosed_paren => writer.writeAll("unclosed parenthesis"),
+            .unknow_char_escape => |e| writer.print("unknow character escape '{s}'", .{e.found}),
             .wrong_value_count_var_decl => |e| writer.print(
                 "value count mismatch variable count, expect {} values",
                 .{e.expect},
@@ -235,6 +237,7 @@ pub const ParserMsg = union(enum) {
             .typed_self => writer.writeAll("remove the type, the compiler infers the type for 'self' on its own"),
             .unclosed_brace => writer.writeAll("close the opening brace"),
             .unclosed_paren => writer.writeAll("close the opening parenthesis"),
+            .unknow_char_escape => writer.writeAll("valid escape characters are '\\t', '\\n', '\\\\', '\\r', '\\\""),
             .wrong_value_count_var_decl => writer.writeAll(
                 "you must either provide no value, 1 value that will assigned to each variable or one per variable",
             ),

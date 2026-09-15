@@ -267,7 +267,10 @@ pub const Identifier = TokenIndex;
 pub const Int = TokenIndex;
 pub const Null = TokenIndex;
 pub const Self = TokenIndex;
-pub const String = TokenIndex;
+pub const String = struct {
+    text: []const u8,
+    span: Span,
+};
 
 pub const Return = struct {
     expr: ?*Expr,
@@ -381,7 +384,7 @@ pub fn toSource(self: *const @This(), node: anytype) []const u8 {
             .dot => |tk| self.token_spans[tk],
             .expr => |e| self.getSpan(e),
         },
-        else => self.getSpan(node.*),
+        else => self.getSpan(node),
     };
 
     return self.source[span.start..span.end];
@@ -514,6 +517,7 @@ pub fn getSpan(self: *const @This(), anynode: anytype) Span {
             },
         },
         Return => self.token_spans[node.kw],
+        String => node.span,
         StructLiteral => self.getSpan(node.structure),
         StructLiteral.Kind => switch (node) {
             .dot => |d| self.token_spans[d],

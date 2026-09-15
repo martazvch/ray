@@ -1238,7 +1238,7 @@ fn parseExpr(self: *Self) Error!*Expr {
         .pipe => self.closure(),
         .@"return" => self.returnExpr(),
         .self => self.literal(.self),
-        .string => self.literal(.string),
+        .string => self.string(),
         .true => self.literal(.bool),
         else => return self.errAtPrev(.{ .expect_expr = .{ .found = self.toSource(self.token_idx - 1) } }),
     };
@@ -1489,6 +1489,42 @@ fn leftParenExprStart(self: *Self) Error!*Expr {
 fn literal(self: *Self, comptime tag: @typeInfo(Ast.Expr).@"union".tag_type.?) Error!*Expr {
     const expr = self.allocator.create(Expr) catch oom();
     expr.* = @unionInit(Ast.Expr, @tagName(tag), self.token_idx - 1);
+
+    return expr;
+}
+
+fn string(self: *Self) Error!*Expr {
+    const expr = self.allocator.create(Expr) catch oom();
+    const text = self.toSource(self.token_idx - 1);
+
+    const no_quotes = text[1 .. text.len - 1];
+    var final: ArrayList(u8) = .empty;
+    var i: usize = 0;
+
+    while (i < no_quotes.len) : (i += 1) {
+        const c = no_quotes[i];
+
+        if (c == '\\') {
+            i += 1;
+
+            // Safe access here because lexer checked if the string and termianted
+            switch (no_quotes[i]) {
+                'n' => final.append(self.allocator, '\n') catch oom(),
+                't' => final.append(self.allocator, '\t') catch oom(),
+                '"' => final.append(self.allocator, '"') catch oom(),
+                'r' => final.append(self.allocator, '\r') catch oom(),
+                '\\' => final.append(self.allocator, '\\') catch oom(),
+                else => return self.errAtPrev(
+                    .{ .unknow_char_escape = .{ .found = no_quotes[i .. i + 1] } },
+                ),
+            }
+        } else final.append(self.allocator, c) catch oom();
+    }
+
+    expr.* = .{ .string = .{
+        .text = final.toOwnedSlice(self.allocator) catch oom(),
+        .span = self.prev(.span),
+    } };
 
     return expr;
 }

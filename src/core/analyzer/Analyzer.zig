@@ -3271,42 +3271,15 @@ pub fn nullLit(self: *Self, expr: Ast.Null) Result {
 }
 
 pub fn string(self: *Self, expr: Ast.String) Result {
-    const text = self.ast.toSource(expr);
-    const span = self.ast.getSpan(expr);
-
-    const no_quotes = text[1 .. text.len - 1];
-    var final: ArrayList(u8) = .empty;
-    var i: usize = 0;
-
-    while (i < no_quotes.len) : (i += 1) {
-        const c = no_quotes[i];
-
-        if (c == '\\') {
-            i += 1;
-
-            // Safe access here because lexer checked if the string and termianted
-            switch (no_quotes[i]) {
-                'n' => final.append(self.alloc, '\n') catch oom(),
-                't' => final.append(self.alloc, '\t') catch oom(),
-                '"' => final.append(self.alloc, '"') catch oom(),
-                'r' => final.append(self.alloc, '\r') catch oom(),
-                '\\' => final.append(self.alloc, '\\') catch oom(),
-                else => return self.err(
-                    .{ .unknow_char_escape = .{ .found = no_quotes[i .. i + 1] } },
-                    span,
-                ),
-            }
-        } else final.append(self.alloc, c) catch oom();
-    }
-
-    const value = self.interner.intern(final.toOwnedSlice(self.alloc) catch oom());
-
     return .{
         .type = self.ti.cache.str,
         .ti = .{ .comp_time = true },
-        .instr = self.irb.addInstr(.{
-            .constant = .{ .index = self.state.addConstant(self.alloc, .{ .string = value }) },
-        }, span.start),
+        .instr = self.irb.addInstr(
+            .{ .constant = .{
+                .index = self.state.addConstant(self.alloc, .{ .string = self.interner.intern(expr.text) }),
+            } },
+            expr.span.start,
+        ),
     };
 }
 
