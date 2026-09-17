@@ -214,6 +214,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .store_blk_val => self.simpleInstruction(writer, name, offset),
         .str_cat => self.simpleInstruction(writer, name, offset),
         .str_mul => self.simpleInstruction(writer, name, offset),
+        .string_interp => self.indexInstruction(writer, name, offset),
         .struct_lit => self.structLiteral(writer, name, false, false, offset),
         .struct_lit_ext => self.structLiteral(writer, name, true, false, offset),
         .struct_lit_zig => self.structLiteral(writer, name, true, false, offset),

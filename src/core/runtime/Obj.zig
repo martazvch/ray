@@ -513,7 +513,7 @@ pub const Structure = struct {
     pub fn create(vm: *Vm, parent: *const Module.Structure) *Self {
         // Fields first for GC because other wise allocating fields after creation
         // of the instance may trigger GC in between
-        const alloc_fields = vm.gc_alloc.alloc(Value, parent.field_count) catch oom();
+        const alloc_fields = vm.gc_alloc.alloc(Value, parent.fields.len) catch oom();
         const obj = Obj.allocate(vm, Self, parent.type_id);
 
         obj.parent = parent;
@@ -570,7 +570,6 @@ pub const CStructure = struct {
         const obj = Obj.allocate(vm, Self, undefined);
         obj.name = undefined;
         obj.layout = layout;
-        // obj.bytes = vm.gc_alloc.alignedAlloc(u8, layout.alignment, layout.size) catch oom();
         obj.bytes = vm.gc_alloc.alloc(u8, layout.size) catch oom();
 
         return obj;
@@ -580,7 +579,6 @@ pub const CStructure = struct {
         const obj = Obj.allocateComptime(alloc, Self, parent.type_id);
         obj.name = parent.name;
         obj.layout = parent.layout;
-        // obj.bytes = alloc.alignedAlloc(u8, parent.layout.alignment, parent.layout.size) catch oom();
         obj.bytes = alloc.alloc(u8, parent.layout.size) catch oom();
 
         for (fields, 0..) |field, i| {
@@ -1055,6 +1053,7 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
         .@"error", .@"union" => self.as(Union).deinit(vm),
     }
 }
+
 pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
     switch (self.kind) {
         .array => {
@@ -1068,7 +1067,9 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
         },
         .box => {
             const box = self.as(Box);
-            try writer.writeAll("Box ");
+            if (comptime @import("builtin").mode == .Debug) {
+                try writer.writeAll("Box ");
+            }
             box.value.print(writer);
         },
         .closure => {
@@ -1082,7 +1083,7 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
         },
         .@"enum" => {
             const instance = self.as(Enum);
-            try writer.print("<enum {s}.{s}>", .{
+            try writer.print("{s}.{s}", .{
                 instance.parent.name,
                 instance.parent.tags[instance.tag_id],
             });
@@ -1096,14 +1097,28 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
         .iterator => try writer.writeAll("<iterator>"),
         .pointer => try writer.print("<pointer 0x{x}>", .{@intFromPtr(self.as(Pointer).child)}),
         .string => try writer.print("{s}", .{self.as(String).chars}),
-        .structure => try writer.print("<structure {s}>", .{self.as(Structure).parent.name}),
+        .structure => {
+            const structure = self.as(Structure);
+            const parent = structure.parent;
+
+            if (parent.fields.len == 0) {
+                try writer.print("{s}{{}}", .{parent.name});
+            } else {
+                try writer.print("{s}{{ ", .{parent.name});
+                for (structure.fields, 0..) |f, i| {
+                    try writer.print("{s} = ", .{parent.fields[i]});
+                    f.print(writer);
+                    if (i < structure.fields.len - 1) try writer.writeAll(", ");
+                }
+                try writer.writeAll(" }");
+            }
+        },
         .c_structure => try writer.print("<c structure {s}>", .{self.as(CStructure).name}),
         .zig_structure => try writer.print("<zig structure {s}>", .{self.as(ZigStructure).name}),
         .trait_obj => try writer.print("<trait obj {s}>", .{self.as(TraitObj).vtable.name}),
         .@"union", .@"error" => {
             const instance = self.as(Union);
-            try writer.print("<{s} {s}.{s}>", .{
-                if (instance.parent.is_err) "error" else "union",
+            try writer.print("{s}.{s}", .{
                 instance.parent.name,
                 instance.parent.tags[instance.tag_id],
             });

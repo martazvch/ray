@@ -14,7 +14,8 @@ source: [:0]const u8,
 index: usize,
 tokens: std.MultiArrayList(Token),
 errs: ArrayList(LexerReport),
-modes: ArrayList(enum { normal, interp }),
+modes: ArrayList(enum { normal, string }),
+string_start: usize,
 allocator: Allocator,
 
 const Self = @This();
@@ -149,6 +150,8 @@ pub const Token = struct {
         star,
         star_equal,
         string,
+        string_part,
+        string_end,
         @"struct",
         tilde,
         trait,
@@ -209,6 +212,7 @@ pub fn init(allocator: Allocator) Self {
         .tokens = .{},
         .errs = .empty,
         .modes = .empty,
+        .string_start = 0,
         .allocator = allocator,
     };
 }
@@ -228,39 +232,62 @@ pub fn lex(self: *Self, source: [:0]const u8) void {
         // TODO: redo this part. As we lex every thing at once, use arraylist for
         // errors like parser, analyzer, ...? Or use compitme to associate both sides
         switch (tk.tag) {
-            .base_prefix_uppercase => self.errorAt(.{ .base_prefix_uppercase = .{ .base = source[tk.span.start] } }, tk),
-            .expect_digit_before_dot => self.errorAt(.expect_digit_before_dot, tk),
-            .expect_digit_before_separator => self.errorAt(.expect_digit_before_separator, tk),
-            .expect_digit_after_base => self.errorAt(.expect_digit_after_base, tk),
-            .leading_zeroes => self.errorAt(.leading_zeroes, tk),
+            .base_prefix_uppercase => self.errorAt(.{ .base_prefix_uppercase = .{ .base = source[tk.span.start] } }, tk.span),
+            .expect_digit_before_dot => self.errorAt(.expect_digit_before_dot, tk.span),
+            .expect_digit_before_separator => self.errorAt(.expect_digit_before_separator, tk.span),
+            .expect_digit_after_base => self.errorAt(.expect_digit_after_base, tk.span),
+            .leading_zeroes => self.errorAt(.leading_zeroes, tk.span),
 
-            .invalid_float_digit => self.errorAt(.{ .invalid_float_digit = .{ .digit = source[tk.span.start] } }, tk),
-            .invalid_int_digit => self.errorAt(.{ .invalid_int_digit = .{ .digit = source[tk.span.start] } }, tk),
-            .invalid_int_binary => self.errorAt(.{ .invalid_int_binary = .{ .digit = source[tk.span.start] } }, tk),
-            .invalid_int_hexa => self.errorAt(.{ .invalid_int_hexa = .{ .digit = source[tk.span.start] } }, tk),
-            .invalid_int_octal => self.errorAt(.{ .invalid_int_octal = .{ .digit = source[tk.span.start] } }, tk),
-            .repeated_digit_separator => self.errorAt(.repeated_digit_separator, tk),
-            .trailing_digit_separator => self.errorAt(.trailing_digit_separator, tk),
-            .unterminated_str => self.errorAt(.unterminated_str, tk),
-            .unexpected_char => self.errorAt(.unexpected_char, tk),
+            .invalid_float_digit => self.errorAt(.{ .invalid_float_digit = .{ .digit = source[tk.span.start] } }, tk.span),
+            .invalid_int_digit => self.errorAt(.{ .invalid_int_digit = .{ .digit = source[tk.span.start] } }, tk.span),
+            .invalid_int_binary => self.errorAt(.{ .invalid_int_binary = .{ .digit = source[tk.span.start] } }, tk.span),
+            .invalid_int_hexa => self.errorAt(.{ .invalid_int_hexa = .{ .digit = source[tk.span.start] } }, tk.span),
+            .invalid_int_octal => self.errorAt(.{ .invalid_int_octal = .{ .digit = source[tk.span.start] } }, tk.span),
+            .repeated_digit_separator => self.errorAt(.repeated_digit_separator, tk.span),
+            .trailing_digit_separator => self.errorAt(.trailing_digit_separator, tk.span),
+            .unterminated_str => self.errorAt(.unterminated_str, tk.span),
+            .unexpected_char => self.errorAt(.unexpected_char, tk.span),
+
+            .eof => {
+                _ = self.modes.pop();
+
+                if (self.modes.getLastOrNull()) |mode| {
+                    // If we were still in a string mode, it means that we stopped at:
+                    //  "abcd{
+                    // because we were in `normal` mode to parse interpaloted value and
+                    // then it failed, leaving us in `string` mode
+                    if (mode == .string) {
+                        self.errorAt(.unterminated_str, .{ .start = self.string_start, .end = self.string_start });
+                        break;
+                    }
+                }
+
+                self.tokens.append(self.allocator, tk) catch oom();
+                break;
+            },
+
             else => self.tokens.append(self.allocator, tk) catch oom(),
         }
-
-        if (tk.tag == .eof) break;
     }
 }
 
-fn errorAt(self: *Self, tag: LexerMsg, token: Token) void {
-    const report = LexerReport.err(tag, token.span.start, token.span.end);
+fn errorAt(self: *Self, tag: LexerMsg, span: Span) void {
+    const report = LexerReport.err(tag, span.start, span.end);
     self.errs.append(self.allocator, report) catch oom();
 }
 
 pub fn next(self: *Self) Token {
+    if (self.modes.getLastOrNull()) |mode| {
+        if (mode == .string) {
+            return self.nextStringPart();
+        }
+    }
+
     var res = Token{
         .tag = undefined,
         .span = .{
             .start = self.index,
-            .end = undefined,
+            .end = self.index,
         },
     };
 
@@ -277,32 +304,43 @@ pub fn next(self: *Self) Token {
                     continue :state .start;
                 },
                 '(' => {
-                    res.tag = .left_paren;
                     self.advance();
+                    res.tag = .left_paren;
                 },
                 ')' => {
-                    res.tag = .right_paren;
                     self.advance();
+                    res.tag = .right_paren;
                 },
                 '{' => {
-                    res.tag = .left_brace;
                     self.advance();
+                    res.tag = .left_brace;
+                    self.modes.append(self.allocator, .normal) catch oom();
                 },
                 '}' => {
-                    res.tag = .right_brace;
                     self.advance();
+                    _ = self.modes.pop();
+
+                    if (self.modes.getLastOrNull()) |last_mode| {
+                        if (last_mode == .string) {
+                            return self.nextStringPart();
+                        } else {
+                            res.tag = .right_brace;
+                        }
+                    } else {
+                        res.tag = .right_brace;
+                    }
                 },
                 '[' => {
-                    res.tag = .left_bracket;
                     self.advance();
+                    res.tag = .left_bracket;
                 },
                 ']' => {
-                    res.tag = .right_bracket;
                     self.advance();
+                    res.tag = .right_bracket;
                 },
                 ',' => {
-                    res.tag = .comma;
                     self.advance();
+                    res.tag = .comma;
                 },
                 '+' => {
                     self.advance();
@@ -347,12 +385,12 @@ pub fn next(self: *Self) Token {
                 },
                 '/' => continue :state .slash,
                 '\n' => {
-                    res.tag = .new_line;
                     self.advance();
+                    res.tag = .new_line;
                 },
                 ':' => {
-                    res.tag = .colon;
                     self.advance();
+                    res.tag = .colon;
                 },
                 '<' => continue :state .less,
                 '>' => continue :state .greater,
@@ -362,6 +400,8 @@ pub fn next(self: *Self) Token {
                 '?' => continue :state .question_mark,
                 '"' => {
                     res.tag = .string;
+                    self.string_start = self.index;
+                    self.modes.append(self.allocator, .string) catch oom();
                     continue :state .string;
                 },
                 '&' => {
@@ -379,8 +419,8 @@ pub fn next(self: *Self) Token {
                     } else res.tag = .pipe;
                 },
                 '~' => {
-                    res.tag = .tilde;
                     self.advance();
+                    res.tag = .tilde;
                 },
                 '^' => {
                     self.advance();
@@ -457,8 +497,8 @@ pub fn next(self: *Self) Token {
                     } else continue :state .invalid;
                 },
                 else => {
-                    res.tag = .unexpected_char;
                     self.advance();
+                    res.tag = .unexpected_char;
                 },
             }
         },
@@ -763,18 +803,29 @@ pub fn next(self: *Self) Token {
             switch (self.current()) {
                 0 => {
                     if (self.index == self.source.len) {
-                        // For error reporting, one byte length
-                        return tokenAt(.unterminated_str, .{
-                            .start = res.span.start,
-                            .end = res.span.start + 1,
-                        });
+                        _ = self.modes.pop();
+                        res.tag = .unterminated_str;
+                        return res;
                     }
                 },
-                '"' => self.advance(),
+                '"' => {
+                    self.advance();
+                    _ = self.modes.pop();
+                },
                 '\\' => {
                     // Consider anything as a valid escape, check is done in parser
                     self.advance();
                     continue :state .string;
+                },
+                '{' => {
+                    self.advance();
+                    self.modes.append(self.allocator, .normal) catch oom();
+
+                    // Early return because we want to exclude '{' from string part
+                    return .{
+                        .span = .{ .start = res.span.start, .end = self.index - 1 },
+                        .tag = .string_part,
+                    };
                 },
                 else => continue :state .string,
             }
@@ -783,6 +834,48 @@ pub fn next(self: *Self) Token {
 
     res.span.end = self.index;
     return res;
+}
+
+fn nextStringPart(self: *Self) Token {
+    const start = self.index;
+
+    while (true) {
+        switch (self.current()) {
+            '\\' => {
+                self.advance();
+                self.advance();
+            },
+            '{' => {
+                self.advance();
+                self.modes.append(self.allocator, .normal) catch oom();
+
+                return .{
+                    .span = .{ .start = start, .end = self.index - 1 },
+                    .tag = .string_part,
+                };
+            },
+            '"' => {
+                self.advance();
+                _ = self.modes.pop();
+
+                return .{
+                    .span = .{ .start = start, .end = self.index },
+                    .tag = .string_end,
+                };
+            },
+            0 => {
+                if (self.index == self.source.len) {
+                    _ = self.modes.pop();
+
+                    return .{
+                        .span = .{ .start = self.string_start, .end = self.string_start },
+                        .tag = .unterminated_str,
+                    };
+                }
+            },
+            else => self.advance(),
+        }
+    }
 }
 
 inline fn advance(self: *Self) void {

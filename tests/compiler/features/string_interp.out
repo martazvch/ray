@@ -1,0 +1,19 @@
+//---- test ----
+
+-- f --
+load_const index 4, value 8
+ret
+
+-- main --
+load_const index 5, value 4
+load_const index 6, value value: 
+get_local index 0
+load_const index 7, value , f: 
+load_fn index 0, f
+load_const index 8, value 
+string_interp index 2
+print
+ret_naked
+
+-- global scope --
+call index 1, arity 0, main

@@ -1,9 +1,9 @@
-<enum Marker.none>
-<enum Marker.circle>
+Marker.none
+Marker.circle
 o
 x
-<enum Marker.circle>
-<enum Marker.circle>
+Marker.circle
+Marker.circle
 true
 false
 true

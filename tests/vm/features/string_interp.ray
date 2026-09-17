@@ -1,0 +1,26 @@
+fn f(a: int, b: bool) -> float {
+    return 8
+}
+
+enum E { up, down, }
+union U { u1, u2, }
+struct S { a, b: float }
+
+fn main() {
+    v1 := 4
+    v2 := 6.5
+    v3 := true
+    v4 := "Tom"
+    v5 := [1, 2, 3]
+    v6 := 0..4
+
+    print "v1: {v1}\nv2: {v2}\nv3: {v3}"
+    print "v4: {v4}\nv5: {v5}\nv6: {v6}"
+    print "f: {f}"
+
+    e := E.up
+    u := U.u2
+    s := S{ a=1.2, b=-8.5 }
+    print "e: {e}\nu: {u}\ns: {s}"
+}
+

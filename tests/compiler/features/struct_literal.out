@@ -1,7 +1,7 @@
 -- main --
-load_const index 5, value <structure Human>
+load_const index 5, value Human{ age = 5, name = Tom }
 
-load_const index 5, value <structure Human>
+load_const index 5, value Human{ age = 5, name = Tom }
 set_local index 0
 
 load_const index 6, value 95

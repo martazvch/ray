@@ -1,9 +1,9 @@
 -- main --
 load_const index 4, value 1
-load_const index 11, value <structure Point>
-load_const index 21, value <structure Point>
-load_const index 31, value <structure Point>
-load_const index 41, value <structure Point>
+load_const index 11, value Point{ x = 1, y = 2, past = [[1, 2], [3, 4]] }
+load_const index 21, value Point{ x = 5, y = 6, past = [[7, 8], [9, 10]] }
+load_const index 31, value Point{ x = 11, y = 12, past = [[13, 14], [15, 16]] }
+load_const index 41, value Point{ x = 17, y = 18, past = [[19, 20], [21, 22]] }
 
 get_local_dup index 1
 get_local_dup index 2

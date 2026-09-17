@@ -1,4 +1,4 @@
-<structure Point>
+Point{ x = 11, y = 12, past = [[13, 14], [15, 16]] }
 11
 [13, 14]
 16

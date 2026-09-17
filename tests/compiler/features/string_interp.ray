@@ -1,0 +1,9 @@
+fn f(a: int, b: bool) -> float {
+    return 8
+}
+
+fn main() {
+    value := 4
+    print "value: {value}, f: {f}"
+}
+

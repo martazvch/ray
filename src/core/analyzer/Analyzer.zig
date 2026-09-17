@@ -1056,7 +1056,7 @@ fn structDecl(self: *Self, node: *const Ast.StructDecl, ctx: *Context) StmtResul
         return self.endCStructDecl(node, name, sym_index, interned, ty, ctx);
     }
 
-    const default_fields = try self.structureFields(node.fields, ty, ctx);
+    const fields_res = try self.structureFields(node.fields, ty, ctx);
     const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
     const traits = try self.containerTraitImpls(interned, node.traits, &ty.traits, ctx);
 
@@ -1065,8 +1065,8 @@ fn structDecl(self: *Self, node: *const Ast.StructDecl, ctx: *Context) StmtResul
             .name = name,
             .sym_index = sym_index,
             .type_id = self.ti.typeId(interned),
-            .fields_count = node.fields.len,
-            .default_fields = default_fields,
+            .fields = fields_res.names,
+            .default_fields = fields_res.default_instrs,
             .functions = funcs,
             .traits = traits,
         } },
@@ -1074,19 +1074,26 @@ fn structDecl(self: *Self, node: *const Ast.StructDecl, ctx: *Context) StmtResul
     );
 }
 
-fn structureFields(self: *Self, fields: []const Ast.VarDecl, ty: *Type.Structure, ctx: *Context) Error![]const InstrIndex {
+const FieldRes = struct {
+    names: []const []const u8,
+    default_instrs: []const InstrIndex,
+};
+fn structureFields(self: *Self, fields: []const Ast.VarDecl, ty: *Type.Structure, ctx: *Context) Error!FieldRes {
     var default_fields: ArrayList(InstrIndex) = .empty;
+    var field_names = ArrayList([]const u8).initCapacity(self.alloc, fields.len) catch oom();
     ty.fields.ensureTotalCapacity(self.alloc, fields.len) catch oom();
 
     for (fields) |*f| {
         const span = self.ast.getSpan(f.name);
-        const field_name = self.internToken(f.name);
+        const field_text = self.ast.toSource(f.name);
+        const field_name = self.interner.intern(field_text);
 
         if (ty.fields.get(field_name) != null) return self.err(
-            .{ .already_declared_field = .{ .name = self.ast.toSource(f.name) } },
+            .{ .already_declared_field = .{ .name = field_text } },
             span,
         );
 
+        field_names.appendAssumeCapacity(self.alloc.dupe(u8, field_text) catch oom());
         var struct_field: Type.Structure.Field = .{
             .type = try self.checkAndGetType(f.typ, ctx),
             .default = null,
@@ -1105,7 +1112,10 @@ fn structureFields(self: *Self, fields: []const Ast.VarDecl, ty: *Type.Structure
         ty.fields.putAssumeCapacity(field_name, struct_field);
     }
 
-    return default_fields.toOwnedSlice(self.alloc) catch oom();
+    return .{
+        .names = field_names.toOwnedSlice(self.alloc) catch oom(),
+        .default_instrs = default_fields.toOwnedSlice(self.alloc) catch oom(),
+    };
 }
 
 fn endCStructDecl(
@@ -1473,6 +1483,7 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
         .@"return" => |*e| self.returnExpr(e, ctx),
         .self => |e| self.identifier(e, ctx),
         .string => |e| self.string(e),
+        .string_interp => |e| self.stringInterp(e, ctx),
         .struct_literal => |*e| self.structLiteral(e, ctx),
         .ternary => |*e| self.ternary(e, ctx),
         .trap => |e| self.trap(e, if (expect.expects()) .value else .none, ctx),
@@ -1785,68 +1796,68 @@ fn foldBinop(self: *Self, op: Instr.Binop.Op, lhs: InstrIndex, rhs: InstrIndex, 
     const rval = self.getConstant(rhs);
 
     return switch (op) {
-        .sub_int => self.addConstant(.{ .int = lval.int - rval.int }, offset),
-        .add_int => self.addConstant(.{ .int = lval.int + rval.int }, offset),
-        .mul_int => self.addConstant(.{ .int = lval.int * rval.int }, offset),
+        .sub_int => self.addConstantInstr(.{ .int = lval.int - rval.int }, offset),
+        .add_int => self.addConstantInstr(.{ .int = lval.int + rval.int }, offset),
+        .mul_int => self.addConstantInstr(.{ .int = lval.int * rval.int }, offset),
         .div_int => div: {
             if (rval.int == 0) {
                 return self.err(.div_by_zero, rhs_span);
             }
-            break :div self.addConstant(.{ .int = @divFloor(lval.int, rval.int) }, offset);
+            break :div self.addConstantInstr(.{ .int = @divFloor(lval.int, rval.int) }, offset);
         },
 
-        .sub_float => self.addConstant(.{ .float = lval.float - rval.float }, offset),
-        .add_float => self.addConstant(.{ .float = lval.float + rval.float }, offset),
-        .mul_float => self.addConstant(.{ .float = lval.float * rval.float }, offset),
+        .sub_float => self.addConstantInstr(.{ .float = lval.float - rval.float }, offset),
+        .add_float => self.addConstantInstr(.{ .float = lval.float + rval.float }, offset),
+        .mul_float => self.addConstantInstr(.{ .float = lval.float * rval.float }, offset),
         .div_float => div: {
             if (rval.float == 0) {
                 return self.err(.div_by_zero, rhs_span);
             }
-            break :div self.addConstant(.{ .float = lval.float / rval.float }, offset);
+            break :div self.addConstantInstr(.{ .float = lval.float / rval.float }, offset);
         },
 
-        .eq_int => self.addConstant(.{ .bool = lval.int == rval.int }, offset),
-        .eq_float => self.addConstant(.{ .bool = lval.float == rval.float }, offset),
-        .ne_int => self.addConstant(.{ .bool = lval.int != rval.int }, offset),
-        .ne_float => self.addConstant(.{ .bool = lval.float != rval.float }, offset),
-        .eq_bool => self.addConstant(.{ .bool = lval.bool == rval.bool }, offset),
-        .ne_bool => self.addConstant(.{ .bool = lval.bool != rval.bool }, offset),
-        .eq_str => self.addConstant(.{ .bool = lval.string == rval.string }, offset),
-        .ne_str => self.addConstant(.{ .bool = lval.string != rval.string }, offset),
+        .eq_int => self.addConstantInstr(.{ .bool = lval.int == rval.int }, offset),
+        .eq_float => self.addConstantInstr(.{ .bool = lval.float == rval.float }, offset),
+        .ne_int => self.addConstantInstr(.{ .bool = lval.int != rval.int }, offset),
+        .ne_float => self.addConstantInstr(.{ .bool = lval.float != rval.float }, offset),
+        .eq_bool => self.addConstantInstr(.{ .bool = lval.bool == rval.bool }, offset),
+        .ne_bool => self.addConstantInstr(.{ .bool = lval.bool != rval.bool }, offset),
+        .eq_str => self.addConstantInstr(.{ .bool = lval.string == rval.string }, offset),
+        .ne_str => self.addConstantInstr(.{ .bool = lval.string != rval.string }, offset),
 
-        .mod_int => self.addConstant(.{ .int = @mod(lval.int, rval.int) }, offset),
-        .mod_float => self.addConstant(.{ .float = @mod(lval.float, rval.float) }, offset),
+        .mod_int => self.addConstantInstr(.{ .int = @mod(lval.int, rval.int) }, offset),
+        .mod_float => self.addConstantInstr(.{ .float = @mod(lval.float, rval.float) }, offset),
 
-        .@"and" => self.addConstant(.{ .bool = lval.bool and rval.bool }, offset),
-        .@"or" => self.addConstant(.{ .bool = lval.bool or rval.bool }, offset),
+        .@"and" => self.addConstantInstr(.{ .bool = lval.bool and rval.bool }, offset),
+        .@"or" => self.addConstantInstr(.{ .bool = lval.bool or rval.bool }, offset),
 
-        .binary_and => self.addConstant(.{ .int = lval.int & rval.int }, offset),
-        .binary_or => self.addConstant(.{ .int = lval.int | rval.int }, offset),
-        .binary_xor => self.addConstant(.{ .int = lval.int ^ rval.int }, offset),
+        .binary_and => self.addConstantInstr(.{ .int = lval.int & rval.int }, offset),
+        .binary_or => self.addConstantInstr(.{ .int = lval.int | rval.int }, offset),
+        .binary_xor => self.addConstantInstr(.{ .int = lval.int ^ rval.int }, offset),
         .shift_left => shift: {
             if (rval.int > std.math.maxInt(u6)) return self.err(
                 .{ .shift_overflow = .{ .max = std.math.maxInt(u6), .found = rval.int } },
                 rhs_span,
             );
-            break :shift self.addConstant(.{ .int = lval.int << @intCast(rval.int) }, offset);
+            break :shift self.addConstantInstr(.{ .int = lval.int << @intCast(rval.int) }, offset);
         },
         .shift_right => shift: {
             if (rval.int > std.math.maxInt(u6)) return self.err(
                 .{ .shift_overflow = .{ .max = std.math.maxInt(u6), .found = rval.int } },
                 rhs_span,
             );
-            break :shift self.addConstant(.{ .int = lval.int >> @intCast(rval.int) }, offset);
+            break :shift self.addConstantInstr(.{ .int = lval.int >> @intCast(rval.int) }, offset);
         },
 
-        .gt_float => self.addConstant(.{ .bool = lval.float > rval.float }, offset),
-        .ge_float => self.addConstant(.{ .bool = lval.float >= rval.float }, offset),
-        .lt_float => self.addConstant(.{ .bool = lval.float < rval.float }, offset),
-        .le_float => self.addConstant(.{ .bool = lval.float <= rval.float }, offset),
+        .gt_float => self.addConstantInstr(.{ .bool = lval.float > rval.float }, offset),
+        .ge_float => self.addConstantInstr(.{ .bool = lval.float >= rval.float }, offset),
+        .lt_float => self.addConstantInstr(.{ .bool = lval.float < rval.float }, offset),
+        .le_float => self.addConstantInstr(.{ .bool = lval.float <= rval.float }, offset),
 
-        .gt_int => self.addConstant(.{ .bool = lval.int > rval.int }, offset),
-        .ge_int => self.addConstant(.{ .bool = lval.int >= rval.int }, offset),
-        .lt_int => self.addConstant(.{ .bool = lval.int < rval.int }, offset),
-        .le_int => self.addConstant(.{ .bool = lval.int <= rval.int }, offset),
+        .gt_int => self.addConstantInstr(.{ .bool = lval.int > rval.int }, offset),
+        .ge_int => self.addConstantInstr(.{ .bool = lval.int >= rval.int }, offset),
+        .lt_int => self.addConstantInstr(.{ .bool = lval.int < rval.int }, offset),
+        .le_int => self.addConstantInstr(.{ .bool = lval.int <= rval.int }, offset),
 
         .add_str, .bang_bang, .eq_null, .eq_ptr, .mul_str, .ne_null, .ne_ptr, .question_mark_question_mark => unreachable,
     };
@@ -1886,7 +1897,7 @@ fn binopArithmeticCoercion(
 fn castIntToFloat(self: *Self, info: InstrInfos) InstrIndex {
     if (info.ti.comp_time) {
         const cte = self.getConstant(info.instr).int;
-        return self.addConstant(.{ .float = @floatFromInt(cte) }, self.irb.instrOffset(info.instr));
+        return self.addConstantInstr(.{ .float = @floatFromInt(cte) }, self.irb.instrOffset(info.instr));
     }
     return self.irb.wrapInstr(.int_to_float, info.instr);
 }
@@ -2002,7 +2013,7 @@ fn binopComparisonCoercion(
                     cte.enum_lit.tag_index
                 else
                     cte.union_lit.tag_index;
-                return ana.addConstant(.{ .int = @intCast(tag_index) }, offset);
+                return ana.addConstantInstr(.{ .int = @intCast(tag_index) }, offset);
             }
         }.getTag;
 
@@ -2060,7 +2071,7 @@ pub fn isUnionLit(self: *const Self, instr: ir.Index) bool {
 fn unionTagLiteral(self: *Self, info: InstrInfos) InstrIndex {
     if (info.ti.comp_time) {
         const cte = self.getConstant(info.instr).union_lit;
-        return self.addConstant(.{ .int = @intCast(cte.tag_index) }, self.irb.instrOffset(info.instr));
+        return self.addConstantInstr(.{ .int = @intCast(cte.tag_index) }, self.irb.instrOffset(info.instr));
     }
     return self.irb.wrapInstr(.union_tag, info.instr);
 }
@@ -2204,7 +2215,7 @@ pub fn implicitSelector(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result 
     return .{
         .type = tag_res.ty,
         .ti = .{ .comp_time = true },
-        .instr = self.addConstant(
+        .instr = self.addConstantInstr(
             if (tag_res.ty.is(.@"enum")) .{ .enum_lit = tag_lit } else .{ .union_lit = tag_lit },
             span.start,
         ),
@@ -2395,7 +2406,7 @@ fn enumAccess(self: *Self, enum_info: InstrInfos, ty: Type.Enum, tag_tk: Ast.Tok
             .tag = .{
                 .type = self.ti.intern(.{ .@"enum" = ty }),
                 .ti = .{ .comp_time = true },
-                .instr = self.addConstant(
+                .instr = self.addConstantInstr(
                     .{ .enum_lit = .{
                         .sym = self.irb.data(enum_info.instr).load_symbol,
                         .tag_index = index,
@@ -2533,7 +2544,7 @@ fn unionAccess(self: *Self, union_info: InstrInfos, ty: Type.Union, tag_tk: Ast.
             .tag = .{
                 .type = self.ti.intern(.{ .@"union" = ty }),
                 .ti = .{ .comp_time = ty.tags.get(tag_name).?.is(.void) },
-                .instr = self.addConstant(
+                .instr = self.addConstantInstr(
                     .{ .union_lit = .{
                         .sym = self.irb.data(union_info.instr).load_symbol,
                         .tag_index = index,
@@ -3192,7 +3203,7 @@ pub fn boolLit(self: *Self, expr: Ast.Bool) Result {
     return .{
         .type = self.ti.cache.bool,
         .ti = .{ .comp_time = true },
-        .instr = self.addConstant(
+        .instr = self.addConstantInstr(
             .{ .bool = self.ast.token_tags[expr] == .true },
             self.ast.getSpan(expr).start,
         ),
@@ -3210,7 +3221,7 @@ pub fn floatLit(self: *Self, expr: Ast.Float, negate: bool) Result {
     return .{
         .type = self.ti.cache.float,
         .ti = .{ .comp_time = true },
-        .instr = self.addConstant(.{ .float = value }, span.start),
+        .instr = self.addConstantInstr(.{ .float = value }, span.start),
     };
 }
 
@@ -3243,7 +3254,7 @@ pub fn intLit(self: *Self, expr: Ast.Int, negate: bool, ctx: *const Context) Res
     return .{
         .type = ty,
         .ti = .{ .comp_time = true },
-        .instr = self.addConstant(.{ .int = value }, span.start),
+        .instr = self.addConstantInstr(.{ .int = value }, span.start),
     };
 }
 
@@ -3266,7 +3277,7 @@ pub fn nullLit(self: *Self, expr: Ast.Null) Result {
     return .{
         .type = self.ti.cache.null,
         .ti = .{ .comp_time = true },
-        .instr = self.addConstant(.null, self.ast.getSpan(expr).start),
+        .instr = self.addConstantInstr(.null, self.ast.getSpan(expr).start),
     };
 }
 
@@ -3279,6 +3290,32 @@ pub fn string(self: *Self, expr: Ast.String) Result {
                 .index = self.state.addConstant(self.alloc, .{ .string = self.interner.intern(expr.text) }),
             } },
             expr.span.start,
+        ),
+    };
+}
+
+pub fn stringInterp(self: *Self, expr: Ast.StringInterp, ctx: *Context) Result {
+    const span = self.ast.getSpan(expr);
+    var exprs = ArrayList(InstrIndex).initCapacity(self.alloc, expr.exprs.len) catch oom();
+    var literals = ArrayList(ConstIdx).initCapacity(self.alloc, expr.literals.len) catch oom();
+
+    for (expr.literals) |l| {
+        literals.appendAssumeCapacity(self.addConstant(.{ .string = self.interner.intern(l) }));
+    }
+
+    for (expr.exprs) |e| {
+        const res = try self.analyzeExpr(e, .value, ctx);
+        exprs.appendAssumeCapacity(res.instr);
+    }
+
+    return .{
+        .type = self.ti.cache.str,
+        .instr = self.irb.addInstr(
+            .{ .string_interp = .{
+                .exprs = exprs.toOwnedSlice(self.alloc) catch oom(),
+                .literals = literals.toOwnedSlice(self.alloc) catch oom(),
+            } },
+            span.start,
         ),
     };
 }
@@ -3958,11 +3995,11 @@ fn unaryConstant(self: *Self, info: InstrInfos, offset: usize) InstrIndex {
     const cte = self.getConstant(info.instr);
 
     if (info.type.is(.int)) {
-        return self.addConstant(.{ .int = -cte.int }, offset);
+        return self.addConstantInstr(.{ .int = -cte.int }, offset);
     } else if (info.type.is(.bool)) {
-        return self.addConstant(.{ .bool = !cte.bool }, offset);
+        return self.addConstantInstr(.{ .bool = !cte.bool }, offset);
     } else {
-        return self.addConstant(.{ .float = -cte.float }, offset);
+        return self.addConstantInstr(.{ .float = -cte.float }, offset);
     }
 }
 
@@ -4043,7 +4080,7 @@ fn binaryNot(self: *Self, expr: *Expr, span: Span, ctx: *Context) Result {
     );
 
     const instr = if (rhs.ti.comp_time)
-        self.addConstant(.{ .int = ~self.getConstant(rhs.instr).int }, span.start)
+        self.addConstantInstr(.{ .int = ~self.getConstant(rhs.instr).int }, span.start)
     else
         self.irb.addInstr(
             .{ .unary = .{ .op = .tilde, .typ = .int, .instr = rhs.instr } },
@@ -4661,11 +4698,15 @@ pub fn tryGetConstant(self: *Self, index: ir.Index) ?Instr.Data {
     };
 }
 
-pub fn addConstant(self: *Self, constant: Constant, offset: usize) InstrIndex {
+pub fn addConstantInstr(self: *Self, constant: Constant, offset: usize) InstrIndex {
     return self.irb.addInstr(
         .{ .constant = .{ .index = self.state.addConstant(self.alloc, constant) } },
         offset,
     );
+}
+
+pub fn addConstant(self: *Self, constant: Constant) ConstIdx {
+    return self.state.addConstant(self.alloc, constant);
 }
 
 pub fn getConstant(self: *const Self, instr: InstrIndex) Constant {

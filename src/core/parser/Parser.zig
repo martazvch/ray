@@ -1239,6 +1239,7 @@ fn parseExpr(self: *Self) Error!*Expr {
         .@"return" => self.returnExpr(),
         .self => self.literal(.self),
         .string => self.string(),
+        .string_part => self.stringInterp(),
         .true => self.literal(.bool),
         else => return self.errAtPrev(.{ .expect_expr = .{ .found = self.toSource(self.token_idx - 1) } }),
     };
@@ -1495,9 +1496,23 @@ fn literal(self: *Self, comptime tag: @typeInfo(Ast.Expr).@"union".tag_type.?) E
 
 fn string(self: *Self) Error!*Expr {
     const expr = self.allocator.create(Expr) catch oom();
-    const text = self.toSource(self.token_idx - 1);
+    expr.* = .{ .string = .{
+        .text = try self.resolveStringEscape(self.token_idx - 1, .both),
+        .span = self.prev(.span),
+    } };
 
-    const no_quotes = text[1 .. text.len - 1];
+    return expr;
+}
+
+fn resolveStringEscape(self: *Self, token: TokenIndex, quotes: enum { start, end, both, none }) Error![]const u8 {
+    const text = self.toSource(token);
+
+    const no_quotes = switch (quotes) {
+        .start => text[1..text.len],
+        .end => text[0 .. text.len - 1],
+        .both => text[1 .. text.len - 1],
+        .none => text,
+    };
     var final: ArrayList(u8) = .empty;
     var i: usize = 0;
 
@@ -1522,9 +1537,46 @@ fn string(self: *Self) Error!*Expr {
         } else final.append(self.allocator, c) catch oom();
     }
 
-    expr.* = .{ .string = .{
-        .text = final.toOwnedSlice(self.allocator) catch oom(),
-        .span = self.prev(.span),
+    return final.toOwnedSlice(self.allocator) catch oom();
+}
+
+fn stringInterp(self: *Self) Error!*Expr {
+    const start = self.prev(.span).start;
+    const expr = self.allocator.create(Expr) catch oom();
+
+    var exprs: ArrayList(*Expr) = .empty;
+    var literals: ArrayList([]const u8) = .empty;
+
+    // We expect: (string_part, expr)* string_end
+    literals.append(self.allocator, try self.resolveStringEscape(self.token_idx - 1, .start)) catch oom();
+    var interp_start = self.token_spans[self.token_idx - 1].end;
+    self.advance();
+
+    while (!self.check(.eof)) {
+        if (self.prev(.tag) == .string_end or self.prev(.tag) == .string_part) {
+            return self.errAtSpan(.{ .start = interp_start, .end = interp_start + 1 }, .empty_string_interp);
+        }
+
+        exprs.append(self.allocator, try self.parseExpr()) catch oom();
+
+        if (self.match(.string_end)) {
+            literals.append(self.allocator, try self.resolveStringEscape(self.token_idx - 1, .end)) catch oom();
+            break;
+        }
+
+        self.advance();
+        literals.append(self.allocator, try self.resolveStringEscape(self.token_idx - 1, .none)) catch oom();
+        interp_start = self.token_spans[self.token_idx - 1].end;
+        self.advance();
+    }
+
+    // We should always have [literal, expr, literal, *] even if literals are empty string
+    std.debug.assert(literals.items.len == exprs.items.len + 1);
+
+    expr.* = .{ .string_interp = .{
+        .exprs = exprs.toOwnedSlice(self.allocator) catch oom(),
+        .literals = literals.toOwnedSlice(self.allocator) catch oom(),
+        .span = .{ .start = start, .end = start },
     } };
 
     return expr;

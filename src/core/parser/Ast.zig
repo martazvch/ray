@@ -190,6 +190,7 @@ pub const Expr = union(enum) {
     @"return": Return,
     self: Self,
     string: String,
+    string_interp: StringInterp,
     struct_literal: StructLiteral,
     ternary: Ternary,
     trap: Trap,
@@ -269,6 +270,11 @@ pub const Null = TokenIndex;
 pub const Self = TokenIndex;
 pub const String = struct {
     text: []const u8,
+    span: Span,
+};
+pub const StringInterp = struct {
+    exprs: []*Expr,
+    literals: []const []const u8,
     span: Span,
 };
 
@@ -517,7 +523,7 @@ pub fn getSpan(self: *const @This(), anynode: anytype) Span {
             },
         },
         Return => self.token_spans[node.kw],
-        String => node.span,
+        String, StringInterp => node.span,
         StructLiteral => self.getSpan(node.structure),
         StructLiteral.Kind => switch (node) {
             .dot => |d| self.token_spans[d],

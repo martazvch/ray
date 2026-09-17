@@ -474,11 +474,24 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
         .null => try self.pushKeyValue(name, "{}", comma),
         .match => |n| try self.match(n, comma),
         .pattern => |n| try self.pattern(n, comma),
-        // .reference => |e| try self.renderSingleExpr(name, e.expr, .block, comma),
         .@"return" => |e| {
             if (e.expr) |data| {
                 try self.renderSingleExpr(name, data, .block, comma);
             } else try self.emptyKey("return", .block, comma);
+        },
+        .string_interp => |e| {
+            try self.openKey(name, .block);
+            try self.openKey("literals", .list);
+            for (e.literals, 0..) |lit, i| {
+                try self.pushValue(lit, i != e.literals.len - 1);
+            }
+            try self.closeKey(.list, true);
+            try self.openKey("exprs", .list);
+            for (e.exprs, 0..) |ex, i| {
+                try self.renderSingleExpr(null, ex, .block, i != e.literals.len - 1);
+            }
+            try self.closeKey(.list, false);
+            try self.closeKey(.block, comma);
         },
         .struct_literal => |e| {
             try self.openKey(name, .block);
@@ -709,6 +722,12 @@ fn emptyKey(self: *Self, key: []const u8, tag: KeyTag, comma: bool) !void {
 fn pushKeyValue(self: *Self, key: []const u8, value: []const u8, comma: bool) !void {
     try self.indent();
     try self.writer.print("\"{s}\": \"{s}\"", .{ key, value });
+    try self.finishPush(comma);
+}
+
+fn pushValue(self: *Self, value: []const u8, comma: bool) !void {
+    try self.indent();
+    try self.writer.print("\"{s}\"", .{value});
     try self.finishPush(comma);
 }
 

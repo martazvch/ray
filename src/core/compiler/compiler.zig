@@ -403,6 +403,7 @@ const Compiler = struct {
             .print => |index| self.wrappedInstrNoDup(.print, index),
             .range => |data| self.range(data),
             .@"return" => |data| self.returnInstr(data),
+            .string_interp => |data| self.stringInterp(data),
             .struct_decl => |*data| self.structDecl(data),
             .cstruct_decl => |*data| self.cStructDecl(data),
             .struct_literal => |*data| self.structLiteral(data),
@@ -1219,11 +1220,24 @@ const Compiler = struct {
         } else self.writeOp(.ret_naked);
     }
 
+    fn stringInterp(self: *Self, data: Instruction.StringInterp) Error!void {
+        // Compiles [literal, expr, literal, expr, ...]
+        for (0..data.exprs.len) |i| {
+            try self.constant(data.literals[i], self.manager.mod_index, true);
+            try self.compileInstr(data.exprs[i]);
+        }
+
+        // Always one additional literal due to parsing
+        try self.constant(data.literals[data.literals.len - 1], self.manager.mod_index, true);
+
+        self.writeOpAndByte(.string_interp, @intCast(data.exprs.len));
+    }
+
     fn structDecl(self: *Self, data: *const Instruction.StructDecl) Error!void {
         self.manager.state.modules.setSymbol(self.manager.mod_index, data.sym_index, Module.Structure{
             .name = self.manager.alloc.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
             .type_id = data.type_id,
-            .field_count = data.fields_count,
+            .fields = data.fields,
         });
         try self.defaults(data.default_fields);
         try self.containerFnDecls(data.functions);

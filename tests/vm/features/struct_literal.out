@@ -1,27 +1,27 @@
-<structure Human>
+Human{ age = 5, name = Tom }
 5
 Tom
 
-<structure Human>
+Human{ age = 5, name = Tom }
 5
 Tom
 
-<structure Human>
+Human{ age = 95, name = Tom }
 95
 Tom
 
-<structure Human>
+Human{ age = 6, name = Martin }
 6
 Martin
 
-<structure Human>
+Human{ age = 95, name = Martin }
 95
 Martin
 
-<structure Human>
+Human{ age = 95, name = Martin }
 95
 Martin
 
-<structure Local>
+Local{ answer = 42 }
 42
 

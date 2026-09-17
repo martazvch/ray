@@ -1,5 +1,5 @@
 -- init --
-load_const index 3, value <enum Bar.a>
+load_const index 3, value Bar.a
 ret
 
 -- toStr --
@@ -17,8 +17,8 @@ load_const index 6, value b
 ret
 
 -- main --
-load_const index 7, value <enum Foo.a>
-load_const index 8, value <enum Bar.b>
+load_const index 7, value Foo.a
+load_const index 8, value Bar.b
 get_local index 0
 get_enum_tag
 load_const index 4, value 0

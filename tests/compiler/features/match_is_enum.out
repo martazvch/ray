@@ -1,5 +1,5 @@
 -- main --
-load_const index 3, value <enum Foo.a>
+load_const index 3, value Foo.a
 
 get_local index 0
 dup
@@ -9,7 +9,7 @@ pop
 get_local index 0
 get_enum_tag
 dup
-load_const index 3, value <enum Foo.a>
+load_const index 3, value Foo.a
 get_enum_tag
 eq_int
 jump_false 19 -> 29
@@ -19,7 +19,7 @@ print
 jump 26 -> 62
 pop
 dup
-load_const index 5, value <enum Foo.b>
+load_const index 5, value Foo.b
 get_enum_tag
 eq_int
 jump_false 35 -> 45
@@ -29,7 +29,7 @@ print
 jump 42 -> 62
 pop
 dup
-load_const index 7, value <enum Foo.c>
+load_const index 7, value Foo.c
 get_enum_tag
 eq_int
 jump_false 51 -> 61

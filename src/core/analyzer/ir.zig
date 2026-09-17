@@ -61,6 +61,7 @@ pub const Instruction = struct {
         print: Index,
         range: Range,
         @"return": Return,
+        string_interp: StringInterp,
         struct_decl: StructDecl,
         cstruct_decl: CStructDecl,
         struct_literal: StructLiteral,
@@ -287,11 +288,15 @@ pub const Instruction = struct {
     pub const Return = struct {
         value: ?Index,
     };
+    pub const StringInterp = struct {
+        literals: []const ConstIdx,
+        exprs: []const Index,
+    };
     pub const StructDecl = struct {
         name: usize,
         sym_index: SymbolIndex,
         type_id: TypeId,
-        fields_count: usize,
+        fields: []const []const u8,
         default_fields: []const Index,
         functions: []const Index,
         traits: []const Trait,

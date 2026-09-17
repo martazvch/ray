@@ -123,7 +123,7 @@ exit_repl
 // ---- test.ray ----
 
 -- main --
-load_const index 5, value <structure Point>
+load_const index 5, value Point{ x = 1, y = 90 }
 
 get_local index 0
 call_ext index 1, module 4, arity 1, display

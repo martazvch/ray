@@ -1,5 +1,5 @@
 -- main --
-load_const index 3, value <union Foo.a>
+load_const index 3, value Foo.a
 get_local index 0
 get_union_tag
 load_const index 4, value 0

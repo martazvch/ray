@@ -6,8 +6,8 @@ yup
 yup
 false
 false
-<structure Foo>
-<enum Bar.bb>
+Foo{ a = 8 }
+Bar.bb
 [true, false]
 3.3
 99.99
@@ -17,6 +17,6 @@ yup
 Tom
 false
 false
-<structure Foo>
-<enum Bar.bb>
+Foo{ a = 8 }
+Bar.bb
 [true, false]

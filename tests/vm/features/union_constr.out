@@ -1,17 +1,17 @@
-<union Foo.a>
+Foo.a
 5
-<union Foo.b>
+Foo.b
 1.2
-<union Foo.c>
-<union Foo.d>
-<enum Dir.south>
+Foo.c
+Foo.d
+Dir.south
 
-<union Foo.a>
+Foo.a
 5
-<union Foo.b>
+Foo.b
 1.2
-<union Foo.c>
-<union Foo.d>
-<enum Dir.south>
+Foo.c
+Foo.d
+Dir.south
 [true, false]
 

@@ -111,6 +111,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .range => |data| self.range(data),
         .pointer => |data| self.pointer(data),
         .@"return" => |data| self.returnInstr("Return", data),
+        .string_interp => |data| self.stringInterp(data),
         .struct_decl => |*data| self.structDecl(data),
         .cstruct_decl => |*data| self.cStructDecl(data),
         .struct_literal => |*data| self.structLiteral(data),
@@ -600,6 +601,29 @@ fn returnInstr(self: *Self, text: []const u8, data: Instruction.Return) void {
 
 fn stringInstr(self: *Self, index: usize) void {
     self.indentAndPrintSlice("[String {s}]", .{self.interner.getKey(index).?});
+}
+
+fn stringInterp(self: *Self, data: Instruction.StringInterp) void {
+    self.indentAndAppendSlice("[String interp]");
+
+    {
+        self.indentAndAppendSlice("- literals");
+        self.indent_level += 1;
+        defer self.indent_level -= 1;
+
+        for (data.literals) |l| {
+            self.constant(.{ .index = l });
+        }
+    }
+    {
+        self.indentAndAppendSlice("- exprs");
+        self.indent_level += 1;
+        defer self.indent_level -= 1;
+
+        for (data.exprs) |e| {
+            self.parseInstr(e);
+        }
+    }
 }
 
 fn structDecl(self: *Self, data: *const Instruction.StructDecl) void {

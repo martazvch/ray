@@ -170,6 +170,7 @@ pub const OpCode = enum(u8) {
     store_blk_val,
     str_cat,
     str_mul,
+    string_interp,
     struct_lit,
     struct_lit_ext,
     struct_lit_c,

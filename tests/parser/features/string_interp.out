@@ -1,0 +1,40 @@
+{
+    "string_interp": {
+        "literals": [
+            "Tom ",
+            "ab",
+            "cd structLit: ",
+            "ended"
+        ],
+        "exprs": [
+            {
+                "int": "1"
+            },
+            {
+                "identifier": "foo"
+            },
+            {
+                "struct_literal": {
+                    "structure": {
+                        "identifier": "Buz"
+                    },
+                    "fields_values": [
+                        {
+                            "name": "a",
+                            "value": {
+                                "int": "1"
+                            }
+                        },
+                        {
+                            "name": "b",
+                            "value": {
+                                "int": "2"
+                            }
+                        }
+                    ]
+                }
+            },
+        ]
+    }
+}
+

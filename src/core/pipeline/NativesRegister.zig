@@ -165,10 +165,11 @@ fn registerStruct(self: *Self, alloc: Allocator, comptime zstruct: zffi.StructMe
         });
     }
 
+    // TODO: group runtime type info between Ray, C, Zig
     self.current.zig_structs.appendAssumeCapacity(.{
         .name = zstruct.name,
         .type_id = ti.typeId(ty),
-        .field_count = zstruct.fields.len,
+        .fields = undefined,
     });
 
     const gop = self.current.zig_structs_meta.getOrPutAssumeCapacity(struct_name);

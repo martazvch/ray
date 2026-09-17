@@ -751,6 +751,32 @@ fn execute(self: *Self) !void {
             .store_blk_val => self.frame.blk_val = self.stack.pop(),
             .str_cat => self.strConcat(),
             .str_mul => self.strMul(self.stack.peekRef(0).obj.as(Obj.String), self.stack.peekRef(1).int),
+
+            // TODO: Error
+            .string_interp => {
+                const expr_count = self.frame.readByte();
+                // We always have one additional literal due to parsing
+                const total_count = (expr_count * 2) + 1;
+                const base = self.stack.top - total_count;
+
+                var wa = std.Io.Writer.Allocating.init(self.gc_alloc);
+                var w = &wa.writer;
+
+                var i: usize = 0;
+                while (i < total_count - 1) : (i += 2) {
+                    const string = base[i].obj.as(Obj.String);
+                    w.writeAll(string.chars) catch oom();
+                    base[i + 1].print(w);
+                }
+                const string = base[total_count - 1].obj.as(Obj.String);
+                w.writeAll(string.chars) catch oom();
+
+                const result = Obj.String.take(self, wa.toOwnedSlice() catch oom());
+
+                self.stack.top -= total_count;
+                self.stack.push(.makeObj(result.asObj()));
+            },
+
             .struct_lit => {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();

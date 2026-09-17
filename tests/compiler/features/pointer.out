@@ -1,7 +1,7 @@
 -- main --
 load_const index 3, value 1
 ptr_local index 0
-load_const index 6, value <structure Foo>
+load_const index 6, value Foo{ a = 2, b = ok }
 get_local index 2
 ptr_field index 0
 get_local index 2

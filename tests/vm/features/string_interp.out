@@ -1,0 +1,10 @@
+v1: 4
+v2: 6.5
+v3: true
+v4: Tom
+v5: [1, 2, 3]
+v6: 0..4
+f: <function f>
+e: E.up
+u: U.u2
+s: S{ a = 1.2, b = -8.5 }

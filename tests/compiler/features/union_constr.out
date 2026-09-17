@@ -4,9 +4,9 @@ union_constr index 0, tag 0, Foo
 load_const index 6, value 1.2
 union_constr index 0, tag 1, Foo
 set_local index 0
-load_const index 7, value <union Foo.c>
+load_const index 7, value Foo.c
 set_local index 0
-load_const index 9, value <enum Dir.south>
+load_const index 9, value Dir.south
 union_constr index 0, tag 3, Foo
 set_local index 0
 ret_naked

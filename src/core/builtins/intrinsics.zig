@@ -15,7 +15,7 @@ pub const functions: []const zffi.Intrinsic = &.{
 };
 
 pub fn typeName(ana: *Analyzer, ty: *const Type, offset: usize) usize {
-    return ana.addConstant(
+    return ana.addConstantInstr(
         .{ .string = ana.interner.intern(ana.typeName(ty)) },
         offset,
     );

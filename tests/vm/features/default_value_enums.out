@@ -1,6 +1,6 @@
-<enum Marker.cross>
+Marker.cross
 x
-<enum Marker.circle>
+Marker.circle
 o
 o
 x

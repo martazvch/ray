@@ -61,7 +61,7 @@ pub const Module = struct {
     pub const Structure = struct {
         name: []const u8,
         type_id: TypeId,
-        field_count: usize,
+        fields: []const []const u8,
     };
 
     pub const CStructure = struct {
