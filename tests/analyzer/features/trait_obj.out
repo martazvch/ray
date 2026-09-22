@@ -4,7 +4,7 @@
         Foo, vtable 0:
         - function 0
         [Function declaration speak]
-            [Print]
+            [Pop]
                 [Binop type: add_str]
                     [Constant index 3]
                         [String Bar ]
@@ -16,7 +16,7 @@
         Foo, vtable 1:
         - function 0
         [Function declaration speak]
-            [Print]
+            [Pop]
                 [Binop type: add_str]
                     [Constant index 4]
                         [String Baz ]

@@ -1,15 +1,19 @@
 [Function declaration main]
     [Block pop count: 0, is_expr: false]
-        [Print]
+        [Call Zig symbol 3 module 0]
+            - args
             [Constant index 7]
                 [String before]
-        [Print]
+        [Call Zig symbol 3 module 0]
+            - args
             [Constant index 9]
                 [String after]
-        [Print]
+        [Call Zig symbol 3 module 0]
+            - args
             [Constant index 10]
                 [String last defer]
-        [Print]
+        [Call Zig symbol 3 module 0]
+            - args
             [Constant index 8]
                 [String in defer]
     [Block pop count: 1, is_expr: false]
@@ -17,7 +21,8 @@
             [Constant index 11]
                 [Int 1]
         [Block pop count: 0, is_expr: false]
-            [Print]
+            [Call Zig symbol 3 module 0]
+                - args
                 [Variable index: 0, scope: local]
             [Block pop count: 0, is_expr: false]
                 [Binop type: add_int]
@@ -25,14 +30,18 @@
                     [Constant index 11]
                         [Int 1]
                 [Assignment index: 0, scope: local]
-                [Print]
+                [Call Zig symbol 3 module 0]
+                    - args
                     [Constant index 12]
                         [String exiting block]
-        [Print]
+        [Call Zig symbol 3 module 0]
+            - args
             [Variable index: 0, scope: local]
-    [Print]
+    [Call Zig symbol 3 module 0]
+        - args
         [Constant index 6]
             [String end]
-    [Print]
+    [Call Zig symbol 3 module 0]
+        - args
         [Constant index 5]
             [Int 10]

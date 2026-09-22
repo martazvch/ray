@@ -9,6 +9,6 @@ fn quote(text: str) -> str {
 use .^.math.{Vec2}
 
 fn fmtVec2(v: Vec2) {
-    print v.x
-    print v.y
+    print(v.x)
+    print(v.y)
 }

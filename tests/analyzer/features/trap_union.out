@@ -38,9 +38,8 @@
                 [Load symbol 0]
                 - tag
                 0
-
 [Function declaration main]
-    [Print]
+    [Pop]
         [Trap match_is]
         - lhs
             [Call symbol 0]
@@ -80,7 +79,7 @@
             [Type id]
                 [Constant index 10]
                     [Int -999]
-    [Print]
+    [Discard]
         [Trap expr]
         - lhs
             [Call symbol 0]
@@ -89,7 +88,7 @@
                     [Int 15]
         - rhs
             [Block pop count: 1, is_expr: true]
-                [Print]
+                [Discard]
                     [Variable index: 0, scope: local]
                 [Break depth: 0, pop: 1]
                     [Constant index 11]

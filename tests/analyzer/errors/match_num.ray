@@ -3,13 +3,13 @@ fn getValue() -> int { return 5 }
 fn main() {
     value := 2
 
-    print match value {
+    _ = match value {
         0 => 10
         2 => 30
         2 => 3
     }
 
-    print match value {
+    _ = match value {
         0 => 10
         1 => 20
         4 => 30
@@ -17,23 +17,23 @@ fn main() {
         else => 50
     }
 
-    print match value {
+    _ = match value {
         0 => 10
         1 => 20
     }
     
-    print match value {
+    _ = match value {
         getValue() => 10
         1 => 20
     }
 
-    print match value {
+    _ = match value {
         -5 => -10
         -8..-2 => 20
         else => 100
     }
 
-    print match value {
+    _ = match value {
         -8..-2 => 20
         -5 => -10
         else => 100

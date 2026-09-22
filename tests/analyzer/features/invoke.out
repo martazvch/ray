@@ -1,6 +1,6 @@
 [Structure declaration Human]
     [Function declaration speak]
-        [Print]
+        [Pop]
             [Field access 1]
                 [Variable index: 0, scope: local]
     [Function declaration getOld, returns]

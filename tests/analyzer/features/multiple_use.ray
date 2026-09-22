@@ -6,24 +6,24 @@ fn main() {
     middle.display()
     
     square := geom.Square { side=10, middle }
-    print square.middle.x
-    print square.middle.y
+    square.middle.x
+    square.middle.y
 
     math.introduce()
     vec := math.getVecFromPos(square.middle.x, square.middle.y)
-    print vec.x
-    print vec.y
+    vec.x
+    vec.y
 
     {
         use data.sub.simple_str
-        print simple_str.quote("local import")
+        simple_str.quote("local import")
         middle.display()
-        print simple_str.concat("just ", "concaneted")
+        simple_str.concat("just ", "concaneted")
     }
 
     new_middle := square.moveCenter(middle)
     new_middle.display()
-    print square.middle.x
-    print square.middle.y
+    square.middle.x
+    square.middle.y
 }
 

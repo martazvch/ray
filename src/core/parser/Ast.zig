@@ -21,7 +21,6 @@ pub const Node = union(enum) {
     fn_decl: FnDecl,
     for_loop: For,
     multi_var_decl: MultiVarDecl,
-    print: *Expr,
     struct_decl: StructDecl,
     trait_decl: TraitDecl,
     union_decl: UnionDecl,

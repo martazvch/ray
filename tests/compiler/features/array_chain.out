@@ -25,7 +25,7 @@ load_const index 4, value 1
 index_arr
 load_const index 42, value 0
 index_arr
-print
+pop
 
 get_local index 6
 get_field index 0
@@ -35,7 +35,7 @@ index_arr
 load_const index 42, value 0
 index_arr
 get_field index 0
-print
+pop
 
 get_local index 6
 get_field index 0
@@ -47,7 +47,7 @@ index_arr
 get_field index 2
 load_const index 42, value 0
 index_arr
-print
+pop
 
 get_local index 6
 get_field index 0
@@ -61,7 +61,7 @@ get_local index 0
 index_arr
 load_const index 4, value 1
 index_arr
-print
+pop
 
 load_const index 45, value [55, 66]
 get_local index 6

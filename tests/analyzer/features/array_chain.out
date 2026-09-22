@@ -72,7 +72,7 @@
             - args
             [Variable index: 4, scope: local]
             [Default field constant index 3]
-    [Print]
+    [Pop]
         [Indexing array]
             - index
             [Constant index 42]
@@ -86,7 +86,7 @@
                 [Field access 0]
                     [Field access 0]
                         [Variable index: 5, scope: local]
-    [Print]
+    [Pop]
         [Field access 0]
             [Indexing array]
                 - index
@@ -101,7 +101,7 @@
                     [Field access 0]
                         [Field access 0]
                             [Variable index: 5, scope: local]
-    [Print]
+    [Pop]
         [Indexing array]
             - index
             [Constant index 42]
@@ -121,7 +121,7 @@
                         [Field access 0]
                             [Field access 0]
                                 [Variable index: 5, scope: local]
-    [Print]
+    [Pop]
         [Indexing array]
             - index
             [Constant index 4]

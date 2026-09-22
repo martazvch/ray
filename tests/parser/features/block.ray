@@ -5,5 +5,5 @@
 a = 1+56}
 
 blk: {
-    print "yes"
+    "yes"
 }

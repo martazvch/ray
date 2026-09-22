@@ -14,9 +14,7 @@
                 "body": {
                     "block": {
                         "exprs": [
-                            "print": {
-                                "identifier": "err"
-                            }
+                            "identifier": "err"
                         ]
                     }
                 }

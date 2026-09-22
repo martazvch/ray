@@ -2,7 +2,7 @@ fn getBool() -> bool { return false }
 
 fn main() {
     match true {
-        getBool() => print true
-        else => print false
+        getBool() => true
+        else => false
     }
 }

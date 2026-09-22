@@ -1,5 +1,4 @@
 [Union declaration ValueErr]
-
 [Function declaration failable, returns]
     [If]
     - condition:
@@ -37,9 +36,8 @@
                 [Load symbol 0]
                 - tag
                 0
-
 [Function declaration main]
-    [Print]
+    [Discard]
         [Trap expr]
         - lhs
             [Call symbol 0]
@@ -48,12 +46,12 @@
                     [Int 15]
         - rhs
             [Block pop count: 1, is_expr: true]
-                [Print]
+                [Pop]
                     [Variable index: 0, scope: local]
                 [Break depth: 0, pop: 1]
                     [Constant index 8]
                         [Int 88]
-    [Print]
+    [Discard]
         [Trap match]
         - lhs
             [Call symbol 0]
@@ -97,14 +95,14 @@
                         - tag
                         0
             - body:
-                [Print]
+                [Discard]
                     [Constant index 9]
                         [Int 1]
             - wildcard:
-                [Print]
+                [Discard]
                     [Constant index 10]
                         [Int 4]
-    [Print]
+    [Discard]
         [Trap expr]
         - lhs
             [Call symbol 0]

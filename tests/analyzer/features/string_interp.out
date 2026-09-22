@@ -6,7 +6,7 @@
     [Variable declaration index: 0, scope: local]
         [Constant index 5]
             [Int 4]
-    [Print]
+    [Pop]
         [String interp]
         - literals
             [Constant index 6]

@@ -630,12 +630,6 @@ fn execute(self: *Self) !void {
                 const count = self.frame.readByte();
                 self.stack.top -= count;
             },
-            .print => {
-                var wa = std.Io.Writer.Allocating.init(self.allocator);
-                var writer = &wa.writer;
-                self.stack.pop().print(writer);
-                self.state.config.printFn(self.io, writer.buffered());
-            },
             .ptr_array => {
                 const index = self.stack.pop().int;
                 const obj = self.stack.pop().obj;

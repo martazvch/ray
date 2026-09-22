@@ -1,36 +1,36 @@
 fn main() {
     for a in [1, 2, 3] {
-        print a
+        a
     }
 
     arr := [5, 6, 7, 8]
     for a in arr {
-        print a
+        a
     }
 
     string := "Tom"
     for c in string {
-        print c
+        c
     }
 
     for c in "Martin" {
-        print c
+        c
     }
 
     for v, i in [] {
-        print i
+        i
     }
 
     for v in 0..5 {
-        print v
+        v
     }
 
     for i in -1..5 {
-        print i
+        i
     }
 
     for i in -8..-5 {
-        print i
+        i
     }
 
     loop: for c in "Martin" {

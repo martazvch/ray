@@ -53,7 +53,7 @@
             - tag
             0
     - body
-    [Print]
+    [Pop]
         [Field access 0]
             [Variable index: 0, scope: local]
         [Call symbol 0]
@@ -66,7 +66,7 @@
             - tag
             1
     - body
-    [Print]
+    [Pop]
         [Field access 0]
             [Variable index: 0, scope: local]
         [Call symbol 0]
@@ -86,8 +86,6 @@
                 [Load symbol 0]
                 - tag
                 2
-    [Print]
-        [Variable index: 0, scope: local]
     [Constant index 6]
         [Enum create]
             - symbol
@@ -95,8 +93,6 @@
             - tag
             1
     [Assignment index: 0, scope: local]
-    [Print]
-        [Variable index: 0, scope: local]
     [Call symbol 1]
         - args
         [Constant index 6]
@@ -135,20 +131,14 @@
     [Field assignment]
         [Field access 0]
             [Variable index: 1, scope: local]
-    [Print]
-        [Field access 0]
-            [Variable index: 1, scope: local]
-    [Print]
-        [Field access 1]
-            [Variable index: 1, scope: local]
-    [Print]
+    [Pop]
         [Binop type: eq_int]
             [Enum tag]
                 [Field access 0]
                     [Variable index: 1, scope: local]
             [Constant index 7]
                 [Int 1]
-    [Print]
+    [Pop]
         [Binop type: ne_int]
             [Enum tag]
                 [Field access 0]

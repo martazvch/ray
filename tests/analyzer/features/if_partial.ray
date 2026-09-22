@@ -5,7 +5,7 @@ fn main() {
 
     fn func(a: int) -> int {
         // Only one path generates a value, returns a value otherwise
-        print if true do "str" else return a
+        if true do "str" else return a
 
         tmp: str = if true do return a + 2 else {
             local := 56.4

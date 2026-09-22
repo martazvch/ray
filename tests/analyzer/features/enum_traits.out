@@ -7,7 +7,7 @@
         Bar, vtable 0:
         - function 0
         [Function declaration speak]
-            [Print]
+            [Pop]
                 [If]
                 - condition:
                     [Binop type: eq_int]

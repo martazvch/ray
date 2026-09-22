@@ -31,12 +31,9 @@ fn main() {
 
     foo := Foo{}
 
-    print Foo.static()
-
-    print copy()
-
-    print foo.method()
-
-    print math.getIntDef()
+    Foo.static()
+    copy()
+    foo.method()
+    math.getIntDef() 
 }
 

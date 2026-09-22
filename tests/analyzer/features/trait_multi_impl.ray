@@ -8,14 +8,14 @@ trait Foo {
 struct Bar {
     impl Foo {
         fn speak(self) {
-            print "I'm Bar"
+            "I'm Bar"
         }
     }
 }
 struct Baz {
     impl Foo {
         fn speak(self) {
-            print "I'm Baz"
+            "I'm Baz"
         }
     }
 }

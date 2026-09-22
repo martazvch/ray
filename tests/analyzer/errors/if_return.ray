@@ -9,7 +9,7 @@ fn main() {
 
     fn func(a: int, b: float) -> int {
         // Returns b, which is a float
-        print if true do "str" else return b
+        _ =  if true do "str" else return b
 
         tmp: str = if true do return a + 2 else {
             local := 56.4

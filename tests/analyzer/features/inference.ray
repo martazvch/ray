@@ -6,10 +6,10 @@ fn get_bool() -> bool { return true }
 
 fn main() {
     // No cast here, it recognized 2 floats
-    print a + b
+    a + b
     // Only bool allowed here
-    print not res
+    not res
 
     bo := get_bool() // infered as bool
-    print not bo // 'not' only allowed with booleans
+    not bo // 'not' only allowed with booleans
 }

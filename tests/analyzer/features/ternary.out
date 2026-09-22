@@ -1,5 +1,5 @@
 [Function declaration main]
-    [Print]
+    [Pop]
         [If]
         - condition:
             [Constant index 0]

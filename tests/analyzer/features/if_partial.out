@@ -21,17 +21,16 @@
         - else:
             [Return]
     [Function declaration func, returns]
-        [Print]
-            [If]
-            - condition:
-                [Constant index 0]
-                    [Bool true]
-            - then:
-                [Constant index 5]
-                    [String str]
-            - else:
-                [Return]
-                    [Variable index: 0, scope: local]
+        [If]
+        - condition:
+            [Constant index 0]
+                [Bool true]
+        - then:
+            [Constant index 5]
+                [String str]
+        - else:
+            [Return]
+                [Variable index: 0, scope: local]
         [Variable declaration index: 1, scope: local]
             [If]
             - condition:

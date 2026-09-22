@@ -1,6 +1,6 @@
 fn main() {
     a := 1
-    print a.*
+    a.*
 
     b := "ok"
     ptr1 := *b

@@ -1,10 +1,10 @@
 trait Foo {
-    fn speak() { print "Foo" }
+    fn speak() {}
 }
 
 struct Bar {
     impl Foo {
-        fn speak() { print "bar" }
+        fn speak() {}
     }
 }
 

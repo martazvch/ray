@@ -149,7 +149,6 @@ pub const OpCode = enum(u8) {
     pop2,
     pop3,
     popn,
-    print,
     ptr_array,
     ptr_local,
     ptr_global,

@@ -9,10 +9,10 @@ fn main() {
 
     match f is {
         Foo {
-            .a => print "a"
-            .b => print "b"
-            .c => print "c"
+            .a => "a"
+            .b => "b"
+            .c => "c"
         }
-        int => print "int"
+        int => "int"
     }
 }

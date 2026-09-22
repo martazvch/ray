@@ -2,7 +2,7 @@
     [Variable declaration index: 0, scope: local]
         [Constant index 3]
             [Int 2]
-    [Print]
+    [Pop]
         [Match int]
         - expression:
             [Variable index: 0, scope: local]
@@ -48,7 +48,7 @@
     [Variable declaration index: 1, scope: local]
         [Constant index 14]
             [Float 2]
-    [Print]
+    [Pop]
         [Match float]
         - expression:
             [Variable index: 1, scope: local]

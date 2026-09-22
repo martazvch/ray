@@ -11,15 +11,15 @@ fn main() {
     bar: Bar = .a
 
     match marker {
-        Marker.circle => print "circle"
-        Marker.cross => print "cross"
-        Marker.none => print "none"
+        Marker.circle => "circle"
+        Marker.cross => "cross"
+        Marker.none => "none"
     }
 
     match marker {
-        .circle => print "circle"
-        .cross => print "cross"
-        .none => print "none"
+        .circle => "circle"
+        .cross => "cross"
+        .none => "none"
     }
 
     foo := match marker {

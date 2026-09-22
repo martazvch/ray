@@ -193,7 +193,6 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .pop2 => self.simpleInstruction(writer, name, offset),
         .pop3 => self.simpleInstruction(writer, name, offset),
         .popn => self.indexInstruction(writer, name, offset),
-        .print => self.simpleInstruction(writer, name, offset),
         .ptr_array => self.simpleInstruction(writer, name, offset),
         .ptr_local => self.indexInstruction(writer, name, offset),
         .ptr_global => self.indexInstruction(writer, name, offset),

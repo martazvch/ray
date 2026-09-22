@@ -3,7 +3,8 @@
         [Constant index 3]
             [Int 3]
     [Function declaration capture]
-        [Print]
+        [Call Zig symbol 3 module 0]
+            - args
             [Unbox]
                 [Variable index: 0, scope: local]
         - captures
@@ -30,7 +31,8 @@
             [Variable declaration index: 1, scope: local]
                 [Null]
             [Function declaration capture1]
-                [Print]
+                [Call Zig symbol 3 module 0]
+                    - args
                     [Unbox]
                         [Variable index: 0, scope: local]
                 - captures
@@ -44,7 +46,8 @@
         [Constant index 4]
             [Int 1]
     [Function declaration capture2]
-        [Print]
+        [Call Zig symbol 3 module 0]
+            - args
             [Unbox]
                 [Variable index: 0, scope: local]
         - captures

@@ -4,7 +4,7 @@
         Foo, vtable 0:
         - function 1
         [Function declaration speakNoDef]
-            [Print]
+            [Pop]
                 [Constant index 5]
                     [String noDef]
         - function 3
@@ -18,7 +18,7 @@
                         [Int 0]
             - then:
                 [Block pop count: 0, is_expr: false]
-                    [Print]
+                    [Pop]
                         [Binop type: add_str]
                             [Constant index 8]
                                 [String I'm a: ]
@@ -31,7 +31,7 @@
                                     0
             - else:
                 [Block pop count: 0, is_expr: false]
-                    [Print]
+                    [Pop]
                         [Binop type: add_str]
                             [Constant index 9]
                                 [String I'm b: ]
@@ -42,12 +42,12 @@
                                 1
         - function 0
         [Function declaration speak]
-            [Print]
+            [Pop]
                 [Constant index 3]
                     [String oui]
         - function 2
         [Function declaration method]
-            [Print]
+            [Pop]
                 [Constant index 4]
                     [String method]
 [Function declaration main]

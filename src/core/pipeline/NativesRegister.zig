@@ -314,6 +314,7 @@ fn fnIntrinsicToRay(
 fn zigToRay(self: *Self, alloc: Allocator, T: type, interner: *Interner, ti: *TypeInterner) *const Type {
     return switch (T) {
         // `anyopaque` is used to represent `any` in Ray
+        Value => ti.getCached(.any),
         anyopaque => ti.getCached(.any),
         bool => ti.getCached(.bool),
         i64 => ti.getCached(.int),

@@ -1,13 +1,13 @@
 fn main() {
     data := Data{
-        value1=3,
-        value2=56.78,
-        value3=true,
-        name="Tom",
+        value1 = 3,
+        value2 = 56.78,
+        value3 = true,
+        name = "Tom",
     }
-    print data.value1
-    print data.value2
-    print data.value3
-    print data.name
+    data.value1
+    data.value2
+    data.value3
+    data.name
 }
 

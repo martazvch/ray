@@ -7,9 +7,7 @@
         },
         "body": {
             "exprs": [
-                "print": {
-                    "identifier": "v"
-                }
+                "identifier": "v"
             ]
         }
     },

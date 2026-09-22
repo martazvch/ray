@@ -7,7 +7,8 @@
                 [Field access 1]
                     [Variable index: 0, scope: local]
 [Function declaration introduce]
-    [Print]
+    [Call Zig symbol 3 module 0]
+        - args
         [Constant index 3]
             [String This is a mathematical module]
 [Function declaration getVecFromPos, returns]
@@ -68,6 +69,6 @@
                     [Int 6]
                 [Constant index 6]
                     [Int 89]
-        [Print]
+        [Pop]
             [Field access 1]
                 [Variable index: 3, scope: local]

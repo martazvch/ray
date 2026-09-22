@@ -1,5 +1,5 @@
 [Function declaration main]
-    [Print]
+    [Pop]
         [Call string function 0]
             [Constant index 3]
                 [String abcd]

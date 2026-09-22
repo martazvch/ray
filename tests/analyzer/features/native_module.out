@@ -16,12 +16,12 @@
 
 //-- test.ray --
 [Function declaration main]
-    [Print]
+    [Pop]
         [Call c symbol 1 module 3]
             - args
             [Constant index 3]
                 [Float 4]
-    [Print]
+    [Pop]
         [Call symbol 0 module 3]
             - args
             [Constant index 4]

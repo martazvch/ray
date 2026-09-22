@@ -19,9 +19,7 @@
                 ],
                 "return_type": "void",
                 "body": [
-                    "print": {
-                        "identifier": "a"
-                    }
+                    "identifier": "a"
                 ]
             },
             "fn_decl": {
@@ -125,9 +123,7 @@
                 ],
                 "return_type": "void",
                 "body": [
-                    "print": {
-                        "identifier": "a"
-                    }
+                    "identifier": "a"
                 ]
             },
             "fn_decl": {

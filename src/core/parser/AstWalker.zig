@@ -178,7 +178,6 @@ fn captureFromNode(self: *Self, node: *Ast.Node, ctx: *CaptureCtx) void {
                 self.captureFromExpr(val, ctx);
             };
         },
-        .print => |expr| self.captureFromExpr(expr, ctx),
         .struct_decl => {},
         .trait_decl => |expr| {
             for (expr.functions) |*f| {

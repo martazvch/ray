@@ -15,6 +15,6 @@ fn main() {
         vec2 := please2(6, 89)
 
         // Accessing fields of type defined in math
-        print vec2.y
+        vec2.y
     }
 }

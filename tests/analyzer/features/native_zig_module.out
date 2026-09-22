@@ -1,23 +1,23 @@
 [Function declaration main]
-    [Print]
+    [Pop]
         [Call Zig symbol 13 module 1]
             - args
             [Variable index: 1, scope: global, module 1]
-    [Print]
+    [Pop]
         [Call Zig symbol 13 module 1]
             - args
             [Constant index 3]
                 [Int 0]
-    [Print]
+    [Pop]
         [Call Zig symbol 14 module 1]
             - args
             [Variable index: 0, scope: global, module 1]
-    [Print]
+    [Pop]
         [Call Zig symbol 14 module 1]
             - args
             [Constant index 3]
                 [Int 0]
-    [Print]
+    [Pop]
         [Call Zig symbol 4 module 1]
             - args
             [Constant index 4]

@@ -7,10 +7,10 @@ load_const index 6, value 5
 call_array index 0, arity 1
 get_local index 0
 call_array index 2, arity 0
-print
+pop
 get_local index 0
 call_array index 1, arity 0
-print
+pop
 ret_naked
 
 -- global scope --

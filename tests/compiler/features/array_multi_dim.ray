@@ -12,8 +12,8 @@ fn main() {
     foo := Foo{arr=[[6, 7, getIdx()], [8, 9+1, 11]]}
 
     // Access
-    print arr[1][2]
-    print arr[-2][-1]
+    arr[1][2]
+    arr[-2][-1]
 
     // Element assignment
     arr[-1][getIdx()] = 99
@@ -22,6 +22,6 @@ fn main() {
     foo.arr[getIdx()] = [1]
     foo.arr[getIdx()][1] = -9
     // Access in struct
-    print foo.arr[getIdx()]
-    print foo.arr[getIdx()][1]
+    foo.arr[getIdx()]
+    foo.arr[getIdx()][1]
 }

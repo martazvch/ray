@@ -4,17 +4,16 @@
             [Int 5]
 
 [Function declaration main]
-    [Match int]
-    - expression:
-        [Call symbol 0]
-    - arms:
-        - expr:
-            [Constant index 3]
-                [Int 5]
-        - body:
-            [Print]
+    [Pop]
+        [Match int]
+        - expression:
+            [Call symbol 0]
+        - arms:
+            - expr:
+                [Constant index 3]
+                    [Int 5]
+            - body:
                 [Variable index: 0, scope: local]
-        - wildcard:
-            [Print]
+            - wildcard:
                 [Constant index 4]
                     [String non]

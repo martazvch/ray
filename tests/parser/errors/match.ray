@@ -1,21 +1,21 @@
 match value {
-    "value" print "oui"
+    "value" print("oui")
 }
 
 match value
-    "value" => print "oui"
+    "value" => print("oui")
 }
 
 match value {
-    "value" => { print "oui" } "otherValue" => "error"
+    "value" => { print("oui") } "otherValue" => "error"
 }
 
 match value is {
-    int print "oui"
+    int print("oui")
 }
 
 match value is {
-    int print "oui"
+    int print("oui")
 }
 
 match value {

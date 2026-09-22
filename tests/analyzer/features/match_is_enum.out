@@ -12,49 +12,46 @@
                 [Load symbol 0]
                 - tag
                 0
-    [Match is]
-    - expression:
-        [Variable index: 0, scope: local]
-    - arms:
-    [Type id]
-        [Match enum]
+    [Pop]
+        [Match is]
         - expression:
             [Variable index: 0, scope: local]
         - arms:
-            - expr:
-                [Constant index 3]
-                    [Enum create]
-                        - symbol
-                        [Load symbol 0]
-                        - tag
-                        0
-            - body:
-                [Print]
+        [Type id]
+            [Match enum]
+            - expression:
+                [Variable index: 0, scope: local]
+            - arms:
+                - expr:
+                    [Constant index 3]
+                        [Enum create]
+                            - symbol
+                            [Load symbol 0]
+                            - tag
+                            0
+                - body:
                     [Constant index 4]
                         [String a]
-            - expr:
-                [Constant index 5]
-                    [Enum create]
-                        - symbol
-                        [Load symbol 0]
-                        - tag
-                        1
-            - body:
-                [Print]
+                - expr:
+                    [Constant index 5]
+                        [Enum create]
+                            - symbol
+                            [Load symbol 0]
+                            - tag
+                            1
+                - body:
                     [Constant index 6]
                         [String b]
-            - expr:
-                [Constant index 7]
-                    [Enum create]
-                        - symbol
-                        [Load symbol 0]
-                        - tag
-                        2
-            - body:
-                [Print]
+                - expr:
+                    [Constant index 7]
+                        [Enum create]
+                            - symbol
+                            [Load symbol 0]
+                            - tag
+                            2
+                - body:
                     [Constant index 8]
                         [String c]
-    [Type id]
-        [Print]
+        [Type id]
             [Constant index 9]
                 [String int]

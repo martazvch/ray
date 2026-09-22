@@ -43,7 +43,7 @@
                         [Int 8]
                         [Int 10]
                         [Int 11]
-    [Print]
+    [Pop]
         [Indexing array]
             - index
             [Constant index 3]
@@ -55,7 +55,7 @@
                     [Int 1]
                 - expr
                 [Variable index: 0, scope: local]
-    [Print]
+    [Pop]
         [Indexing array]
             - index
             [Constant index 23]
@@ -101,14 +101,14 @@
             - expr
             [Field access 0]
                 [Variable index: 2, scope: local]
-    [Print]
+    [Pop]
         [Indexing array]
             - index
             [Call symbol 0]
             - expr
             [Field access 0]
                 [Variable index: 2, scope: local]
-    [Print]
+    [Pop]
         [Indexing array]
             - index
             [Constant index 4]

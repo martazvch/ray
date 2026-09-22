@@ -2,20 +2,21 @@
     [Variable declaration index: 0, scope: local]
         [Constant index 3]
             [Float 8.3]
-    [Match is]
-    - expression:
-        [Variable index: 0, scope: local]
-    - arms:
-    [Type id]
-        [Print]
+
+    [Pop]
+        [Match is]
+        - expression:
+            [Variable index: 0, scope: local]
+        - arms:
+        [Type id]
             [Binop type: add_int]
                 [Variable index: 0, scope: local]
                 [Constant index 4]
                     [Int 1]
-    [Type id]
-        [Print]
+        [Type id]
             [Constant index 5]
                 [String float]
+
     [Variable declaration index: 1, scope: local]
         [Match is]
         - expression:
@@ -30,39 +31,37 @@
         [Variable declaration index: 2, scope: local]
             [Constant index 0]
                 [Bool true]
-        [Match is]
-        - expression:
-            [Variable index: 0, scope: local]
-        - arms:
-        [Type id]
-            [Match float]
+
+        [Pop]
+            [Match is]
             - expression:
                 [Variable index: 0, scope: local]
             - arms:
-                - expr:
-                    [Constant index 7]
-                        [Float 1.2]
-                - body:
-                    [Print]
+            [Type id]
+                [Match float]
+                - expression:
+                    [Variable index: 0, scope: local]
+                - arms:
+                    - expr:
+                        [Constant index 7]
+                            [Float 1.2]
+                    - body:
                         [Constant index 8]
                             [String first]
-                - expr:
-                    [Range]
-                    - start:
-                    [Constant index 9]
-                        [Float 4.5]
-                    - end:
-                    [Constant index 10]
-                        [Float 10]
-                - body:
-                    [Print]
+                    - expr:
+                        [Range]
+                        - start:
+                        [Constant index 9]
+                            [Float 4.5]
+                        - end:
+                        [Constant index 10]
+                            [Float 10]
+                    - body:
                         [Constant index 11]
                             [String second]
-                - wildcard:
-                    [Print]
+                    - wildcard:
                         [Constant index 12]
                             [String non]
-        [Type id]
-            [Print]
+            [Type id]
                 [Constant index 13]
                     [String int]

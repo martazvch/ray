@@ -43,9 +43,7 @@
     "block": {
         "label": "blk",
         "exprs": [
-            "print": {
-                "string": "yes"
-            }
+            "string": "yes"
         ]
     }
 }

@@ -249,7 +249,6 @@ fn synchronize(self: *Self) void {
             .@"if",
             .left_brace,
             .match,
-            .print,
             .@"return",
             .@"struct",
             .trait,
@@ -973,8 +972,6 @@ fn deferableStmt(self: *Self) Error!Node {
         self.forLoop()
     else if (self.match(.@"while"))
         self.whileStmt()
-    else if (self.match(.print))
-        self.print()
     else if (self.match(.underscore))
         self.discard()
     else {
@@ -1081,10 +1078,6 @@ fn forLoop(self: *Self) Error!Node {
         .expr = expr,
         .body = body.block,
     } };
-}
-
-fn print(self: *Self) Error!Node {
-    return .{ .print = try self.parsePrecedenceExpr(0) };
 }
 
 fn whileStmt(self: *Self) Error!Node {

@@ -33,6 +33,6 @@ fn failable5() -> Foo!void {
 fail File.notFound
 
 fn main() {
-    print failable()
+    failable()
 }
 

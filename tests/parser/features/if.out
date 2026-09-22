@@ -8,9 +8,7 @@
         "then": {
             "block": {
                 "exprs": [
-                    "print": {
-                        "string": "ok"
-                    }
+                    "string": "ok"
                 ]
             }
         },
@@ -24,9 +22,7 @@
         "then": {
             "block": {
                 "exprs": [
-                    "print": {
-                        "string": "ok"
-                    }
+                    "string": "ok"
                 ]
             }
         },
@@ -40,16 +36,12 @@
         "then": {
             "block": {
                 "exprs": [
-                    "print": {
-                        "string": "ok"
-                    }
+                    "string": "ok"
                 ]
             }
         },
         "else": {
-            "print": {
-                "string": "ko"
-            }
+            "string": "ko"
         },
     },
     "if": {
@@ -61,18 +53,14 @@
         "then": {
             "block": {
                 "exprs": [
-                    "print": {
-                        "string": "ok"
-                    }
+                    "string": "ok"
                 ]
             }
         },
         "else": {
             "block": {
                 "exprs": [
-                    "print": {
-                        "string": "ko"
-                    }
+                    "string": "ko"
                 ]
             }
         },
@@ -82,9 +70,7 @@
             "expr": {
                 "block": {
                     "exprs": [
-                        "print": {
-                            "string": "in cond"
-                        },
+                        "string": "in cond",
                         "bool": "false"
                     ]
                 }
@@ -93,9 +79,7 @@
         "then": {
             "block": {
                 "exprs": [
-                    "print": {
-                        "string": "ok"
-                    }
+                    "string": "ok"
                 ]
             }
         },
@@ -107,9 +91,7 @@
             }
         },
         "then": {
-            "print": {
-                "string": "ok"
-            }
+            "string": "ok"
         },
     },
     "if": {
@@ -119,14 +101,10 @@
             }
         },
         "then": {
-            "print": {
-                "string": "ok"
-            }
+            "string": "ok"
         },
         "else": {
-            "print": {
-                "string": "ko"
-            }
+            "string": "ko"
         },
     },
     "if": {
@@ -136,16 +114,12 @@
             }
         },
         "then": {
-            "print": {
-                "string": "ok"
-            }
+            "string": "ok"
         },
         "else": {
             "block": {
                 "exprs": [
-                    "print": {
-                        "string": "ko"
-                    }
+                    "string": "ko"
                 ]
             }
         },
@@ -157,9 +131,7 @@
             }
         },
         "then": {
-            "print": {
-                "string": "ok"
-            }
+            "string": "ok"
         },
         "else": {
             "if": {
@@ -169,14 +141,10 @@
                     }
                 },
                 "then": {
-                    "print": {
-                        "string": "elseif"
-                    }
+                    "string": "elseif"
                 },
                 "else": {
-                    "print": {
-                        "string": "ko"
-                    }
+                    "string": "ko"
                 }
             }
         },
@@ -208,9 +176,7 @@
             }
         },
         "then": {
-            "print": {
-                "string": "ok"
-            }
+            "string": "ok"
         },
     }
 }

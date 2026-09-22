@@ -7,7 +7,7 @@ fn main() {
     array[1.0]
 
     twoDim := [[1, 2], [3, 4]]
-    print twoDim[0][1][2]
+    twoDim[0][1][2]
 
     name := "Tom"
     name[1] = "i"

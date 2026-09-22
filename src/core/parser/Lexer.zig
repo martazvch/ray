@@ -59,7 +59,6 @@ pub const Token = struct {
         .{ "not", .not },
         .{ "null", .null },
         .{ "or", .@"or" },
-        .{ "print", .print },
         .{ "return", .@"return" },
         .{ "self", .self },
         .{ "struct", .@"struct" },
@@ -137,7 +136,6 @@ pub const Token = struct {
         pipe_equal,
         plus,
         plus_equal,
-        print,
         question_mark,
         question_mark_question_mark,
         @"return",
@@ -1039,17 +1037,18 @@ test "keywords" {
     var lexer = Self.init(std.testing.allocator);
     defer lexer.deinit();
     lexer.lex(
-        \\\and else false for fn if null or print return 
+        \\\and else false for fn if null or return 
         \\\self struct true while not do use break 
         \\\as enum match in fail trap is continue trait impl
         \\\union extern defer
     );
 
     const res = [_]Token.Tag{
-        .@"and",      .@"else",  .false, .@"for",    .@"fn",    .@"if",     .null,     .@"or", .print,
-        .@"return",   .new_line, .self,  .@"struct", .true,     .@"while",  .not,      .do,    .use,
-        .@"break",    .new_line, .as,    .@"enum",   .match,    .in,        .fail,     .trap,  .is,
-        .@"continue", .trait,    .impl,  .new_line,  .@"union", .@"extern", .@"defer", .eof,
+        .@"and",    .@"else",  .false,       .@"for",    .@"fn",   .@"if",    .null,     .@"or",
+        .@"return", .new_line, .self,        .@"struct", .true,    .@"while", .not,      .do,
+        .use,       .@"break", .new_line,    .as,        .@"enum", .match,    .in,       .fail,
+        .trap,      .is,       .@"continue", .trait,     .impl,    .new_line, .@"union", .@"extern",
+        .@"defer",  .eof,
     };
 
     for (0..res.len) |i| {

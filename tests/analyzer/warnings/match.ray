@@ -1,7 +1,7 @@
 fn main() {
     bind := 5
     match bind @b {
-        else => print "useless"
+        else => "useless"
     }
 }
 

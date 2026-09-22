@@ -16,6 +16,9 @@ pub const module: zffi.Module = .{
         .init(Module, "str", "", &.{
             .{ .name = "value" },
         }),
+        .init(Module, "print", "", &.{
+            .{ .name = "value" },
+        }),
     },
 };
 
@@ -43,4 +46,12 @@ pub fn str(vm: *Vm, value: zffi.Union(&.{ .int, .float })) zffi.Str {
         .int => |i| try std.fmt.allocPrint(vm.gc_alloc, "{}", .{i}),
         .float => |f| try std.fmt.allocPrint(vm.gc_alloc, "{}", .{f}),
     };
+}
+
+pub fn print(vm: *Vm, value: zffi.Any) void {
+    const stdout = std.Io.File.stdout();
+    var writer = stdout.writer(vm.io, &.{});
+    const w = &writer.interface;
+    value.print(w);
+    vm.state.config.printFn(vm.io, w.buffered());
 }

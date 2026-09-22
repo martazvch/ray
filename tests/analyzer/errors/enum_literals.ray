@@ -6,5 +6,5 @@ fn main() {
     marker: Marker = .triangle
 
     marker: Marker = .circle
-    print marker.cross
+    marker.cross
 }

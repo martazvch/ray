@@ -107,7 +107,6 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .obj_func => unreachable,
         .pat_nullable => |index| self.indexInstr("Nullable pattern", index),
         .pop => |index| self.indexInstr("Pop", index),
-        .print => |index| self.indexInstr("Print", index),
         .range => |data| self.range(data),
         .pointer => |data| self.pointer(data),
         .@"return" => |data| self.returnInstr("Return", data),

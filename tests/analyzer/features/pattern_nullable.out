@@ -9,7 +9,7 @@
             [Call symbol 0]
     - then:
         [Block pop count: 1, is_expr: false]
-            [Print]
+            [Pop]
                 [Variable index: 0, scope: local]
     [While]
     - condition:
@@ -17,5 +17,5 @@
             [Call symbol 0]
     - body:
         [Block pop count: 1, is_expr: false]
-            [Print]
+            [Pop]
                 [Variable index: 0, scope: local]

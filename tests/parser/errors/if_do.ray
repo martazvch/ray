@@ -1,2 +1,2 @@
 if true do a := 1
-if false { print "oui" } else struct Foo {}
+if false { } else struct Foo {}

@@ -2,7 +2,7 @@
     [Variable declaration index: 0, scope: local]
         [Constant index 3]
             [String value]
-    [Print]
+    [Pop]
         [Match string]
         - expression:
             [Variable index: 0, scope: local]

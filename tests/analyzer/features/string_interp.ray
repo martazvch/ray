@@ -4,6 +4,6 @@ fn f(a: int, b: bool) -> float {
 
 fn main() {
     value := 4
-    print "value: {value}, f: {f}"
+    "value: {value}, f: {f}"
 }
 

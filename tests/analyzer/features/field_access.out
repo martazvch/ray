@@ -16,7 +16,7 @@
             [Constant index 6]
                 [String Tom]
             [Variable index: 0, scope: local]
-    [Print]
+    [Pop]
         [Field access 1]
             [Field access 2]
                 [Variable index: 1, scope: local]

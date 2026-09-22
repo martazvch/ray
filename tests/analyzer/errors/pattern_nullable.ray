@@ -3,7 +3,7 @@ fn main() {
     // Check if variable isn't available in outer scope
     ok: ?float = 9.
     if v := ok {}
-    print v
+    v
 
     if e := getValue() {}
 }

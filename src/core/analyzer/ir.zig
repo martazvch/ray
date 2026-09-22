@@ -58,7 +58,6 @@ pub const Instruction = struct {
         pat_nullable: Index,
         pointer: Pointer,
         pop: Index,
-        print: Index,
         range: Range,
         @"return": Return,
         string_interp: StringInterp,

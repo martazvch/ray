@@ -2,7 +2,7 @@
     [Variable declaration index: 0, scope: local]
         [Constant index 3]
             [String Tom]
-    [Print]
+    [Pop]
         [Indexing str]
             - index
             [Constant index 4]

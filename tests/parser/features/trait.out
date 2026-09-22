@@ -35,12 +35,8 @@
                 ],
                 "return_type": "void",
                 "body": [
-                    "print": {
-                        "self": "{}"
-                    },
-                    "print": {
-                        "identifier": "other"
-                    }
+                    "self": "{}",
+                    "identifier": "other"
                 ]
             }
         ]

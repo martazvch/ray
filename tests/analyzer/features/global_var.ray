@@ -3,7 +3,7 @@ b := true
 c := 56.7
 
 fn main() {
-    print b
-    print c
-    print a
+    b
+    c
+    a
 }

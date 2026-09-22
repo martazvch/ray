@@ -102,9 +102,6 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
             }
             try self.closeKey(.list, comma);
         },
-        .print => |n| {
-            try self.renderSingleExpr(@tagName(node.*), n, .block, comma);
-        },
         .struct_decl => |n| {
             try self.openKey(if (n.is_extern) "extern_struct_decl" else @tagName(node.*), .block);
             try self.pushKeyValue("name", self.ast.toSource(n.name), true);

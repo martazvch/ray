@@ -6,7 +6,7 @@ fn main() {
 
     b: int = match "Tom" {
         "Tom" => 5
-        else => print "yes"
+        else => _ = "yes"
     }
 
     u: int|float = 1
@@ -25,7 +25,7 @@ fn main() {
     }
 
      t := match 1 {
-        1 => print "oui"
-        else => print "non"
+        1 => _ = "oui"
+        else => _ = "non"
     }
 }

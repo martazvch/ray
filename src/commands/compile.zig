@@ -257,12 +257,6 @@ fn transpileInstr(self: *Self, instr: usize, interner: *const misc.Interner) !vo
             // std.log.debug("FnDecl: {any}", .{n});
             try self.transpilefn(n, interner);
         },
-        .print => |n| {
-            // std.log.debug("Print: {any}", .{n});
-            self.appendSlice("std.debug.print(\"{any}\\n\", .{", .{ .new_line = false });
-            try self.transpileInstr(n, interner);
-            self.appendSlice("});", .{ .indent = false });
-        },
         .struct_decl => |n| {
             std.log.debug("Struct decl: {any}", .{n});
 

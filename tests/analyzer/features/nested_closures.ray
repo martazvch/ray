@@ -2,7 +2,7 @@ fn main() {
     // Near scope capture
     a: int = 3
 
-    fn capture() { print a }
+    fn capture() { print(a) }
 
     // Far scope capture
     first := 1
@@ -17,14 +17,14 @@ fn main() {
         fn nested2() {
             mach3: int
 
-            fn capture1() { print b }
+            fn capture1() { print(b) }
         }
     }
 
     // Assignment
     d := 1
 
-    fn capture2() { print d }
+    fn capture2() { print(d) }
 
     d = 2
 }

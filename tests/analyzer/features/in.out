@@ -1,5 +1,5 @@
 [Function declaration main]
-    [Print]
+    [Pop]
         [In string]
             - needle:
             [Constant index 3]
@@ -7,7 +7,7 @@
             - haystack:
             [Constant index 4]
                 [String string]
-    [Print]
+    [Pop]
         [In range_int]
             - needle:
             [Constant index 5]
@@ -20,7 +20,7 @@
             - end:
             [Constant index 7]
                 [Int 6]
-    [Print]
+    [Pop]
         [In range_float]
             - needle:
             [Constant index 8]
@@ -33,7 +33,7 @@
             - end:
             [Constant index 10]
                 [Float 6.9]
-    [Print]
+    [Pop]
         [In array]
             - needle:
             [Constant index 11]

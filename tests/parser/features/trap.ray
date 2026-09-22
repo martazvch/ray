@@ -1,5 +1,5 @@
 func() trap err {
-    print err
+    err
 }
 func() trap _ { }
 func() trap match binding {

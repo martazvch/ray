@@ -1,5 +1,5 @@
 for v in arr {
-    print v
+    v
 }
 
 for v, i in arr {}

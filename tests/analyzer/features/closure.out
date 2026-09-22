@@ -12,8 +12,8 @@
         [Assignment index: 0, scope: local, unbox]
         - captures
         [Capture index: 0, is_local: true]
-    [Function declaration get]
-        [Print]
+    [Function declaration get, returns]
+        [Return]
             [Unbox]
                 [Variable index: 0, scope: local]
         - captures
@@ -26,5 +26,6 @@
     [Call symbol 0]
     [Fn call]
         [Variable index: 0, scope: global]
-    [Fn call]
-        [Variable index: 1, scope: global]
+    [Pop]
+        [Fn call]
+            [Variable index: 1, scope: global]

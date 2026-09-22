@@ -14,6 +14,7 @@ pub const Float = f64;
 pub const Bool = bool;
 pub const Str = []const u8;
 pub const Enum = *Obj.Enum;
+pub const Any = Value;
 
 pub const All = union(enum) {
     bool: Bool,
@@ -281,6 +282,11 @@ pub fn makeNative(func: anytype) Fn {
         }
 
         fn fromValue(T: type, value: Value) T {
+            // In case type is 'Any', we need Value which would be treated as 'union'
+            if (T == Value) {
+                return value;
+            }
+
             return switch (@typeInfo(T)) {
                 .float => value.float,
                 .int => value.int,

@@ -5,11 +5,11 @@ struct Data {
 }
 
 fn useDataAndVec(data: Data, vec: math.Vec2) {
-    print "-- Data"
-    print data.a
-    print data.b
+    print("-- Data")
+    print(data.a)
+    print(data.b)
 
-    print "-- Vec2"
-    print vec.x
-    print vec.y
+    print("-- Vec2")
+    print(vec.x)
+    print(vec.y)
 }

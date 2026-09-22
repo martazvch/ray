@@ -14,12 +14,12 @@ struct_lit index 0, arity 1, Foo
 get_local index 0
 load_const index 4, value 1
 index_arr
-print
+pop
 
 get_local index 0
 load_const index 10, value -2
 index_arr
-print
+pop
 
 load_const index 11, value 99
 get_local index 0
@@ -36,7 +36,7 @@ get_local index 2
 get_field index 0
 call index 0, arity 0, getIdx
 index_arr
-print
+pop
 
 load_const index 4, value 1
 load_const index 4, value 1

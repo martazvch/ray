@@ -8,13 +8,13 @@ struct Point {
     }
 
     fn display(self) {
-        print self.x
-        print self.y
+        print(self.x)
+        print(self.y)
     }
 }
 
 fn introduce() {
-    print "module for basic geometry"
+    print("module for basic geometry")
 }
 
 struct Square {

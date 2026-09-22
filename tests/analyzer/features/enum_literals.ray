@@ -16,11 +16,11 @@ struct Cell {
 }
 
 fn markerStuff(m: Marker = Marker.cross) {
-    print m.toString()
+    m.toString()
 }
 
 fn markerStuff2(m = Marker.circle) {
-    print m.toString()
+    m.toString()
 }
 
 fn getMarker() -> Marker {
@@ -29,21 +29,16 @@ fn getMarker() -> Marker {
 
 fn main() {
     marker: Marker = .none
-    print marker
-
     marker = .circle
-    print marker
 
     markerStuff(.circle)
     markerStuff2(.cross)
 
     cell := Cell{}
     cell.marker = .circle
-    print cell.marker
-    print cell.marker2
 
-    print cell.marker == .circle
-    print cell.marker != .circle
+    cell.marker == .circle
+    cell.marker != .circle
 
     marker == .none
     marker == Marker.none

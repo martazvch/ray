@@ -5,7 +5,7 @@ fn main() {
     b = float(6.4)
 
     bind := int
-    print bind(5.6)
+    bind(5.6)
 
-    print str(5)
+    str(5)
 }

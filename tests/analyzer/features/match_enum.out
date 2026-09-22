@@ -23,80 +23,77 @@
                 [Load symbol 1]
                 - tag
                 0
-    [Match enum]
-    - expression:
-        [Variable index: 0, scope: local]
-    - arms:
-        - expr:
-            [Constant index 5]
-                [Enum create]
-                    - symbol
-                    [Load symbol 0]
-                    - tag
-                    1
-        - body:
-            [Print]
+    [Pop]
+        [Match enum]
+        - expression:
+            [Variable index: 0, scope: local]
+        - arms:
+            - expr:
+                [Constant index 5]
+                    [Enum create]
+                        - symbol
+                        [Load symbol 0]
+                        - tag
+                        1
+            - body:
                 [Constant index 6]
                     [String circle]
-        - expr:
-            [Constant index 7]
-                [Enum create]
-                    - symbol
-                    [Load symbol 0]
-                    - tag
-                    0
-        - body:
-            [Print]
+            - expr:
+                [Constant index 7]
+                    [Enum create]
+                        - symbol
+                        [Load symbol 0]
+                        - tag
+                        0
+            - body:
                 [Constant index 8]
                     [String cross]
-        - expr:
-            [Constant index 3]
-                [Enum create]
-                    - symbol
-                    [Load symbol 0]
-                    - tag
-                    2
-        - body:
-            [Print]
+            - expr:
+                [Constant index 3]
+                    [Enum create]
+                        - symbol
+                        [Load symbol 0]
+                        - tag
+                        2
+            - body:
                 [Constant index 9]
                     [String none]
-    [Match enum]
-    - expression:
-        [Variable index: 0, scope: local]
-    - arms:
-        - expr:
-            [Constant index 5]
-                [Enum create]
-                    - symbol
-                    [Load symbol 0]
-                    - tag
-                    1
-        - body:
-            [Print]
+    [Pop]
+        [Match enum]
+        - expression:
+            [Variable index: 0, scope: local]
+        - arms:
+            - expr:
+                [Constant index 5]
+                    [Enum create]
+                        - symbol
+                        [Load symbol 0]
+                        - tag
+                        1
+            - body:
                 [Constant index 6]
                     [String circle]
-        - expr:
-            [Constant index 7]
-                [Enum create]
-                    - symbol
-                    [Load symbol 0]
-                    - tag
-                    0
-        - body:
-            [Print]
+            - expr:
+                [Constant index 7]
+                    [Enum create]
+                        - symbol
+                        [Load symbol 0]
+                        - tag
+                        0
+            - body:
                 [Constant index 8]
                     [String cross]
-        - expr:
-            [Constant index 3]
-                [Enum create]
-                    - symbol
-                    [Load symbol 0]
-                    - tag
-                    2
-        - body:
-            [Print]
+            - expr:
+                [Constant index 3]
+                    [Enum create]
+                        - symbol
+                        [Load symbol 0]
+                        - tag
+                        2
+            - body:
                 [Constant index 9]
                     [String none]
+
     [Variable declaration index: 2, scope: local]
         [Match enum]
         - expression:

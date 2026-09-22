@@ -4,9 +4,9 @@ fn getValue() -> int {
 
 fn main() {
     match getValue() @v {
-        5 => print v
-        else => print "non"
+        5 => v
+        else => "non"
     }
-    print v
+    _ = v
 }
 

@@ -21,13 +21,13 @@
     [Assignment index: 1, scope: local]
     [Variable declaration index: 2, scope: local]
         [Load native symbol 0 module 0]
-    [Print]
+    [Pop]
         [Fn call]
             [Variable index: 2, scope: local]
             - args
             [Constant index 3]
                 [Float 5.6]
-    [Print]
+    [Pop]
         [Call Zig symbol 2 module 0]
             - args
             [Constant index 4]

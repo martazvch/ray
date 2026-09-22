@@ -13,7 +13,7 @@ fn main() {
     // Nested
     fn add1(a:int, b:float) {
         fn sub(a:int) -> str {
-            print a
+            a
             return "yes"
         }
 

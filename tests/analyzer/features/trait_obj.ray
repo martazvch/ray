@@ -5,7 +5,7 @@ trait Foo {
 struct Bar {
     impl Foo {
         fn speak(self, a: int) {
-            print "Bar " + str(a)
+            "Bar " + str(a)
         }
     }
 }
@@ -13,7 +13,7 @@ struct Bar {
 struct Baz {
     impl Foo {
         fn speak(self, a: int) {
-            print "Baz " + str(a)
+            "Baz " + str(a)
         }
     }
 }

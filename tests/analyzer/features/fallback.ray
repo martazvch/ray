@@ -9,8 +9,8 @@ fn optional() -> ?int {
 }
 
 fn main() {
-    print failable() !! 85
-    print optional() ?? 85
+    failable() !! 85
+    optional() ?? 85
 
     a: int = failable() !! 85
     b: int = optional() ?? 85

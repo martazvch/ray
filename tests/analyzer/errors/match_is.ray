@@ -18,7 +18,7 @@ fn main() {
 
     b := match a is {
         int => 5
-        float => print "float"
+        float => _ = "float"
     }
 
     c: bool = match a is {
@@ -32,16 +32,16 @@ fn main() {
     }
 
     match a is {
-        int => print "int"
-        float => print "float"
-        else => print "else"
+        int => _ = "int"
+        float => _ = "float"
+        else => _ = "else"
     }
 
     // Valide match to check if variable's type isn't changed
     match a is {
-        int => print "int"
-        float => print "float"
+        int => _ = "int"
+        float => _ = "float"
     }
     // Should still be an union
-    print a + 1
+    _ = a + 1
 }

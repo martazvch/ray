@@ -364,7 +364,7 @@ const Compiler = struct {
             .constant => |data| self.constant(data.index, self.manager.mod_index, true),
             .@"continue" => |data| self.continueInstr(data),
             .deref => |index| self.wrappedInstr(.deref, index),
-            .discard => |index| self.wrappedInstr(.pop, index),
+            .discard => |index| self.wrappedInstrNoDup(.pop, index),
 
             .enum_decl => |*data| self.enumDecl(data),
             .enum_tag => |index| self.getTag(index, .@"enum"),
@@ -399,8 +399,7 @@ const Compiler = struct {
             .pat_nullable => |index| self.wrappedInstr(.ne_null_push, index),
 
             .pointer => |index| self.pointer(index),
-            .pop => |index| self.wrappedInstr(.pop, index),
-            .print => |index| self.wrappedInstrNoDup(.print, index),
+            .pop => |index| self.wrappedInstrNoDup(.pop, index),
             .range => |data| self.range(data),
             .@"return" => |data| self.returnInstr(data),
             .string_interp => |data| self.stringInterp(data),

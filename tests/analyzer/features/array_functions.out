@@ -9,9 +9,9 @@
         - args
         [Constant index 6]
             [Int 5]
-    [Print]
+    [Pop]
         [Call array function 2]
             [Variable index: 0, scope: local]
-    [Print]
+    [Pop]
         [Call array function 1]
             [Variable index: 0, scope: local]

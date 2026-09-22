@@ -1,5 +1,6 @@
 func() trap call() {}
 func() trap 12 {}
 func() trap AnyErr.error1 {}
-func() trap err print err
+func() trap err 1
+a := 1
 func() trap {}

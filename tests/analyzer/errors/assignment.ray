@@ -1,7 +1,7 @@
 struct Foo {
     a: int,
 
-    fn f(self, a: int) { print a }
+    fn f(self, a: int) {}
 }
 
 fn add(a: int) {
@@ -22,9 +22,7 @@ fn main() {
     // Assign to method
     foo := Foo{ a=5 }
 
-    fn f2(this: Foo, a: int) {
-        print 2 * a
-    }
+    fn f2(this: Foo, a: int) { }
 
     foo.f = f2
 

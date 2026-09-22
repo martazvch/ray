@@ -14,10 +14,10 @@ fn main() {
     a := "sss"
 
     b := *a
-    print b.*
+    b.*
  
     c := *b
-    print c.*.*
+    c.*.*
 
     value := 9
     bar := Bar{ a=true, b="ok" }
@@ -25,9 +25,9 @@ fn main() {
     pbar := *bar
 
     foo := Foo{ b=*value, c=*bar, d=*pvalue, e=*pbar }
-    print foo.b.* == value
-    print foo.c.*.a == bar.a
-    print foo.d.*.* == value
-    print foo.e.*.*.b == bar.b
+    foo.b.* == value
+    foo.c.*.a == bar.a
+    foo.d.*.* == value
+    foo.e.*.*.b == bar.b
 }
 

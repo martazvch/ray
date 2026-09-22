@@ -8,7 +8,7 @@ struct Vec2 {
 }
 
 fn introduce() {
-    print "This is a mathematical module"
+    print("This is a mathematical module")
 }
 
 fn getVecFromPos(x: int, y: int) -> Vec2 {

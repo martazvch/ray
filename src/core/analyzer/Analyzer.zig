@@ -217,7 +217,6 @@ pub fn analyzeNode(self: *Self, node: *const Node, expect: ExprResKind, ctx: *Co
         .fn_decl => |*n| (try self.fnDeclaration(n, ctx)).instr,
         .for_loop => |*n| try self.forLoop(n, ctx),
         .multi_var_decl => |*n| try self.multiVarDecl(n, ctx),
-        .print => |n| try self.print(n, ctx),
         .struct_decl => |*n| try self.structDecl(n, ctx),
         .trait_decl => |*n| try self.traitDecl(n, ctx),
         .union_decl => |*n| try self.unionDecl(n, ctx),
@@ -930,13 +929,6 @@ fn defaultValue(self: *Self, decl_type: *const Type, val: *const Expr, kind: any
     // TODO: see if this is safe enough with comp_time check above
     const const_index = self.irb.getInstr(value_res.instr).constant.index;
     return .{ value_res, const_index };
-}
-
-fn print(self: *Self, expr: *const Expr, ctx: *Context) StmtResult {
-    const res = try self.analyzeExpr(expr, .any, ctx);
-    // HACK: gonna be deleted when we'll have a real `print` function
-    if (res.type.is(.optional)) @panic("have to unwrap optional first");
-    return self.irb.wrapInstr(.print, res.instr);
 }
 
 fn expectAssignableValue(self: *Self, expr: *const Ast.Expr, ctx: *Context) Result {

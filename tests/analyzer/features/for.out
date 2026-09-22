@@ -8,7 +8,7 @@
                 [Int 3]
     - body:
         [Block pop count: 1, is_expr: false]
-            [Print]
+            [Pop]
                 [Variable index: 1, scope: local]
     [Variable declaration index: 0, scope: local]
         [Constant index 11]
@@ -22,7 +22,7 @@
         [Variable index: 0, scope: local]
     - body:
         [Block pop count: 1, is_expr: false]
-            [Print]
+            [Pop]
                 [Variable index: 2, scope: local]
     [Variable declaration index: 1, scope: local]
         [Constant index 12]
@@ -32,7 +32,7 @@
         [Variable index: 1, scope: local]
     - body:
         [Block pop count: 1, is_expr: false]
-            [Print]
+            [Pop]
                 [Variable index: 3, scope: local]
     [For]
     - expr:
@@ -40,7 +40,7 @@
             [String Martin]
     - body:
         [Block pop count: 1, is_expr: false]
-            [Print]
+            [Pop]
                 [Variable index: 3, scope: local]
     [For]
     - expr:
@@ -48,7 +48,7 @@
             [Array]
     - body:
         [Block pop count: 2, is_expr: false]
-            [Print]
+            [Pop]
                 [Variable index: 3, scope: local]
     [For]
     - expr:
@@ -61,7 +61,7 @@
             [Int 5]
     - body:
         [Block pop count: 1, is_expr: false]
-            [Print]
+            [Pop]
                 [Variable index: 3, scope: local]
     [For]
     - expr:
@@ -74,7 +74,7 @@
             [Int 5]
     - body:
         [Block pop count: 1, is_expr: false]
-            [Print]
+            [Pop]
                 [Variable index: 3, scope: local]
     [For]
     - expr:
@@ -87,7 +87,7 @@
             [Int -5]
     - body:
         [Block pop count: 1, is_expr: false]
-            [Print]
+            [Pop]
                 [Variable index: 3, scope: local]
     [For]
     - expr:

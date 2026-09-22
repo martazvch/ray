@@ -1,45 +1,45 @@
-if true { print "ok" }
+if true { "ok" }
 if true {
-    print "ok"
+    "ok"
 }
 
 if true
 {
-    print "ok"
+    "ok"
 }
-else print "ko"
+else "ko"
 
 if true {
-    print "ok" } else {
-    print "ko" }
+    "ok" } else {
+    "ko" }
 
 
 // Condition as block
 
 if {
-    print "in cond"
+    "in cond"
     false
 }{
-    print "ok"
+    "ok"
 }
 
 
 // Do syntax
 
-if true do print "ok"
+if true do "ok"
 
-if true do print "ok"
-else print "ko"
+if true do "ok"
+else "ko"
 
-if true do print "ok"
-else { print "ko" }
+if true do "ok"
+else { "ko" }
 
 
 // Else if
 
-if true do print "ok"
-else if true do print "elseif"
-else print "ko"
+if true do "ok"
+else if true do "elseif"
+else "ko"
 
 
 // If as expression
@@ -47,4 +47,4 @@ else print "ko"
 _res := if true do 5 else 10
 
 // Labelled
-cond: if true do print "ok"
+cond: if true do "ok"

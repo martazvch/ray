@@ -13,8 +13,8 @@ fn voidOptional() -> ?void {
 }
 
 fn main() {
-    print nonFailable() !! 85
-    print nonFailable() ?? 85
-    print voidFailable() !! 3
-    print voidOptional() ?? 3
+    nonFailable() !! 85
+    nonFailable() ?? 85
+    voidFailable() !! 3
+    voidOptional() ?? 3
 }
