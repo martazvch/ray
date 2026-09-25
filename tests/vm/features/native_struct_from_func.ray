@@ -1,10 +1,10 @@
 // Field access
 fn printData(data: Data) {
-    print data.value1
-    print data.value2
-    print data.value3
-    print data.name
-    print "-------------"
+    print(data.value1)
+    print(data.value2)
+    print(data.value3)
+    print(data.name)
+    print("-------------")
 }
 
 fn main() {

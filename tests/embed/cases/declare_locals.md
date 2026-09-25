@@ -13,7 +13,7 @@ a := 65
 
 - code
 ```
-print a
+print(a)
 ```
 
 - res
@@ -32,7 +32,7 @@ other := "a string"
 
 - code
 ```
-print a
+print(a)
 ```
 
 - res
@@ -44,7 +44,7 @@ print a
 
 - code
 ```
-print other
+print(other)
 ```
 
 - res

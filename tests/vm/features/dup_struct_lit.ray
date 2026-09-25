@@ -4,10 +4,10 @@ fn main() {
     foo := Foo{}
     bar := Bar{foo}
 
-    print foo.a
-    print bar.foo.a
+    print(foo.a)
+    print(bar.foo.a)
 
     foo.a = 9
-    print foo.a
-    print bar.foo.a
+    print(foo.a)
+    print(bar.foo.a)
 }

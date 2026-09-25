@@ -1,17 +1,17 @@
 fn main() {
     for v, i in [10, 20, 30] {
-        print i
-        print v
+        print(i)
+        print(v)
     }
 
     for v, i in [-9, -8, -7] {
-        print "----"
-        print i
-        print v
+        print("----")
+        print(i)
+        print(v)
 
         for vv, j in [100, 200, 300] {
-            print j
-            print vv
+            print(j)
+            print(vv)
         }
     }
 }

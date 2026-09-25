@@ -12,17 +12,17 @@ struct Vec2 {
     arr: []bool = [true, false],
 
     fn display(self) {
-        print self.a
-        print self.b
-        print self.x
-        print self.y
-        print self.z
-        print self.w
-        print self.aa
-        print self.bb
-        print self.foo
-        print self.bar
-        print self.arr
+        print(self.a)
+        print(self.b)
+        print(self.x)
+        print(self.y)
+        print(self.z)
+        print(self.w)
+        print(self.aa)
+        print(self.bb)
+        print(self.foo)
+        print(self.bar)
+        print(self.arr)
     }
 }
 

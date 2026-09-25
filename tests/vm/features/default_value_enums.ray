@@ -20,19 +20,19 @@ struct Cell {
 }
 
 fn markerStuff(m: Marker = Marker.circle) {
-    print m.toString()
+    print(m.toString())
 }
 
 fn markerStuff2(m = Marker.cross) {
-    print m.toString()
+    print(m.toString())
 }
 
 fn main() {
     cell := Cell{}
-    print cell.marker
-    print cell.marker.toString()
-    print cell.marker2
-    print cell.marker2.toString()
+    print(cell.marker)
+    print(cell.marker.toString())
+    print(cell.marker2)
+    print(cell.marker2.toString())
 
     markerStuff()
     markerStuff2()

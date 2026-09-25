@@ -1,13 +1,13 @@
 fn main() {
     arr := [1, 2]
-    print arr
-    print arr.len()
+    print(arr)
+    print(arr.len())
 
     arr.push(5)
-    print arr
-    print arr.len()
+    print(arr)
+    print(arr.len())
 
-    print arr.pop()
-    print arr.len()
+    print(arr.pop())
+    print(arr.len())
 }
 

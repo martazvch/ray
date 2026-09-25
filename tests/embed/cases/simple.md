@@ -6,7 +6,7 @@ Simple expressions
 
 - code
 ```
-print 1
+print(1)
 ```
 
 - res
@@ -18,7 +18,7 @@ print 1
 
 - code
 ```
-print -2
+print(-2)
 ```
 
 - res

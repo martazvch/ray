@@ -1,17 +1,17 @@
 trait Foo {
     fn speak(self, a: int)
     fn speak2(self, a: int) {
-        print a == 1
+        print(a == 1)
     }
 }
 
 struct Bar {
     impl Foo {
         fn speak(self, a := 1) {
-            print "Bar " + str(a)
+            print("Bar " + str(a))
         }
         fn speak2(self, a := 1) {
-            print a == 1
+            print(a == 1)
         }
     }
 }
@@ -19,10 +19,10 @@ struct Bar {
 struct Baz {
     impl Foo {
         fn speak(self, a := 2) {
-            print "Baz " + str(a)
+            print("Baz " + str(a))
         }
         fn speak2(self, a := 2) {
-            print a == 2
+            print(a == 2)
         }
     }
 }

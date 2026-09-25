@@ -6,24 +6,24 @@ fn main() {
     foo := Foo{bar}
     ref := foo.bar
 
-    print foo.bar.v
-    print ref.v
-    print "------"
+    print(foo.bar.v)
+    print(ref.v)
+    print("------")
     
     foo.bar.v = 9
-    print foo.bar.v
-    print ref.v
-    print "------"
+    print(foo.bar.v)
+    print(ref.v)
+    print("------")
 
     ref = foo.bar
     foo.bar = Bar{ v=12 }
-    print foo.bar.v
-    print ref.v
-    print "------"
+    print(foo.bar.v)
+    print(ref.v)
+    print("------")
 
     ref = foo.bar
     ref.v = 65
-    print foo.bar.v
-    print ref.v
-    print "------"
+    print(foo.bar.v)
+    print(ref.v)
+    print("------")
 }

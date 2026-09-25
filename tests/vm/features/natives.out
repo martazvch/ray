@@ -1,6 +1,6 @@
 fn main() {
     file := open("natives.ray")
-    print file.readAll()
+    print(file.readAll())
 }
 
 

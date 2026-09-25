@@ -9,9 +9,9 @@ fn sub() -> int {
 }
 
 fn main() {
-    print add // expect: <fn add>
-    print sub // expect: <fn sub>
-    print add // expect: <fn add>
+    print(add) // expect: <fn add>
+    print(sub) // expect: <fn sub>
+    print(add) // expect: <fn add>
 
     // local declaration
     {
@@ -22,13 +22,13 @@ fn main() {
             return "mul"
         }
 
-        print sub // expect: <fn sub>
-        print add // expect: <fn add>
-        print mul // expect: <fn mul>
+        print(sub) // expect: <fn sub>
+        print(add) // expect: <fn add>
+        print(mul) // expect: <fn mul>
     }
 
-    print sub // expect: <fn sub>
-    print add // expect: <fn add>
+    print(sub) // expect: <fn sub>
+    print(add) // expect: <fn add>
 
     // With args, to see if it compiles well too and that args dosen't mess up stack
     fn fn1(a: int) {}
@@ -39,6 +39,6 @@ fn main() {
     // Trailing comma
     fn fn3(a: int,) {}
 
-    print fn1 // expect: <fn fn1>
-    print fn2 // expect: <fn fn2>
+    print(fn1) // expect: <fn fn1>
+    print(fn2) // expect: <fn fn2>
 }

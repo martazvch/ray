@@ -14,20 +14,20 @@ fn failable(value: int) -> bool!ValueErr {
 }
 
 fn main() {
-    print failable(5) trap e {
-        print e
+    print(failable(5) trap e {
+        print(e)
         break 88
-    }
-    print failable(3) trap match e {
+    })
+    print(failable(3) trap match e {
         .tooSmall => 1
         else => 4
-    }
-    print failable(33) trap match e {
+    })
+    print(failable(33) trap match e {
         .tooSmall => 1
         else => 4
-    }
-    print failable(33) trap e {
+    })
+    print(failable(33) trap e {
         return
-    }
+    })
 }
 

@@ -7,16 +7,16 @@ fn get2(value: int) -> ?int {
 
 fn main() {
     if v := getValue() {
-        print v
+        print(v)
     }
 
     if n := getNull() {
-        print "here"
+        print("here")
     }
 
     i := 0
     while v := get2(i) {
-        print v
+        print(v)
         i += 1
     }
 }

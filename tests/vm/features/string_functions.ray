@@ -1,9 +1,9 @@
 fn main() {
-    print "abcd".len()
+    print("abcd".len())
 
     string := "ab cd ef eaaa1"
     for s in string.split(" ") {
-        print s
+        print(s)
     }
 }
 

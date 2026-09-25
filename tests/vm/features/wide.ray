@@ -257,6 +257,6 @@ fn main() {
         255,
         256,
     ]
-    print "no problem"
+    print("no problem")
 }
 

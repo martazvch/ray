@@ -1,26 +1,26 @@
 fn main() {
     value := true
     match value {
-        true => print true
-        false => print false
+        true => print(true)
+        false => print(false)
     }
 
     value = false
     match value {
-        true => print true
-        false => print false
+        true => print(true)
+        false => print(false)
     }
 
     value = false
     match value {
-        true => print true
-        else => print false
+        true => print(true)
+        else => print(false)
     }
 
     value = true
     match value {
-        true => print true
-        else => print false
+        true => print(true)
+        else => print(false)
     }
 }
 

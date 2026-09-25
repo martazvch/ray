@@ -1,37 +1,37 @@
 fn main() {
     // No braces
     z := if true do 1 else 2
-    print z // expect: 1
+    print(z) // expect: 1
 
     y := if false do return else 3
-    print y // expect: 3
+    print(y) // expect: 3
 
     x := if true do 23 else return
-    print x // expect: 23
+    print(x) // expect: 23
 
     // With blocks
     a := if true {break 5} else 12
-    print a // expect: 5
+    print(a) // expect: 5
 
     b := if false do 5 else {break 8}
-    print b // expect: 8
+    print(b) // expect: 8
 
     c := if false {break 5} else {break 21}
-    print c // expect: 21
+    print(c) // expect: 21
 
     d := if { break true } do 5 + 6 else {
         break 1
     }
-    print d // expect: 11
+    print(d) // expect: 11
 
     e := if { break not true } { break 5 + 6 } else {
         tmp := 1
-        print tmp // expect: 1
+        print(tmp) // expect: 1
         tmp = 5
-        print tmp // expect: 5
+        print(tmp) // expect: 5
         break a + b + tmp
     }
-    print e // expect: 18
+    print(e) // expect: 18
 
     f := if {
         tmp := "garbage"
@@ -42,21 +42,21 @@ fn main() {
         break -5
     } else -10
 
-    print f // expect: -5
+    print(f) // expect: -5
 
     g := if not not true do 6/2 else 0
-    print g // expect: 3
+    print(g) // expect: 3
 
     h := if if true do true else false {
         tmp := 3
         break tmp + e
     } else -8
 
-    print h // expect: 21
+    print(h) // expect: 21
 
     // Labelled
     cond: if true {
         if 1 == 1 do break :cond
-        print "unreachable"
+        print("unreachable")
     }
 }

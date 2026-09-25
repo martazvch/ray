@@ -15,7 +15,7 @@ struct Bar {
 }
 
 fn main() {
-    print Bar.init().a
+    print(Bar.init().a)
 
     struct Baz {
         flag = true
@@ -26,7 +26,7 @@ fn main() {
     }
 
     foo := Foo.init()
-    print foo.y
-    print Baz.init().flag
+    print(foo.y)
+    print(Baz.init().flag)
 }
 

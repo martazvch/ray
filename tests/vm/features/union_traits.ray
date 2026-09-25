@@ -1,8 +1,8 @@
 trait Foo {
-    fn speak() { print "oui" }
+    fn speak() { print("oui") }
     fn speakNoDef()
 
-    fn method(self) { print "method" }
+    fn method(self) { print("method") }
     fn methodNoDef(self)
 }
 
@@ -11,12 +11,12 @@ union Bar {
     b: str,
     
     impl Foo {
-        fn speakNoDef() { print "noDef" }
+        fn speakNoDef() { print("noDef") }
         fn methodNoDef(self) {
             if self == .a {
-                print "I'm a: " + str(self.a)
+                print("I'm a: " + str(self.a))
             } else {
-                print "I'm b: " + self.b
+                print("I'm b: " + self.b)
             }
         }
     }

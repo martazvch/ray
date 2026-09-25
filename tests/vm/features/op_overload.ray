@@ -48,7 +48,7 @@ struct Vec2 {
     }
 
     fn display(self) {
-        print "x: " + str(self.x) + ", y: " + str(self.y)
+        print("x: " + str(self.x) + ", y: " + str(self.y))
     }
 }
 

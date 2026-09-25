@@ -13,17 +13,17 @@ struct Foo {
 fn main() {
     a := "sss"
     b := *a
-    print b == *a
-    print b.*
+    print(b == *a)
+    print(b.*)
  
     c := *b
-    print c == *b
-    print c.* == *a
-    print c.* == b
+    print(c == *b)
+    print(c.* == *a)
+    print(c.* == b)
 
     a = "ok"
-    print b.*
-    print c.*.*
+    print(b.*)
+    print(c.*.*)
 
     value := 9
     bar := Bar{ a=true, b="ok" }
@@ -31,28 +31,28 @@ fn main() {
     pbar := *bar
 
     foo := Foo{ b=*value, c=*bar, d=*pvalue, e=*pbar }
-    print foo.b == *value
-    print foo.b.* == value
+    print(foo.b == *value)
+    print(foo.b.* == value)
 
-    print foo.c == *bar
-    print foo.c.*.a == bar.a
+    print(foo.c == *bar)
+    print(foo.c.*.a == bar.a)
 
-    print foo.d == *pvalue
-    print foo.d.* == *value
-    print foo.d.*.* == value
+    print(foo.d == *pvalue)
+    print(foo.d.* == *value)
+    print(foo.d.*.* == value)
 
-    print foo.e == *pbar
-    print foo.e.* == *bar
-    print foo.e.*.*.b == bar.b
+    print(foo.e == *pbar)
+    print(foo.e.* == *bar)
+    print(foo.e.*.*.b == bar.b)
 
     value = 15
-    print foo.b.*
-    print foo.d.*.*
+    print(foo.b.*)
+    print(foo.d.*.*)
 
     bar.a = false
-    print foo.c.*.a
-    print foo.e.*.*.a
+    print(foo.c.*.a)
+    print(foo.e.*.*.a)
     bar.b = "new"
-    print foo.c.*.b
-    print foo.e.*.*.b
+    print(foo.c.*.b)
+    print(foo.e.*.*.b)
 }

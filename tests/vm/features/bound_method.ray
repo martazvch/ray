@@ -3,7 +3,7 @@ struct Person {
 
     fn speak(self) {
         self.age = self.age * 10
-        print self.age
+        print(self.age)
     }
 
     fn getOld(self, amount: int) -> int {
@@ -13,7 +13,7 @@ struct Person {
 }
 
 fn oui() {
-    print "oui"
+    print("oui")
 }
 
 fn main() {

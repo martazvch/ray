@@ -1,78 +1,78 @@
 fn main() {
     for a in [1, 2, 3] {
-        print a
+        print(a)
     }
 
     arr := [5, 6, 7, 8]
     for a in arr {
-        print a
+        print(a)
     }
-    print "----"
+    print("----")
 
     for i in [1, 2, 3] {
-        print i
+        print(i)
         for j in [4, 5] {
-            print j
+            print(j)
         }
     }
-    print "----"
+    print("----")
 
     for c in "Martin" {
-        print c
+        print(c)
     }
 
     string := "Tom"
     for c in string {
-        print c
+        print(c)
     }
-    print "----"
+    print("----")
 
     for c in "Martin" {
-        print c
+        print(c)
         for cc in "Tom" {
-            print cc
+            print(cc)
         }
     }
-    print "----"
+    print("----")
 
     for c in "Martin" {
-        print c
+        print(c)
         for j in [4, 5] {
-            print j
+            print(j)
         }
     }
-    print "----"
+    print("----")
 
     for i in 0..5 {
-        print i
+        print(i)
     }
-    print "----"
+    print("----")
 
     for i in 5..0 {
-        print i
+        print(i)
     }
-    print "----"
+    print("----")
 
     a := 6
 
     for i in 0..a {
-        print i
+        print(i)
     }
-    print "----"
+    print("----")
 
     for i in a..0 {
-        print i
+        print(i)
     }
-    print "----"
+    print("----")
 
     for i in -1..5 {
-        print i
+        print(i)
     }
-    print "----"
+    print("----")
 
     for i in -8..-5 {
-        print i
+        print(i)
     }
-    print "----"
+    print("----")
 }
 

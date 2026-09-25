@@ -32,45 +32,45 @@ fn main() {
     
     data := Data{ first, second }
 
-    print "Test 1"
+    print("Test 1")
     it := data.iterator("first")
     while v := it.next() {
-        print v // expect 1, 2, 3
+        print(v) // expect 1, 2, 3
     }
 
-    print "Test 2"
+    print("Test 2")
     it = data.iterator("second")
     while v := it.next() {
-        print v // expect 4, 5, 6
+        print(v) // expect 4, 5, 6
     }
 
-    print "Test 3"
+    print("Test 3")
     data = Data.init()
     data.first = [12, 34, 56]
     data.second = [78, 91, 23]
 
     it = data.iterator("first")
     while v := it.next() {
-        print v // expect 12, 34, 56 
+        print(v) // expect 12, 34, 56 
     }
 
-    print "Test 4"
+    print("Test 4")
     it = data.iterator("second")
     while v := it.next() {
-        print v // expect 78, 91, 23 
+        print(v) // expect 78, 91, 23 
     }
 
-    print "Test 5"
+    print("Test 5")
     data = Data.initWithData(second=[120, 340, 560], first=[780, 910, 230])
     it = data.iterator("first")
     while v := it.next() {
-        print v // expect 780, 910, 230 
+        print(v) // expect 780, 910, 230 
     }
 
-    print "Test 6"
+    print("Test 6")
     it = data.iterator("second")
     while v := it.next() {
-        print v // expect 120, 340, 560 
+        print(v) // expect 120, 340, 560 
     }
 }
 

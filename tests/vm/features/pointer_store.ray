@@ -7,14 +7,14 @@ fn f(a: *Foo) {
 fn main() {
     a := 1
     ptr := *a
-    print ptr.*
+    print(ptr.*)
 
     ptr.* = 6
-    print ptr.*
+    print(ptr.*)
 
     foo := Foo{ x=4 }
-    print foo.x
+    print(foo.x)
     f(*foo)
-    print foo.x
+    print(foo.x)
 }
 

@@ -26,18 +26,18 @@ fn main() {
     bar := Bar{}
 
     foo := Foo{ function=copy }
-    print foo.function()
+    print(foo.function())
 
     foo.function = Bar.static
-    print foo.function()
+    print(foo.function())
 
     foo.function = bar.method
-    print foo.function()
+    print(foo.function())
 
     foo.function = math.getInt
-    print foo.function()
+    print(foo.function())
 
     tmp := bar.importFuncFromMethod
     foo.function = tmp()
-    print foo.function()
+    print(foo.function())
 }

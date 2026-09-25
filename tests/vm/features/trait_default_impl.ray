@@ -1,9 +1,9 @@
 trait Foo {
     fn speak() {
-        print "hello"
+        print("hello")
     }
 
-    fn method0(self) { print "method0" }
+    fn method0(self) { print("method0") }
 
     fn method1(self) {
         self.method0()
@@ -17,10 +17,10 @@ struct Bar {
 struct Baz {
     impl Foo {
         fn speak() {
-            print "bye"
+            print("bye")
         }
         fn method0(self) {
-            print "modified method"
+            print("modified method")
         }
     }
 }

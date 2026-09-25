@@ -15,30 +15,30 @@ union Foo {
 
 fn main() {
     foo := Foo.a(5)
-    print foo
-    print foo.a
+    print(foo)
+    print(foo.a)
     foo = Foo.b(1.2)
-    print foo
-    print foo.b
+    print(foo)
+    print(foo.b)
     foo = Foo.c
-    print foo
+    print(foo)
     foo = Foo.d(Dir.south)
-    print foo
-    print foo.d
+    print(foo)
+    print(foo.d)
 
     foo = .a(5)
-    print foo
-    print foo.a
+    print(foo)
+    print(foo.a)
     foo = .b(1.2)
-    print foo
-    print foo.b
+    print(foo)
+    print(foo.b)
     foo = .c
-    print foo
+    print(foo)
     foo = .d(.south)
-    print foo
-    print foo.d
+    print(foo)
+    print(foo.d)
 
     foo = .e(.bb([true, false]))
-    print foo.e.bb
+    print(foo.e.bb)
 }
 

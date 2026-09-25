@@ -12,8 +12,8 @@ struct Foo {
 }
 
 fn printFoo(foo: Foo) {
-    print foo.a
-    print foo.c
+    print(foo.a)
+    print(foo.c)
 }
 
 fn main() {
@@ -29,8 +29,8 @@ fn main() {
         a=.{ x=1, y=2 },
         b=.{ x=3, y=4 },
     }
-    print line.a.x
-    print line.a.y
-    print line.b.x
-    print line.b.y
+    print(line.a.x)
+    print(line.a.y)
+    print(line.b.x)
+    print(line.b.y)
 }

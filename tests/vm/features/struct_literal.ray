@@ -7,43 +7,43 @@ answer := 42
 
 fn main() {
     human := Human{ age=5, name="Tom" }
-    print human
-    print human.age
-    print human.name
+    print(human)
+    print(human.age)
+    print(human.name)
 
     human = Human{ name="Tom", age=5 }
-    print human
-    print human.age
-    print human.name
+    print(human)
+    print(human.age)
+    print(human.name)
 
     age := 95
     human = Human{ age, name="Tom" }
-    print human
-    print human.age
-    print human.name
+    print(human)
+    print(human.age)
+    print(human.name)
 
     name := "Martin"
     human = Human{ age=6, name }
-    print human
-    print human.age
-    print human.name
+    print(human)
+    print(human.age)
+    print(human.name)
 
     human = Human{ age, name }
-    print human
-    print human.age
-    print human.name
+    print(human)
+    print(human.age)
+    print(human.name)
     
     human = Human{ name, age }
-    print human
-    print human.age
-    print human.name
+    print(human)
+    print(human.age)
+    print(human.name)
 
     struct Local {
         answer: int
     }
 
     addr := Local{answer}
-    print addr
-    print addr.answer
+    print(addr)
+    print(addr.answer)
 }
 

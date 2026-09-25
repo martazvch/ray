@@ -2,13 +2,13 @@ fn main() {
     // Nested unnamed blocks, break outer from inner
     outer: {
         {
-            print "A" // expect A
+            print("A") // expect A
             break :outer
-            print "B"
+            print("B")
         }
-        print "C"
+        print("C")
     }
-    print "D" // expect D
+    print("D") // expect D
 
     // Labelled block with value, break inside inner block
     x := val: {
@@ -17,35 +17,35 @@ fn main() {
         }
         break :val 99
     }
-    print x // expect 42
+    print(x) // expect 42
 
    // Conditional break in labelled block
     y := val: {
         if true do break :val 10
         else break :val 20
     }
-    print y // expect 10
+    print(y) // expect 10
 
     n := num: {
         if false do break :num 5
-        print "fallthrough" // expect fallthrough
+        print("fallthrough") // expect fallthrough
         break :num 7
     }
-    print n // expect 7
+    print(n) // expect 7
 
     // Multiple levels of labels
     a: {
         b: {
             c: {
-                print "start" // expect start
+                print("start") // expect start
                 break :b
-                print "never"
+                print("never")
             }
-            print "after c"
+            print("after c")
         }
-        print "after b" // expect after b
+        print("after b") // expect after b
     }
-    print "after a"
+    print("after a")
 
     // If then with do
     z := b: if true { 
@@ -56,7 +56,7 @@ fn main() {
         }
         break 4
     } else 3
-    print z // expect 1
+    print(z) // expect 1
 
     // If then without do
     z = b: if true {
@@ -65,7 +65,7 @@ fn main() {
         }
         break 0 // mandatory for now
     } else b: { break :b 8 }
-    print z // expect 6
+    print(z) // expect 6
 
     // If else
     z = b: if false {
@@ -74,5 +74,5 @@ fn main() {
         }
         break 0 // mandatory for now
     } else b: { break :b 8 }
-    print z // expect 8
+    print(z) // expect 8
 }

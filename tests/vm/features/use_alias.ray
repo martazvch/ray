@@ -3,20 +3,20 @@ use data.math as m
 fn main() {
     m.introduce()
     vec := m.getVecFromPos(1, 2)
-    print vec.x
-    print vec.y
+    print(vec.x)
+    print(vec.y)
     vec = m.getVecFromPos(8, 9)
-    print vec.x
-    print vec.y
+    print(vec.x)
+    print(vec.y)
 
     fn trash(a: int) -> bool {
         return a < 10
     }
-    print trash(vec.y)
+    print(trash(vec.y))
 
     vec = m.getVecFromPos(3, 7)
-    print vec.x
-    print vec.y
+    print(vec.x)
+    print(vec.y)
 
     please := m.introduce
     please()
@@ -24,6 +24,6 @@ fn main() {
     please2 := m.getVecFromPos
     vec2 := please2(6, 89)
 
-    print vec2.x
-    print vec2.y
+    print(vec2.x)
+    print(vec2.y)
 }

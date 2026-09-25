@@ -10,7 +10,7 @@ fn main() {
         break nb
     }
 
-    print a // expect: 7
+    print(a) // expect: 7
 
     // Returning an outter local from a scope
     b := 56
@@ -20,35 +20,35 @@ fn main() {
         break b
     }
 
-    print c // expect: 56
+    print(c) // expect: 56
 
     {
         tmp := 67
         b := 87. - 6.
-        print b // expect: 81
+        print(b) // expect: 81
     }
 
     // Naked break
     {
         break
-        print "no" // should not see this one
+        print("no") // should not see this one
     }
 
     // Returning a global
     scope := {
-        print "in scope" // expect: "in scope"
+        print("in scope") // expect: "in scope"
         break glob1
     }
 
-    print scope // expect: 7.5
+    print(scope) // expect: 7.5
 
     // Breaks only inner scope
     {
         {
             a := 1
             break
-            print "ayo"
+            print("ayo")
         }
-        print "oh boi"
+        print("oh boi")
     }
 }

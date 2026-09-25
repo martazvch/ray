@@ -15,7 +15,7 @@ fn add(x, y: int = 8) -> int {
 
 - code
 ```
-print add(1, 2)
+print(add(1, 2))
 ```
 
 - res
@@ -27,7 +27,7 @@ print add(1, 2)
 
 - code
 ```
-print add()
+print(add())
 ```
 
 - res

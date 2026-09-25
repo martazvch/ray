@@ -1,5 +1,5 @@
 fn main() {
     v1: ?int = 0
-    print typeName(v1)
-    print typeName(main)
+    print(typeName(v1))
+    print(typeName(main))
 }

@@ -6,11 +6,11 @@ enum Dir {up, down}
 
 fn useData(data: ?Data, dir: ?Dir) {
     if d := data {
-        print d.a
-        print d.b
+        print(d.a)
+        print(d.b)
     }
     if d := dir {
-        print d
+        print(d)
     }
 }
 
@@ -20,7 +20,7 @@ fn main() {
 
     data :?Data = .{ a=3, b=4 }
     if d := data {
-        print d.a
-        print d.b
+        print(d.a)
+        print(d.b)
     }
 }

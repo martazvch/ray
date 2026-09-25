@@ -11,16 +11,16 @@ fn main() {
     bar: Bar = .a
 
     match marker {
-        Marker.circle => print "circle"
-        Marker.cross => print "cross"
-        Marker.none => print "none"
+        Marker.circle => print("circle")
+        Marker.cross => print("cross")
+        Marker.none => print("none")
     }
 
     marker = .circle
     match marker {
-        .circle => print "circle"
-        .cross => print "cross"
-        .none => print "none"
+        .circle => print("circle")
+        .cross => print("cross")
+        .none => print("none")
     }
 
     marker = .none
@@ -34,16 +34,16 @@ fn main() {
         }
     }
 
-    print foo
+    print(foo)
 
     a := match marker {
         .circle => "circle"
         else => "any other"
     }
-    print a
+    print(a)
 
-     print match marker {
+     print(match marker {
         else => "all cases"
-    }
+    })
 }
 

@@ -7,7 +7,7 @@ enum Foo {
 
     impl Bar {
         fn speak(self) {
-            print self == .a ? "yes" : "no"
+            print(self == .a ? "yes" : "no")
         }
     }
 }

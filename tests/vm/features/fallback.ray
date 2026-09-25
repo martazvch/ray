@@ -17,10 +17,10 @@ fn optional(value: int) -> ?int {
 }
 
 fn main() {
-    print failable(25) !! 85
-    print failable(5) !! 85
+    print(failable(25) !! 85)
+    print(failable(5) !! 85)
 
-    print optional(25) ?? 42
-    print optional(5) ?? 42
+    print(optional(25) ?? 42)
+    print(optional(5) ?? 42)
 }
 

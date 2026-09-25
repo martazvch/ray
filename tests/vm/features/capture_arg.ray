@@ -1,7 +1,7 @@
 fn main() {
     fn first(a: int) -> fn() -> void {
         fn second() {
-            print a
+            print(a)
         }
 
         return second

@@ -1,7 +1,7 @@
 fn factory() -> fn() -> void {
     a := 1
     
-    fn capture() { print a }
+    fn capture() { print(a) }
 
     return capture
 }
@@ -11,7 +11,7 @@ fn factory2() -> fn() -> void {
     
     fn capture() {
         a = a + 1
-        print a
+        print(a)
     }
 
     return capture
@@ -51,16 +51,16 @@ fn main() {
     prod2() // expect: 4
 
     prod3 := factory3()
-    print prod3() // expect: 900
-    print prod3() // expect: 9000
+    print(prod3()) // expect: 900
+    print(prod3()) // expect: 9000
 
     prod4 := factory4(25)
-    print prod4(50, true) // expect: 56
-    print prod4(4, false) // expect: 80
-    print prod4(50, false) // expect: 123
+    print(prod4(50, true)) // expect: 56
+    print(prod4(4, false)) // expect: 80
+    print(prod4(50, false)) // expect: 123
 
     prod4_bis := factory4(150)
-    print prod4_bis(50, true) // expect: 123
-    print prod4_bis(4, false) // expect: 80
-    print prod4_bis(50, false) // expect: 80
+    print(prod4_bis(50, true)) // expect: 123
+    print(prod4_bis(4, false)) // expect: 80
+    print(prod4_bis(50, false)) // expect: 80
 }

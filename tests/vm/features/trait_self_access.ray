@@ -1,7 +1,7 @@
 trait Foo {
     fn speak(self, a: int)
     fn speak2(self, a: int) {
-        print a == 1
+        print(a == 1)
     }
 }
 
@@ -10,8 +10,8 @@ struct Bar {
 
     impl Foo {
         fn speak(self, a: int) {
-            print self.value
-            print "Bar " + str(a)
+            print(self.value)
+            print("Bar " + str(a))
         }
     }
 }
@@ -21,8 +21,8 @@ struct Baz {
 
     impl Foo {
         fn speak(self, a := 2) {
-            print self.value
-            print "Baz " + str(a)
+            print(self.value)
+            print("Baz " + str(a))
         }
     }
 }

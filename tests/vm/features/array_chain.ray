@@ -23,15 +23,15 @@ fn main() {
     poly := Poly{ vertex=[[p1, p2], [p3, p4]] }
     obj := Object{ poly } 
 
-    print obj.poly.vertex[1][0]
-    print obj.poly.vertex[1][0].x
-    print obj.poly.vertex[i][0].past[0]
-    print obj.poly.vertex[1][0].past[i][1]
+    print(obj.poly.vertex[1][0])
+    print(obj.poly.vertex[1][0].x)
+    print(obj.poly.vertex[i][0].past[0])
+    print(obj.poly.vertex[1][0].past[i][1])
 
     // Don't change
     p3.past = [[11, 22], [33, 44]]
-    print obj.poly.vertex[1][0].past[0]
+    print(obj.poly.vertex[1][0].past[0])
     
     obj.poly.vertex[1][0].past[0] = [55, 66]
-    print obj.poly.vertex[1][0].past
+    print(obj.poly.vertex[1][0].past)
 }

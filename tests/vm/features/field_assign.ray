@@ -11,11 +11,11 @@ struct Person {
 fn main() {
     pet := Pet{ name="Vodka", has_eaten=true }
     tom := Person{ name="Tom", pet }
-    print tom.name
+    print(tom.name)
     tom.name = "Martin"
-    print tom.name
-    print tom.pet.has_eaten
+    print(tom.name)
+    print(tom.pet.has_eaten)
     tom.pet.has_eaten = false
-    print tom.pet.has_eaten
+    print(tom.pet.has_eaten)
 }
 

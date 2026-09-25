@@ -9,12 +9,12 @@ fn main() {
     ]
 
     for f in arr {
-        print f.x
+        print(f.x)
     }
     for f in *arr {
         f.x *= 10
     }
     for f in arr {
-        print f.x
+        print(f.x)
     }
 }

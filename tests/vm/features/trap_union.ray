@@ -22,13 +22,13 @@ fn failable(val: int) -> bool!ValueErr|OtherErr {
 }
 
 fn testFail(value: int) {
-    print failable(value) trap match e is {
+    print(failable(value) trap match e is {
         ValueErr {
             .tooSmall => 1
             .tooBig => 100
         }
         OtherErr => -999
-    }
+    })
 }
 
 fn main() {
@@ -38,10 +38,9 @@ fn main() {
     testFail(220)
     testFail(100)
 
-    print failable(15) trap e {
-        print e
+    print(failable(15) trap e {
+        print(e)
         break 88
-    }
+    })
 }
-
 

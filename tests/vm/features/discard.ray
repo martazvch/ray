@@ -6,11 +6,11 @@ fn main() {
 
     _ = nb1 * nb2
 
-    print nb1 // expect: 10
-    print nb2 // expect: -0.5
+    print(nb1) // expect: 10
+    print(nb2) // expect: -0.5
 
     res := nb1 * 4.
     _ = 3
 
-    print res // expect: 40
+    print(res) // expect: 40
 }

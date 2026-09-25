@@ -37,5 +37,5 @@ fn main() {
         reimport.useDataAndVec(.{ a=1, b=2 }, .{ x=56, y=68 })
     }
 
-    print "ok"
+    print("ok")
 }

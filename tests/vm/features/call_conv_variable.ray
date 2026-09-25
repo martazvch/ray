@@ -24,29 +24,29 @@ fn main() {
     foo := Foo{}
 
     bound := Foo.static
-    print bound()
+    print(bound())
 
     bound = copy
-    print bound()
+    print(bound())
 
     bound = foo.method
-    print bound()
+    print(bound())
 
     bound = math.getInt
-    print bound()
+    print(bound())
 
     // Call conv survives a layer
     tmp := foo.importFuncFromMethod
-    print tmp()
+    print(tmp())
     bound = tmp()
-    print bound()
+    print(bound())
 
     // Builtins
     bind := int
-    print bind(5.6)
-    print bind(-92.123)
+    print(bind(5.6))
+    print(bind(-92.123))
 
     bind2 := float
-    print bind2(1)
-    print bind2(10)
+    print(bind2(1))
+    print(bind2(10))
 }

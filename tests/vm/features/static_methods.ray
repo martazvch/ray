@@ -18,14 +18,14 @@ fn main() {
     }
 
     v := Vec1.new(5)
-    print v.x
+    print(v.x)
     new := Vec1.new
     v = new(65)
-    print v.x
+    print(v.x)
 
     v2 := Vec2.new(12, 99)
-    print v2.y
+    print(v2.y)
     new2 := Vec2.new
     v2 = new2(56, 78)
-    print v2.x
+    print(v2.x)
 }

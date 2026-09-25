@@ -10,7 +10,7 @@ fn main() {
     last := 9
 
     capture()
-    print a
+    print(a)
 
     fn nested() {
         mach: int
@@ -18,8 +18,8 @@ fn main() {
         fn nested2() {
             mach3: int
             fn capture1() {
-                print b
-                print c
+                print(b)
+                print(c)
             }
             b = false
             capture1()
@@ -32,7 +32,7 @@ fn main() {
 
     // Assignment
     d := 1
-    fn capture2() { print d }
+    fn capture2() { print(d) }
     d = 2
     capture2()
 

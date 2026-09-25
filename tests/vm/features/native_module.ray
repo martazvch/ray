@@ -9,8 +9,8 @@ fn calcul(value: float) -> float {
 }
 
 fn main() {
-    print calcul(4.)
-    print cmodule.ret_arg(4.)
-    print cmodule.rayFunc(8.)
+    print(calcul(4.))
+    print(cmodule.ret_arg(4.))
+    print(cmodule.rayFunc(8.))
 }
 

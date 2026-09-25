@@ -3,18 +3,18 @@ use data.geom{ Point, Square }
 
 fn main() {
     v := Vec2{ x=3, y=9 }
-    print v.x
-    print v.y
+    print(v.x)
+    print(v.y)
 
     pt := Point{ x=5, y=8 }
-    print pt.x
-    print pt.y
+    print(pt.x)
+    print(pt.y)
 
     {
         use data.math{Vec2 as Pipou,}
         v := Pipou{ x=55, y=333 }
-        print v.x
-        print v.y
+        print(v.x)
+        print(v.y)
     }
 
     introduce()

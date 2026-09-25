@@ -6,7 +6,7 @@ fn set_vars() {
 
     // Here, assignment refers to heap variable
     fn set() { a = "updated" }
-    fn get() { print a }
+    fn get() { print(a) }
 
     globalSet = set
     globalGet = get
@@ -16,7 +16,7 @@ fn outer() -> fn() -> void {
     x := "outside"
 
     fn inner() {
-        print x
+        print(x)
     }
 
     return inner

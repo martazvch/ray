@@ -13,9 +13,9 @@ fn call(func: fn(int, bool) -> int, arg1: int, arg2: bool) -> int {
 fn main() {
     f := add
     name := "theprimeagen"
-    print name // expect: "theprimeagen"
+    print(name) // expect: "theprimeagen"
 
-    print f(4, -9) // expect: -5
+    print(f(4, -9)) // expect: -5
 
     // local function
     arg1 := 9
@@ -25,11 +25,11 @@ fn main() {
     }
 
     f2 := sub
-    print name // expect: "theprimeagen"
+    print(name) // expect: "theprimeagen"
     arg2 := 2
 
-    print f2(arg1, arg2) // expect: 6.5
+    print(f2(arg1, arg2)) // expect: 6.5
 
     // Function as parameter
-    print call(called, 75, true) // expect: 75
+    print(call(called, 75, true)) // expect: 75
 }

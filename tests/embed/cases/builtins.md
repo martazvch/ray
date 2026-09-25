@@ -5,7 +5,7 @@ Tests if builtin functions (written in Zig) are available when embedded
 
 - code
 ```
-print int(5.6)
+print(int(5.6))
 ```
 
 - res
@@ -17,7 +17,7 @@ print int(5.6)
 
 - code
 ```
-print int("5")
+print(int("5"))
 ```
 
 - res
@@ -29,7 +29,7 @@ print int("5")
 
 - code
 ```
-print float(5)
+print(float(5))
 ```
 
 - res
@@ -41,7 +41,7 @@ print float(5)
 
 - code
 ```
-print float("5.8")
+print(float("5.8"))
 ```
 
 - res
@@ -53,7 +53,7 @@ print float("5.8")
 
 - code
 ```
-print str(68)
+print(str(68))
 ```
 
 - res
@@ -65,7 +65,7 @@ print str(68)
 
 - code
 ```
-print str(68.12)
+print(str(68.12))
 ```
 
 - res

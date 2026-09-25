@@ -1,10 +1,10 @@
 fn testString(s: str) {
-    print match s {
+    print(match s {
         "To" => "yup"
         "Martin" => "lom"
         "Tom" => "atLeast"
         else => "z"
-    }
+    })
 }
 
 fn main() {
@@ -13,12 +13,11 @@ fn main() {
     testString("Tor")
     testString("Tom")
 
-    print match "Tom" {
+    print(match "Tom" {
         "To" => "yup"
         "Martin" => "Tom"
         "Tom" => "atLeast"
         else => "z"
-    }
+    })
 }
-
 

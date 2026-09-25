@@ -6,6 +6,6 @@ fn main() {
     incr()
     incr()
 
-    print count
+    print(count)
 }
 

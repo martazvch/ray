@@ -14,16 +14,16 @@ fn main() {
     }
 
     pt := Point { x=1 }
-    print pt.x
+    print(pt.x)
 
     v := Vec2.new(3456, 98)
-    print v.getPt().x
+    print(v.getPt().x)
 
     fn local() -> Point {
         return Point{ x=3456 }
     }
     
-    print local().x == v.getPt().x
+    print(local().x == v.getPt().x)
 }
 
 

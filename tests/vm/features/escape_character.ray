@@ -1,5 +1,5 @@
 fn main() {
-    print "\nIm on next line\n"
-    print "Not escaped \\n"
-    print "Here are some quotes: one \" two \""
+    print("\nIm on next line\n")
+    print("Not escaped \\n")
+    print("Here are some quotes: one \" two \"")
 }

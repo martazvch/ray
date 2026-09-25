@@ -16,7 +16,7 @@ struct Cell {
     marker: Marker = .none,
 
     fn mark(self, marker: Marker) {
-        if self.marker != .none do print "Already played cell"
+        if self.marker != .none do print("Already played cell")
 
         self.marker = marker
     }
@@ -41,7 +41,7 @@ struct Grid {
 
     fn playAt(self, x, y: int, marker: Marker, method := false) {
         if self.cells[x][y].marker != .none {
-            print "Already played in this cell"
+            print("Already played in this cell")
             return
         }
         
@@ -65,7 +65,7 @@ struct Grid {
             grid += line + (i < self.cells.len() - 1 ? "\n" : "")
         }
         
-        print grid
+        print(grid)
     }
 }
 

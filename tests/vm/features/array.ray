@@ -11,29 +11,29 @@ fn main() {
     arr2 := [1, 2,]
     foo := Foo{arr=[6, 7, getIdx()]}
 
-    print arr
+    print(arr)
 
     // Access
-    print arr[2]
-    print arr[-2]
+    print(arr[2])
+    print(arr[-2])
 
     // Element assignment
     arr[getIdx()] = 99
-    print arr
+    print(arr)
     // Assignment
     arr = arr2
-    print arr
+    print(arr)
 
-    print foo.arr
+    print(foo.arr)
     // Element assignment in struct
     foo.arr[getIdx()] = -9
     // Access in struct
-    print foo.arr
-    print foo.arr[getIdx()]
+    print(foo.arr)
+    print(foo.arr[getIdx()])
 
     // Array index must not be cow-checked
     i, j := 1
     arr3 := [[1, 2], [3, 4]]
     arr3[i][j] = 98
-    print arr3[i][j]
+    print(arr3[i][j])
 }

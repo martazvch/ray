@@ -4,7 +4,7 @@ fn main() {
         loc2 := 5
         _loc3 := -.5
 
-        print _loc3 + loc1
+        print(_loc3 + loc1)
     }
 
     {
@@ -12,17 +12,17 @@ fn main() {
         loc2 := 5
         _loc3 := -1.5
 
-        print _loc3 + loc1
+        print(_loc3 + loc1)
 
         {
             loc1 := 6.
             loc2 := 1.5
 
-            print loc2 + loc1
-            print loc1 + _loc3
+            print(loc2 + loc1)
+            print(loc1 + _loc3)
         }
 
-        print loc2
+        print(loc2)
     }
 
     glob := 1
@@ -32,7 +32,7 @@ fn main() {
         loc1 := "local"
         loc2 := " var"
 
-        print loc1 + loc2 + period
+        print(loc1 + loc2 + period)
     }
 
     {
@@ -43,15 +43,15 @@ fn main() {
         {
             loc1 := "tmp"
             loc2 := "sublocal"
-            print loc2
+            print(loc2)
             loc2 = "assign sub"
-            print loc2
+            print(loc2)
         }
 
-        print loc2
+        print(loc2)
         loc2 = loc1
-        print loc2
+        print(loc2)
     }
     loc2 = "still global"
-    print loc2
+    print(loc2)
 }

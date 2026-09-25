@@ -6,6 +6,6 @@ fn main() {
         middle=.{ x=1, y=2 },
     }
 
-    print square.middle.x
-    print square.middle.y
+    print(square.middle.x)
+    print(square.middle.y)
 }

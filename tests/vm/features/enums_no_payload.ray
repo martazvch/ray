@@ -15,20 +15,20 @@ enum Bar {
 
 fn main() {
     foo := Foo.a
-    print foo
+    print(foo)
 
     bar := Bar.b
-    print bar
+    print(bar)
 
-    print foo == Foo.a
-    print Foo.a == foo
-    print Foo.a == Foo.b
+    print(foo == Foo.a)
+    print(Foo.a == foo)
+    print(Foo.a == Foo.b)
 
-    print bar != Bar.a
-    print Bar.a != bar
-    print Bar.a != Bar.b
+    print(bar != Bar.a)
+    print(Bar.a != bar)
+    print(Bar.a != Bar.b)
 
     d := Bar.init()
-    print d.toStr()
+    print(d.toStr())
 }
 

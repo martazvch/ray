@@ -4,24 +4,24 @@ struct Foo {
 }
 
 fn f(a: *int) {
-    print a.*
+    print(a.*)
 }
 
 fn main() {
     a := 1
     b := *a
     c := *a
-    print *a == b
-    print b == c
-    print *a != b
-    print b != *a
+    print(*a == b)
+    print(b == c)
+    print(*a != b)
+    print(b != *a)
 
     foo := Foo{ a=2, b="ok" }
     ref1 := *foo.a
     ref2 := *foo.b
-    print *foo.a == *foo.a
-    print ref1 == *foo.a
-    print ref2 == ref2
+    print(*foo.a == *foo.a)
+    print(ref1 == *foo.a)
+    print(ref2 == ref2)
 
     f(*a)
     a = 6
@@ -29,11 +29,11 @@ fn main() {
 
     arr := [1, 2, 3]
     ptr := *arr[1]
-    print ptr.*
-    print arr
+    print(ptr.*)
+    print(arr)
 
     ptr.* = 99
-    print ptr.*
-    print arr
+    print(ptr.*)
+    print(arr)
 }
 

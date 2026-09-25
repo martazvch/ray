@@ -7,10 +7,10 @@ fn main() {
     // expect: 2
     // expect: 3
     while i<4 {
-        print i
+        print(i)
         i = i + 1
     }
-    print "----"
+    print("----")
 
     // local with condition manipulation
     {
@@ -20,13 +20,13 @@ fn main() {
         // expect: 7
         // expect: 9
         while i > 2 {
-            print i
+            print(i)
 
             i = i + 2
             if i > 10 do i = 1
         }
     }
-    print "----"
+    print("----")
 
     // local with stack manipulation
     offset := 3
@@ -39,9 +39,9 @@ fn main() {
         while i < 9 {
             tmp := 12/3
             j = i + offset
-            print j
+            print(j)
             i = i + offset
         }
     }
-    print "----"
+    print("----")
 }

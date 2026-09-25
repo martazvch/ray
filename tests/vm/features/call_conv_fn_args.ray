@@ -21,15 +21,15 @@ struct Bar {
 fn copy(b: bool) -> int { return 5 }
 
 fn argsCallConv(arg1: fn(bool)->int, arg2: fn(bool)->int, arg3: fn(int)->int) {
-    print arg1(true)
-    print arg2(false)
-    print arg3(8)
+    print(arg1(true))
+    print(arg2(false))
+    print(arg3(8))
 }
 
 fn argsCallConv2(arg1: fn(bool)->int, arg2: fn(int)->int, arg3: fn(bool)->int) {
-    print arg1(true)
-    print arg2(10)
-    print arg3(false)
+    print(arg1(true))
+    print(arg2(10))
+    print(arg3(false))
 }
 
 fn main() {

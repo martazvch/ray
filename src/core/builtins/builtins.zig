@@ -49,9 +49,8 @@ pub fn str(vm: *Vm, value: zffi.Union(&.{ .int, .float })) zffi.Str {
 }
 
 pub fn print(vm: *Vm, value: zffi.Any) void {
-    const stdout = std.Io.File.stdout();
-    var writer = stdout.writer(vm.io, &.{});
-    const w = &writer.interface;
-    value.print(w);
-    vm.state.config.printFn(vm.io, w.buffered());
+    var wa = std.Io.Writer.Allocating.init(vm.allocator);
+    defer wa.deinit();
+    value.print(&wa.writer);
+    vm.state.config.printFn(vm.io, wa.writer.buffered());
 }

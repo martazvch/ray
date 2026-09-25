@@ -1,9 +1,9 @@
 fn get_nb() -> int { return 5 }
 fn mul(a: int) -> int { return a * get_nb() }
 fn naked() {
-    print "oui"
+    print("oui")
     return
-    print "non"
+    print("non")
 }
 fn nested() -> str {
     if not false do return "exit"
@@ -16,14 +16,14 @@ fn nested2() -> bool {
         }
     }
 
-    print "not here"
+    print("not here")
     return false
 }
 
 fn main() {
-    print mul(6) // expect: 30
+    print(mul(6)) // expect: 30
     naked() // expect: "oui"
-    print nested() // expect: "exit"
-    print nested2() // exepct: true
+    print(nested()) // expect: "exit"
+    print(nested2()) // exepct: true
 }
 

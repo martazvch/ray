@@ -8,6 +8,6 @@ struct Vec2 {
 
 fn main() {
     v := Vec2.new(12, 99)
-    print v.x
-    print v.y
+    print(v.x)
+    print(v.y)
 }

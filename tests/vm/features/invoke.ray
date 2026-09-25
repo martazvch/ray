@@ -3,7 +3,7 @@ struct Pet {
     life: float
 
     fn speakTo(self, to: str) {
-        print self.name + to
+        print(self.name + to)
     }
 }
 
@@ -18,8 +18,8 @@ struct Human {
     }
 
     fn speak(self) {
-        print "I'm " + self.name
-        print "My pet is " + self.pet.name
+        print("I'm " + self.name)
+        print("My pet is " + self.pet.name)
     }
 }
 
@@ -29,7 +29,7 @@ fn main() {
     trash: int
 
     tom.speak() 
-    print tom.getOld(60)
+    print(tom.getOld(60))
     trash2: int
     tom.pet.speakTo(tom.name)
 }

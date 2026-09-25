@@ -2,7 +2,7 @@ fn outer() {
     x := "outside"
 
     fn inner() {
-        print x
+        print(x)
     }
 
     inner()
@@ -11,7 +11,7 @@ fn outer() {
 fn main() {
     a := 1
 
-    fn capture() { print a }
+    fn capture() { print(a) }
 
     capture() // expect: 1
     a = 2
