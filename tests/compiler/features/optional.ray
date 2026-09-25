@@ -2,19 +2,19 @@ fn main() {
     a: ?int = 1
 
     if a == null {
-        print "oui"
+        _ = "oui"
     }
 
     if null == a {
-        print "oui"
+        _ = "oui"
     }
 
     if a != null {
-        print "oui"
+        _ = "oui"
     }
 
     if null != a {
-        print "oui"
+        _ = "oui"
     }
 }
 

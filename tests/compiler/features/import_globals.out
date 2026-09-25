@@ -10,7 +10,7 @@ ret
 
 -- introduce --
 load_const index 3, value This is a mathematical module
-print
+call_zig index 3, module 0, arity 1, print
 ret_naked
 
 -- getVecFromPos --
@@ -38,9 +38,9 @@ exit_repl
 
 -- main --
 get_global_ext index 1, module 3, value math
-print
+pop
 get_global_ext index 0, module 3, value 8
-print
+pop
 ret_naked
 
 -- global scope --

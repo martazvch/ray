@@ -6,7 +6,7 @@ load_const index 3, value 1
 jump 7 -> 13
 pop
 load_const index 4, value 0
-print
+pop
 ret_naked
 
 -- global scope --

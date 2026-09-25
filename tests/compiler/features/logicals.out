@@ -1,16 +1,16 @@
 -- main --
 push_false
 
-get_local_dup index 0
+get_local index 0
 jump_false 3 -> 9
 pop
-get_local_dup index 0
+get_local index 0
 pop
 
-get_local_dup index 0
+get_local index 0
 jump_true 12 -> 18
 pop
-get_local_dup index 0
+get_local index 0
 pop
 
 ret_naked

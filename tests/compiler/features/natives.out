@@ -2,10 +2,10 @@
 
 -- main --
 load_const index 3, value natives.ray
-call_zig index 4, module 0, arity 1, open
+call_zig index 5, module 0, arity 1, open
 get_local index 0
-call_zig index 3, module 0, arity 1, readAll
-print
+call_zig index 4, module 0, arity 1, readAll
+pop
 ret_naked
 
 -- global scope --

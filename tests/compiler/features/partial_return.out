@@ -7,7 +7,7 @@ jump 7 -> 14
 pop
 get_local index 0
 ret
-print
+pop
 
 push_false
 jump_false 16 -> 29
@@ -27,7 +27,7 @@ pop
 load_blk_val
 
 get_local index 1
-print
+pop
 
 push_false
 jump_false 45 -> 55
@@ -90,7 +90,7 @@ jump 9 -> 13
 pop
 
 load_const index 12, value should not be seen
-print
+pop
 
 load_const index 13, value 4.5
 ret
@@ -106,7 +106,7 @@ ret
 pop
 
 load_const index 12, value should not be seen
-print
+pop
 
 load_const index 15, value 0.01
 ret
@@ -164,7 +164,7 @@ pop
 load_const index 3, value 4
 
 get_local index 0
-print
+pop
 
 push_true
 jump_false 16 -> 25
@@ -175,22 +175,22 @@ pop
 ret_naked
 
 get_local index 1
-print
+pop
 
 load_const index 4, value 5
 call index 1, arity 1, func
-print
+pop
 
 load_const index 14, value 8.5
 call index 2, arity 1, shortcut
-print
+pop
 
 load_const index 16, value -18.5
 call index 3, arity 1, shortcut_bis
-print
+pop
 
 call index 4, arity 0, nested
-print
+pop
 
 ret_naked
 

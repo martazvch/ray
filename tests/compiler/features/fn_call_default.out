@@ -1,23 +1,23 @@
 -- staticFn --
 get_local index 0
-print
+call_zig index 3, module 0, arity 1, print
 get_local index 1
-print
+call_zig index 3, module 0, arity 1, print
 get_local index 2
-print
+call_zig index 3, module 0, arity 1, print
 get_local index 3
-print
+call_zig index 3, module 0, arity 1, print
 ret_naked
 
 -- method --
 get_local index 1
-print
+call_zig index 3, module 0, arity 1, print
 get_local index 2
-print
+call_zig index 3, module 0, arity 1, print
 get_local index 3
-print
+call_zig index 3, module 0, arity 1, print
 get_local index 4
-print
+call_zig index 3, module 0, arity 1, print
 ret_naked
 
 -- getInt --
@@ -29,57 +29,57 @@ exit_repl
 
 -- function --
 get_local index 0
-print
+pop
 get_local index 1
-print
+pop
 get_local index 2
-print
+pop
 get_local index 3
-print
+pop
 ret_naked
 
 -- staticFn --
 get_local index 0
-print
+pop
 get_local index 1
-print
+pop
 get_local index 2
-print
+pop
 get_local index 3
-print
+pop
 ret_naked
 
 -- method --
 get_local index 1
-print
+pop
 get_local index 2
-print
+pop
 get_local index 3
-print
+pop
 get_local index 4
-print
+pop
 ret_naked
 
 -- staticFn --
 get_local index 0
-print
+pop
 get_local index 1
-print
+pop
 get_local index 2
-print
+pop
 get_local index 3
-print
+pop
 ret_naked
 
 -- method --
 get_local index 1
-print
+pop
 get_local index 2
-print
+pop
 get_local index 3
-print
+pop
 get_local index 4
-print
+pop
 ret_naked
 
 -- main --
@@ -249,7 +249,7 @@ load_const index 59, value -360.9
 call index 2, arity 5, method
 load_const_ext index 5, module 3, value 56
 call_ext index 2, module 3, arity 1, getInt
-print
+pop
 load_const index 60, value imported static
 load_const_ext index 3, module 3, value 0
 push_false

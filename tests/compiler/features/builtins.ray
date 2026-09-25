@@ -3,6 +3,6 @@ fn main() {
     a = int(5)
     b: float = float(6)
     b = float(6.4)
-    print str(5)
+    print(str(5))
 }
 

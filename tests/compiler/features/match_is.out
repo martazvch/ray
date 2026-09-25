@@ -9,7 +9,7 @@ pop
 get_local index 0
 load_const index 4, value 1
 add_int
-print
+pop
 jump 16 -> 33
 pop
 
@@ -18,7 +18,7 @@ is_float
 jump_false 22 -> 32
 pop
 load_const index 5, value float
-print
+pop
 jump 29 -> 33
 pop
 pop
@@ -50,7 +50,7 @@ eq_float
 jump_false 66 -> 76
 pop
 load_const index 8, value first
-print
+pop
 jump 73 -> 98
 pop
 
@@ -62,11 +62,11 @@ in_range_float
 jump_false 84 -> 94
 pop
 load_const index 11, value second
-print
+pop
 jump 91 -> 98
 pop
 load_const index 12, value non
-print
+pop
 pop
 jump 99 -> 116
 pop
@@ -76,7 +76,7 @@ is_int
 jump_false 105 -> 115
 pop
 load_const index 13, value int
-print
+pop
 jump 112 -> 116
 pop
 pop

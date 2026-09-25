@@ -1,6 +1,6 @@
 -- speakNoBody --
 load_const index 6, value bye
-print
+pop
 ret_naked
 
 -- withDefault --
@@ -17,12 +17,12 @@ ret
 
 -- speak --
 load_const index 3, value hello
-print
+pop
 ret_naked
 
 -- method0 --
 load_const index 5, value method0
-print
+pop
 ret_naked
 
 -- method1 --
@@ -32,7 +32,7 @@ ret_naked
 
 -- speakNoBody --
 load_const index 6, value bye
-print
+pop
 ret_naked
 
 -- withDefaultNoBody --
@@ -43,7 +43,7 @@ ret
 
 -- speak --
 load_const index 3, value hello
-print
+pop
 ret_naked
 
 -- withDefault --
@@ -54,7 +54,7 @@ ret
 
 -- method0 --
 load_const index 5, value method0
-print
+pop
 ret_naked
 
 -- method1 --
@@ -69,16 +69,16 @@ call index 6, arity 0, speakNoBody
 call index 12, arity 0, speakNoBody
 load_const index 7, value 9
 call index 7, arity 1, withDefault
-print
+pop
 load_const index 10, value 4
 call index 15, arity 1, withDefault
-print
+pop
 load_const index 8, value 2
 call index 8, arity 1, withDefaultNoBody
-print
+pop
 load_const index 9, value 5
 call index 13, arity 1, withDefaultNoBody
-print
+pop
 load_const index 11, value Bar{}
 get_local index 0
 call index 11, arity 1, method1

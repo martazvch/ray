@@ -1,7 +1,7 @@
 -- main --
 load_const index 3, value abcd
 call_string index 0, arity 0
-print
+pop
 ret_naked
 
 -- global scope --

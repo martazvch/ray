@@ -3,7 +3,7 @@ struct Human {
     name: str,
 
     fn speak(self) {
-        print self.name
+        _ = self.name
     }
 
     fn getOld(self, amount: int) -> int {

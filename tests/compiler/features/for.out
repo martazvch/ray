@@ -4,7 +4,7 @@ iter_new_arr
 iter_next
 jump_null 4 -> 14
 get_local index 1
-print
+pop
 pop
 loop 11 -> 3
 pop2
@@ -16,7 +16,7 @@ iter_new_arr
 iter_next
 jump_null 21 -> 31
 get_local index 2
-print
+pop
 pop
 loop 28 -> 20
 pop2
@@ -27,7 +27,7 @@ iter_new_str
 iter_next
 jump_null 38 -> 48
 get_local index 3
-print
+pop
 pop
 loop 45 -> 37
 pop2
@@ -37,7 +37,7 @@ iter_new_str
 iter_next
 jump_null 53 -> 63
 get_local index 3
-print
+pop
 pop
 loop 60 -> 52
 pop2
@@ -47,9 +47,9 @@ iter_new_arr
 iter_next_index
 jump_null 68 -> 81
 get_local index 4
-print
+pop
 get_local index 3
-print
+pop
 pop2
 loop 78 -> 67
 pop3
@@ -61,7 +61,7 @@ iter_new_range
 iter_next
 jump_null 89 -> 99
 get_local index 3
-print
+pop
 pop
 loop 96 -> 88
 pop2
@@ -73,7 +73,7 @@ iter_new_range
 iter_next
 jump_null 107 -> 117
 get_local index 3
-print
+pop
 pop
 loop 114 -> 106
 pop2

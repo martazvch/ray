@@ -10,7 +10,7 @@ ret
 
 -- introduce --
 load_const index 3, value This is a mathematical module
-print
+call_zig index 3, module 0, arity 1, print
 ret_naked
 
 -- getVecFromPos --
@@ -57,7 +57,7 @@ call_dyn index 2
 
 get_local index 3
 get_field index 1
-print
+pop
 
 ret_naked
 

@@ -1,21 +1,21 @@
 fn main() {
     // Only one path produces a value
     a := if false { return } else 4
-    print a // expect: 4
+    _ = a // expect: 4
 
     b := if true do 5 else return
-    print b // expect: 5
+    _ = b // expect: 5
 
     fn func(a: int) -> int {
         // Only one path generates a value, returns a value otherwise
-        print if true do "str" else return a // expect: "str"
+        _ = if true do "str" else return a // expect: "str"
 
         tmp: str = if false do return a + 2 else {
             local := 56.4
             break "champ"
         }
 
-        print tmp // expect: "champ"
+        _ = tmp // expect: "champ"
 
         // If without else but not as last stmt
         if false do return 8
@@ -31,25 +31,25 @@ fn main() {
         }
     }
 
-    print func(5)
+    _ = func(5)
 
     // Mono branch exit
     fn shortcut(arg: float) -> float {
         if true { return arg }
-        print "should not be seen"
+        _ = "should not be seen"
         return 4.5
     }
 
-    print shortcut(8.5) // expect: 8.5
+    _ = shortcut(8.5) // expect: 8.5
 
     // Dual branch exit
     fn shortcut_bis(arg: float) -> float {
         if false {} else { return arg }
-        print "should not be seen"
+        _ = "should not be seen"
         return 0.01
     }
 
-    print shortcut_bis(-18.5) // expect: -18.5
+    _ = shortcut_bis(-18.5) // expect: -18.5
 
     // Complicated nested
     fn nested() -> int {
@@ -64,5 +64,5 @@ fn main() {
         }
     }
 
-    print nested() // expect: 3
+    _ = nested() // expect: 3
 }

@@ -29,31 +29,31 @@ ret
 -- markerStuff --
 get_local index 0
 call index 1, arity 1, toString
-print
+pop
 ret_naked
 
 -- markerStuff2 --
 get_local index 0
 call index 1, arity 1, toString
-print
+pop
 ret_naked
 
 -- main --
 load_const index 9, value Cell{ marker = Marker.cross, marker2 = Marker.circle }
 get_local index 0
 get_field index 0
-print
+pop
 get_local index 0
 get_field index 0
 call index 1, arity 1, toString
-print
+pop
 get_local index 0
 get_field index 1
-print
+pop
 get_local index 0
 get_field index 1
 call index 1, arity 1, toString
-print
+pop
 load_const index 6, value Marker.circle
 call index 2, arity 1, markerStuff
 load_const index 3, value Marker.cross

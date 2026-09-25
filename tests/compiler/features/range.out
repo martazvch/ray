@@ -6,7 +6,7 @@ iter_new_range
 iter_next
 jump_null 7 -> 35
 get_local index 1
-print
+pop
 load_const index 6, value 8
 load_const index 5, value 6
 range_new_int
@@ -14,7 +14,7 @@ iter_new_range
 iter_next
 jump_null 20 -> 30
 get_local index 3
-print
+pop
 pop
 loop 27 -> 19
 pop2
@@ -28,7 +28,7 @@ iter_new_range
 iter_next
 jump_null 43 -> 53
 get_local index 1
-print
+pop
 pop
 loop 50 -> 42
 pop2

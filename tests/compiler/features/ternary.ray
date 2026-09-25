@@ -1,4 +1,4 @@
 fn main() {
-    print true ? 1 : 0
+    _ = true ? 1 : 0
 }
 

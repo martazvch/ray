@@ -1,7 +1,7 @@
 fn main() {
     i := 0
     while i<4 {
-        print i
+        _ = i
         i = i + 1
     }
 }

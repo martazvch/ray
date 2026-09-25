@@ -1,16 +1,16 @@
 -- capture --
 get_local index 0
 unbox
-print
+call_zig index 3, module 0, arity 1, print
 ret_naked
 
 -- capture1 --
 get_local index 0
 unbox
-print
+call_zig index 3, module 0, arity 1, print
 get_local index 1
 unbox
-print
+call_zig index 3, module 0, arity 1, print
 ret_naked
 
 -- nested2 --
@@ -23,7 +23,7 @@ ret_naked
 
 -- nested --
 push_null
-get_local_dup index 0
+get_local index 0
 unbox
 
 load_fn index 3, nested2
@@ -36,7 +36,7 @@ ret_naked
 -- capture2 --
 get_local index 0
 unbox
-print
+call_zig index 3, module 0, arity 1, print
 ret_naked
 
 -- main --

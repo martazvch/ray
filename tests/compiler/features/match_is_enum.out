@@ -15,7 +15,7 @@ eq_int
 jump_false 19 -> 29
 pop
 load_const index 4, value a
-print
+pop
 jump 26 -> 62
 pop
 dup
@@ -25,7 +25,7 @@ eq_int
 jump_false 35 -> 45
 pop
 load_const index 6, value b
-print
+pop
 jump 42 -> 62
 pop
 dup
@@ -35,7 +35,7 @@ eq_int
 jump_false 51 -> 61
 pop
 load_const index 8, value c
-print
+pop
 jump 58 -> 62
 pop
 pop
@@ -46,7 +46,7 @@ is_int
 jump_false 69 -> 79
 pop
 load_const index 9, value int
-print
+pop
 jump 76 -> 80
 pop
 pop

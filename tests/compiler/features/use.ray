@@ -11,6 +11,6 @@ fn main() {
     please2 := math.getVecFromPos
     vec2 := please2(6, 89)
 
-    print vec2.y
+    _ = vec2.y
 }
 

@@ -2,10 +2,10 @@ fn getValue() -> ?float { return 5. }
 
 fn main() {
     if v := getValue() {
-        print v
+        _ = v
     }
 
     while v := getValue() {
-        print v
+        _ = v
     }
 }

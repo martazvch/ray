@@ -1,4 +1,4 @@
 fn main() {
-    print "abcd".len()
+    _ = "abcd".len()
 }
 

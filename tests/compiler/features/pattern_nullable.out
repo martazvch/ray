@@ -8,7 +8,7 @@ ne_null_push
 jump_false 4 -> 15
 pop
 get_local index 0
-print
+pop
 pop
 jump 12 -> 16
 
@@ -21,7 +21,7 @@ ne_null_push
 jump_false 20 -> 31
 pop
 get_local index 0
-print
+pop
 pop
 loop 28 -> 16
 

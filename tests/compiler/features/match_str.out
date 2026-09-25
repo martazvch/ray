@@ -27,7 +27,7 @@ jump 42 -> 48
 pop
 load_const index 9, value oooo
 swap_pop
-print
+pop
 ret_naked
 
 -- global scope --

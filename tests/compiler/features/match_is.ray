@@ -2,8 +2,8 @@ fn main() {
     a: int|float = 8.3
 
     match a is {
-        int => print a + 1
-        float => print "float"
+        int => _ = a + 1
+        float => _ = "float"
     }
 
     b := match a is {
@@ -14,10 +14,10 @@ fn main() {
     trash := true
     match a is {
         float {
-            1.2 => print "first"
-            4.5..10.0 => print "second"
-            else => print "non"
+            1.2 => _ = "first"
+            4.5..10.0 => _ = "second"
+            else => _ = "non"
         }
-        int => print "int"
+        int => _ = "int"
     }
 }

@@ -12,7 +12,7 @@ load_const index 7, value , f:
 load_fn index 0, f
 load_const index 8, value 
 string_interp index 2
-print
+pop
 ret_naked
 
 -- global scope --

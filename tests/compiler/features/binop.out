@@ -2,138 +2,138 @@
 load_const index 3, value 1
 load_const index 4, value 2
 load_const index 5, value foo
-get_local_dup index 0
-get_local_dup index 0
+get_local index 0
+get_local index 0
 neg_int
 add_int
 pop
 
-get_local_dup index 1
-get_local_dup index 1
+get_local index 1
+get_local index 1
 neg_float
 add_float
 pop
 
-get_local_dup index 2
-get_local_dup index 2
+get_local index 2
+get_local index 2
 str_cat
 pop
 
-get_local_dup index 1
-get_local_dup index 1
+get_local index 1
+get_local index 1
 neg_float
 sub_float
 pop
 
-get_local_dup index 0
-get_local_dup index 0
+get_local index 0
+get_local index 0
 neg_int
 sub_int
 pop
 
-get_local_dup index 1
-get_local_dup index 1
+get_local index 1
+get_local index 1
 neg_float
 mul_float
 pop
 
-get_local_dup index 0
-get_local_dup index 0
+get_local index 0
+get_local index 0
 neg_int
 mul_int
 pop
 
-get_local_dup index 0
-get_local_dup index 2
+get_local index 0
+get_local index 2
 str_mul
 pop
 
-get_local_dup index 0
-get_local_dup index 2
+get_local index 0
+get_local index 2
 str_mul
 pop
 
-get_local_dup index 1
-get_local_dup index 1
+get_local index 1
+get_local index 1
 neg_float
 div_float
 pop
 
-get_local_dup index 0
-get_local_dup index 0
+get_local index 0
+get_local index 0
 neg_int
 div_int
 pop
 
-get_local_dup index 0
-get_local_dup index 0
+get_local index 0
+get_local index 0
 gt_int
 pop
 
-get_local_dup index 1
-get_local_dup index 1
+get_local index 1
+get_local index 1
 gt_float
 pop
 
-get_local_dup index 1
-get_local_dup index 1
+get_local index 1
+get_local index 1
 ge_float
 pop
 
-get_local_dup index 0
-get_local_dup index 0
+get_local index 0
+get_local index 0
 ge_int
 pop
 
-get_local_dup index 1
-get_local_dup index 1
+get_local index 1
+get_local index 1
 neg_float
 lt_float
 pop
 
-get_local_dup index 0
-get_local_dup index 0
+get_local index 0
+get_local index 0
 neg_int
 lt_int
 pop
 
-get_local_dup index 0
-get_local_dup index 0
+get_local index 0
+get_local index 0
 le_int
 pop
 
-get_local_dup index 1
-get_local_dup index 1
+get_local index 1
+get_local index 1
 le_float
 pop
 
-get_local_dup index 0
-get_local_dup index 0
+get_local index 0
+get_local index 0
 eq_int
 pop
 
-get_local_dup index 1
-get_local_dup index 1
+get_local index 1
+get_local index 1
 eq_float
 pop
 
-get_local_dup index 0
-get_local_dup index 0
+get_local index 0
+get_local index 0
 ne_int
 pop
 
-get_local_dup index 1
-get_local_dup index 1
+get_local index 1
+get_local index 1
 ne_float
 pop
 
-get_local_dup index 0
-get_local_dup index 0
+get_local index 0
+get_local index 0
 mod_int
 pop
 
-get_local_dup index 1
-get_local_dup index 1
+get_local index 1
+get_local index 1
 mod_float
 pop
 
@@ -149,27 +149,27 @@ ptr_local index 4
 ne_ptr
 pop
 
-get_local_dup index 3
+get_local index 3
 load_const index 3, value 1
 binary_and
 pop
 
-get_local_dup index 3
+get_local index 3
 load_const index 3, value 1
 binary_or
 pop
 
-get_local_dup index 3
+get_local index 3
 load_const index 3, value 1
 binary_xor
 pop
 
-get_local_dup index 3
+get_local index 3
 load_const index 3, value 1
 shift_left
 pop
 
-get_local_dup index 3
+get_local index 3
 load_const index 3, value 1
 shift_right
 pop

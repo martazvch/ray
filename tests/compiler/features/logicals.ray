@@ -1,5 +1,5 @@
 fn main() {
     b := false
-    b and b
-    b or b
+    _ = b and b
+    _ = b or b
 }

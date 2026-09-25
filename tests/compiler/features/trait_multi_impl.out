@@ -1,6 +1,6 @@
 -- speak --
 load_const index 3, value I'm Bar
-print
+pop
 ret_naked
 
 -- other --
@@ -10,7 +10,7 @@ ret_naked
 
 -- speak --
 load_const index 4, value I'm Baz
-print
+pop
 ret_naked
 
 -- other --

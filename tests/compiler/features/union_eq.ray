@@ -6,11 +6,11 @@ union Bar {
 
 fn main() {
     foo: Foo = .a
-    if foo == .a do print "I'm foo.a"
-    else if foo == .b do print "I'm foo.b"
+    if foo == .a do _ = "I'm foo.a"
+    else if foo == .b do _ = "I'm foo.b"
 
     bar: Bar = .b("ee")
-    if bar == .a do print "I'm bar.a"
-    else if bar == .b do print "I'm bar.b"
+    if bar == .a do _ = "I'm bar.a"
+    else if bar == .b do _ = "I'm bar.b"
 }
 

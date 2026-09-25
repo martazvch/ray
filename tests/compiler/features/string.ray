@@ -1,5 +1,5 @@
 fn main() {
     name := "Tom"
-    print name[1]
+    _ = name[1]
 }
 

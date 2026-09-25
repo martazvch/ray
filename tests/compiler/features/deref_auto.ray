@@ -17,7 +17,7 @@ fn main() {
 
     foo := Foo{ a=*bar }
     pfoo := *foo
-    print pfoo.a.a
-    print pfoo.a.b.a
+    _ = pfoo.a.a
+    _ = pfoo.a.b.a
 }
 

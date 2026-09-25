@@ -5,9 +5,9 @@ fn main() {
         value3=true,
         name="Tom",
     }
-    print data.value1
-    print data.value2
-    print data.value3
-    print data.name
+    _ = data.value1
+    _ = data.value2
+    _ = data.value3
+    _ = data.name
 }
 

@@ -63,19 +63,19 @@ jump 64 -> 68
 pop
 swap_pop
 swap_pop
-print
+pop
 load_const index 7, value 15
 call index 0, arity 1, failable
 jump_no_err 76 -> 91
 get_local index 0
-print
+pop
 load_const index 11, value 88
 store_blk_val
 pop
 jump 86 -> 90
 pop
 load_blk_val
-print
+pop
 ret_naked
 
 -- global scope --

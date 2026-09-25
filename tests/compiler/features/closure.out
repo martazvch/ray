@@ -6,8 +6,7 @@ ret_naked
 -- get --
 get_local index 0
 unbox
-print
-ret_naked
+ret
 
 -- set_vars --
 load_const index 3, value init
@@ -37,6 +36,7 @@ call_dyn index 0
 
 get_global index 1, value null
 call_dyn index 0
+pop
 
 ret_naked
 

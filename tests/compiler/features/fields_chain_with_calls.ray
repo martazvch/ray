@@ -16,6 +16,6 @@ fn getVec(x: int) -> Vec2 {
 
 fn main() {
     v := Vec2 { x=1 }
-    print v.getPt().x
-    print getVec(5).x
+    _ = v.getPt().x
+    _ = getVec(5).x
 }

@@ -1,12 +1,12 @@
 globalSet: fn() -> void
-globalGet: fn() -> void
+globalGet: fn() -> str
 
 fn set_vars() {
     a := "init"
 
     // Here, assignment refers to heap variable
     fn set() { a = "updated" }
-    fn get() { print a }
+    fn get() -> str { return a }
 
     globalSet = set
     globalGet = get

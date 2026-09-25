@@ -10,7 +10,7 @@ ret
 
 -- introduce --
 load_const index 3, value This is a mathematical module
-print
+call_zig index 3, module 0, arity 1, print
 ret_naked
 
 -- getVecFromPos --
@@ -53,16 +53,16 @@ ret_naked
 
 -- display --
 get_local index 0
-get_field index 0
-print
+get_field_dup index 0
+call_zig index 3, module 0, arity 1, print
 get_local index 0
-get_field index 1
-print
+get_field_dup index 1
+call_zig index 3, module 0, arity 1, print
 ret_naked
 
 -- introduce --
 load_const index 3, value module for basic geometry
-print
+call_zig index 3, module 0, arity 1, print
 ret_naked
 
 -- moveCenter --

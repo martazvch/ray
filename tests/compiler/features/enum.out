@@ -52,7 +52,7 @@ pop
 call index 0, arity 0, init
 get_local index 2
 call index 1, arity 1, toStr
-print
+pop
 
 ret_naked
 

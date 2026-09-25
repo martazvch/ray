@@ -1,7 +1,7 @@
 fn main() {
     s := "value"
 
-    print match s {
+    _ = match s {
         "volue" => 1
         "valuee" => 2
         "value" => 3

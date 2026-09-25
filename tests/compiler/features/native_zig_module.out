@@ -1,19 +1,19 @@
 -- main --
 get_global_ext index 1, module 1, value 3.141592653589793
 call_zig index 13, module 1, arity 1, cos
-print
+pop
 load_const index 3, value 0
 call_zig index 13, module 1, arity 1, cos
-print
+pop
 get_global_ext index 0, module 1, value 2.718281828459045
 call_zig index 14, module 1, arity 1, sin
-print
+pop
 load_const index 3, value 0
 call_zig index 14, module 1, arity 1, sin
-print
+pop
 load_const index 4, value -5
 call_zig index 4, module 1, arity 1, sign
-print
+pop
 ret_naked
 
 -- global scope --

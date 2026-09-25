@@ -5,7 +5,7 @@ eq_null
 jump_false 5 -> 15
 pop
 load_const index 4, value oui
-print
+pop
 jump 12 -> 16
 pop
 get_local_dup index 0
@@ -13,7 +13,7 @@ eq_null
 jump_false 19 -> 29
 pop
 load_const index 4, value oui
-print
+pop
 jump 26 -> 30
 pop
 get_local_dup index 0
@@ -21,7 +21,7 @@ ne_null
 jump_false 33 -> 43
 pop
 load_const index 4, value oui
-print
+pop
 jump 40 -> 44
 pop
 get_local_dup index 0
@@ -29,7 +29,7 @@ ne_null
 jump_false 47 -> 57
 pop
 load_const index 4, value oui
-print
+pop
 jump 54 -> 58
 pop
 ret_naked

@@ -10,12 +10,12 @@ ret
 call index 0, arity 0, failable
 load_const index 4, value 85
 fallback_err
-print
+pop
 
 call index 1, arity 0, optional
 load_const index 4, value 85
 fallback_opt
-print
+pop
 
 ret_naked
 

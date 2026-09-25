@@ -4,11 +4,11 @@
 //  - we jump just after the other JUMP (on the POP) to exit the then branch
 
 fn main() {
-    if true do print "yes"
+    if true do print("yes")
 
-    if true  { print "yes" }
+    if true  { _ =  "yes" }
 
-    if false { print "yes" } else { print "no" }
+    if false { _ =  "yes" } else { _ =  "no" }
 
     a := if true { break 1 } else { break 2 }
 
@@ -16,7 +16,7 @@ fn main() {
 
     c := if { break not true } { break 5 + 6 } else {
         tmp := 1
-        print tmp
+        _ =  tmp
         tmp = 5
         break a + b + tmp
     }

@@ -15,15 +15,13 @@ load_const index 4, value 1
 load_const index 7, value 7
 pop
 load_const index 3, value 5
-get_local index 1
-print
 pop2
 
 load_const index 7, value 7
 get_local_dup index 0
 store_blk_val
 pop
-jump 30 -> 34
+jump 27 -> 31
 pop
 
 load_blk_val
@@ -34,7 +32,7 @@ load_const index 10, value 90
 get_local_dup index 3
 store_blk_val
 popn index 4
-jump 48 -> 53
+jump 45 -> 50
 
 popn index 4
 load_blk_val

@@ -1,33 +1,33 @@
 fn main() {
     for a in [1, 2, 3] {
-        print a
+        _ =  a
     }
 
     arr := [5, 6, 7, 8]
     for a in arr {
-        print a
+        _ =  a
     }
 
     string := "Tom"
     for c in string {
-        print c
+        _ =  c
     }
 
     for c in "Martin" {
-        print c
+        _ =  c
     }
 
     for i, v in [true, false] {
-        print i
-        print v
+        _ =  i
+        _ =  v
     }
 
     for v in 0..5 {
-        print v
+        _ =  v
     }
     
     for i in -1..5 {
-        print i
+        _ =  i
     }
 
     for i in -8..-5 {

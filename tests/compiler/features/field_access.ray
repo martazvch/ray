@@ -12,6 +12,6 @@ struct Human {
 fn main() {
     pet := Pet{ name="Vodka", has_eaten=false }
     human := Human{ age=5, name="Tom", pet }
-    print human.pet.has_eaten
+    _ = human.pet.has_eaten
 }
 

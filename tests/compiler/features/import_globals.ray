@@ -3,7 +3,7 @@ glob_value := 1
 use data.math.{name}
 
 fn main() {
-    print name
-    print math.eight
+    _ =  name
+    _ =  math.eight
 }
 

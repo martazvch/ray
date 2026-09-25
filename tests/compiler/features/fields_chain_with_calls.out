@@ -13,12 +13,12 @@ load_const index 6, value Vec2{ x = 1 }
 get_local index 0
 call index 0, arity 1, getPt
 get_field index 0
-print
+pop
 
 load_const index 7, value 5
 call index 1, arity 1, getVec
 get_field index 0
-print
+pop
 
 ret_naked
 

@@ -18,15 +18,15 @@ fn failable(val: int) -> bool!ValueErr|OtherErr {
 }
 
 fn main() {
-    print failable(15) trap match e is {
+    _ = failable(15) trap match e is {
         ValueErr {
             .tooSmall => 1
             .tooBig => 100
         }
         OtherErr => -999
     }
-    print failable(15) trap e {
-        print e
+    _ = failable(15) trap e {
+        _ = e
         break 88
     }
 }

@@ -11,12 +11,12 @@ eq_int
 jump_false 7 -> 17
 pop
 get_local index 0
-print
+pop
 jump 14 -> 21
 pop
 
 load_const index 4, value non
-print
+pop
 pop
 
 ret_naked

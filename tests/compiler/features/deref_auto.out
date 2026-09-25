@@ -12,7 +12,7 @@ deref
 get_field index 0
 deref
 get_field index 0
-print
+pop
 get_local index 4
 deref
 get_field index 0
@@ -20,7 +20,7 @@ deref
 get_field index 1
 deref
 get_field index 0
-print
+pop
 ret_naked
 
 -- global scope --

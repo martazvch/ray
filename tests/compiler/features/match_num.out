@@ -37,7 +37,7 @@ jump 59 -> 65
 pop
 load_const index 11, value 100
 swap_pop
-print
+pop
 
 
 load_const index 12, value 2
@@ -81,7 +81,7 @@ jump 129 -> 135
 pop
 load_const index 11, value 100
 swap_pop
-print
+pop
 
 ret_naked
 

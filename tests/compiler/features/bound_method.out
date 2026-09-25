@@ -1,7 +1,7 @@
 -- speak --
 get_local index 0
-get_field index 1
-print
+get_field_dup index 1
+call_zig index 3, module 0, arity 1, print
 ret_naked
 
 -- getOld --
