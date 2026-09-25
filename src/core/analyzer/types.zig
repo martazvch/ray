@@ -32,7 +32,6 @@ pub const Language = enum {
 
 pub const Type = union(enum) {
     any,
-    never,
     void,
     int,
     float,
@@ -358,7 +357,7 @@ pub const Type = union(enum) {
         hasher.update(asBytes(&@intFromEnum(self)));
 
         switch (self) {
-            .any, .never, .void, .int, .float, .bool, .str, .null => {},
+            .any, .void, .int, .float, .bool, .str, .null => {},
             .u8 => {},
             .array => |ty| ty.child.hash(allocator, hasher),
             .@"enum" => |*ty| {
@@ -424,7 +423,7 @@ pub const Type = union(enum) {
         const w = &wa.writer;
 
         switch (self.*) {
-            .any, .never, .int, .float, .bool, .str, .null, .void, .range => return @tagName(self.*),
+            .any, .int, .float, .bool, .str, .null, .void, .range => return @tagName(self.*),
             .u8 => return @tagName(self.*),
             .array => |ty| {
                 errdefer oom();
@@ -511,7 +510,7 @@ pub const TypeInterner = struct {
     cache: Cache,
 
     const scalar_list: []const Type = &.{
-        .any, .float, .int, .bool, .str, .null, .void, .never,
+        .any, .float, .int, .bool, .str, .null, .void,
         .u8,
     };
     const trait_list: []const []const u8 = &.{"IsEnum"};

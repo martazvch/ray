@@ -104,7 +104,7 @@ pub const InstrInfos = struct {
         none,
 
         pub fn exitScope(self: ControlFlow) bool {
-            return self == .@"return" or self == .@"break";
+            return self != .none;
         }
     };
 };
@@ -893,7 +893,7 @@ fn fnBody(
         returns = res.cf == .@"return";
 
         // If last expression produced a value and that it wasn't the last one we pop it
-        if (fn_type.return_type == self.ti.getCached(.void) and !res.type.is(.void) and !res.type.is(.never)) {
+        if (!res.type.is(.void) and !returns) {
             body_instrs.appendAssumeCapacity(self.irb.wrapPreviousInstr(.pop));
         } else {
             body_instrs.appendAssumeCapacity(res.instr);
@@ -1486,9 +1486,9 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
     const ty = res.type;
 
     switch (expect) {
-        .any => try self.checkNotVoid(ty, span),
+        .any => try self.checkNotVoid(res, span),
         .value => {
-            try self.checkNotVoid(ty, span);
+            try self.checkNotVoid(res, span);
 
             // Functions are first class object and treated like values
             if (res.ti.is_sym and !ty.is(.function)) return self.err(
@@ -1509,8 +1509,11 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
     return res;
 }
 
-fn checkNotVoid(self: *Self, ty: *const Type, span: Span) Error!void {
-    if (ty.is(.void)) return self.err(.void_value, span);
+/// Checks if a value is not void? If control flow indicates 'return' we don't even check
+/// because 'return' expression always result in 'void' type as it exits scope
+fn checkNotVoid(self: *Self, info: InstrInfos, span: Span) Error!void {
+    if (info.cf == .@"return") return;
+    if (info.type.is(.void)) return self.err(.void_value, span);
 }
 
 fn array(self: *Self, expr: *const Ast.Array, ctx: *Context) Result {
@@ -1591,7 +1594,7 @@ fn block(self: *Self, expr: *const Ast.Block, pop_offset: usize, opts: LexScope.
         pure = pure and res.ti.comp_time;
 
         // Type checking is done in break expression analyzis
-        if (!res.type.is(.void) and !res.type.is(.never)) {
+        if (!res.type.is(.void)) {
             instrs.appendAssumeCapacity(self.irb.wrapPreviousInstr(.pop));
         } else {
             instrs.appendAssumeCapacity(res.instr);
@@ -1607,7 +1610,7 @@ fn block(self: *Self, expr: *const Ast.Block, pop_offset: usize, opts: LexScope.
     const final = ty: {
         // If the block returned and we have no breaks, it means we returned with 'return',
         // so we exited scope complytely
-        if (cf == .@"return" and popped_scope.breaks.len == 0) break :ty self.ti.getCached(.never);
+        if (cf == .@"return" and popped_scope.breaks.len == 0) break :ty self.ti.getCached(.void);
 
         // If the block partially or doesn't return, if we expect a value it's an error otherwise we
         // choose the safe option to return void
@@ -1632,7 +1635,7 @@ fn block(self: *Self, expr: *const Ast.Block, pop_offset: usize, opts: LexScope.
             .{ .block = .{
                 .instrs = instrs.toOwnedSlice(self.alloc) catch oom(),
                 .pop_count = @intCast(popped_scope.pop_count - pop_offset),
-                .is_expr = !final.is(.void) and !final.is(.never),
+                .is_expr = !final.is(.void),
             } },
             self.ast.getSpan(expr).start,
         ),
@@ -3026,7 +3029,6 @@ fn ifExpr(self: *Self, expr: *const Ast.If, expect: ExprResKind, ctx: *Context) 
     const span = self.ast.getSpan(expr.pattern);
 
     const cond_res = try self.pattern(expr.pattern, ctx);
-    var pure = cond_res.ti.comp_time;
 
     // We can continue to analyze if the condition isn't a bool
     if (!cond_res.type.is(.bool)) self.err(
@@ -3035,15 +3037,12 @@ fn ifExpr(self: *Self, expr: *const Ast.If, expect: ExprResKind, ctx: *Context) 
     ) catch {};
 
     // Analyze then branch
-    var then_res = try self.analyzeNode(&expr.then, expect, ctx);
-    pure = pure and then_res.ti.comp_time;
+    const then_res = try self.analyzeNode(&expr.then, expect, ctx);
 
     var else_res: ?InstrInfos = null;
 
     if (expr.@"else") |*n| {
-        const else_res_tmp = try self.analyzeNode(n, expect, ctx);
-        pure = pure and else_res_tmp.ti.comp_time;
-        else_res = else_res_tmp;
+        else_res = try self.analyzeNode(n, expect, ctx);
     } else if (expect == .value) {
         return self.err(
             .{ .missing_else_clause = .{ .if_type = self.typeName(then_res.type) } },
@@ -3051,13 +3050,12 @@ fn ifExpr(self: *Self, expr: *const Ast.If, expect: ExprResKind, ctx: *Context) 
         );
     }
 
-    const branch_res = try self.checkIfBranches(&then_res, &else_res, expr, expect);
+    const branch_res = self.checkIfBranches(then_res, else_res);
 
-    // TODO: branch elimination
     return .{
-        .type = branch_res,
+        .type = branch_res.type,
         .ti = .{ .comp_time = false },
-        .cf = if (branch_res.is(.never)) .@"return" else .none,
+        .cf = branch_res.cf,
         .instr = self.irb.addInstr(
             .{ .@"if" = .{
                 .cond = cond_res.instr,
@@ -3069,38 +3067,27 @@ fn ifExpr(self: *Self, expr: *const Ast.If, expect: ExprResKind, ctx: *Context) 
     };
 }
 
-fn checkIfBranches(
-    self: *Self,
-    then_info: *InstrInfos,
-    else_info_opt: *?InstrInfos,
-    expr: *const Ast.If,
-    expect: ExprResKind,
-) Error!*const Type {
-    const then_res = try self.checkBranch(then_info, expect, self.ast.getSpan(expr.then));
+const IfBranchesRes = struct {
+    type: *const Type,
+    cf: InstrInfos.ControlFlow = .none,
+};
+fn checkIfBranches(self: *Self, then_info: InstrInfos, else_info_opt: ?InstrInfos) IfBranchesRes {
+    const then_type = self.ifBranchType(then_info);
+    const else_info = else_info_opt orelse return .{ .type = then_type };
 
-    // const else_info = else_info_opt.* orelse return then_res;
-    const else_info = if (else_info_opt.*) |*i| i else return then_res;
-    const else_res = try self.checkBranch(else_info, expect, self.ast.getSpan(expr.@"else".?));
+    if (then_info.cf.exitScope() and else_info.cf.exitScope()) return .{
+        .type = self.ti.getCached(.void),
+        .cf = if (then_info.cf == .@"return" and else_info.cf == .@"return")
+            .@"return"
+        else
+            .@"break",
+    };
 
-    // No need to get cast information as 'break' and 'return' already handles it
-    if (then_info.cf.exitScope() and else_info.cf.exitScope()) return self.ti.getCached(.never);
-
-    return self.mergeTypes(&.{ then_res, else_res });
+    return .{ .type = self.mergeTypes(&.{ then_type, self.ifBranchType(else_info) }) };
 }
 
-fn checkBranch(
-    self: *Self,
-    info: *InstrInfos,
-    expect: ExprResKind,
-    span: Span,
-) Error!*const Type {
-    if (info.cf.exitScope()) {
-        return self.ti.getCached(.void);
-    }
-
-    if (expect == .value and info.type.is(.void)) return self.err(.void_value, span);
-
-    return info.type;
+fn ifBranchType(self: *Self, info: InstrInfos) *const Type {
+    return if (info.cf.exitScope()) return self.ti.getCached(.void) else info.type;
 }
 
 fn in(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
@@ -3644,7 +3631,7 @@ fn returnExpr(self: *Self, expr: *const Ast.Return, ctx: *Context) Result {
     defer ctx.decl_type = null;
 
     const exp = expr.expr orelse return .{
-        .type = self.ti.getCached(.never),
+        .type = self.ti.getCached(.void),
         .cf = .@"return",
         .instr = self.irb.addInstr(.{ .@"return" = .{ .value = null } }, span.start),
     };
@@ -3892,6 +3879,7 @@ fn trap(self: *Self, expr: Ast.Trap, expect: ExprResKind, ctx: *Context) Result 
 
     return .{
         .type = rhs.type,
+        .cf = rhs.cf,
         .instr = self.irb.addInstr(
             .{ .trap = .{
                 .lhs = lhs.instr,
@@ -4342,6 +4330,8 @@ fn extractDeclType(decl: *const Type) *const Type {
 /// Checks for `void` values, array inference, cast and function type generation
 /// The goal is to see if the two types are equivalent and if so, make the transformations needed
 fn performTypeCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, decl_explicit_void: bool, span: Span) Error!*const Type {
+    if (value_info.cf == .@"return") return decl;
+
     const value = value_info.type;
 
     return self.checkTypeCoercion(decl, value_info, decl_explicit_void, span) catch |e| switch (e) {
@@ -4372,10 +4362,6 @@ fn checkTypeCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, de
 
     if (decl == value) return decl;
     if (decl.is(.any)) return decl;
-
-    // If this is 'never', it means we ended with a control flow in which all branches returned
-    // In that case, the type has already been tested against function's type
-    if (value.is(.never)) return decl;
 
     if (decl.is(.float) and value.is(.int)) {
         value_info.instr = self.castIntToFloat(value_info.*);
