@@ -1,16 +1,16 @@
 //---- test ----
 
 -- f --
-load_const index 4, value 8
+load_const index 0, value 8
 ret
 
 -- main --
-load_const index 5, value 4
-load_const index 6, value value: 
+load_const index 1, value 4
+load_const index 2, value value: 
 get_local index 0
-load_const index 7, value , f: 
+load_const index 3, value , f: 
 load_fn index 0, f
-load_const index 8, value 
+load_const index 4, value 
 string_interp index 2
 pop
 ret_naked

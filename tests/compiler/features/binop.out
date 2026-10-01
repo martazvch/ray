@@ -1,7 +1,7 @@
 -- main --
-load_const index 3, value 1
-load_const index 4, value 2
-load_const index 5, value foo
+load_const index 0, value 1
+load_const index 1, value 2
+load_const index 2, value foo
 get_local index 0
 get_local index 0
 neg_int
@@ -137,8 +137,8 @@ get_local index 1
 mod_float
 pop
 
-load_const index 3, value 1
-load_const index 6, value 2
+load_const index 0, value 1
+load_const index 3, value 2
 ptr_local index 3
 ptr_local index 4
 eq_ptr
@@ -150,27 +150,27 @@ ne_ptr
 pop
 
 get_local index 3
-load_const index 3, value 1
+load_const index 0, value 1
 binary_and
 pop
 
 get_local index 3
-load_const index 3, value 1
+load_const index 0, value 1
 binary_or
 pop
 
 get_local index 3
-load_const index 3, value 1
+load_const index 0, value 1
 binary_xor
 pop
 
 get_local index 3
-load_const index 3, value 1
+load_const index 0, value 1
 shift_left
 pop
 
 get_local index 3
-load_const index 3, value 1
+load_const index 0, value 1
 shift_right
 pop
 

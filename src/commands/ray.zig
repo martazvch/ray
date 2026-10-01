@@ -35,5 +35,5 @@ pub fn run(io: std.Io, allocator: Allocator, file_path: []const u8, config: Stat
     vm.init(io, allocator, &state);
     defer vm.deinit();
 
-    try vm.run(entry_point, state.modules.modules.values());
+    try vm.run(entry_point);
 }

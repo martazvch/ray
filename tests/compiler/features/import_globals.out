@@ -9,22 +9,22 @@ add_int
 ret
 
 -- introduce --
-load_const index 3, value This is a mathematical module
-call_zig index 3, module 0, arity 1, print
+load_const index 0, value This is a mathematical module
+call_zig index 3, arity 1, print
 ret_naked
 
 -- getVecFromPos --
 get_local index 0
 get_local index 1
-struct_lit index 0, arity 2, Vec2
+struct_lit index 3, arity 2, Vec2
 ret
 
 -- getInt --
-load_const index 4, value 12
+load_const index 1, value 12
 ret
 
 -- getInt2 --
-load_const index 4, value 12
+load_const index 1, value 12
 ret
 
 -- getIntDef --
@@ -37,11 +37,11 @@ exit_repl
 //---- test ----
 
 -- main --
-get_global_ext index 1, module 3, value math
+get_global index 8, value math
 pop
-get_global_ext index 0, module 3, value 8
+get_global index 7, value 8
 pop
 ret_naked
 
 -- global scope --
-call index 0, arity 0, main
+call index 6, arity 0, main

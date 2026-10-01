@@ -1,11 +1,11 @@
 -- main --
-load_const index 4, value Baz{ a = ok }
-load_const index 5, value 5
+load_const index 1, value Baz{ a = ok }
+load_const index 2, value 5
 ptr_local index 0
-struct_lit index 1, arity 2, Bar
+struct_lit index 4, arity 2, Bar
 ptr_local index 1
 ptr_local index 1
-struct_lit index 2, arity 1, Foo
+struct_lit index 5, arity 1, Foo
 ptr_local index 3
 get_local index 4
 deref

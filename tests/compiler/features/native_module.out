@@ -1,7 +1,7 @@
 //---- cmodule ----
 
 -- rayFunc --
-load_const index 3, value 2
+load_const index 0, value 2
 get_local index 0
 mul_float
 call_c index 1, arity 1, ret_arg
@@ -13,13 +13,13 @@ exit_repl
 //---- test ----
 
 -- main --
-load_const index 3, value 4
-call_c_ext index 1, module 3, arity 1, ret_arg
+load_const index 1, value 4
+call_c index 1, arity 1, ret_arg
 pop
-load_const index 4, value 8
-call_ext index 0, module 3, arity 1, rayFunc
+load_const index 2, value 8
+call index 0, arity 1, rayFunc
 pop
 ret_naked
 
 -- global scope --
-call index 0, arity 0, main
+call index 1, arity 0, main

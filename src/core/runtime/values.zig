@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Writer = std.Io.Writer;
 
+const Artifacts = @import("../compiler/Artifacts.zig");
 const Obj = @import("Obj.zig");
 const Vm = @import("Vm.zig");
 const oom = @import("misc").oom;
@@ -79,7 +80,7 @@ pub const Value = union(enum) {
         };
     }
 
-    pub fn print(self: *const Self, writer: *Writer) void {
+    pub fn print(self: *const Self, artifacts: *const Artifacts, writer: *Writer) void {
         switch (self.*) {
             .bool => |v| writer.print("{}", .{v}) catch oom(),
             .float => |v| writer.print("{d}", .{v}) catch oom(),
@@ -87,7 +88,7 @@ pub const Value = union(enum) {
             .null => writer.print("null", .{}) catch oom(),
             .range_float => |v| writer.print("{}..{}", .{ v.start, v.end }) catch oom(),
             .range_int => |v| writer.print("{}..{}", .{ v.start, v.end }) catch oom(),
-            .obj => |v| v.print(writer) catch oom(),
+            .obj => |v| v.print(artifacts, writer) catch oom(),
         }
     }
 };

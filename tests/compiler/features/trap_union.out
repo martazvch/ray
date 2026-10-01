@@ -1,6 +1,6 @@
 -- failable --
 get_local index 0
-load_const index 3, value 10
+load_const index 0, value 10
 lt_int
 jump_false 5 -> 15
 pop
@@ -10,20 +10,20 @@ pop
 jump 12 -> 33
 pop
 get_local index 0
-load_const index 4, value 20
+load_const index 2, value 20
 gt_int
 jump_false 21 -> 32
 pop
-load_const index 5, value ValueErr.tooBig
+load_const index 3, value ValueErr.tooBig
 ret
 pop
 jump 29 -> 33
 pop
-load_const index 6, value ValueErr.tooSmall
+load_const index 4, value ValueErr.tooSmall
 ret
 
 -- main --
-load_const index 7, value 15
+load_const index 5, value 15
 call index 0, arity 1, failable
 jump_no_err 5 -> 69
 get_local index 0
@@ -34,21 +34,21 @@ pop
 get_local index 0
 get_union_tag
 dup
-load_const index 6, value ValueErr.tooSmall
+load_const index 4, value ValueErr.tooSmall
 get_union_tag
 eq_int
 jump_false 25 -> 34
 pop
-load_const index 8, value 1
+load_const index 6, value 1
 jump 31 -> 50
 pop
 dup
-load_const index 5, value ValueErr.tooBig
+load_const index 3, value ValueErr.tooBig
 get_union_tag
 eq_int
 jump_false 40 -> 49
 pop
-load_const index 9, value 100
+load_const index 7, value 100
 jump 46 -> 50
 pop
 swap_pop
@@ -58,18 +58,18 @@ dup
 is_type x
 jump_false 58 -> 67
 pop
-load_const index 10, value -999
+load_const index 8, value -999
 jump 64 -> 68
 pop
 swap_pop
 swap_pop
 pop
-load_const index 7, value 15
+load_const index 5, value 15
 call index 0, arity 1, failable
 jump_no_err 76 -> 91
 get_local index 0
 pop
-load_const index 11, value 88
+load_const index 9, value 88
 store_blk_val
 pop
 jump 86 -> 90

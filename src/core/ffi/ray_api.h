@@ -43,7 +43,6 @@ typedef int64_t (*RayGetInt)(const RayVm *const, Index);
 typedef bool (*RayGetBool)(const RayVm *const, Index);
 typedef char *(*RayGetStr)(const RayVm *const, Index);
 
-typedef CStruct *(*RayNewStruct)(const RayVm *const, const Index, const Index);
 typedef StructBytes (*RayStructByes)(const CStruct *const);
 typedef CStruct *(*RayGetStruct)(const RayVm *const, const Index);
 
@@ -61,7 +60,6 @@ typedef struct {
     RaySetStr set_str;
     RayGetStr get_str;
 
-    RayNewStruct new_struct;
     RayStructByes struct_bytes;
     RaySetStruct set_struct;
     RayGetStruct get_struct;

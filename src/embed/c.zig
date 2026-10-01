@@ -89,7 +89,7 @@ pub export fn rayRun(opaque_vm: *cVm, code: [*c]const u8) c_int {
         error.ExitOnPrint => return 0,
         else => return @intFromError(error.CompileErr),
     };
-    vm.runRepl(entry_point, vm.state.modules.modules.values()) catch return @intFromError(error.RuntimeErr);
+    vm.runRepl(entry_point) catch return @intFromError(error.RuntimeErr);
     return 0;
 }
 

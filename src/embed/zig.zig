@@ -48,7 +48,7 @@ pub fn run(self: *Self, code: [:0]const u8) Error!void {
         error.ExitOnPrint => return,
         else => return error.CompileErr,
     };
-    self.vm.runRepl(entry_point, self.state.modules.modules.values()) catch return error.RuntimeErr;
+    self.vm.runRepl(entry_point) catch return error.RuntimeErr;
 }
 
 pub fn deinit(self: *Self) void {

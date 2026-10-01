@@ -27,13 +27,13 @@ pub const Constant = union(enum) {
     string: misc.Interner.Index,
 
     pub const StructLit = struct {
-        parent: struct { symbol: usize, module: ModIdx },
+        symbol: Instruction.LoadSymbol,
         values: []const ConstIdx,
         lang: Language,
     };
 
     pub const TagLit = struct {
-        sym: Instruction.LoadSymbol,
+        symbol: Instruction.LoadSymbol,
         tag_index: usize,
     };
 };
@@ -104,15 +104,15 @@ fn hash(data: Constant) u64 {
         .string => |*s| hasher.update(asBytes(s)),
         .null => {},
         .enum_lit, .union_lit => |e| {
-            hasher.update(asBytes(&e.sym.module.toInt()));
+            hasher.update(asBytes(&e.symbol.module.toInt()));
             hasher.update(@tagName(data));
-            hasher.update(asBytes(&e.sym.symbol));
+            hasher.update(asBytes(&e.symbol.symbol));
             hasher.update(asBytes(&e.tag_index));
         },
         .struct_lit => |s| {
             hasher.update(asBytes(&s.lang));
-            hasher.update(asBytes(&s.parent.symbol));
-            hasher.update(asBytes(&s.parent.module));
+            hasher.update(asBytes(&s.symbol.symbol));
+            hasher.update(asBytes(&s.symbol.module));
             for (s.values) |v| {
                 hasher.update(asBytes(&v));
             }

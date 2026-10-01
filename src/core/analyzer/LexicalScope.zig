@@ -10,7 +10,6 @@ const InstrIndex = @import("ir.zig").Index;
 const Span = @import("../parser/Lexer.zig").Span;
 const State = @import("../pipeline/State.zig");
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
-const Meta = @import("../pipeline/NativesRegister.zig").Meta;
 
 const misc = @import("misc");
 const InternerIdx = misc.Interner.Index;
@@ -186,10 +185,10 @@ pub fn initGlobalScope(self: *Self, allocator: Allocator, state: *State) void {
     }
 
     const global_mod = state.native_reg.getGlobalScope();
-    for ([_]*const Meta{
-        &global_mod.zig_funcs_meta,
-        &global_mod.c_funcs_meta,
-        &global_mod.zig_structs_meta,
+    for ([_]*const SymbolMap{
+        &global_mod.zig_funcs,
+        &global_mod.c_funcs,
+        &global_mod.zig_structs,
         &state.native_reg.intrinsics_meta,
     }) |reg| {
         self.natives.ensureUnusedCapacity(allocator, @intCast(reg.count())) catch oom();

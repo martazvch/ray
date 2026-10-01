@@ -18,6 +18,7 @@ const cffi = @import("../ffi/cffi.zig");
 const zffi = @import("../ffi/zffi.zig");
 const NativeLib = @import("../analyzer/NativeLib.zig");
 const SymbolTable = @import("SymbolTable.zig");
+const Artifacts = @import("../compiler/Artifacts.zig");
 
 const misc = @import("misc");
 const Interner = misc.Interner;
@@ -39,6 +40,8 @@ native_reg: NativeRegister,
 strings: std.AutoHashMapUnmanaged(usize, *Obj.String),
 array_fns: ObjFns,
 string_fns: ObjFns,
+
+artifacts: Artifacts,
 
 /// Associated dynamic library to this module. When importing a native module, we open
 /// a subpipeline with the associated library to fetch symbols
@@ -107,6 +110,8 @@ pub fn new(io: Io, allocator: Allocator, cwd: Io.Dir, config: Config) Self {
         .array_fns = Obj.Array.getFns(),
         .string_fns = Obj.String.getFns(),
 
+        .artifacts = .{},
+
         .dynlib = null,
     };
 
@@ -156,7 +161,7 @@ pub fn initGlobalScope(self: *Self, allocator: Allocator) void {
 }
 
 pub fn registerMod(self: *Self, allocator: Allocator, Module: type) void {
-    self.native_reg.registerMod(allocator, &self.interner, &self.type_interner, Module);
+    self.native_reg.registerMod(allocator, &self.artifacts, &self.interner, &self.type_interner, Module);
 }
 
 pub fn registerIntrinsics(self: *Self, allocator: Allocator, Module: type) void {
@@ -165,12 +170,12 @@ pub fn registerIntrinsics(self: *Self, allocator: Allocator, Module: type) void 
 
 /// Used by embedded
 pub fn registerFn(self: *Self, allocator: Allocator, func: zffi.FnMeta) void {
-    _ = self.native_reg.registerZigFnInGlobal(allocator, &func, &self.interner, &self.type_interner);
+    _ = self.native_reg.registerZigFnInGlobal(allocator, &func, &self.artifacts, &self.interner, &self.type_interner);
 }
 
 /// Used by embedded
 pub fn registerCFn(self: *Self, allocator: Allocator, func: cffi.FnProto) void {
-    _ = self.native_reg.registerCFnInGlobal(allocator, &func, &self.interner, &self.type_interner);
+    _ = self.native_reg.registerCFnInGlobal(allocator, &func, &self.artifacts, &self.interner, &self.type_interner);
 }
 
 /// Used after analyzer to register module's public symbols' information

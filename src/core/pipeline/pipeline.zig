@@ -67,7 +67,6 @@ pub fn run(
     }
 
     state.registerModPubSymbols(alloc, mod_index);
-    state.modules.ensureCompileSizes(alloc, mod_index, state);
 
     // Compiler
     var compiler = CompilationUnit.init(io, alloc, state, mod_index, state.config.print_bytecode);

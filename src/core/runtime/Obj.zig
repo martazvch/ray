@@ -13,7 +13,7 @@ const ObjFnTypeInfo = type_mod.ObjFnTypeInfo;
 const ObjFns = type_mod.ObjFns;
 
 const Chunk = @import("../compiler/Chunk.zig");
-const Module = @import("../pipeline/ModuleManager.zig").Module;
+const Artifacts = @import("../compiler/Artifacts.zig");
 const zffi = @import("../ffi/zffi.zig");
 const cffi = @import("../ffi/cffi.zig");
 const oom = @import("misc").oom;
@@ -505,18 +505,19 @@ pub const CFn = struct {
 
 pub const Structure = struct {
     obj: Obj,
-    parent: *const Module.Structure,
+    parent_index: usize,
     fields: []Value,
 
     const Self = @This();
 
-    pub fn create(vm: *Vm, parent: *const Module.Structure) *Self {
+    pub fn create(vm: *Vm, parent_index: usize) *Self {
         // Fields first for GC because other wise allocating fields after creation
         // of the instance may trigger GC in between
+        const parent = vm.state.artifacts.get(.structure, parent_index);
         const alloc_fields = vm.gc_alloc.alloc(Value, parent.fields.len) catch oom();
         const obj = Obj.allocate(vm, Self, parent.type_id);
 
-        obj.parent = parent;
+        obj.parent_index = parent_index;
         obj.fields = alloc_fields;
 
         if (options.log_gc) obj.asObj().log();
@@ -524,9 +525,10 @@ pub const Structure = struct {
         return obj;
     }
 
-    pub fn createComptime(alloc: Allocator, parent: *const Module.Structure, fields: []const Value) *Self {
+    pub fn createComptime(alloc: Allocator, artifacts: *const Artifacts, parent_index: usize, fields: []const Value) *Self {
+        const parent = artifacts.get(.structure, parent_index);
         const obj = Obj.allocateComptime(alloc, Self, parent.type_id);
-        obj.parent = parent;
+        obj.parent_index = parent_index;
         obj.fields = alloc.dupe(Value, fields) catch oom();
 
         return obj;
@@ -537,7 +539,7 @@ pub const Structure = struct {
     }
 
     pub fn deepCopy(self: *Self, vm: *Vm) *Self {
-        var obj = Self.create(vm, self.parent);
+        var obj = Self.create(vm, self.parent_index);
         vm.gc.pushTmpRoot(obj.asObj());
         defer vm.gc.popTmpRoot();
 
@@ -562,11 +564,11 @@ pub const CStructure = struct {
     obj: Obj,
     name: []const u8,
     bytes: []u8,
-    layout: Module.CStructure.Layout,
+    layout: Artifacts.CStructure.Layout,
 
     const Self = @This();
 
-    pub fn create(vm: *Vm, layout: Module.CStructure.Layout) *Self {
+    pub fn create(vm: *Vm, layout: Artifacts.CStructure.Layout) *Self {
         const obj = Obj.allocate(vm, Self, undefined);
         obj.name = undefined;
         obj.layout = layout;
@@ -575,7 +577,7 @@ pub const CStructure = struct {
         return obj;
     }
 
-    pub fn createComptime(alloc: Allocator, parent: *const Module.CStructure, fields: []const Value) *Self {
+    pub fn createComptime(alloc: Allocator, parent: *const Artifacts.CStructure, fields: []const Value) *Self {
         const obj = Obj.allocateComptime(alloc, Self, parent.type_id);
         obj.name = parent.name;
         obj.layout = parent.layout;
@@ -592,7 +594,7 @@ pub const CStructure = struct {
         const f = self.layout.fields[index];
         const p = self.bytes.ptr + f.offset;
 
-        return switch (f.tag) {
+        return switch (f.kind) {
             .u8 => .makeInt(@as(*const u8, @ptrCast(p)).*),
             // .i32 => .makeInt(@as(*const i32, @ptrCast(@alignCast(p))).*),
             // .f32 => .makeFloat(@as(*const f32, @ptrCast(@alignCast(p))).*),
@@ -604,7 +606,7 @@ pub const CStructure = struct {
         const f = self.layout.fields[index];
         const p = self.bytes.ptr + f.offset;
 
-        switch (f.tag) {
+        switch (f.kind) {
             .u8 => @as(*u8, @ptrCast(p)).* = @intCast(value.int),
             // .i32 => @as(*i32, @ptrCast(@alignCast(p))).* = @intCast(value.int),
             // .f32 => @as(*f32, @ptrCast(@alignCast(p))).* = @floatCast(value.float),
@@ -633,14 +635,14 @@ pub const CStructure = struct {
 
 pub const Enum = struct {
     obj: Obj,
-    parent: *const Module.Enum,
+    parent: *const Artifacts.Enum,
     tag_id: u8,
     payload: i64,
 
     const Self = @This();
 
     /// Creates an enum instance
-    pub fn create(allocator: Allocator, parent: *const Module.Enum, tag_id: u8) *Self {
+    pub fn create(allocator: Allocator, parent: *const Artifacts.Enum, tag_id: u8) *Self {
         const obj = Obj.allocateComptime(allocator, Self, parent.type_id);
         obj.parent = parent;
         obj.tag_id = tag_id;
@@ -661,14 +663,14 @@ pub const Enum = struct {
 
 pub const Union = struct {
     obj: Obj,
-    parent: *const Module.Union,
+    parent: *const Artifacts.Union,
     tag_id: u8,
     payload: Value,
 
     const Self = @This();
 
     /// Creates a compile time constant that is a naked enum field
-    pub fn create(vm: *Vm, parent: *const Module.Union, tag_id: u8, payload: Value) *Self {
+    pub fn create(vm: *Vm, parent: *const Artifacts.Union, tag_id: u8, payload: Value) *Self {
         vm.gc.pushTmpBuf(&.{payload});
         defer vm.gc.popTmpBuf();
 
@@ -683,7 +685,7 @@ pub const Union = struct {
     }
 
     /// Creates a compile time constant that is a naked union field
-    pub fn createComptime(allocator: Allocator, parent: *const Module.Union, tag_id: u8, payload: Value) *Self {
+    pub fn createComptime(allocator: Allocator, parent: *const Artifacts.Union, tag_id: u8, payload: Value) *Self {
         const obj = Obj.allocateComptime(allocator, Self, parent.type_id);
         obj.parent = parent;
         obj.tag_id = tag_id;
@@ -959,11 +961,11 @@ pub const ZigStructure = struct {
 pub const TraitObj = struct {
     obj: Obj,
     data: *Obj,
-    vtable: *const Module.VTable,
+    vtable: *const Artifacts.VTable,
 
     const Self = @This();
 
-    pub fn create(vm: *Vm, data: *Obj, vtable: *const Module.VTable) *Self {
+    pub fn create(vm: *Vm, data: *Obj, vtable: *const Artifacts.VTable) *Self {
         const obj = Obj.allocate(vm, Self, undefined);
         obj.data = data;
         obj.vtable = vtable;
@@ -1054,13 +1056,13 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
     }
 }
 
-pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
+pub fn print(self: *Obj, artifacts: *const Artifacts, writer: *Writer) Writer.Error!void {
     switch (self.kind) {
         .array => {
             const array = self.as(Array);
             try writer.writeAll("[");
             for (array.values.items, 0..) |val, i| {
-                val.print(writer);
+                val.print(artifacts, writer);
                 if (i < array.values.items.len - 1) try writer.writeAll(", ");
             }
             try writer.writeAll("]");
@@ -1070,7 +1072,7 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
             if (comptime @import("builtin").mode == .Debug) {
                 try writer.writeAll("Box ");
             }
-            box.value.print(writer);
+            box.value.print(artifacts, writer);
         },
         .closure => {
             const closure = self.as(Closure);
@@ -1099,7 +1101,7 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
         .string => try writer.print("{s}", .{self.as(String).chars}),
         .structure => {
             const structure = self.as(Structure);
-            const parent = structure.parent;
+            const parent = artifacts.get(.structure, structure.parent_index);
 
             if (parent.fields.len == 0) {
                 try writer.print("{s}{{}}", .{parent.name});
@@ -1107,7 +1109,7 @@ pub fn print(self: *Obj, writer: *Writer) Writer.Error!void {
                 try writer.print("{s}{{ ", .{parent.name});
                 for (structure.fields, 0..) |f, i| {
                     try writer.print("{s} = ", .{parent.fields[i]});
-                    f.print(writer);
+                    f.print(artifacts, writer);
                     if (i < structure.fields.len - 1) try writer.writeAll(", ");
                 }
                 try writer.writeAll(" }");
@@ -1136,7 +1138,7 @@ pub fn log(self: *Obj) void {
             .{ if (self.kind == .@"error") "error" else "enum", self.as(Enum).parent.name },
         ),
         .function => std.debug.print("<function {s}>", .{self.as(Function).name}),
-        .structure => std.debug.print("<structure {s}>", .{self.as(Structure).parent.name}),
+        .structure => std.debug.print("<structure {s}>", .{self.as(Structure).parent_index.name}),
         .iterator => std.debug.print("<iterator>", .{}),
         .cfunction => std.debug.print("<c function {s}>", .{self.as(CFn).name}),
         .zig_function => std.debug.print("<zig function {s}>", .{self.as(ZigFn).name}),

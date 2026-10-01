@@ -1,60 +1,60 @@
 -- main --
-load_const index 6, value [1, 2, 3]
+load_const index 3, value [1, 2, 3]
 get_local index 0
-load_const index 3, value 1
-index_arr
-pop
-
-get_local index 0
-load_const index 7, value -1
+load_const index 0, value 1
 index_arr
 pop
 
 get_local index 0
-load_const index 3, value 1
-load_const index 8, value 0
+load_const index 4, value -1
+index_arr
+pop
+
+get_local index 0
+load_const index 0, value 1
+load_const index 5, value 0
 range_new_int
 index_range_arr
 pop
 
-load_const index 13, value [[1, 2, 3], [4, 5, 6]]
+load_const index 10, value [[1, 2, 3], [4, 5, 6]]
 get_local index 1
-load_const index 3, value 1
+load_const index 0, value 1
 index_arr
 pop
 
 get_local index 1
-load_const index 3, value 1
+load_const index 0, value 1
 index_arr
-load_const index 4, value 2
+load_const index 1, value 2
 index_arr
 pop
 
 get_local index 1
-load_const index 3, value 1
-load_const index 8, value 0
+load_const index 0, value 1
+load_const index 5, value 0
 range_new_int
 index_range_arr
 pop
 
 get_local index 1
-load_const index 8, value 0
+load_const index 5, value 0
 index_arr
-load_const index 4, value 2
-load_const index 3, value 1
+load_const index 1, value 2
+load_const index 0, value 1
 range_new_int
 index_range_arr
 pop
 
-load_const index 14, value Tom
+load_const index 11, value Tom
 get_local index 2
-load_const index 3, value 1
+load_const index 0, value 1
 index_str
 pop
 
 get_local index 2
-load_const index 4, value 2
-load_const index 3, value 1
+load_const index 1, value 2
+load_const index 0, value 1
 range_new_int
 index_range_str
 pop

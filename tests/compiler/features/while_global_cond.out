@@ -1,15 +1,15 @@
 -- main --
-get_global_dup index 0, value 0
-load_const index 4, value 4
+get_global_dup index 7, value 0
+load_const index 1, value 4
 lt_int
 jump_false 5 -> 22
 pop
-get_global index 0, value 0
+get_global index 7, value 0
 pop
-get_global_dup index 0, value 0
-load_const index 5, value 1
+get_global_dup index 7, value 0
+load_const index 2, value 1
 add_int
-set_global index 0
+set_global index 7
 loop 19 -> 0
 pop
 

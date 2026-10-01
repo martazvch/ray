@@ -1,7 +1,7 @@
 -- main --
-load_const index 3, value 1
+load_const index 0, value 1
 ptr_local index 0
-load_const index 4, value 6
+load_const index 1, value 6
 get_local index 1
 ptr_store
 ret_naked

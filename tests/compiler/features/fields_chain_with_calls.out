@@ -1,21 +1,21 @@
 -- getPt --
-load_const index 4, value Point{ x = 9 }
+load_const index 1, value Point{ x = 9 }
 ret
 
 -- getVec --
 get_local index 0
-struct_lit index 1, arity 1, Vec2
+struct_lit index 4, arity 1, Vec2
 ret
 
 -- main --
-load_const index 6, value Vec2{ x = 1 }
+load_const index 3, value Vec2{ x = 1 }
 
 get_local index 0
 call index 0, arity 1, getPt
 get_field index 0
 pop
 
-load_const index 7, value 5
+load_const index 4, value 5
 call index 1, arity 1, getVec
 get_field index 0
 pop

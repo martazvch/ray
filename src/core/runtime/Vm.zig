@@ -7,7 +7,6 @@ const options = @import("options");
 
 const TypeId = @import("../analyzer/types.zig").TypeId;
 const OpCode = @import("../compiler/Chunk.zig").OpCode;
-const Module = @import("../pipeline/ModuleManager.zig").Module;
 const Disassembler = @import("../compiler/Disassembler.zig");
 const oom = @import("misc").oom;
 const Gc = @import("Gc.zig");
@@ -26,7 +25,6 @@ arena_comptime: std.heap.ArenaAllocator,
 gc_alloc: Allocator,
 strings: *std.AutoHashMapUnmanaged(usize, *Obj.String),
 objects: ?*Obj,
-modules: []Module,
 state: *State,
 
 // Used ti-ype ids at runtime
@@ -125,27 +123,20 @@ fn err(self: *Self, kind: Error) Error {
     return kind;
 }
 
-pub fn run(self: *Self, entry_point: *Obj.Function, modules: []Module) !void {
-    self.modules = modules;
+pub fn run(self: *Self, entry_point: *Obj.Function) !void {
     self.gc.active = true;
-
     self.frame = try self.frame_stack.new();
-    self.frame.call(entry_point, &self.stack, 0, modules);
-
+    self.frame.call(entry_point, &self.stack, 0);
     try self.execute();
 }
 
-pub fn runRepl(self: *Self, entry_point: *Obj.Function, modules: []Module) !void {
-    self.modules = modules;
+pub fn runRepl(self: *Self, entry_point: *Obj.Function) !void {
     self.gc.active = true;
-
     self.frame = try self.frame_stack.new();
     // Reset stack pointer to start of stack
     self.frame.slots = self.stack.values[0..].ptr;
-    self.frame.module = &modules[entry_point.module_index];
     self.frame.function = entry_point;
     self.frame.ip = entry_point.chunk.code.items.ptr;
-
     try self.execute();
 }
 
@@ -167,8 +158,7 @@ fn execute(self: *Self) !void {
 
             var dis = Disassembler.init(
                 &self.frame.function.chunk,
-                self.frame.module.index,
-                &self.state.modules,
+                &self.state.artifacts,
             );
             const instr_nb = self.frame.instructionNb();
             _ = dis.disInstruction(&bfw, instr_nb);
@@ -232,13 +222,13 @@ fn execute(self: *Self) !void {
 
             .bound_method => {
                 const sym_index = self.frame.readByte();
-
                 const closure = Obj.Closure.create(
                     self,
-                    self.frame.module.funcs[sym_index],
+                    self.state.artifacts.funcs.items[sym_index],
                     (self.stack.top - 1)[0..1],
                 );
                 // Discard the function
+                // PERF: just peekRef to mutate?
                 self.stack.top -= 1;
                 self.stack.push(Value.makeObj(closure.asObj()));
             },
@@ -252,26 +242,12 @@ fn execute(self: *Self) !void {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
                 self.frame = try self.frame_stack.newKeepMod();
-                self.frame.call(self.frame.module.funcs[index], &self.stack, arity, self.modules);
-            },
-            .call_ext => {
-                const index = self.frame.readByte();
-                const module = self.frame.readByte();
-                const arity = self.frame.readByte();
-                self.frame = try self.frame_stack.newKeepMod();
-                self.frame.call(self.modules[module].funcs[index], &self.stack, arity, self.modules);
+                self.frame.call(self.state.artifacts.funcs.items[index], &self.stack, arity);
             },
             .call_c => {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const obj = self.frame.module.c_funcs[index];
-                self.callC(obj, arity);
-            },
-            .call_c_ext => {
-                const index = self.frame.readByte();
-                const module = self.frame.readByte();
-                const arity = self.frame.readByte();
-                const obj = self.modules[module].c_funcs[index];
+                const obj = self.state.artifacts.c_funcs.items[index];
                 self.callC(obj, arity);
             },
             .call_virtual => {
@@ -283,13 +259,12 @@ fn execute(self: *Self) !void {
 
                 self.stack.peekRef(first_arg_index).obj = trait_obj.data;
                 self.frame = try self.frame_stack.newKeepMod();
-                self.frame.call(trait_obj.vtable.functions[index], &self.stack, arity, self.modules);
+                self.frame.call(trait_obj.vtable.functions[index], &self.stack, arity);
             },
             .call_zig => {
                 const index = self.frame.readByte();
-                const module = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const f = self.modules[module].zig_funcs[index].function;
+                const f = self.state.artifacts.zig_funcs.items[index].function;
                 const result = f(self, (self.stack.top - arity)[0..arity]);
 
                 self.stack.top -= arity;
@@ -310,7 +285,7 @@ fn execute(self: *Self) !void {
                     else => {
                         @branchHint(.likely);
                         self.frame = try self.frame_stack.newKeepMod();
-                        self.frame.runtimeCall(callee, &self.stack, args_count, self.modules);
+                        self.frame.runtimeCall(callee, &self.stack, args_count);
                     },
                 }
             },
@@ -419,16 +394,11 @@ fn execute(self: *Self) !void {
             },
             .get_global => {
                 const idx = self.frame.readByte();
-                self.stack.push(self.frame.module.globals[idx]);
+                self.stack.push(self.state.artifacts.globals.items[idx]);
             },
             .get_global_dup => {
                 const idx = self.frame.readByte();
-                self.stack.push(self.frame.module.globals[idx].deepCopy(self));
-            },
-            .get_global_ext => {
-                const index = self.frame.readByte();
-                const module = self.frame.readByte();
-                self.stack.push(self.modules[module].globals[index]);
+                self.stack.push(self.state.artifacts.globals.items[idx].deepCopy(self));
             },
             // TODO: see if same compiler bug as get_global
             .get_local => self.stack.push(self.frame.slots[self.frame.readByte()]),
@@ -558,26 +528,18 @@ fn execute(self: *Self) !void {
             .le_float => self.stack.push(Value.makeBool(self.stack.pop().float >= self.stack.pop().float)),
             .le_int => self.stack.push(Value.makeBool(self.stack.pop().int >= self.stack.pop().int)),
             .load_blk_val => self.stack.push(self.frame.blk_val),
-            .load_const => self.stack.push(self.frame.readConstant(wide).deepCopy(self)),
-            .load_const_ext => {
-                const const_index = self.frame.readByte();
-                const mod_index = self.frame.readByte();
-                self.stack.push(self.modules[mod_index].constants[const_index]);
+            .load_const => {
+                // TODO: Compiler bug: https://github.com/ziglang/zig/issues/13938?
+                const index = self.frame.readMaybeShort(wide);
+                self.stack.push(self.state.artifacts.constants.items[index].deepCopy(self));
             },
             .load_fn_zig => {
                 const symbol_idx = self.frame.readByte();
-                const mod_index = self.frame.readByte();
-                self.stack.push(.makeObj(self.modules[mod_index].zig_funcs[symbol_idx].asObj()));
+                self.stack.push(.makeObj(self.state.artifacts.zig_funcs.items[symbol_idx].asObj()));
             },
             .load_fn => {
                 const symbol_idx = self.frame.readByte();
-                self.stack.push(.makeObj(self.frame.module.funcs[symbol_idx].asObj()));
-            },
-            .load_fn_ext => {
-                const symbol_index = self.frame.readByte();
-                const module_index = self.frame.readByte();
-                const module = self.modules[module_index];
-                self.stack.push(.makeObj(module.funcs[symbol_index].asObj()));
+                self.stack.push(.makeObj(self.state.artifacts.funcs.items[symbol_idx].asObj()));
             },
             .loop => {
                 const jump = self.frame.readShort();
@@ -645,7 +607,7 @@ fn execute(self: *Self) !void {
             },
             .ptr_global => {
                 const idx = self.frame.readByte();
-                self.stack.push(.makeObj(Obj.Pointer.create(self, &self.frame.module.globals[idx]).asObj()));
+                self.stack.push(.makeObj(Obj.Pointer.create(self, &self.state.artifacts.globals.items[idx]).asObj()));
             },
             .ptr_field => {
                 const idx = self.frame.readByte();
@@ -707,7 +669,7 @@ fn execute(self: *Self) !void {
             },
             .set_global => {
                 const idx = self.frame.readByte();
-                self.frame.module.globals[idx] = self.stack.pop();
+                self.state.artifacts.globals.items[idx] = self.stack.pop();
             },
             .set_local => self.frame.slots[self.frame.readByte()] = self.stack.pop(),
             .set_local_box => {
@@ -760,7 +722,7 @@ fn execute(self: *Self) !void {
                 while (i < total_count - 1) : (i += 2) {
                     const string = base[i].obj.as(Obj.String);
                     w.writeAll(string.chars) catch oom();
-                    base[i + 1].print(w);
+                    base[i + 1].print(&self.state.artifacts, w);
                 }
                 const string = base[total_count - 1].obj.as(Obj.String);
                 w.writeAll(string.chars) catch oom();
@@ -774,28 +736,19 @@ fn execute(self: *Self) !void {
             .struct_lit => {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const instance = Obj.Structure.create(self, &self.frame.module.structs[index]);
-                structLit(instance, arity, &self.stack);
-            },
-            .struct_lit_ext => {
-                const index = self.frame.readByte();
-                const mod_index = self.frame.readByte();
-                const arity = self.frame.readByte();
-                const instance = Obj.Structure.create(self, &self.modules[mod_index].structs[index]);
+                const instance = Obj.Structure.create(self, index);
                 structLit(instance, arity, &self.stack);
             },
             .struct_lit_zig => {
                 const index = self.frame.readByte();
-                const mod_index = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const instance = Obj.Structure.create(self, &self.modules[mod_index].structs[index]);
+                const instance = Obj.Structure.create(self, index);
                 structLit(instance, arity, &self.stack);
             },
             .struct_lit_c => {
                 const index = self.frame.readByte();
-                const mod_index = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const layout = self.modules[mod_index].c_structs[index].layout;
+                const layout = self.state.artifacts.c_structs.items[index].layout;
                 const cstruct = Obj.CStructure.create(self, layout);
                 cstructLit(cstruct, arity, &self.stack);
             },
@@ -821,7 +774,7 @@ fn execute(self: *Self) !void {
                 self.stack.push(.makeObj(Obj.TraitObj.create(
                     self,
                     tmp,
-                    &self.frame.module.vtables[vtable_index],
+                    &self.state.artifacts.vtables.items[vtable_index],
                 ).asObj()));
             },
             .unbox => self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.Box).value,
@@ -830,18 +783,7 @@ fn execute(self: *Self) !void {
                 const tag = self.frame.readByte();
                 self.stack.push(.makeObj(Obj.Union.create(
                     self,
-                    &self.frame.module.unions[index],
-                    tag,
-                    self.stack.pop(),
-                ).asObj()));
-            },
-            .union_constr_ext => {
-                const index = self.frame.readByte();
-                const module = self.frame.readByte();
-                const tag = self.frame.readByte();
-                self.stack.push(.makeObj(Obj.Union.create(
-                    self,
-                    &self.modules[module].unions[index],
+                    &self.state.artifacts.unions.items[index],
                     tag,
                     self.stack.pop(),
                 ).asObj()));
@@ -914,7 +856,7 @@ fn strMul(self: *Self, str: *const Obj.String, factor: i64) void {
     self.stack.top -= 1;
 }
 
-// // TODO: runtime error desactivable with release fast mode
+// TODO: runtime error desactivable with release fast mode
 fn normalizeIndex(self: *Self, len: usize, index: i64) Error!usize {
     if (index >= 0) {
         const i: usize = @intCast(index);
@@ -931,7 +873,7 @@ fn normalizeIndex(self: *Self, len: usize, index: i64) Error!usize {
     }
 }
 
-// // TODO: runtime error desactivable with release fast mode
+// TODO: runtime error desactivable with release fast mode
 fn checkRangeIndex(self: *Self, len: usize, range: Value.RangeInt) Error!struct { usize, usize } {
     const s = try self.normalizeIndex(len, range.start);
     const e = try self.normalizeIndex(len, range.end);
@@ -992,7 +934,6 @@ const Stack = struct {
 
 pub const CallFrame = struct {
     function: *Obj.Function,
-    module: *Module,
     ip: [*]u8,
     slots: [*]Value,
     captures: []Value,
@@ -1009,12 +950,6 @@ pub const CallFrame = struct {
         return self.ip[0];
     }
 
-    pub fn readConstant(self: *CallFrame, wide: bool) Value {
-        // TODO: Compiler bug: https://github.com/ziglang/zig/issues/13938?
-        const index = self.readMaybeShort(wide);
-        return self.module.constants[index];
-    }
-
     pub fn readShort(self: *CallFrame) u16 {
         const part1 = self.readByte();
         const part2 = self.readByte();
@@ -1027,15 +962,14 @@ pub const CallFrame = struct {
     }
 
     /// Sets the call to the provided function
-    pub fn call(self: *CallFrame, func: *Obj.Function, stack: *Stack, args_count: usize, modules: []Module) void {
+    pub fn call(self: *CallFrame, func: *Obj.Function, stack: *Stack, args_count: usize) void {
         self.slots = stack.top - args_count;
-        self.module = &modules[func.module_index];
         self.function = func;
         self.ip = func.chunk.code.items.ptr;
     }
 
     /// Calls a function bounded to a runtime value. Checks what kind of function it is before calling
-    pub fn runtimeCall(self: *CallFrame, callee: *Obj, stack: *Stack, args_count: usize, modules: []Module) void {
+    pub fn runtimeCall(self: *CallFrame, callee: *Obj, stack: *Stack, args_count: usize) void {
         // As it's a runtime value containing the function, it's on top of stack. We got one slot behind to override it
         self.slots = stack.top - args_count - 1;
 
@@ -1055,7 +989,6 @@ pub const CallFrame = struct {
             },
             .function => b: {
                 const function = callee.as(Obj.Function);
-                self.module = &modules[function.module_index];
                 // Moves all arguments one slot back to override the runtime variable containing the function
                 // Not ideal regarding performance but allow the return address to be in the right place
                 // It comes from the fact that runtime calls are handled the same way as comptime resolved
@@ -1099,7 +1032,6 @@ const FrameStack = struct {
         }
 
         const new_frame = &self.frames[self.count];
-        new_frame.module = self.frames[self.count - 1].module;
         self.count += 1;
 
         return new_frame;

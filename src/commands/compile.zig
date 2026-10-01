@@ -228,9 +228,7 @@ fn transpileInstr(self: *Self, instr: usize, interner: *const misc.Interner) !vo
             self.appendSlice(interner.getKey(variable.name).?, .none);
         },
         .load_symbol => |n| {
-            const symbol = self.lex_scope.getSymbol(n.symbol);
-            const sym_name = interner.getKey(symbol.name).?;
-            self.appendSlice(sym_name, .none);
+            _ = n; // autofix
         },
         .field => |n| {
             std.log.debug("Field: {any}", .{n});
@@ -300,12 +298,8 @@ fn transpileInstr(self: *Self, instr: usize, interner: *const misc.Interner) !vo
         .struct_literal => |n| {
             std.log.debug("Struct lit: {any}", .{n});
 
-            try self.transpileInstr(n.structure, interner);
-
-            const sym = switch (self.irb.instructions.items(.data)[n.structure]) {
-                .load_symbol => |sym| self.lex_scope.getSymbol(sym.symbol),
-                else => unreachable,
-            };
+            self.loadSymbol(n.structure, interner);
+            const sym = self.lex_scope.getSymbol(n.structure.symbol);
             const struct_type = sym.type.structure;
 
             if (n.values.len == 0) {
@@ -429,6 +423,12 @@ fn transpilefn(self: *Self, instr_data: ir.Instruction.FnDecl, interner: *const 
     }
 
     self.appendSlice("}", .all);
+}
+
+fn loadSymbol(self: *Self, data: Instr.LoadSymbol, interner: *const misc.Interner) void {
+    const symbol = self.lex_scope.getSymbol(data.symbol);
+    const sym_name = interner.getKey(symbol.name).?;
+    self.appendSlice(sym_name, .none);
 }
 
 fn openScope(self: *Self) void {

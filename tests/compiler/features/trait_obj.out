@@ -1,37 +1,37 @@
 -- speak --
-load_const index 3, value Bar 
+load_const index 0, value Bar 
 get_local index 1
-call_zig index 2, module 0, arity 1, str
+call_zig index 2, arity 1, str
 str_cat
 pop
 ret_naked
 
 -- speak --
-load_const index 4, value Baz 
+load_const index 1, value Baz 
 get_local index 1
-call_zig index 2, module 0, arity 1, str
+call_zig index 2, arity 1, str
 str_cat
 pop
 ret_naked
 
 -- f --
 get_local index 0
-load_const index 5, value 2
+load_const index 2, value 2
 call_virtual index 0, arity 2
 ret_naked
 
 -- main --
-load_const index 6, value Bar{}
+load_const index 3, value Bar{}
 get_local index 0
 trait_obj index 0
-call index 3, arity 1, f
+call index 2, arity 1, f
 
-load_const index 7, value Baz{}
+load_const index 4, value Baz{}
 get_local index 1
 trait_obj index 1
-call index 3, arity 1, f
+call index 2, arity 1, f
 
 ret_naked
 
 -- global scope --
-call index 4, arity 0, main
+call index 3, arity 0, main

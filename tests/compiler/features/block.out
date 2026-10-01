@@ -1,23 +1,23 @@
 -- main --
-load_const index 3, value 5
+load_const index 0, value 5
 store_blk_val
 jump 3 -> 6
 load_blk_val
 pop
 
-load_const index 3, value 5
+load_const index 0, value 5
 pop
 
 push_null
 pop
 
-load_const index 4, value 1
-load_const index 7, value 7
+load_const index 1, value 1
+load_const index 2, value 7
 pop
-load_const index 3, value 5
+load_const index 0, value 5
 pop2
 
-load_const index 7, value 7
+load_const index 2, value 7
 get_local_dup index 0
 store_blk_val
 pop
@@ -25,10 +25,10 @@ jump 27 -> 31
 pop
 
 load_blk_val
-load_const index 8, value 67
-load_const index 9, value just chillin
-load_const index 7, value 7
-load_const index 10, value 90
+load_const index 3, value 67
+load_const index 4, value just chillin
+load_const index 2, value 7
+load_const index 5, value 90
 get_local_dup index 3
 store_blk_val
 popn index 4

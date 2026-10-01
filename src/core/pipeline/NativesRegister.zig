@@ -4,16 +4,14 @@ const ArrayList = std.ArrayList;
 
 const cffi = @import("../ffi/cffi.zig");
 const zffi = @import("../ffi/zffi.zig");
-const MapNameType = @import("../analyzer/types.zig").MapNameType;
 const Type = @import("../analyzer/types.zig").Type;
 const TypeInterner = @import("../analyzer/types.zig").TypeInterner;
 const LexScope = @import("../analyzer/LexicalScope.zig");
 const Symbol = LexScope.Symbol;
 const SymbolMap = LexScope.SymbolMap;
-const Variable = LexScope.Variable;
 const VariableMap = LexScope.VariableMap;
+const Artifacts = @import("../compiler/Artifacts.zig");
 
-const Module = @import("ModuleManager.zig").Module;
 const Value = @import("../runtime/values.zig").Value;
 const Obj = @import("../runtime/Obj.zig");
 const Vm = @import("../runtime/Vm.zig");
@@ -26,26 +24,13 @@ pub const NativeModule = struct {
     path: []const u8,
     index: usize,
 
-    // Globals
-    globals: ArrayList(Value) = .empty,
-    globals_meta: VariableMap = .empty,
+    globals: VariableMap = .empty,
+    zig_funcs: SymbolMap = .empty,
+    c_funcs: SymbolMap = .empty,
+    zig_structs: SymbolMap = .empty,
 
-    /// Native Zig functions used at runtime
-    zig_funcs: ArrayList(*Obj.ZigFn) = .empty,
-    /// Native Zig functions translated to Ray's type system for compilation
-    zig_funcs_meta: Meta = .empty,
-
-    /// C functions used at runtime
-    c_funcs: ArrayList(*Obj.CFn) = .empty,
-    /// C functions translated to Ray's type system for compilation
-    c_funcs_meta: Meta = .empty,
-
-    /// Native structures used at runtime
-    zig_structs: ArrayList(Module.Structure) = .empty,
-    /// Native structures translated to Ray's type system for compilation
-    zig_structs_meta: Meta = .empty,
     /// Native structures translated to Ray's type system used here for self references
-    scratch_structs: Meta = .empty,
+    scratch_structs: SymbolMap = .empty,
 };
 
 mods: std.AutoArrayHashMapUnmanaged(Interner.Index, NativeModule),
@@ -53,10 +38,9 @@ current: *NativeModule,
 
 /// Intrinsic functions called during Analyzis pass
 intrinsics: std.AutoHashMapUnmanaged(Interner.Index, zffi.IntrinsicFn),
-intrinsics_meta: Meta,
+intrinsics_meta: SymbolMap,
 
 const Self = @This();
-pub const Meta = SymbolMap;
 
 pub fn init(self: *Self, alloc: Allocator, interner: *Interner) void {
     self.mods = .empty;
@@ -66,7 +50,7 @@ pub fn init(self: *Self, alloc: Allocator, interner: *Interner) void {
     self.intrinsics_meta = .empty;
 }
 
-pub fn registerMod(self: *Self, alloc: Allocator, interner: *Interner, ti: *TypeInterner, Mod: type) void {
+pub fn registerMod(self: *Self, alloc: Allocator, artifacts: *Artifacts, interner: *Interner, ti: *TypeInterner, Mod: type) void {
     if (!@hasDecl(Mod, "module")) {
         @compileError("Native Zig files must declare a module");
     }
@@ -91,17 +75,16 @@ pub fn registerMod(self: *Self, alloc: Allocator, interner: *Interner, ti: *Type
     }
 
     self.current.zig_structs.ensureUnusedCapacity(alloc, mod.structures.len) catch oom();
-    self.current.zig_structs_meta.ensureUnusedCapacity(alloc, mod.structures.len) catch oom();
     inline for (mod.structures) |s| {
-        self.registerStruct(alloc, s, interner, ti);
+        self.registerStruct(alloc, s, artifacts, interner, ti);
     }
 
     inline for (mod.functions) |func| {
-        _ = self.registerZigFn(alloc, &func, interner, ti);
+        _ = self.registerZigFn(alloc, &func, artifacts, interner, ti);
     }
 
     inline for (mod.globals) |cte| {
-        _ = self.registerGlobal(alloc, cte, interner, ti);
+        _ = self.registerGlobal(alloc, cte, artifacts, interner, ti);
     }
 }
 
@@ -110,7 +93,14 @@ pub fn getGlobalScope(self: *Self) *NativeModule {
 }
 
 // TODO: Errors
-fn registerStruct(self: *Self, alloc: Allocator, comptime zstruct: zffi.StructMeta, interner: *Interner, ti: *TypeInterner) void {
+fn registerStruct(
+    self: *Self,
+    alloc: Allocator,
+    comptime zstruct: zffi.StructMeta,
+    artifacts: *Artifacts,
+    interner: *Interner,
+    ti: *TypeInterner,
+) void {
     // TODO: handle container name properly
     const struct_name = interner.intern(zstruct.name);
     var s: Type.Structure = .{
@@ -127,7 +117,7 @@ fn registerStruct(self: *Self, alloc: Allocator, comptime zstruct: zffi.StructMe
     const sym: Symbol = .{
         .name = struct_name,
         .type = ty,
-        .index = self.current.zig_structs_meta.count(),
+        .index = self.current.zig_structs.count(),
         .module = .toIndex(self.current.index),
     };
     self.current.scratch_structs.put(
@@ -142,7 +132,7 @@ fn registerStruct(self: *Self, alloc: Allocator, comptime zstruct: zffi.StructMe
             @panic("Already declared function");
         }
 
-        const reg = self.registerZigFn(alloc, func, interner, ti);
+        const reg = self.registerZigFn(alloc, func, artifacts, interner, ti);
         ty.structure.functions.putAssumeCapacity(
             interned_name,
             .{
@@ -165,14 +155,19 @@ fn registerStruct(self: *Self, alloc: Allocator, comptime zstruct: zffi.StructMe
         });
     }
 
-    // TODO: group runtime type info between Ray, C, Zig
-    self.current.zig_structs.appendAssumeCapacity(.{
-        .name = zstruct.name,
-        .type_id = ti.typeId(ty),
-        .fields = undefined,
-    });
+    artifacts.add(
+        alloc,
+        .structure,
+        .toIndex(self.current.index),
+        sym.index,
+        .{
+            .name = zstruct.name,
+            .type_id = ti.typeId(ty),
+            .fields = undefined,
+        },
+    );
 
-    const gop = self.current.zig_structs_meta.getOrPutAssumeCapacity(struct_name);
+    const gop = self.current.zig_structs.getOrPutAssumeCapacity(struct_name);
     if (gop.found_existing) {
         @panic("Already declared with same name");
     }
@@ -185,16 +180,31 @@ const Registered = struct {
 };
 
 /// Used by embedded, always registers in global scope when not registerating via a module
-pub fn registerZigFnInGlobal(self: *Self, alloc: Allocator, comptime func: *const zffi.FnMeta, interner: *Interner, ti: *TypeInterner) Registered {
+pub fn registerZigFnInGlobal(
+    self: *Self,
+    alloc: Allocator,
+    comptime func: *const zffi.FnMeta,
+    artifacts: *Artifacts,
+    interner: *Interner,
+    ti: *TypeInterner,
+) Registered {
     self.current = self.getGlobalScope();
-    return self.registerZigFn(alloc, func, interner, ti);
+    return self.registerZigFn(alloc, func, artifacts, interner, ti);
 }
 
 // We can use pointers here because we refer to comptime declarations in Module
-fn registerZigFn(self: *Self, alloc: Allocator, comptime func: *const zffi.FnMeta, interner: *Interner, ti: *TypeInterner) Registered {
+fn registerZigFn(
+    self: *Self,
+    alloc: Allocator,
+    comptime func: *const zffi.FnMeta,
+    artifacts: *Artifacts,
+    interner: *Interner,
+    ti: *TypeInterner,
+) Registered {
     const fn_type = self.fnZigToRay(alloc, func, interner, ti);
     const fn_name = interner.intern(func.name);
-    const gop = self.current.zig_funcs_meta.getOrPut(alloc, fn_name) catch oom();
+    const index = self.current.zig_funcs.count();
+    const gop = self.current.zig_funcs.getOrPut(alloc, fn_name) catch oom();
 
     // TODO: Error
     if (gop.found_existing) {
@@ -203,14 +213,20 @@ fn registerZigFn(self: *Self, alloc: Allocator, comptime func: *const zffi.FnMet
     gop.value_ptr.* = .{
         .name = fn_name,
         .type = fn_type,
-        .index = self.current.zig_funcs.items.len,
+        .index = index,
         .module = .toIndex(self.current.index),
         .lang = .zig,
     };
 
-    self.current.zig_funcs.append(alloc, .create(alloc, func.name, func.function)) catch oom();
+    _ = artifacts.add(
+        alloc,
+        .zig_function,
+        .toIndex(self.current.index),
+        index,
+        .create(alloc, func.name, func.function),
+    );
 
-    return .{ .index = self.current.zig_funcs.items.len - 1, .type = fn_type };
+    return .{ .index = index, .type = fn_type };
 }
 
 // TODO: Errors
@@ -348,26 +364,42 @@ fn zigToRay(self: *Self, alloc: Allocator, T: type, interner: *Interner, ti: *Ty
 }
 
 /// Declares in global scope, used when not declaring via a module
-pub fn registerCFnInGlobal(self: *Self, alloc: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) Registered {
+pub fn registerCFnInGlobal(
+    self: *Self,
+    alloc: Allocator,
+    proto: *const cffi.FnProto,
+    artifacts: *Artifacts,
+    interner: *Interner,
+    ti: *TypeInterner,
+) Registered {
     self.current = self.getGlobalScope();
-    return self.registerCFn(alloc, proto, interner, ti);
+    return self.registerCFn(alloc, proto, artifacts, interner, ti);
 }
 
-fn registerCFn(self: *Self, alloc: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) Registered {
+fn registerCFn(
+    self: *Self,
+    alloc: Allocator,
+    proto: *const cffi.FnProto,
+    artifacts: *Artifacts,
+    interner: *Interner,
+    ti: *TypeInterner,
+) Registered {
     const fn_type = cFnToRay(alloc, proto, interner, ti);
     const name_str = std.mem.span(proto.name);
     const fn_name = interner.intern(name_str);
-    self.current.c_funcs_meta.put(alloc, fn_name, .{
+    const index = self.current.c_funcs.count();
+
+    self.current.c_funcs.put(alloc, fn_name, .{
         .name = fn_name,
         .type = fn_type,
-        .index = self.current.c_funcs_meta.count(),
+        .index = index,
         .module = .toIndex(self.current.index),
     }) catch oom();
+
     const native = Obj.CFn.create(alloc, name_str, proto.func, proto.return_type != .void);
+    artifacts.add(alloc, .c_function, .toIndex(self.current.index), index, native);
 
-    self.current.c_funcs.append(alloc, native) catch oom();
-
-    return .{ .index = self.current.c_funcs.items.len - 1, .type = fn_type };
+    return .{ .index = index, .type = fn_type };
 }
 
 pub fn cFnToRay(alloc: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) *const Type {
@@ -411,9 +443,17 @@ fn cTypeToRay(ty: cffi.cType, ti: *TypeInterner) *const Type {
     };
 }
 
-fn registerGlobal(self: *Self, alloc: Allocator, global: zffi.Global, interner: *Interner, ti: *TypeInterner) void {
+fn registerGlobal(
+    self: *Self,
+    alloc: Allocator,
+    global: zffi.Global,
+    artifacts: *Artifacts,
+    interner: *Interner,
+    ti: *TypeInterner,
+) void {
     const name = interner.intern(global.name);
-    const gop = self.current.globals_meta.getOrPut(alloc, name) catch oom();
+    const index = self.current.globals.count();
+    const gop = self.current.globals.getOrPut(alloc, name) catch oom();
     if (gop.found_existing) {
         @panic("Already declared global in module");
     }
@@ -426,7 +466,7 @@ fn registerGlobal(self: *Self, alloc: Allocator, global: zffi.Global, interner: 
             .int => ti.getCached(.int),
             else => unreachable,
         },
-        .index = self.current.globals_meta.count() - 1,
+        .index = index,
         .comp_time = true,
         .constant = true,
         .initialized = true,
@@ -435,5 +475,5 @@ fn registerGlobal(self: *Self, alloc: Allocator, global: zffi.Global, interner: 
         .ext_mod = .toIndex(self.current.index),
     };
 
-    self.current.globals.append(alloc, global.value) catch oom();
+    artifacts.add(alloc, .global, .toIndex(self.current.index), index, global.value);
 }

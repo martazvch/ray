@@ -1,7 +1,7 @@
 const TagLit = @import("ConstantInterner.zig").Constant.TagLit;
 const ConstIdx = @import("ConstantInterner.zig").ConstIdx;
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
-const CLayout = @import("../pipeline/ModuleManager.zig").Module.CStructure.Layout;
+const CLayout = @import("../compiler/Artifacts.zig").CStructure.Layout;
 const cffi = @import("../ffi/cffi.zig");
 const Language = @import("types.zig").Language;
 
@@ -307,7 +307,7 @@ pub const Instruction = struct {
         layout: CLayout,
     };
     pub const StructLiteral = struct {
-        structure: Index,
+        structure: LoadSymbol,
         values: []const Arg,
         lang: Language,
     };

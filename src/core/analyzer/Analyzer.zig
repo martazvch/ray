@@ -24,7 +24,7 @@ const Constant = @import("ConstantInterner.zig").Constant;
 const Pipeline = @import("../pipeline/pipeline.zig");
 const State = @import("../pipeline/State.zig");
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
-const CLayout = @import("../pipeline/ModuleManager.zig").Module.CStructure.Layout;
+const CLayout = @import("../compiler/Artifacts.zig").CStructure.Layout;
 const cffi = @import("../ffi/cffi.zig");
 const Value = @import("../runtime/values.zig").Value;
 const CFn = @import("../runtime/Obj.zig").CFn;
@@ -1154,7 +1154,7 @@ fn cStructFields(self: *Self, fields: []const Ast.VarDecl, ty: *Type.Structure, 
         const cfield = try self.cField(field_type);
 
         offset = std.mem.alignForward(usize, offset, cfield.size);
-        cfields.appendAssumeCapacity(.{ .offset = offset, .tag = cfield.tag });
+        cfields.appendAssumeCapacity(.{ .offset = offset, .kind = cfield.tag });
         offset += cfield.size;
         max_align = @max(max_align, cfield.size);
     }
@@ -1166,7 +1166,7 @@ fn cStructFields(self: *Self, fields: []const Ast.VarDecl, ty: *Type.Structure, 
     };
 }
 
-fn cField(self: *Self, ty: *const Type) Error!struct { size: usize, tag: CLayout.Field.Tag } {
+fn cField(self: *Self, ty: *const Type) Error!struct { size: usize, tag: CLayout.Field.Kind } {
     _ = self; // autofix
     return switch (ty.*) {
         .u8 => .{ .size = @sizeOf(u8), .tag = .u8 },
@@ -1348,7 +1348,7 @@ fn use(self: *Self, node: *const Ast.Use) StmtResult {
                 .{ .dynlib_not_module = .{ .name = self.ast.toSource(dynlib.token) } },
                 self.ast.getSpan(dynlib.token),
             );
-            handcheck(&cffi.api, self.state.modules.modules.count());
+            handcheck(&cffi.api);
 
             const prev_dynlib = self.state.dynlib;
             self.state.dynlib = &dynlib.lib;
@@ -2203,7 +2203,7 @@ pub fn implicitSelector(self: *Self, tag: Ast.TokenIndex, ctx: *Context) Result 
 
     // TODO: protect the cast
     const tag_lit: Constant.TagLit = .{
-        .sym = .{ .module = sym.module, .symbol = @intCast(sym.index) },
+        .symbol = .{ .module = sym.module, .symbol = @intCast(sym.index) },
         .tag_index = @intCast(tag_res.index),
     };
 
@@ -2403,7 +2403,7 @@ fn enumAccess(self: *Self, enum_info: InstrInfos, ty: Type.Enum, tag_tk: Ast.Tok
                 .ti = .{ .comp_time = true },
                 .instr = self.addConstantInstr(
                     .{ .enum_lit = .{
-                        .sym = self.irb.data(enum_info.instr).load_symbol,
+                        .symbol = self.irb.data(enum_info.instr).load_symbol,
                         .tag_index = index,
                     } },
                     self.ast.getSpan(tag_tk).start,
@@ -2541,7 +2541,7 @@ fn unionAccess(self: *Self, union_info: InstrInfos, ty: Type.Union, tag_tk: Ast.
                 .ti = .{ .comp_time = ty.tags.get(tag_name).?.is(.void) },
                 .instr = self.addConstantInstr(
                     .{ .union_lit = .{
-                        .sym = self.irb.data(union_info.instr).load_symbol,
+                        .symbol = self.irb.data(union_info.instr).load_symbol,
                         .tag_index = index,
                     } },
                     self.ast.getSpan(tag_tk).start,
@@ -3753,7 +3753,7 @@ fn structLiteral(self: *Self, expr: *const Ast.StructLiteral, ctx: *Context) Res
     else
         self.irb.addInstr(
             .{ .struct_literal = .{
-                .structure = struct_res.instr,
+                .structure = self.irb.data(struct_res.instr).load_symbol,
                 .values = values,
                 .lang = struct_type.lang,
             } },
@@ -3781,7 +3781,7 @@ fn structLitConstant(self: *Self, struct_instr: InstrIndex, instrs: []const Inst
     return self.irb.addInstr(
         .{ .constant = .{
             .index = self.state.addConstant(self.alloc, .{ .struct_lit = .{
-                .parent = .{ .symbol = parent.symbol, .module = parent.module },
+                .symbol = .{ .symbol = parent.symbol, .module = parent.module },
                 .values = vals.toOwnedSlice(self.alloc) catch oom(),
                 .lang = lang,
             } }),

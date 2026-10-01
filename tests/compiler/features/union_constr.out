@@ -1,12 +1,12 @@
 -- main --
-load_const index 4, value 5
+load_const index 0, value 5
 union_constr index 0, tag 0, Foo
-load_const index 6, value 1.2
+load_const index 1, value 1.2
 union_constr index 0, tag 1, Foo
 set_local index 0
-load_const index 7, value Foo.c
+load_const index 2, value Foo.c
 set_local index 0
-load_const index 9, value Dir.south
+load_const index 3, value Dir.south
 union_constr index 0, tag 3, Foo
 set_local index 0
 ret_naked

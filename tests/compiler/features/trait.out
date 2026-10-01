@@ -1,17 +1,17 @@
 -- speakNoBody --
-load_const index 6, value bye
+load_const index 0, value bye
 pop
 ret_naked
 
 -- withDefault --
 get_local index 0
-load_const index 7, value 9
+load_const index 1, value 9
 eq_int
 ret
 
 -- withDefaultNoBody --
 get_local index 0
-load_const index 8, value 2
+load_const index 2, value 2
 eq_int
 ret
 
@@ -21,7 +21,39 @@ pop
 ret_naked
 
 -- method0 --
-load_const index 5, value method0
+load_const index 4, value method0
+pop
+ret_naked
+
+-- method1 --
+get_local index 0
+call index 4, arity 1, method0
+ret_naked
+
+-- speakNoBody --
+load_const index 0, value bye
+pop
+ret_naked
+
+-- withDefaultNoBody --
+get_local index 0
+load_const index 5, value 5
+eq_int
+ret
+
+-- speak --
+load_const index 3, value hello
+pop
+ret_naked
+
+-- withDefault --
+get_local index 0
+load_const index 6, value 1
+eq_int
+ret
+
+-- method0 --
+load_const index 4, value method0
 pop
 ret_naked
 
@@ -30,59 +62,27 @@ get_local index 0
 call index 10, arity 1, method0
 ret_naked
 
--- speakNoBody --
-load_const index 6, value bye
-pop
-ret_naked
-
--- withDefaultNoBody --
-get_local index 0
-load_const index 9, value 5
-eq_int
-ret
-
--- speak --
-load_const index 3, value hello
-pop
-ret_naked
-
--- withDefault --
-get_local index 0
-load_const index 4, value 1
-eq_int
-ret
-
--- method0 --
-load_const index 5, value method0
-pop
-ret_naked
-
--- method1 --
-get_local index 0
-call index 16, arity 1, method0
-ret_naked
-
 -- main --
-call index 9, arity 0, speak
-call index 14, arity 0, speak
+call index 3, arity 0, speak
+call index 8, arity 0, speak
+call index 0, arity 0, speakNoBody
 call index 6, arity 0, speakNoBody
-call index 12, arity 0, speakNoBody
-load_const index 7, value 9
-call index 7, arity 1, withDefault
+load_const index 1, value 9
+call index 1, arity 1, withDefault
 pop
-load_const index 10, value 4
-call index 15, arity 1, withDefault
+load_const index 7, value 4
+call index 9, arity 1, withDefault
 pop
-load_const index 8, value 2
-call index 8, arity 1, withDefaultNoBody
+load_const index 2, value 2
+call index 2, arity 1, withDefaultNoBody
 pop
-load_const index 9, value 5
-call index 13, arity 1, withDefaultNoBody
+load_const index 5, value 5
+call index 7, arity 1, withDefaultNoBody
 pop
-load_const index 11, value Bar{}
+load_const index 8, value Bar{}
 get_local index 0
-call index 11, arity 1, method1
+call index 5, arity 1, method1
 ret_naked
 
 -- global scope --
-call index 18, arity 0, main
+call index 12, arity 0, main

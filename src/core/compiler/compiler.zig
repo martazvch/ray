@@ -1,7 +1,6 @@
 const std = @import("std");
 const Io = std.Io;
 const ArrayList = std.ArrayList;
-const MultiArrayList = std.MultiArrayList;
 const Allocator = std.mem.Allocator;
 const FieldEnum = std.meta.FieldEnum;
 
@@ -10,17 +9,16 @@ const ir = @import("../analyzer/ir.zig");
 const Instruction = ir.Instruction;
 const State = @import("../pipeline/State.zig");
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
-const Module = @import("../pipeline/ModuleManager.zig").Module;
 const Obj = @import("../runtime/Obj.zig");
 const Value = @import("../runtime/values.zig").Value;
-const Vm = @import("../runtime/Vm.zig");
 const Chunk = @import("Chunk.zig");
 const OpCode = Chunk.OpCode;
 const CompilerMsg = @import("compiler_msg.zig").CompilerMsg;
 const ConstInterner = @import("../analyzer/ConstantInterner.zig");
 const Constant = ConstInterner.Constant;
 const ConstIdx = ConstInterner.ConstIdx;
-const NativeMod = @import("../pipeline/NativesRegister.zig").NativeModule;
+const Artifacts = @import("Artifacts.zig");
+const Linker = @import("Linker.zig");
 
 const misc = @import("misc");
 const Interner = misc.Interner;
@@ -89,18 +87,23 @@ pub const CompilationUnit = struct {
 
         if (main_index) |idx| {
             // TODO: protect
-            self.compiler.writeOpAndByte(.call, @intCast(idx));
+            const index = self.state.artifacts.getIndex(.function, self.mod_index, idx);
+            self.compiler.writeOpAndByte(.call, @intCast(index));
             self.compiler.writeByte(0);
         } else {
             self.compiler.writeOp(.exit_repl);
         }
 
-        return try self.compiler.end();
+        return self.compiler.end();
     }
 };
 
 const Compiler = struct {
+    alloc: Allocator,
     manager: *CompilationUnit,
+    interner: *const Interner,
+    artifacts: *Artifacts,
+    module: ModIndex,
     function: *Obj.Function,
     block_stack: BlockStack,
     state: Context = .{},
@@ -159,7 +162,11 @@ const Compiler = struct {
 
     pub fn init(manager: *CompilationUnit, name: []const u8, type_id: ir.TypeId, module_index: usize) Self {
         return .{
+            .alloc = manager.alloc,
+            .interner = &manager.state.interner,
+            .artifacts = &manager.state.artifacts,
             .manager = manager,
+            .module = manager.mod_index,
             .function = Obj.Function.create(
                 manager.alloc,
                 name,
@@ -186,12 +193,12 @@ const Compiler = struct {
 
     /// Writes an OpCode to the current chunk
     fn writeOp(self: *Self, op: OpCode) void {
-        self.function.chunk.writeOp(self.manager.alloc, op, self.manager.line);
+        self.function.chunk.writeOp(self.alloc, op, self.manager.line);
     }
 
     /// Writes a byte to the current chunk
     fn writeByte(self: *Self, byte: u8) void {
-        self.function.chunk.writeByte(self.manager.alloc, byte, self.manager.line);
+        self.function.chunk.writeByte(self.alloc, byte, self.manager.line);
     }
 
     /// Writes an OpCode and a byte to the current chunk
@@ -218,35 +225,11 @@ const Compiler = struct {
         }
     }
 
-    /// Emits the corresponding `get_global` or `get_local` with the correct index
-    fn emitGetVar(self: *Self, variable: *const Instruction.Variable) void {
-        // BUG: Protect the cast, we can't have more than 256 variable to lookup for now
-        switch (variable.kind) {
-            .local => |d| {
-                self.writeOpAndByte(
-                    if (d.duplicable and self.state.dup) .get_local_dup else .get_local,
-                    @intCast(variable.index),
-                );
-            },
-            .global => |d| {
-                if (d.module) |mod| {
-                    self.writeOpAndByte(.get_global_ext, @intCast(variable.index));
-                    self.writeByte(@intCast(mod.toInt()));
-                } else {
-                    self.writeOpAndByte(
-                        if (self.state.dup) .get_global_dup else .get_global,
-                        @intCast(variable.index),
-                    );
-                }
-            },
-        }
-    }
-
     fn emitJump(self: *Self, kind: OpCode) usize {
         const chunk = &self.function.chunk;
-        chunk.writeOp(self.manager.alloc, kind, self.manager.line);
-        chunk.writeByte(self.manager.alloc, 0xff, self.manager.line);
-        chunk.writeByte(self.manager.alloc, 0xff, self.manager.line);
+        chunk.writeOp(self.alloc, kind, self.manager.line);
+        chunk.writeByte(self.alloc, 0xff, self.manager.line);
+        chunk.writeByte(self.alloc, 0xff, self.manager.line);
 
         return chunk.code.items.len - 2;
     }
@@ -294,16 +277,12 @@ const Compiler = struct {
         chunk.code.items[offset + 1] = @intCast(jump_offset & 0xff);
     }
 
-    pub fn end(self: *Self) Error!*Obj.Function {
+    pub fn end(self: *Self) *Obj.Function {
         if (self.manager.render) {
-            var alloc_writer: std.Io.Writer.Allocating = .init(self.manager.alloc);
+            var alloc_writer: std.Io.Writer.Allocating = .init(self.alloc);
             defer alloc_writer.deinit();
 
-            var dis = Disassembler.init(
-                &self.function.chunk,
-                self.manager.mod_index,
-                &self.manager.state.modules,
-            );
+            var dis = Disassembler.init(&self.function.chunk, self.artifacts);
             dis.disChunk(&alloc_writer.writer, self.function.name);
 
             var buf: [1024]u8 = undefined;
@@ -330,22 +309,16 @@ const Compiler = struct {
 
     /// Creates a symbol based on the opcode. If module index isn't null, uses the `_ext` version of the opcode
     fn symbolAccess(self: *Self, comptime op: OpCode, sym_data: Instruction.LoadSymbol) void {
-        if (sym_data.module != self.manager.mod_index) {
-            if (!@hasField(OpCode, @tagName(op) ++ "_ext")) {
-                @compileError("Opcode " ++ @tagName(op) ++ " doesn't have an `_ext` version");
-            }
+        const index = switch (op) {
+            .load_fn => self.artifacts.getIndex(.function, sym_data.module, sym_data.symbol),
+            .load_fn_zig => self.artifacts.getIndex(.zig_function, sym_data.module, sym_data.symbol),
+            .struct_lit => self.artifacts.getIndex(.structure, sym_data.module, sym_data.symbol),
+            .struct_lit_c => self.artifacts.getIndex(.c_structure, sym_data.module, sym_data.symbol),
+            .union_constr => self.artifacts.getIndex(.@"union", sym_data.module, sym_data.symbol),
+            else => unreachable,
+        };
 
-            self.writeOpAndByte(@field(OpCode, @tagName(op) ++ "_ext"), sym_data.symbol);
-            // TODO: protect cast
-            self.writeByte(@intCast(sym_data.module.toInt()));
-        } else {
-            self.writeOpAndByte(op, sym_data.symbol);
-        }
-    }
-
-    fn nonRaySymbolAccess(self: *Self, comptime op: OpCode, sym_data: Instruction.LoadSymbol) void {
-        self.writeOpAndByte(op, sym_data.symbol);
-        self.writeByte(@intCast(sym_data.module.toInt()));
+        self.writeOpAndByte(op, @intCast(index));
     }
 
     fn compileInstr(self: *Self, instr: ir.Index) Error!void {
@@ -361,7 +334,7 @@ const Compiler = struct {
             .@"break" => |data| self.breakInstr(data),
             .call => |*data| self.call(data),
 
-            .constant => |data| self.constant(data.index, self.manager.mod_index, true),
+            .constant => |data| self.constant(data.index, self.module, true),
             .@"continue" => |data| self.continueInstr(data),
             .deref => |index| self.wrappedInstr(.deref, index),
             .discard => |index| self.wrappedInstrNoDup(.pop, index),
@@ -382,7 +355,7 @@ const Compiler = struct {
             // Standalone 'load_symbol' can only mean that we're loading a function to bind it to a runtime value
             .load_symbol => |data| switch (data.lang) {
                 .ray => self.symbolAccess(.load_fn, data),
-                .zig => self.nonRaySymbolAccess(.load_fn_zig, data),
+                .zig => self.symbolAccess(.load_fn_zig, data),
                 .c => @panic("TODO"),
             },
 
@@ -405,7 +378,7 @@ const Compiler = struct {
             .string_interp => |data| self.stringInterp(data),
             .struct_decl => |*data| self.structDecl(data),
             .cstruct_decl => |*data| self.cStructDecl(data),
-            .struct_literal => |*data| self.structLiteral(data),
+            .struct_literal => |data| self.structLiteral(data),
             .trait_decl => |data| self.traitDecl(data),
             .trait_obj => |data| self.traitObj(data),
             .trap => |data| self.trap(data),
@@ -464,21 +437,25 @@ const Compiler = struct {
                 self.writeOp(.ptr_store);
                 return;
             },
-            .identifier => |*variable| .{ variable, false },
+            .identifier => |variable| .{ variable, false },
             .indexing => |indexing_data| return self.arrayAssign(indexing_data),
             .field => |*field_data| return self.fieldAssignment(field_data),
-            .unbox => |index| .{ &self.at(index).identifier, true },
+            .unbox => |index| .{ self.at(index).identifier, true },
             else => unreachable,
         };
 
         // BUG: Protect the cast, we can't have more than 256 variable to lookup for now
-        self.writeOpAndByte(
-            switch (variable_data.kind) {
-                .local => if (unbox) .set_local_box else .set_local,
-                .global => .set_global,
-            },
-            @intCast(variable_data.index),
-        );
+        switch (variable_data.kind) {
+            .local => self.writeOpAndByte(
+                if (unbox) .set_local_box else .set_local,
+                @intCast(variable_data.index),
+            ),
+
+            .global => |glob| self.writeOpAndByte(
+                .set_global,
+                @intCast(self.artifacts.getIndex(.global, glob.module orelse self.module, variable_data.index)),
+            ),
+        }
     }
 
     fn fieldAssignment(self: *Self, data: *const Instruction.Field) Error!void {
@@ -573,7 +550,7 @@ const Compiler = struct {
     }
 
     fn block(self: *Self, data: *const Instruction.Block) Error!void {
-        self.block_stack.open(self.manager.alloc);
+        self.block_stack.open(self.alloc);
 
         for (data.instrs) |instr| {
             try self.compileInstr(instr);
@@ -585,10 +562,12 @@ const Compiler = struct {
         if (data.is_expr) self.writeOp(.load_blk_val);
     }
 
-    // TODO: protext cast
+    // TODO: protect cast
     fn boundMethod(self: *Self, data: Instruction.BoundMethod) Error!void {
         try self.compileInstrNoDup(data.structure);
-        self.writeOpAndByte(.bound_method, @intCast(data.index));
+
+        const index = self.artifacts.getIndex(.function, self.module, data.index);
+        self.writeOpAndByte(.bound_method, @intCast(index));
     }
 
     fn breakInstr(self: *Self, data: Instruction.Break) Error!void {
@@ -599,7 +578,7 @@ const Compiler = struct {
         }
 
         self.writePops(data.pop_count);
-        self.block_stack.add(self.manager.alloc, .@"break", self.emitJump(.jump), data.depth);
+        self.block_stack.add(self.alloc, .@"break", self.emitJump(.jump), data.depth);
     }
 
     fn call(self: *Self, data: *const Instruction.Call) Error!void {
@@ -613,7 +592,7 @@ const Compiler = struct {
                 .c, .zig => unreachable,
             },
             .load_symbol => |sym| {
-                return self.callSymbol(data, 0, sym.symbol, sym.module);
+                return self.callSymbol(data, 0, sym.module, sym.symbol);
             },
             .obj_func => |obj_data| {
                 return self.callObjFn(obj_data, data.args);
@@ -631,7 +610,7 @@ const Compiler = struct {
 
     fn invoke(self: *Self, data: *const Instruction.Call, callee: Instruction.Field) Error!void {
         try self.compileInstrNoDup(callee.structure);
-        try self.callSymbol(data, 1, callee.index, data.module);
+        try self.callSymbol(data, 1, data.module, callee.index);
     }
 
     fn virtualCall(self: *Self, data: *const Instruction.Call, callee: Instruction.Field) Error!void {
@@ -648,26 +627,25 @@ const Compiler = struct {
         self: *Self,
         data: *const Instruction.Call,
         arity_offset: usize,
+        mod_index: ModIndex,
         sym_index: usize,
-        sym_mod: ModIndex,
     ) Error!void {
         try self.compileArgs(data.args);
 
-        const is_ext = sym_mod != self.manager.mod_index;
+        const index = switch (data.kind) {
+            .normal, .method, .bound => self.artifacts.getIndex(.function, mod_index, sym_index),
+            .c => self.artifacts.getIndex(.c_function, mod_index, sym_index),
+            .zig, .zig_method => self.artifacts.getIndex(.zig_function, mod_index, sym_index),
+            .intrinsic => unreachable,
+        };
         const op: OpCode = switch (data.kind) {
-            .c => if (is_ext) .call_c_ext else .call_c,
+            .c => .call_c,
             .zig, .zig_method => .call_zig,
-            .normal, .method, .bound => if (is_ext) .call_ext else .call,
+            .normal, .method, .bound => .call,
             // Only called at analyzis time
             .intrinsic => unreachable,
         };
-        self.writeOpAndByte(op, @intCast(sym_index));
-
-        // 'call_zig' uses an external module by default
-        if (is_ext) {
-            self.writeByte(@intCast(sym_mod.toInt()));
-        }
-
+        self.writeOpAndByte(op, @intCast(index));
         self.writeByte(@intCast(data.args.len + arity_offset));
     }
 
@@ -682,7 +660,6 @@ const Compiler = struct {
     }
 
     fn compileArgs(self: *Self, args: []const Instruction.Arg) Error!void {
-        // TODO: protext casts
         for (args) |arg| {
             switch (arg) {
                 .default => |def| try self.constant(def.constant, def.module, true),
@@ -694,6 +671,7 @@ const Compiler = struct {
     /// Compiles any callable (free functions, members functions, ...)
     fn compileFnBody(self: *Self, name: []const u8, data: *const Instruction.FnDecl) Error!*Obj.Function {
         var compiler = Compiler.init(self.manager, name, data.type_id, self.function.module_index);
+        const index = self.artifacts.addPlaceholder(self.alloc, .function, self.module, data.sym_index);
 
         try self.defaults(data.defaults);
 
@@ -702,23 +680,26 @@ const Compiler = struct {
         }
 
         // If the function doesn't return by itself, we emit one naked return
-        if (!data.returns) compiler.writeOp(.ret_naked);
+        if (!data.returns) {
+            compiler.writeOp(.ret_naked);
+        }
+
+        self.artifacts.set(.function, index, compiler.function);
+
         return compiler.end();
     }
 
     fn fnDecl(self: *Self, data: *const Instruction.FnDecl) Error!void {
-        const fn_name = if (data.name) |idx| self.manager.state.interner.getKey(idx).? else "anonymus";
-
-        const func = try self.compileFnBody(fn_name, data);
-        self.manager.state.modules.setSymbol(self.manager.mod_index, data.sym_index, func);
+        const fn_name = if (data.name) |idx| self.interner.getKey(idx).? else "anonymus";
+        _ = try self.compileFnBody(fn_name, data);
 
         if (data.captures.len > 0) {
-            try self.compileClosure(data, data.sym_index);
+            try self.compileClosure(data);
         }
     }
 
-    fn compileClosure(self: *Self, data: *const Instruction.FnDecl, sym_index: usize) Error!void {
-        self.writeOpAndByte(.load_fn, @intCast(sym_index));
+    fn compileClosure(self: *Self, data: *const Instruction.FnDecl) Error!void {
+        self.symbolAccess(.load_fn, .{ .module = self.module, .symbol = @intCast(data.sym_index) });
 
         for (data.captures) |*capt| {
             try self.capture(capt);
@@ -728,9 +709,9 @@ const Compiler = struct {
     }
 
     fn cFnDecl(self: *Self, data: *const Instruction.CFnDecl) Error!void {
-        const fn_name = self.manager.state.interner.getKey(data.name).?;
-        const func = Obj.CFn.create(self.manager.alloc, fn_name, data.func, data.returns);
-        self.manager.state.modules.setSymbol(self.manager.mod_index, data.sym_index, func);
+        const fn_name = self.interner.getKey(data.name).?;
+        const func = Obj.CFn.create(self.alloc, fn_name, data.func, data.returns);
+        self.artifacts.add(self.alloc, .c_function, self.module, data.sym_index, func);
     }
 
     fn containerFnDecls(self: *Self, decls: []const ir.Index) Error!void {
@@ -738,39 +719,39 @@ const Compiler = struct {
             const fn_data = self.manager.instr_data[decl].fn_decl;
             // Structures and enums' functions have a name
             // TODO: not all the time
-            const fn_name = self.manager.state.interner.getKey(fn_data.name orelse unreachable).?;
-            const func = try self.compileFnBody(fn_name, &fn_data);
-            self.manager.state.modules.setSymbol(self.manager.mod_index, fn_data.sym_index, func);
+            const fn_name = self.interner.getKey(fn_data.name orelse unreachable).?;
+            _ = try self.compileFnBody(fn_name, &fn_data);
         }
     }
 
     fn containerTraitDecls(self: *Self, decls: []const Instruction.Trait) Error!void {
         for (decls) |decl| {
-            const mod = self.manager.state.modules.getFromIndex(self.manager.mod_index);
-            const vtable = &mod.vtables[decl.vtable_index];
-            vtable.name = self.manager.alloc.dupe(u8, self.manager.state.interner.getKey(decl.name).?) catch oom();
-            vtable.functions = self.manager.alloc.alloc(*Obj.Function, decl.funcs.len) catch oom();
+            var vtable: Artifacts.VTable = .{
+                .name = self.alloc.dupe(u8, self.interner.getKey(decl.name).?) catch oom(),
+                .functions = self.alloc.alloc(*Obj.Function, decl.funcs.len) catch oom(),
+            };
 
             for (decl.funcs) |func| {
                 switch (func.func) {
                     .compiled => |compiled| {
-                        vtable.functions[func.index] = self.manager.state.modules.getSymbol(
-                            compiled.mod_index orelse self.manager.mod_index,
-                            compiled.sym_index,
+                        vtable.functions[func.index] = self.artifacts.getFromKey(
                             .function,
-                        );
+                            compiled.mod_index orelse self.module,
+                            compiled.sym_index,
+                        ).*;
                     },
                     .instr => |instr| {
                         const fn_data = self.manager.instr_data[instr].fn_decl;
                         // Structures and enums' functions have a name
                         // TODO: not all the time
-                        const fn_name = self.manager.state.interner.getKey(fn_data.name orelse unreachable).?;
+                        const fn_name = self.interner.getKey(fn_data.name orelse unreachable).?;
                         const body = try self.compileFnBody(fn_name, &fn_data);
                         vtable.functions[func.index] = body;
-                        self.manager.state.modules.setSymbol(self.manager.mod_index, fn_data.sym_index, body);
                     },
                 }
             }
+
+            self.artifacts.add(self.alloc, .vtable, self.module, decl.vtable_index, vtable);
         }
     }
 
@@ -778,7 +759,7 @@ const Compiler = struct {
         for (instrs) |instr| {
             // TODO: protect this
             const const_data = self.at(instr).constant;
-            try self.constant(const_data.index, self.manager.mod_index, false);
+            try self.constant(const_data.index, self.module, false);
         }
     }
 
@@ -796,91 +777,75 @@ const Compiler = struct {
 
     fn compileConstant(self: *Self, index: ConstIdx) Error!void {
         const idx = index.toInt();
-        const cte = self.manager.constants[idx];
-
-        const gop = self.manager.compiled_constants.getOrPut(self.manager.alloc, idx) catch oom();
-        if (!gop.found_existing) {
-            const value = switch (cte) {
-                .array => |arr| arr: {
-                    var vals = ArrayList(Value).initCapacity(self.manager.alloc, arr.values.len) catch oom();
-                    for (arr.values) |val| {
-                        try self.compileConstant(val);
-                        vals.appendAssumeCapacity(
-                            self.manager.state.modules.getConstant(self.manager.mod_index, val.toInt()),
-                        );
-                    }
-
-                    break :arr Value.makeObj(Obj.Array.createComptime(
-                        self.manager.alloc,
-                        @intCast(arr.type_id),
-                        vals.toOwnedSlice(self.manager.alloc) catch oom(),
-                    ).asObj());
-                },
-                .bool => |c| Value.makeBool(c),
-                .int => |val| Value.makeInt(val),
-                .float => |val| Value.makeFloat(val),
-                .enum_lit => |val| Value.makeObj(Obj.Enum.create(
-                    self.manager.alloc,
-                    self.manager.state.modules.getSymbol(
-                        val.sym.module,
-                        val.sym.symbol,
-                        .@"enum",
-                    ),
-                    @intCast(val.tag_index),
-                ).asObj()),
-                .union_lit => |val| Value.makeObj(Obj.Union.createComptime(
-                    self.manager.alloc,
-                    self.manager.state.modules.getSymbol(
-                        val.sym.module,
-                        val.sym.symbol,
-                        .@"union",
-                    ),
-                    @intCast(val.tag_index),
-                    .null_,
-                ).asObj()),
-                .struct_lit => |s| s: {
-                    var vals = ArrayList(Value).initCapacity(self.manager.alloc, s.values.len) catch oom();
-                    for (s.values) |val| {
-                        try self.compileConstant(val);
-                        vals.appendAssumeCapacity(
-                            self.manager.state.modules.getConstant(self.manager.mod_index, val.toInt()),
-                        );
-                    }
-
-                    const obj = if (s.lang == .ray)
-                        Obj.Structure.createComptime(
-                            self.manager.alloc,
-                            self.manager.state.modules.getSymbol(
-                                s.parent.module,
-                                s.parent.symbol,
-                                .structure,
-                            ),
-                            vals.toOwnedSlice(self.manager.alloc) catch oom(),
-                        ).asObj()
-                    else
-                        Obj.CStructure.createComptime(
-                            self.manager.alloc,
-                            self.manager.state.modules.getSymbol(
-                                s.parent.module,
-                                s.parent.symbol,
-                                .c_struct,
-                            ),
-                            vals.toOwnedSlice(self.manager.alloc) catch oom(),
-                        ).asObj();
-
-                    break :s Value.makeObj(obj);
-                },
-
-                .null => Value.null_,
-                .string => |val| Value.makeObj(Obj.String.comptimeCopy(
-                    self.manager.alloc,
-                    &self.manager.state.strings,
-                    self.manager.state.interner.getKey(val).?,
-                ).asObj()),
-            };
-
-            self.manager.state.modules.setConstant(self.manager.mod_index, idx, value);
+        const gop = self.manager.compiled_constants.getOrPut(self.alloc, idx) catch oom();
+        if (gop.found_existing) {
+            return;
         }
+
+        const cte = self.manager.constants[idx];
+        const value = switch (cte) {
+            .array => |arr| arr: {
+                var vals = ArrayList(Value).initCapacity(self.alloc, arr.values.len) catch oom();
+                for (arr.values) |val| {
+                    try self.compileConstant(val);
+                    vals.appendAssumeCapacity(self.artifacts.getFromKey(.constant, self.module, val.toInt()).*);
+                }
+
+                break :arr Value.makeObj(Obj.Array.createComptime(
+                    self.alloc,
+                    @intCast(arr.type_id),
+                    vals.toOwnedSlice(self.alloc) catch oom(),
+                ).asObj());
+            },
+            .bool => |c| Value.makeBool(c),
+            .int => |val| Value.makeInt(val),
+            .float => |val| Value.makeFloat(val),
+            .enum_lit => |e| Value.makeObj(Obj.Enum.create(
+                self.alloc,
+                self.artifacts.getFromKey(.@"enum", e.symbol.module, e.symbol.symbol),
+                @intCast(e.tag_index),
+            ).asObj()),
+            .union_lit => |u| Value.makeObj(Obj.Union.createComptime(
+                self.alloc,
+                self.artifacts.getFromKey(.@"union", u.symbol.module, u.symbol.symbol),
+                @intCast(u.tag_index),
+                .null_,
+            ).asObj()),
+            .struct_lit => |s| s: {
+                var vals = ArrayList(Value).initCapacity(self.alloc, s.values.len) catch oom();
+                for (s.values) |val| {
+                    try self.compileConstant(val);
+                    vals.appendAssumeCapacity(
+                        self.artifacts.getFromKey(.constant, self.module, val.toInt()).*,
+                    );
+                }
+
+                const obj = if (s.lang == .ray)
+                    Obj.Structure.createComptime(
+                        self.alloc,
+                        self.artifacts,
+                        self.artifacts.getIndex(.structure, s.symbol.module, s.symbol.symbol),
+                        vals.toOwnedSlice(self.alloc) catch oom(),
+                    ).asObj()
+                else
+                    Obj.CStructure.createComptime(
+                        self.alloc,
+                        self.artifacts.getFromKey(.c_structure, s.symbol.module, s.symbol.symbol),
+                        vals.toOwnedSlice(self.alloc) catch oom(),
+                    ).asObj();
+
+                break :s Value.makeObj(obj);
+            },
+
+            .null => Value.null_,
+            .string => |val| Value.makeObj(Obj.String.comptimeCopy(
+                self.alloc,
+                &self.manager.state.strings,
+                self.interner.getKey(val).?,
+            ).asObj()),
+        };
+
+        self.artifacts.add(self.alloc, .constant, self.module, idx, value);
     }
 
     // TODO: protect casts
@@ -893,30 +858,26 @@ const Compiler = struct {
             .true => self.writeOp(.push_true),
             .false => self.writeOp(.push_false),
             .null => self.writeOp(.push_null),
-            else => |i| {
-                const idx = i.toInt();
-                if (mod != self.manager.mod_index) {
-                    self.writeOpAndByte(.load_const_ext, @intCast(idx));
-                    self.writeByte(@intCast(mod.toInt()));
-                } else {
-                    try self.writeOpAndMaybeShort(.load_const, idx);
-                }
-            },
+            else => |i| try self.writeOpAndMaybeShort(
+                .load_const,
+                self.artifacts.getIndex(.constant, mod, i.toInt()),
+            ),
         }
     }
 
     fn continueInstr(self: *Self, data: Instruction.Continue) Error!void {
         self.writePops(data.pop_count);
-        self.block_stack.add(self.manager.alloc, .@"continue", self.emitJump(.loop), data.depth);
+        self.block_stack.add(self.alloc, .@"continue", self.emitJump(.loop), data.depth);
     }
 
     fn enumDecl(self: *Self, data: *const Instruction.EnumDecl) Error!void {
-        self.manager.state.modules.setSymbol(self.manager.mod_index, data.sym_index, Module.Enum{
-            .name = self.manager.alloc.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
+        self.artifacts.add(self.alloc, .@"enum", self.module, data.sym_index, .{
+            .name = self.alloc.dupe(u8, self.interner.getKey(data.name).?) catch oom(),
             .tags = data.tags,
             .discriminants = data.discriminants,
             .type_id = data.type_id,
         });
+
         try self.containerFnDecls(data.functions);
         try self.containerTraitDecls(data.traits);
     }
@@ -945,7 +906,7 @@ const Compiler = struct {
             .str => .iter_new_str,
         });
 
-        self.block_stack.open(self.manager.alloc);
+        self.block_stack.open(self.alloc);
         const loop_start = self.function.chunk.code.items.len;
 
         self.writeOp(if (data.use_index) .iter_next_index else .iter_next);
@@ -990,7 +951,17 @@ const Compiler = struct {
     }
 
     fn identifier(self: *Self, data: *const Instruction.Variable) Error!void {
-        self.emitGetVar(data);
+        // BUG: Protect the cast, we can't have more than 256 variable to lookup for now
+        switch (data.kind) {
+            .local => |d| self.writeOpAndByte(
+                if (d.duplicable and self.state.dup) .get_local_dup else .get_local,
+                @intCast(data.index),
+            ),
+            .global => |d| self.writeOpAndByte(
+                if (self.state.dup) .get_global_dup else .get_global,
+                @intCast(self.artifacts.getIndex(.global, d.module orelse self.module, data.index)),
+            ),
+        }
     }
 
     fn ifInstr(self: *Self, data: *const Instruction.If) Error!void {
@@ -1060,7 +1031,7 @@ const Compiler = struct {
             try self.compileInstrNoDup(data.expr);
         }
 
-        var exit_jumps = ArrayList(usize).initCapacity(self.manager.alloc, data.arms.len) catch oom();
+        var exit_jumps = ArrayList(usize).initCapacity(self.alloc, data.arms.len) catch oom();
 
         for (data.arms) |arm| {
             self.writeOp(.dup);
@@ -1136,7 +1107,7 @@ const Compiler = struct {
     fn matchType(self: *Self, data: Instruction.MatchType) Error!void {
         try self.compileInstrNoDup(data.expr);
 
-        var exit_jumps = ArrayList(usize).initCapacity(self.manager.alloc, data.arms.len) catch oom();
+        var exit_jumps = ArrayList(usize).initCapacity(self.alloc, data.arms.len) catch oom();
 
         for (data.arms) |arm| {
             self.writeOp(.dup);
@@ -1222,46 +1193,45 @@ const Compiler = struct {
     fn stringInterp(self: *Self, data: Instruction.StringInterp) Error!void {
         // Compiles [literal, expr, literal, expr, ...]
         for (0..data.exprs.len) |i| {
-            try self.constant(data.literals[i], self.manager.mod_index, true);
+            try self.constant(data.literals[i], self.module, true);
             try self.compileInstr(data.exprs[i]);
         }
 
         // Always one additional literal due to parsing
-        try self.constant(data.literals[data.literals.len - 1], self.manager.mod_index, true);
+        try self.constant(data.literals[data.literals.len - 1], self.module, true);
 
         self.writeOpAndByte(.string_interp, @intCast(data.exprs.len));
     }
 
     fn structDecl(self: *Self, data: *const Instruction.StructDecl) Error!void {
-        self.manager.state.modules.setSymbol(self.manager.mod_index, data.sym_index, Module.Structure{
-            .name = self.manager.alloc.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
+        self.artifacts.add(self.alloc, .structure, self.module, data.sym_index, .{
+            .name = self.alloc.dupe(u8, self.interner.getKey(data.name).?) catch oom(),
             .type_id = data.type_id,
             .fields = data.fields,
         });
+
         try self.defaults(data.default_fields);
         try self.containerFnDecls(data.functions);
         try self.containerTraitDecls(data.traits);
     }
 
     fn cStructDecl(self: *Self, data: *const Instruction.CStructDecl) Error!void {
-        self.manager.state.modules.setSymbol(self.manager.mod_index, data.sym_index, Module.CStructure{
-            .name = self.manager.alloc.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
+        self.artifacts.add(self.alloc, .c_structure, self.module, data.sym_index, .{
+            .name = self.alloc.dupe(u8, self.interner.getKey(data.name).?) catch oom(),
             .type_id = data.type_id,
             .layout = data.layout,
         });
     }
 
     // TODO: protect cast
-    fn structLiteral(self: *Self, data: *const Instruction.StructLiteral) Error!void {
+    fn structLiteral(self: *Self, data: Instruction.StructLiteral) Error!void {
         try self.compileArgs(data.values);
+        const load_sym = data.structure;
 
-        switch (self.at(data.structure)) {
-            .load_symbol => |sym| switch (sym.lang) {
-                .ray => self.symbolAccess(.struct_lit, sym),
-                .zig => self.nonRaySymbolAccess(.struct_lit_zig, sym),
-                .c => self.nonRaySymbolAccess(.struct_lit_c, sym),
-            },
-            else => unreachable,
+        if (load_sym.lang == .c) {
+            self.symbolAccess(.struct_lit_c, load_sym);
+        } else {
+            self.symbolAccess(.struct_lit, load_sym);
         }
         self.writeByte(@intCast(data.values.len));
     }
@@ -1305,12 +1275,13 @@ const Compiler = struct {
     }
 
     fn unionDecl(self: *Self, data: *const Instruction.UnionDecl) Error!void {
-        self.manager.state.modules.setSymbol(self.manager.mod_index, data.sym_index, Module.Union{
-            .name = self.manager.alloc.dupe(u8, self.manager.state.interner.getKey(data.name).?) catch oom(),
+        self.artifacts.add(self.alloc, .@"union", self.module, data.sym_index, .{
+            .name = self.alloc.dupe(u8, self.interner.getKey(data.name).?) catch oom(),
             .tags = data.tags,
             .type_id = data.type_id,
             .is_err = data.is_err,
         });
+
         try self.containerFnDecls(data.functions);
         try self.containerTraitDecls(data.traits);
     }
@@ -1322,7 +1293,7 @@ const Compiler = struct {
         }
 
         try self.compileInstr(data.arg);
-        self.symbolAccess(.union_constr, data.tag_lit.sym);
+        self.symbolAccess(.union_constr, data.tag_lit.symbol);
         self.writeByte(@intCast(data.tag_lit.tag_index));
     }
 
@@ -1344,17 +1315,10 @@ const Compiler = struct {
                 const const_index = self.at(value_instr).constant.index;
                 try self.compileConstant(const_index);
 
-                break :value self.manager.state.modules.getConstant(
-                    self.manager.mod_index,
-                    const_index.toInt(),
-                );
+                break :value self.artifacts.getFromKey(.constant, self.module, const_index.toInt()).*;
             };
 
-            self.manager.state.modules.setGlobal(
-                self.manager.mod_index,
-                data.variable.index,
-                value,
-            );
+            self.artifacts.add(self.alloc, .global, self.module, data.variable.index, value);
         }
         // Local value left on stack
         else {
@@ -1373,7 +1337,7 @@ const Compiler = struct {
     fn whileInstr(self: *Self, data: Instruction.While) Error!void {
         const is_null_pat = self.manager.instr_data[data.cond] == .pat_nullable;
 
-        self.block_stack.open(self.manager.alloc);
+        self.block_stack.open(self.alloc);
         const loop_start = self.function.chunk.code.items.len;
 
         try self.compileInstr(data.cond);

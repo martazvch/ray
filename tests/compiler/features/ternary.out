@@ -2,10 +2,10 @@
 push_true
 jump_false 1 -> 10
 pop
-load_const index 3, value 1
+load_const index 1, value 1
 jump 7 -> 13
 pop
-load_const index 4, value 0
+load_const index 2, value 0
 pop
 ret_naked
 

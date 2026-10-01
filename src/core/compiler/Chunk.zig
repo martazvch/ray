@@ -1,8 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
-
-const Value = @import("../runtime/values.zig").Value;
 const oom = @import("misc").oom;
 
 code: ArrayList(u8),
@@ -46,12 +44,8 @@ pub const OpCode = enum(u8) {
 
     /// Calls a ray function within current module
     call,
-    /// Calls a ray function within an extern module
-    call_ext,
     /// Calls a c function within current module
     call_c,
-    /// Calls a c function within an extern module
-    call_c_ext,
     /// Runtime calling convention dispatch
     call_dyn,
     /// Calling a virtual function on a trait object
@@ -87,7 +81,6 @@ pub const OpCode = enum(u8) {
     get_field_c,
     get_global,
     get_global_dup,
-    get_global_ext,
     get_local,
     get_local_dup,
     get_enum_tag,
@@ -126,9 +119,7 @@ pub const OpCode = enum(u8) {
     lt_float,
     load_blk_val,
     load_const,
-    load_const_ext,
     load_fn,
-    load_fn_ext,
     load_fn_zig,
     loop,
     mod_float,
@@ -171,14 +162,12 @@ pub const OpCode = enum(u8) {
     str_mul,
     string_interp,
     struct_lit,
-    struct_lit_ext,
     struct_lit_c,
     struct_lit_zig,
     sub_float,
     sub_int,
     trait_obj,
     union_constr,
-    union_constr_ext,
     union_unwrap,
     swap_pop,
     unbox,

@@ -1,63 +1,63 @@
 -- main --
 push_true
-jump_false 1 -> 14
+jump_false 1 -> 13
 pop
-load_const index 3, value yes
-call_zig index 3, module 0, arity 1, print
-jump 11 -> 15
+load_const index 1, value yes
+call_zig index 3, arity 1, print
+jump 10 -> 14
 pop
 push_true
-jump_false 16 -> 26
+jump_false 15 -> 25
 pop
-load_const index 3, value yes
+load_const index 1, value yes
 pop
-jump 23 -> 27
+jump 22 -> 26
 pop
 push_false
-jump_false 28 -> 38
+jump_false 27 -> 37
 pop
-load_const index 3, value yes
+load_const index 1, value yes
 pop
-jump 35 -> 42
+jump 34 -> 41
 pop
-load_const index 4, value no
+load_const index 3, value no
 pop
 push_true
-jump_false 43 -> 57
+jump_false 42 -> 56
 pop
-load_const index 5, value 1
+load_const index 4, value 1
 store_blk_val
-jump 50 -> 53
+jump 49 -> 52
 load_blk_val
-jump 54 -> 65
+jump 53 -> 64
 pop
-load_const index 6, value 2
+load_const index 5, value 2
 store_blk_val
-jump 61 -> 64
+jump 60 -> 63
 load_blk_val
 push_true
 store_blk_val
-jump 67 -> 70
+jump 66 -> 69
 load_blk_val
-jump_false 71 -> 80
+jump_false 70 -> 79
 pop
-load_const index 9, value 11
-jump 77 -> 83
+load_const index 6, value 11
+jump 76 -> 82
 pop
-load_const index 5, value 1
+load_const index 4, value 1
 push_false
 store_blk_val
-jump 85 -> 88
+jump 84 -> 87
 load_blk_val
-jump_false 89 -> 103
+jump_false 88 -> 102
 pop
-load_const index 9, value 11
+load_const index 6, value 11
 store_blk_val
-jump 96 -> 99
+jump 95 -> 98
 load_blk_val
-jump 100 -> 128
+jump 99 -> 127
 pop
-load_const index 5, value 1
+load_const index 4, value 1
 get_local index 2
 pop
 load_const index 7, value 5
@@ -69,7 +69,7 @@ get_local_dup index 2
 add_int
 store_blk_val
 pop
-jump 123 -> 127
+jump 122 -> 126
 pop
 load_blk_val
 ret_naked

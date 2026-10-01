@@ -374,7 +374,7 @@ fn tagLiteral(self: *Self, data: Constant.TagLit, comptime kind: enum { @"enum",
     self.indent_level += 1;
     defer self.indent_level -= 1;
     self.indentAndAppendSlice("- symbol");
-    self.loadSymbol(data.sym);
+    self.loadSymbol(data.symbol);
     self.indentAndAppendSlice("- tag");
     self.indentAndPrintSlice("{}", .{data.tag_index});
 }
@@ -655,7 +655,7 @@ fn structLiteral(self: *Self, data: *const Instruction.StructLiteral) void {
     self.indent_level += 1;
     defer self.indent_level -= 1;
     self.indentAndAppendSlice("- structure");
-    self.parseInstr(data.structure);
+    self.loadSymbol(data.structure);
     self.argsList("field", data.values);
 }
 

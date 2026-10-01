@@ -1,23 +1,23 @@
 -- staticFn --
 get_local index 0
-call_zig index 3, module 0, arity 1, print
+call_zig index 3, arity 1, print
 get_local index 1
-call_zig index 3, module 0, arity 1, print
+call_zig index 3, arity 1, print
 get_local index 2
-call_zig index 3, module 0, arity 1, print
+call_zig index 3, arity 1, print
 get_local index 3
-call_zig index 3, module 0, arity 1, print
+call_zig index 3, arity 1, print
 ret_naked
 
 -- method --
 get_local index 1
-call_zig index 3, module 0, arity 1, print
+call_zig index 3, arity 1, print
 get_local index 2
-call_zig index 3, module 0, arity 1, print
+call_zig index 3, arity 1, print
 get_local index 3
-call_zig index 3, module 0, arity 1, print
+call_zig index 3, arity 1, print
 get_local index 4
-call_zig index 3, module 0, arity 1, print
+call_zig index 3, arity 1, print
 ret_naked
 
 -- getInt --
@@ -83,196 +83,197 @@ pop
 ret_naked
 
 -- main --
-load_const index 11, value first
-load_const index 12, value 1
-load_const index 9, value 2
-load_const index 13, value 24.5
-call index 0, arity 4, function
-load_const index 14, value second
-load_const index 3, value 12
-load_const index 3, value 12
-load_const index 4, value 98.5
-call index 0, arity 4, function
-load_const index 15, value third
-load_const index 16, value 8
-load_const index 3, value 12
-load_const index 4, value 98.5
-call index 0, arity 4, function
-load_const index 17, value fourth
-load_const index 3, value 12
-load_const index 3, value 12
-load_const index 18, value 123.456
-call index 0, arity 4, function
-load_const index 19, value fifth
-load_const index 21, value 80
-load_const index 3, value 12
-load_const index 20, value 12.34
-call index 0, arity 4, function
-load_const index 22, value sixth
-load_const index 24, value 65
-load_const index 23, value 54
-load_const index 25, value 3.14
-call index 0, arity 4, function
-load_const index 28, value seventh
-load_const index 7, value 111
-load_const index 26, value 11
-load_const index 27, value 1.1
-call index 0, arity 4, function
-load_const index 11, value first
-load_const index 29, value 10
-load_const index 30, value 20
-load_const index 31, value 245
-call index 3, arity 4, staticFn
-load_const index 14, value second
-load_const index 7, value 111
-load_const index 7, value 111
-load_const index 8, value 56.5
-call index 3, arity 4, staticFn
-load_const index 15, value third
-load_const index 21, value 80
-load_const index 7, value 111
-load_const index 8, value 56.5
-call index 3, arity 4, staticFn
-load_const index 17, value fourth
-load_const index 7, value 111
-load_const index 7, value 111
-load_const index 32, value 1234.56
-call index 3, arity 4, staticFn
-load_const index 19, value fifth
-load_const index 34, value 800
-load_const index 7, value 111
-load_const index 33, value 123.4
-call index 3, arity 4, staticFn
-load_const index 22, value sixth
-load_const index 36, value 650
-load_const index 35, value 540
-load_const index 37, value 31.4
-call index 3, arity 4, staticFn
-load_const index 28, value seventh
-load_const index 40, value 1110
-load_const index 38, value 110
-load_const index 39, value 10.1
-call index 3, arity 4, staticFn
-load_const index 41, value Bar{}
+load_const index 15, value first
+load_const index 16, value 1
+load_const index 13, value 2
+load_const index 17, value 24.5
+call index 3, arity 4, function
+load_const index 18, value second
+load_const index 5, value 12
+load_const index 5, value 12
+load_const index 6, value 98.5
+call index 3, arity 4, function
+load_const index 19, value third
+load_const index 20, value 8
+load_const index 5, value 12
+load_const index 6, value 98.5
+call index 3, arity 4, function
+load_const index 21, value fourth
+load_const index 5, value 12
+load_const index 5, value 12
+load_const index 22, value 123.456
+call index 3, arity 4, function
+load_const index 23, value fifth
+load_const index 24, value 80
+load_const index 5, value 12
+load_const index 25, value 12.34
+call index 3, arity 4, function
+load_const index 26, value sixth
+load_const index 27, value 65
+load_const index 28, value 54
+load_const index 29, value 3.14
+call index 3, arity 4, function
+load_const index 30, value seventh
+load_const index 11, value 111
+load_const index 31, value 11
+load_const index 32, value 1.1
+call index 3, arity 4, function
+load_const index 15, value first
+load_const index 33, value 10
+load_const index 34, value 20
+load_const index 35, value 245
+call index 6, arity 4, staticFn
+load_const index 18, value second
+load_const index 11, value 111
+load_const index 11, value 111
+load_const index 12, value 56.5
+call index 6, arity 4, staticFn
+load_const index 19, value third
+load_const index 24, value 80
+load_const index 11, value 111
+load_const index 12, value 56.5
+call index 6, arity 4, staticFn
+load_const index 21, value fourth
+load_const index 11, value 111
+load_const index 11, value 111
+load_const index 36, value 1234.56
+call index 6, arity 4, staticFn
+load_const index 23, value fifth
+load_const index 37, value 800
+load_const index 11, value 111
+load_const index 38, value 123.4
+call index 6, arity 4, staticFn
+load_const index 26, value sixth
+load_const index 39, value 650
+load_const index 40, value 540
+load_const index 41, value 31.4
+call index 6, arity 4, staticFn
+load_const index 30, value seventh
+load_const index 42, value 1110
+load_const index 43, value 110
+load_const index 44, value 10.1
+call index 6, arity 4, staticFn
+load_const index 45, value Bar{}
 get_local_dup index 0
-struct_lit index 1, arity 1, Foo
+struct_lit index 5, arity 1, Foo
 get_local index 1
-load_const index 11, value first
-load_const index 42, value -1
-load_const index 43, value -2
-load_const index 44, value -24.5
-call index 4, arity 5, method
+load_const index 15, value first
+load_const index 46, value -1
+load_const index 47, value -2
+load_const index 48, value -24.5
+call index 7, arity 5, method
 get_local index 1
-load_const index 14, value second
-load_const index 9, value 2
-load_const index 9, value 2
-load_const index 10, value 8.5
-call index 4, arity 5, method
+load_const index 18, value second
+load_const index 13, value 2
+load_const index 13, value 2
+load_const index 14, value 8.5
+call index 7, arity 5, method
 get_local index 1
-load_const index 15, value third
-load_const index 45, value -8
-load_const index 9, value 2
-load_const index 10, value 8.5
-call index 4, arity 5, method
+load_const index 19, value third
+load_const index 49, value -8
+load_const index 13, value 2
+load_const index 14, value 8.5
+call index 7, arity 5, method
 get_local index 1
-load_const index 17, value fourth
-load_const index 9, value 2
-load_const index 9, value 2
-load_const index 46, value -123.456
-call index 4, arity 5, method
+load_const index 21, value fourth
+load_const index 13, value 2
+load_const index 13, value 2
+load_const index 50, value -123.456
+call index 7, arity 5, method
 get_local index 1
-load_const index 19, value fifth
-load_const index 48, value -80
-load_const index 9, value 2
-load_const index 47, value -12.34
-call index 4, arity 5, method
+load_const index 23, value fifth
+load_const index 51, value -80
+load_const index 13, value 2
+load_const index 52, value -12.34
+call index 7, arity 5, method
 get_local index 1
-load_const index 22, value sixth
-load_const index 50, value -65
-load_const index 49, value -54
-load_const index 51, value -3.14
-call index 4, arity 5, method
+load_const index 26, value sixth
+load_const index 53, value -65
+load_const index 54, value -54
+load_const index 55, value -3.14
+call index 7, arity 5, method
 get_local index 1
-load_const index 28, value seventh
-load_const index 54, value -111
-load_const index 52, value -11
-load_const index 53, value -1.1
-call index 4, arity 5, method
+load_const index 30, value seventh
+load_const index 56, value -111
+load_const index 57, value -11
+load_const index 58, value -1.1
+call index 7, arity 5, method
 get_local index 1
 get_field index 0
-load_const index 11, value first
+load_const index 15, value first
 push_true
 push_false
-load_const index 55, value -98.2
-call index 2, arity 5, method
+load_const index 59, value -98.2
+call index 5, arity 5, method
 get_local index 1
 get_field index 0
-load_const index 14, value second
+load_const index 18, value second
 push_false
 push_false
-load_const index 6, value 88.55
-call index 2, arity 5, method
+load_const index 10, value 88.55
+call index 5, arity 5, method
 get_local index 1
 get_field index 0
-load_const index 15, value third
+load_const index 19, value third
 push_true
 push_false
-load_const index 6, value 88.55
-call index 2, arity 5, method
+load_const index 10, value 88.55
+call index 5, arity 5, method
 get_local index 1
 get_field index 0
-load_const index 17, value fourth
+load_const index 21, value fourth
 push_false
 push_false
-load_const index 56, value -27.3
-call index 2, arity 5, method
+load_const index 60, value -27.3
+call index 5, arity 5, method
 get_local index 1
 get_field index 0
-load_const index 19, value fifth
+load_const index 23, value fifth
 push_true
 push_false
-load_const index 57, value 30.4
-call index 2, arity 5, method
+load_const index 61, value 30.4
+call index 5, arity 5, method
 get_local index 1
 get_field index 0
-load_const index 22, value sixth
+load_const index 26, value sixth
 push_true
 push_false
-load_const index 58, value 6540.6
-call index 2, arity 5, method
+load_const index 62, value 6540.6
+call index 5, arity 5, method
 get_local index 1
 get_field index 0
-load_const index 28, value seventh
+load_const index 30, value seventh
 push_false
 push_true
-load_const index 59, value -360.9
-call index 2, arity 5, method
-load_const_ext index 5, module 3, value 56
-call_ext index 2, module 3, arity 1, getInt
+load_const index 63, value -360.9
+call index 5, arity 5, method
+load_const index 4, value 56
+call index 2, arity 1, getInt
 pop
-load_const index 60, value imported static
-load_const_ext index 3, module 3, value 0
+load_const index 64, value imported static
+load_const index 0, value 0
 push_false
 push_false
-call_ext index 0, module 3, arity 4, staticFn
-load_const index 60, value imported static
-load_const index 61, value 90
+call index 0, arity 4, staticFn
+load_const index 64, value imported static
+load_const index 65, value 90
 push_true
 push_false
-call_ext index 0, module 3, arity 4, staticFn
-load_const index 62, value Def{}
+call index 0, arity 4, staticFn
+load_const index 66, value Def{}
 get_local index 2
-load_const index 63, value imported method
-load_const_ext index 4, module 3, value 10
+load_const index 67, value imported method
+load_const index 2, value 10
 push_true
 push_true
-call_ext index 1, module 3, arity 5, method
+call index 1, arity 5, method
 get_local index 2
-load_const index 63, value imported method
-load_const index 64, value 180
+load_const index 67, value imported method
+load_const index 68, value 180
 push_true
 push_false
-call_ext index 1, module 3, arity 5, method
+call index 1, arity 5, method
 ret_naked
+
 -- global scope --
-call index 5, arity 0, main
+call index 8, arity 0, main

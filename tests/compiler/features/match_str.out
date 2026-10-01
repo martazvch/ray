@@ -1,31 +1,31 @@
 -- main --
-load_const index 3, value value
+load_const index 0, value value
 get_local index 0
 dup
-load_const index 4, value volue
+load_const index 1, value volue
 eq_str
 jump_false 8 -> 17
 pop
-load_const index 5, value 1
+load_const index 2, value 1
 jump 14 -> 48
 pop
 dup
-load_const index 6, value valuee
+load_const index 3, value valuee
 eq_str
 jump_false 22 -> 31
 pop
-load_const index 7, value 2
+load_const index 4, value 2
 jump 28 -> 48
 pop
 dup
-load_const index 3, value value
+load_const index 0, value value
 eq_str
 jump_false 36 -> 45
 pop
-load_const index 8, value 3
+load_const index 5, value 3
 jump 42 -> 48
 pop
-load_const index 9, value oooo
+load_const index 6, value oooo
 swap_pop
 pop
 ret_naked

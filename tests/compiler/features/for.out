@@ -1,5 +1,5 @@
 -- main --
-load_const index 6, value [1, 2, 3]
+load_const index 3, value [1, 2, 3]
 iter_new_arr
 iter_next
 jump_null 4 -> 14
@@ -9,7 +9,7 @@ pop
 loop 11 -> 3
 pop2
 
-load_const index 11, value [5, 6, 7, 8]
+load_const index 8, value [5, 6, 7, 8]
 
 get_local index 0
 iter_new_arr
@@ -21,7 +21,7 @@ pop
 loop 28 -> 20
 pop2
 
-load_const index 12, value Tom
+load_const index 9, value Tom
 get_local index 1
 iter_new_str
 iter_next
@@ -32,7 +32,7 @@ pop
 loop 45 -> 37
 pop2
 
-load_const index 13, value Martin
+load_const index 10, value Martin
 iter_new_str
 iter_next
 jump_null 53 -> 63
@@ -42,7 +42,7 @@ pop
 loop 60 -> 52
 pop2
 
-load_const index 14, value [true, false]
+load_const index 13, value [true, false]
 iter_new_arr
 iter_next_index
 jump_null 68 -> 81
@@ -54,8 +54,8 @@ pop2
 loop 78 -> 67
 pop3
 
-load_const index 7, value 5
-load_const index 15, value 0
+load_const index 4, value 5
+load_const index 14, value 0
 range_new_int
 iter_new_range
 iter_next
@@ -66,8 +66,8 @@ pop
 loop 96 -> 88
 pop2
 
-load_const index 7, value 5
-load_const index 16, value -1
+load_const index 4, value 5
+load_const index 15, value -1
 range_new_int
 iter_new_range
 iter_next
@@ -78,7 +78,7 @@ pop
 loop 114 -> 106
 pop2
 
-load_const index 18, value -5
+load_const index 16, value -5
 load_const index 17, value -8
 range_new_int
 iter_new_range

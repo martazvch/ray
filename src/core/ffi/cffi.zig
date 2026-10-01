@@ -11,7 +11,7 @@ const oom = misc.oom;
 
 pub const cVm = opaque {};
 pub const CStruct = opaque {};
-pub const Handcheck = *const fn (*const cApi, Index) callconv(.c) void;
+pub const Handcheck = *const fn (*const cApi) callconv(.c) void;
 pub const Fn = *const fn (*cVm) callconv(.c) void;
 const Index = usize;
 
@@ -25,7 +25,6 @@ const cApi = extern struct {
     set_str: *const fn (*cVm, Index, [*c]const u8) callconv(.c) void,
     get_str: *const fn (*const cVm, Index) callconv(.c) [*c]const u8,
 
-    new_struct: *const fn (*cVm, Index, Index) callconv(.c) *CStruct,
     struct_bytes: *const fn (*CStruct) callconv(.c) [*c]u8,
     set_struct: *const fn (*cVm, Index, *CStruct) callconv(.c) void,
     get_struct: *const fn (*cVm, Index) callconv(.c) *CStruct,
@@ -43,7 +42,6 @@ pub const api: cApi = .{
     .set_str = setStr,
     .get_str = getStr,
 
-    .new_struct = newStruct,
     .struct_bytes = structBytes,
     .set_struct = setStruct,
     .get_struct = getStruct,
@@ -110,11 +108,6 @@ fn setStr(c_vm: *cVm, index: Index, value: [*c]const u8) callconv(.c) void {
 fn getStr(c_vm: *const cVm, index: Index) callconv(.c) [*c]const u8 {
     const vm: *const Vm = @ptrCast(@alignCast(c_vm));
     return vm.frame.slots[index].obj.as(Obj.String).chars.ptr;
-}
-
-fn newStruct(c_vm: *cVm, module: Index, symbol: Index) callconv(.c) *CStruct {
-    const vm: *Vm = @ptrCast(@alignCast(c_vm));
-    return @ptrCast(Obj.CStructure.create(vm, vm.modules[module].c_structs[symbol].layout));
 }
 
 fn structBytes(cstruct: *CStruct) callconv(.c) [*c]u8 {

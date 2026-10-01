@@ -1,5 +1,5 @@
 -- getValue --
-load_const index 3, value 5
+load_const index 0, value 5
 ret
 
 -- main --

@@ -1,51 +1,51 @@
 -- getIdx --
-load_const index 3, value 1
+load_const index 0, value 1
 ret
 
 -- main --
-load_const index 11, value [[1, 2, 3], [4, 5, 6]]
-load_const index 16, value [[1, 2, 33], [3, 4, 55]]
-load_const index 9, value 6
-load_const index 17, value 7
+load_const index 8, value [[1, 2, 3], [4, 5, 6]]
+load_const index 13, value [[1, 2, 33], [3, 4, 55]]
+load_const index 6, value 6
+load_const index 14, value 7
 call index 0, arity 0, getIdx
 array_new length 3, type_id x
-load_const index 22, value [8, 10, 11]
+load_const index 18, value [8, 10, 11]
 array_new length 2, type_id x
-struct_lit index 0, arity 1, Foo
+struct_lit index 3, arity 1, Foo
 
 get_local index 0
-load_const index 3, value 1
+load_const index 0, value 1
 index_arr
-load_const index 4, value 2
+load_const index 1, value 2
 index_arr
 pop
 
 get_local index 0
-load_const index 24, value -2
+load_const index 19, value -2
 index_arr
-load_const index 23, value -1
+load_const index 20, value -1
 index_arr
 pop
 
-load_const index 25, value 99
+load_const index 21, value 99
 get_local index 0
-load_const index 23, value -1
+load_const index 20, value -1
 index_arr
 call index 0, arity 0, getIdx
 array_set
 
-load_const index 26, value [1]
+load_const index 22, value [1]
 get_local index 2
 get_field index 0
 call index 0, arity 0, getIdx
 array_set
 
-load_const index 27, value -9
+load_const index 23, value -9
 get_local index 2
 get_field index 0
 call index 0, arity 0, getIdx
 index_arr
-load_const index 3, value 1
+load_const index 0, value 1
 array_set
 
 get_local index 2
@@ -58,7 +58,7 @@ get_local index 2
 get_field index 0
 call index 0, arity 0, getIdx
 index_arr
-load_const index 3, value 1
+load_const index 0, value 1
 index_arr
 pop
 

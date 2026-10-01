@@ -6,13 +6,13 @@ const SymbolMap = LexScope.SymbolMap;
 const VariableMap = LexScope.VariableMap;
 const Value = @import("../runtime/values.zig").Value;
 const Obj = @import("../runtime/Obj.zig");
-const State = @import("../pipeline/State.zig");
-const TypeId = @import("../analyzer/types.zig").TypeId;
 const NativeMod = @import("NativesRegister.zig").NativeModule;
 
 const misc = @import("misc");
 const InternerIndex = misc.Interner.Index;
 const oom = misc.oom;
+
+modules: std.AutoArrayHashMapUnmanaged(InternerIndex, Module),
 
 const Self = @This();
 
@@ -22,71 +22,10 @@ pub const Module = struct {
     index: Index,
     native: bool,
 
-    /// Compiled values used at runtime
-    globals: []Value = &.{},
-    /// Compiled constants used at runtime
-    constants: []Value = &.{},
-
     /// Type infos gathered by the analyzer used when importing a module
     /// It has all the analyzis-time data to type check
     sym_infos: SymbolMap = .empty,
     globals_infos: VariableMap = .empty,
-
-    /// Compiled objects
-    funcs: []*Obj.Function = &.{},
-    zig_funcs: []*Obj.ZigFn = &.{},
-    c_funcs: []*Obj.CFn = &.{},
-
-    structs: []Structure = &.{},
-    c_structs: []CStructure = &.{},
-    enums: []Enum = &.{},
-    unions: []Union = &.{},
-
-    vtables: []VTable = &.{},
-
-    pub const Enum = struct {
-        name: []const u8,
-        tags: []const []const u8,
-        discriminants: []const i64,
-        type_id: TypeId,
-    };
-
-    pub const Union = struct {
-        name: []const u8,
-        tags: []const []const u8,
-        type_id: TypeId,
-        is_err: bool,
-    };
-
-    pub const Structure = struct {
-        name: []const u8,
-        type_id: TypeId,
-        fields: []const []const u8,
-    };
-
-    pub const CStructure = struct {
-        name: []const u8,
-        type_id: TypeId,
-        layout: Layout,
-
-        pub const Layout = struct {
-            size: usize,
-            alignment: usize,
-            fields: []const Field,
-
-            pub const Field = struct {
-                offset: usize,
-                tag: Tag,
-
-                pub const Tag = enum { u8 };
-            };
-        };
-    };
-
-    pub const VTable = struct {
-        name: []const u8,
-        functions: []*Obj.Function,
-    };
 };
 
 pub const Index = enum(usize) {
@@ -100,8 +39,6 @@ pub const Index = enum(usize) {
         return @intFromEnum(index);
     }
 };
-
-modules: std.AutoArrayHashMapUnmanaged(InternerIndex, Module),
 
 pub const empty: Self = .{
     .modules = .empty,
@@ -151,94 +88,8 @@ pub fn registerGlobalsInfo(self: *Self, allocator: Allocator, index: Index, glob
 /// After creating a native module, we have both compiled functions and symbols informations
 /// Adds the informations and the compiled objects
 pub fn registerSymsFromNativeMod(self: *Self, allocator: Allocator, index: Index, native_mod: *const NativeMod) void {
-    self.registerSymsInfo(allocator, index, &native_mod.zig_funcs_meta);
-    self.registerGlobalsInfo(allocator, index, &native_mod.globals_meta);
-
-    const mod = self.getFromIndex(index);
-    mod.globals = native_mod.globals.items;
-    mod.zig_funcs = native_mod.zig_funcs.items;
-    mod.c_funcs = native_mod.c_funcs.items;
-}
-
-/// Used between analyzis and compilation as we know the exact number of symbols
-pub fn ensureCompileSizes(self: *Self, allocator: Allocator, index: Index, state: *const State) void {
-    const mod = self.getFromIndex(index);
-
-    errdefer oom();
-    // We use realloc because of REPL mode that keeps defining symbols in current module
-    mod.globals = try allocator.realloc(mod.globals, state.lex_scope.current.variables.count());
-    mod.constants = try allocator.realloc(mod.constants, state.const_interner.constants.items.len);
-    mod.enums = try allocator.realloc(mod.enums, state.lex_scope.enum_count);
-    mod.unions = try allocator.realloc(mod.unions, state.lex_scope.union_count);
-    mod.funcs = try allocator.realloc(mod.funcs, state.lex_scope.func_count);
-    mod.c_funcs = try allocator.realloc(mod.c_funcs, state.lex_scope.cfunc_count);
-    mod.structs = try allocator.realloc(mod.structs, state.lex_scope.struct_count);
-    mod.c_structs = try allocator.realloc(mod.c_structs, state.lex_scope.cstruct_count);
-    mod.vtables = try allocator.realloc(mod.vtables, state.lex_scope.vtable_count);
-}
-
-pub fn setGlobal(self: *Self, module_index: Index, value_index: usize, value: Value) void {
-    self.getFromIndex(module_index).globals[value_index] = value;
-}
-
-pub fn getGlobal(self: *const Self, mod: Index, index: usize) Value {
-    return self.getFromIndex(mod).globals[index];
-}
-
-pub fn setSymbol(self: *Self, module_index: Index, sym_index: usize, value: anytype) void {
-    const module = self.getFromIndex(module_index);
-    const array = switch (@TypeOf(value)) {
-        Module.Enum => module.enums,
-        Module.Union => module.unions,
-        *Obj.Function => module.funcs,
-        *Obj.CFn => module.c_funcs,
-        Module.Structure => module.structs,
-        Module.CStructure => module.c_structs,
-        else => @compileError("Can only add symbols defined in compiled module, found " ++ @typeName(@TypeOf(value))),
-    };
-    array[sym_index] = value;
-}
-
-pub fn getSymbol(
-    self: *const Self,
-    mod_index: Index,
-    sym_index: usize,
-    comptime kind: enum {
-        @"enum",
-        function,
-        c_func,
-        zig_func,
-        structure,
-        c_struct,
-        @"union",
-    },
-) switch (kind) {
-    .@"enum" => *const Module.Enum,
-    .function => *Obj.Function,
-    .c_func => *Obj.CFn,
-    .zig_func => *Obj.ZigFn,
-    .structure => *const Module.Structure,
-    .c_struct => *const Module.CStructure,
-    .@"union" => *const Module.Union,
-} {
-    const mod = self.getFromIndex(mod_index);
-    return switch (kind) {
-        .@"enum" => &mod.enums[sym_index],
-        .function => mod.funcs[sym_index],
-        .c_func => mod.c_funcs[sym_index],
-        .zig_func => mod.zig_funcs[sym_index],
-        .structure => &mod.structs[sym_index],
-        .c_struct => &mod.c_structs[sym_index],
-        .@"union" => &mod.unions[sym_index],
-    };
-}
-
-pub fn setConstant(self: *Self, mod: Index, index: usize, value: Value) void {
-    self.getFromIndex(mod).constants[index] = value;
-}
-
-pub fn getConstant(self: *const Self, mod: Index, index: usize) Value {
-    return self.getFromIndex(mod).constants[index];
+    self.registerSymsInfo(allocator, index, &native_mod.zig_funcs);
+    self.registerGlobalsInfo(allocator, index, &native_mod.globals);
 }
 
 pub fn getFromIndex(self: *const Self, index: Index) *Module {

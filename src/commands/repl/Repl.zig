@@ -120,7 +120,7 @@ fn execute(self: *Self) !void {
             error.ExitOnPrint => continue,
             else => return e,
         };
-        try self.vm.runRepl(entry_point, self.state.modules.modules.values());
+        try self.vm.runRepl(entry_point);
     }
 }
 

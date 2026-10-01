@@ -1,5 +1,5 @@
 -- main --
-load_const index 3, value sss
+load_const index 0, value sss
 ptr_local index 0
 get_local index 1
 deref
@@ -11,15 +11,15 @@ deref
 deref
 pop
 
-load_const index 4, value 9
-load_const index 6, value Bar{ a = true, b = ok }
+load_const index 1, value 9
+load_const index 4, value Bar{ a = true, b = ok }
 ptr_local index 3
 ptr_local index 4
 ptr_local index 3
 ptr_local index 4
 ptr_local index 5
 ptr_local index 6
-struct_lit index 1, arity 4, Foo
+struct_lit index 4, arity 4, Foo
 
 get_local index 7
 get_field index 0
