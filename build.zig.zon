@@ -4,8 +4,16 @@
     .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .clarg = .{
-            .url = "https://github.com/martazvch/clarg/archive/refs/tags/0.2.0.tar.gz",
-            .hash = "clarg-0.0.0-g4b0Sat8AAAPBh2u1-szLlSNvMEnJIEnWuOZ47B9Kjzt",
+            .url = "https://github.com/martazvch/clarg/archive/refs/tags/0.3.0.tar.gz",
+            .hash = "clarg-0.0.0-g4b0ST5_AADb11MopaHLlZHXzNsdCLsVmZmWiiNZhpw9",
+        },
+        .libffi = .{
+            .url = "git+https://github.com/allyourcodebase/libffi.git#d2a5c0e58c031153e86470e1e272a328016eb535",
+            .hash = "libffi-3.5.2-QhHaJ3A4AAAjtUrgbo5gvqIi5mL3GGEgCuB_icyO0MOi",
+        },
+        .translate_c = .{
+            .url = "git+https://codeberg.org/ziglang/translate-c#875969d3493e245e01bf5d7860f792d8f3eb9ef5",
+            .hash = "translate_c-0.0.0-Q_BUWoFOBwAhz77Zd15HCVuhTKzdUKc94kezmCeJ7IC_",
         },
     },
     .fingerprint = 0xfd0bf6528c70519c,

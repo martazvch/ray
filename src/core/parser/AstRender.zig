@@ -14,7 +14,7 @@ indent_level: usize,
 
 const Self = @This();
 const Error = std.Io.Writer.Error;
-const spaces: []const u8 = " " ** 1024;
+const spaces: [1024]u8 = @splat(' ');
 const INDENT_SIZE = 4;
 
 pub fn init(allocator: Allocator, ast: *const Ast) Self {

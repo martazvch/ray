@@ -150,9 +150,9 @@ fn getMember(T: type, comptime kind: MemberKind) kind.Type() {
 
     comptime var member: ?Member = null;
 
-    inline for (info.@"struct".decls) |decl| {
-        if (comptime std.mem.eql(u8, decl.name, tag)) {
-            const field = @field(T, decl.name);
+    inline for (info.@"struct".decl_names) |name| {
+        if (comptime std.mem.eql(u8, name, tag)) {
+            const field = @field(T, name);
 
             if (@TypeOf(field) != Member) {
                 @compileError("Expect member '" ++ tag ++ "' to be of type: " ++ @typeName(Member));
@@ -259,16 +259,14 @@ pub fn makeNative(func: anytype) Fn {
             const ArgsType, const vm_index = ArgsTuple(@TypeOf(func));
             var args: ArgsType = undefined;
 
-            const fields = @typeInfo(ArgsType).@"struct".fields;
-
             comptime var offset: usize = 0;
 
-            inline for (fields, 0..) |f, i| {
+            inline for (@typeInfo(ArgsType).@"struct".field_types, 0..) |Field, i| {
                 if (i == vm_index) {
                     args[vm_index] = vm;
                     offset = 1;
                 } else {
-                    args[i] = fromValue(f.type, stack[i - offset]);
+                    args[i] = fromValue(Field, stack[i - offset]);
                 }
             }
 
@@ -372,27 +370,29 @@ fn toValue(vm: *Vm, value: anytype, config: Config) Value {
 }
 
 pub fn ArgsTuple(comptime FnType: type) struct { type, usize } {
-    const infos = @typeInfo(FnType);
-    if (infos != .@"fn") {
+    const info = @typeInfo(FnType);
+    if (info != .@"fn") {
         @compileError("FFI: Can't generate native function for a non-function");
     }
 
-    const fn_infos = infos.@"fn";
-    if (fn_infos.is_var_args) {
+    const fn_info = info.@"fn";
+    if (fn_info.attrs.varargs) {
         @compileError("FFI: Can't generate native function for variadic function");
     }
 
-    const vm_index = if (fn_infos.params[0].type.? == *Vm)
+    const param_types = fn_info.param_types;
+
+    const vm_index = if (param_types[0].? == *Vm)
         0
-    else if (fn_infos.params[1].type.? == *Vm)
+    else if (param_types[1].? == *Vm)
         1
     else
         @compileError("Either first or second argument of functions must be of type *Vm");
 
-    var field_types: [fn_infos.params.len]type = undefined;
+    var field_types: [param_types.len]type = undefined;
 
-    for (fn_infos.params, 0..) |arg, i| {
-        field_types[i] = arg.type.?;
+    for (param_types, 0..) |Param, i| {
+        field_types[i] = Param.?;
     }
 
     return .{

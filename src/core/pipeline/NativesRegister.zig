@@ -234,11 +234,11 @@ fn fnZigToRay(self: *Self, alloc: Allocator, comptime func: *const zffi.FnMeta, 
     var params: Type.Function.ParamsMap = .empty;
 
     // We don't take into account param *Vm and if it's in second place, it means 'self' is in first and we skip it too
-    const offset = if (func.info.params.len > 1 and func.info.params[1].type.? == *Vm) 2 else 1;
-    params.ensureTotalCapacity(alloc, func.info.params.len - offset) catch oom();
+    const offset = if (func.info.param_types.len > 1 and func.info.param_types[1].? == *Vm) 2 else 1;
+    params.ensureTotalCapacity(alloc, func.info.param_types.len - offset) catch oom();
 
-    inline for (func.info.params[offset..], 0..) |*p, i| {
-        const param_ty = self.zigToRay(alloc, p.type.?, interner, ti);
+    inline for (func.info.param_types[offset..], 0..) |Param, i| {
+        const param_ty = self.zigToRay(alloc, Param.?, interner, ti);
 
         const gop = params.getOrPutAssumeCapacity(interner.intern(func.params[i].name));
         if (gop.found_existing) {
@@ -339,9 +339,9 @@ fn zigToRay(self: *Self, alloc: Allocator, T: type, interner: *Interner, ti: *Ty
         []const u8 => ti.getCached(.str),
         else => switch (@typeInfo(T)) {
             .@"union" => |u| {
-                var childs = ArrayList(*const Type).initCapacity(alloc, u.fields.len) catch oom();
-                inline for (u.fields) |f| {
-                    childs.appendAssumeCapacity(self.zigToRay(alloc, f.type, interner, ti));
+                var childs = ArrayList(*const Type).initCapacity(alloc, u.field_names.len) catch oom();
+                inline for (u.field_types) |Field| {
+                    childs.appendAssumeCapacity(self.zigToRay(alloc, Field, interner, ti));
                 }
                 return ti.intern(.{ .inline_union = .{ .types = childs.toOwnedSlice(alloc) catch oom() } });
             },

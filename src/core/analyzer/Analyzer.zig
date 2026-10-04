@@ -747,7 +747,7 @@ fn endExternFnDecl(
         span,
     );
 
-    const name_sentinel = self.alloc.dupeZ(u8, name_text) catch oom();
+    const name_sentinel = self.alloc.dupeSentinel(u8, name_text, 0) catch oom();
     defer self.alloc.free(name_sentinel);
     const func = lib.lookup(cffi.Fn, name_sentinel) orelse return self.err(
         .{ .extern_fn_not_in_lib = .{ .name = name_text } },

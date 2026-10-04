@@ -57,8 +57,6 @@ fn generateMsg(comptime msg: []const u8, comptime clr: Color) []const u8 {
 const err_msg = generateMsg("Error:", .red);
 const help_msg = generateMsg("help:", .green);
 const warning_msg = generateMsg("Warning:", .yellow);
-const corner_to_hint = boxChar(.bottom_left) ++ boxChar(.horitzontal) ** 4;
-const corner_to_end = boxChar(.bottom_left) ++ boxChar(.horitzontal) ** 2;
 
 extern "kernel32" fn GetConsoleOutputCP() std.os.windows.UINT;
 extern "kernel32" fn SetConsoleOutputCP(std.os.windows.UINT) void;
@@ -140,7 +138,7 @@ fn display(Report: type, report: *const GenReport(Report), writer: *Writer, file
         var buf: [10]u8 = undefined;
         // We consider the maximum line number being 99 999. The extra space
         // is for space between line number and gutter and the one at the beginning
-        const buf2: [7]u8 = [_]u8{' '} ** 7;
+        const buf2: [7]u8 = @splat(' ');
 
         // Gets line number digit count
         const written = try std.fmt.bufPrint(&buf, "{}", .{line_count});
@@ -178,7 +176,7 @@ fn display(Report: type, report: *const GenReport(Report), writer: *Writer, file
         try writer.print("{s}{s} ", .{ left_padding, boxChar(.vertical) });
 
         // We get the length of the error code and the half to underline it
-        var space_buf: [1024]u8 = [_]u8{' '} ** 1024;
+        var space_buf: [1024]u8 = @splat(' ');
         const start_space = report.start - line_start;
         const lexeme_len = @max(report.end - report.start, 1);
 
@@ -268,15 +266,17 @@ pub fn GenReport(comptime T: type) type {
 
         /// Used in test mode when we only want error name and associated data
         pub fn toStr(self: *const Self, writer: anytype) !void {
-            const name = @tagName(self.report);
-            try writer.writeAll(name);
+            const tag_name = @tagName(self.report);
+            try writer.writeAll(tag_name);
 
-            inline for (std.meta.fields(T)) |field| {
-                if (field.type != void and std.mem.eql(u8, field.name, name)) {
-                    const field_info = @field(self.report, field.name);
+            const info = @typeInfo(T).@"union";
 
-                    inline for (std.meta.fields(field.type)) |subf| {
-                        const subv = @field(field_info, subf.name);
+            inline for (info.field_names, info.field_types) |name, Field| {
+                if (Field != void and std.mem.eql(u8, name, tag_name)) {
+                    const field_info = @field(self.report, name);
+
+                    inline for (@typeInfo(Field).@"struct".field_names) |sub_name| {
+                        const subv = @field(field_info, sub_name);
 
                         switch (@typeInfo(@TypeOf(subv))) {
                             .int => |i| {

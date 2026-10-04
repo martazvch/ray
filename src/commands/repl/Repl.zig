@@ -30,7 +30,7 @@ const Error = error{ BadRead, BadWrite, TooManyIndents, Empty, EndOfFile } || st
 
 const MAX_IDENT = 64;
 const INDENT_SIZE = 4;
-const SPACES = " " ** (INDENT_SIZE * MAX_IDENT);
+const SPACES: [INDENT_SIZE * MAX_IDENT]u8 = @splat(' ');
 
 const Vec2 = struct {
     x: usize,

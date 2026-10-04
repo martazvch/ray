@@ -174,13 +174,13 @@ pub fn close(self: *Self) struct { pop_count: usize, breaks: []const Break, defe
 
 pub fn initGlobalScope(self: *Self, allocator: Allocator, state: *State) void {
     self.open(allocator, null, .{ .barrier = true });
-    const builtins = std.meta.fields(@TypeOf(state.type_interner.cache));
-    self.builtins.ensureUnusedCapacity(allocator, builtins.len) catch oom();
+    const builtin_names = @typeInfo(@TypeOf(state.type_interner.cache)).@"struct".field_names;
+    self.builtins.ensureUnusedCapacity(allocator, builtin_names.len) catch oom();
 
-    inline for (builtins) |builtin| {
+    inline for (builtin_names) |name| {
         self.builtins.putAssumeCapacity(
-            state.interner.intern(builtin.name),
-            @field(state.type_interner.cache, builtin.name),
+            state.interner.intern(name),
+            @field(state.type_interner.cache, name),
         );
     }
 

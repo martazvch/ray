@@ -31,7 +31,7 @@ constants: []const Constant,
 module: ModIndex,
 
 const indent_size: u8 = 4;
-const spaces: [1024]u8 = [_]u8{' '} ** 1024;
+const spaces: [1024]u8 = @splat(' ');
 
 const Error = std.Io.Writer.Error;
 const Self = @This();

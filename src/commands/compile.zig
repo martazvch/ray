@@ -85,7 +85,7 @@ const LexScope = struct {
 
 const Self = @This();
 const Error = std.ArrayList(u8).Writer.Error;
-const spaces: []const u8 = " " ** 1024;
+const spaces: [1024]u8 = @splat(' ');
 const INDENT_SIZE = 4;
 
 pub const Args = struct {

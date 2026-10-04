@@ -114,9 +114,9 @@ fn getApiFns(T: type) []const BuiltinFn(T) {
     const info = @typeInfo(T).@"struct";
     comptime var fns: []const BuiltinFn(T) = &.{};
 
-    inline for (info.decls) |decl| {
-        if (comptime std.mem.startsWith(u8, decl.name, "_api_")) {
-            comptime fns = fns ++ .{@field(T, decl.name)};
+    inline for (info.decl_names) |name| {
+        if (comptime std.mem.startsWith(u8, name, "_api_")) {
+            comptime fns = fns ++ .{@field(T, name)};
         }
     }
 
@@ -130,16 +130,16 @@ fn getDefApiFns(T: type) std.StaticStringMap(ObjFnInfos) {
     comptime var i: usize = 0;
     comptime var kvs: []const KV = &.{};
 
-    inline for (info.decls) |decl| {
-        if (comptime std.mem.startsWith(u8, decl.name, "_api_")) {
-            const name = decl.name[5..];
-            const def_name = "_defapi_" ++ name;
+    inline for (info.decl_names) |name| {
+        if (comptime std.mem.startsWith(u8, name, "_api_")) {
+            const fn_name = name[5..];
+            const def_name = "_defapi_" ++ fn_name;
 
             if (!@hasDecl(T, def_name)) {
-                @compileError("Missing API type definition for function: " ++ name);
+                @compileError("Missing API type definition for function: " ++ fn_name);
             }
 
-            kvs = kvs ++ .{KV{ name, .{ .index = i, .type_info = @field(T, def_name) } }};
+            kvs = kvs ++ .{KV{ fn_name, .{ .index = i, .type_info = @field(T, def_name) } }};
             i += 1;
         }
     }
@@ -1069,7 +1069,7 @@ pub fn print(self: *Obj, artifacts: *const Artifacts, writer: *Writer) Writer.Er
         },
         .box => {
             const box = self.as(Box);
-            if (comptime @import("builtin").mode == .Debug) {
+            if (comptime @import("builtin").mode == .debug) {
                 try writer.writeAll("Box ");
             }
             box.value.print(artifacts, writer);
@@ -1077,7 +1077,7 @@ pub fn print(self: *Obj, artifacts: *const Artifacts, writer: *Writer) Writer.Er
         .closure => {
             const closure = self.as(Closure);
 
-            if (comptime @import("builtin").mode == .Debug) {
+            if (comptime @import("builtin").mode == .debug) {
                 try writer.print("<closure {s}>", .{closure.function.name});
             } else {
                 try writer.print("<fn {s}>", .{closure.function.name});

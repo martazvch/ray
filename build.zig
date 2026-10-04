@@ -1,4 +1,5 @@
 const std = @import("std");
+const Translator = @import("translate_c").Translator;
 
 pub fn build(b: *std.Build) !void {
     const options = b.addOptions();
@@ -24,15 +25,37 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    // --------------
+    //  Dependencies
+    // --------------
+    const clarg = b.dependency("clarg", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const libffi = b.dependency("libffi", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const ffi = libffi.artifact("ffi");
+
+    const translate_c = b.dependency("translate_c", .{});
+    const translator = Translator.init(translate_c, .{
+        .c_source_file = b.path("src/core/ffi/libffi.h"),
+        .optimize = optimize,
+        .target = target,
+    });
+
+    // ffi.h is generated + installed by libffi package
+    translator.addIncludePath(ffi.getEmittedIncludeTree());
+
+    // ---------
+    //  Modules
+    // ---------
     const ray_mod = b.addModule("ray", .{
         .optimize = optimize,
         .target = target,
         .root_source_file = b.path("src/main.zig"),
-    });
-
-    const exe = b.addExecutable(.{
-        .name = "ray",
-        .root_module = ray_mod,
     });
 
     const misc_mod = b.createModule(.{
@@ -40,6 +63,14 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .root_source_file = b.path("src/misc/misc.zig"),
     });
+
+    const libffi_mod = b.createModule(.{
+        .optimize = optimize,
+        .target = target,
+        .root_source_file = b.path("src/core/libffi.zig"),
+    });
+    libffi_mod.addImport("ffi", translator.mod);
+    libffi_mod.linkLibrary(ffi);
 
     const core_mod = b.createModule(.{
         .optimize = optimize,
@@ -51,22 +82,23 @@ pub fn build(b: *std.Build) !void {
         },
     });
 
-    const clarg = b.dependency("clarg", .{
-        .target = target,
-        .optimize = optimize,
+    // ------------
+    //  Executable
+    // ------------
+    const exe = b.addExecutable(.{
+        .name = "ray",
+        .root_module = ray_mod,
     });
     exe.root_module.addImport("clarg", clarg.module("clarg"));
     exe.root_module.addImport("misc", misc_mod);
+    exe.root_module.addImport("libffi", libffi_mod);
     exe.root_module.addOptions("options", options);
 
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
-
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
+    run_cmd.addPassthruArgs();
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
@@ -114,6 +146,7 @@ pub fn build(b: *std.Build) !void {
     });
     exe_check.root_module.addImport("clarg", clarg.module("clarg"));
     exe_check.root_module.addImport("misc", misc_mod);
+    exe_check.root_module.addImport("libffi", libffi_mod);
     exe_check.root_module.addOptions("options", options);
 
     const check = b.step("check", "Check if foo compiles");
@@ -156,12 +189,7 @@ pub fn build(b: *std.Build) !void {
     buildC(b, test_step, "not_cmodule", "not_module.c", target, optimize);
     buildC(b, test_step, "invalid_cmodule", "invalid_module.c", target, optimize);
 
-    if (b.args) |args| {
-        run_tester.addArgs(args);
-    } else {
-        run_tester.addArg("--stage=all");
-    }
-
+    run_tester.addPassthruArgs();
     test_step.dependOn(&run_tester.step);
 
     // Zig embedded tests
@@ -172,7 +200,11 @@ pub fn build(b: *std.Build) !void {
     test_step.dependOn(&embed_tests.step);
 
     // C embedded tests
-    const install_embed_c_lib = b.addInstallArtifact(embed_c_lib, .{});
+    const embed_c_static = b.addLibrary(.{
+        .name = "ray",
+        .root_module = embed_c_lib.root_module,
+        .linkage = .static,
+    });
 
     const c_embed_test_exe = b.addExecutable(.{
         .name = "c-tester",
@@ -189,17 +221,10 @@ pub fn build(b: *std.Build) !void {
     });
     c_embed_test_exe.root_module.addIncludePath(b.path("tests/embed/c"));
     c_embed_test_exe.root_module.addIncludePath(b.path("src/embed"));
-    c_embed_test_exe.root_module.linkLibrary(embed_c_lib);
-    const lib_dir = b.getInstallPath(.lib, "");
-    c_embed_test_exe.root_module.addRPath(.{ .cwd_relative = lib_dir });
+    c_embed_test_exe.root_module.linkLibrary(embed_c_static);
 
-    const install_c_tester = b.addInstallArtifact(c_embed_test_exe, .{});
-    install_c_tester.step.dependOn(&install_embed_c_lib.step);
-
-    const tester_path = b.getInstallPath(.bin, "c-tester");
-    const run_c_embed_test = b.addSystemCommand(&.{tester_path});
+    const run_c_embed_test = b.addRunArtifact(c_embed_test_exe);
     run_c_embed_test.setCwd(b.path("tests/embed/c"));
-    run_c_embed_test.step.dependOn(&install_c_tester.step);
     test_step.dependOn(&run_c_embed_test.step);
 }
 
