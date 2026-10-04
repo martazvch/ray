@@ -10,15 +10,15 @@ fn main() {
 
     if false { _ =  "yes" } else { _ =  "no" }
 
-    a := if true { break 1 } else { break 2 }
+    a := b: if true { break :b 1 } else { break :b 2 }
 
-    b := if { break true } do 5 + 6 else 1
+    b := if cond: { break :cond true } do 5 + 6 else 1
 
-    c := if { break not true } { break 5 + 6 } else {
+    c := if not true do 5 + 6 else val: {
         tmp := 1
         _ =  tmp
         tmp = 5
-        break a + b + tmp
+        break :val a + b + tmp
     }
 }
 

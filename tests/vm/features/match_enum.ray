@@ -27,10 +27,10 @@ fn main() {
     foo := match marker {
         .circle => 1
         .cross => 2
-        .none => {
+        .none => b: {
             tmp := 4
             tmp2 := 6
-            break 3
+            break :b 3
         }
     }
 

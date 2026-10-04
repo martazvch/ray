@@ -54,7 +54,7 @@ fn main() {
                 break :b 1
             }
         }
-        break 4
+        break :b 4
     } else 3
     print(z) // expect 1
 
@@ -63,7 +63,7 @@ fn main() {
         {
             break :b 6
         }
-        break 0 // mandatory for now
+        break :b 0 // mandatory for now
     } else b: { break :b 8 }
     print(z) // expect 6
 
@@ -72,7 +72,7 @@ fn main() {
         {
             break :b 6
         }
-        break 0 // mandatory for now
+        break :b 0 // mandatory for now
     } else b: { break :b 8 }
     print(z) // expect 8
 }

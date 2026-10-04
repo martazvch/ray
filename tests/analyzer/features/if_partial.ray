@@ -7,22 +7,21 @@ fn main() {
         // Only one path generates a value, returns a value otherwise
         if true do "str" else return a
 
-        tmp: str = if true do return a + 2 else {
+        tmp: str = b: if true do return a + 2 else {
             local := 56.4
-            break "champ"
+            break :b "champ"
         }
 
-        // If without else but not as last stmt
-        if true do return 8
-
-        return if true {
-            if true {
-                return { break 1 }
-            } else break 5
+        // Raises no error
+        return b: if true {
+            break :b if true {
+                return c: { break :c 1 } // expect: 1
+            } else 5
         } else {
-            if false {
+            break :b if false {
                 return if true { return 4 } else 3
-            } else break 8
+            } else 8
         }
     }
 }
+

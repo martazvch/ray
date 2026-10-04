@@ -3,11 +3,11 @@ glob2 := 42.5
 
 fn main() {
     // Last expression returned while discarding inbetween locals
-    a: int = {
+    a: int = val: {
         space := 67
         nb := 7
         sneaky := 90
-        break nb
+        break :val nb
     }
 
     print(a) // expect: 7
@@ -15,9 +15,9 @@ fn main() {
     // Returning an outter local from a scope
     b := 56
 
-    c: int = {
+    c: int = val: {
         sneaky := 90
-        break b
+        break :val b
     }
 
     print(c) // expect: 56
@@ -29,24 +29,24 @@ fn main() {
     }
 
     // Naked break
-    {
-        break
+    b: {
+        break :b
         print("no") // should not see this one
     }
 
     // Returning a global
-    scope := {
+    scope := val: {
         print("in scope") // expect: "in scope"
-        break glob1
+        break :val glob1
     }
 
     print(scope) // expect: 7.5
 
     // Breaks only inner scope
     {
-        {
+        b: {
             a := 1
-            break
+            break :b
             print("ayo")
         }
         print("oh boi")

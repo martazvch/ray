@@ -3,7 +3,7 @@ fn add() -> int {
 }
 
 fn add1() -> int {
-    return if false { break 1 } else { break 5 }
+    return b: if false { break :b 1 } else { break :b 5 }
 }
 
 fn add2() -> int {

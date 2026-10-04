@@ -38,9 +38,9 @@ fn main() {
     testFail(220)
     testFail(100)
 
-    print(failable(15) trap e {
+    print(failable(15) trap e b: {
         print(e)
-        break 88
+        break :b 88
     })
 }
 

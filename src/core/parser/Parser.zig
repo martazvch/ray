@@ -1406,6 +1406,7 @@ fn ifExpr(self: *Self) Error!*Expr {
     self.skipNewLines();
 
     // TODO: Warning for unnecessary 'do' if there is a block after
+    self.ctx.label = self.openningLabel();
     const then: Node = if (self.match(.left_brace))
         .{ .expr = try self.blockExpr(label) }
     else if (self.matchAndSkip(.do))
@@ -1903,11 +1904,12 @@ fn trap(self: *Self, expr: *Expr) Error!*Expr {
         .identifier, .underscore => rhs: {
             self.advance();
             const token = if (self.match(.underscore)) null else self.token_idx - 1;
+            const label = self.openningLabel();
             try self.expect(.left_brace, .trap_no_block_after_binding);
 
             break :rhs .{ .binding = .{
                 .token = token,
-                .body = try self.blockExpr(null),
+                .body = try self.blockExpr(label),
             } };
         },
         else => {

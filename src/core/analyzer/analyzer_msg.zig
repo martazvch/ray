@@ -12,6 +12,7 @@ pub const AnalyzerMsg = union(enum) {
     assign_type,
     big_self_outside_decl,
     block_all_path_dont_return,
+    break_no_val_in_val_block,
     break_val_in_non_val_block,
     call_method_on_constant: struct { name: []const u8 },
     call_method_on_type: struct { name: []const u8 },
@@ -94,6 +95,7 @@ pub const AnalyzerMsg = union(enum) {
     missing_fn_impl_in_trait: struct { func: []const u8, trait: []const u8 },
     named_arg_in_bounded,
     no_continuable_scope,
+    no_breakable_scope,
     no_main,
     non_bool_cond: struct { what: []const u8, found: []const u8 },
     non_comptime_constant,
@@ -157,6 +159,7 @@ pub const AnalyzerMsg = union(enum) {
             .assign_type => writer.writeAll("trying to assign a type"),
             .big_self_outside_decl => writer.writeAll("can't use 'Self' outside a declaration"),
             .block_all_path_dont_return => writer.writeAll("all paths of block expression don't return a value"),
+            .break_no_val_in_val_block => writer.writeAll("targetted block expect a value"),
             .break_val_in_non_val_block => writer.writeAll("can't return a value from this scope"),
             .call_fn_on_trait => |e| writer.print("'{s}' is trait, can't call functions on it", .{e.name}),
             .call_static_fn_on_trait_obj => |e| writer.print("can't call static function '{s}' on an instance", .{e.fn_name}),
@@ -239,6 +242,7 @@ pub const AnalyzerMsg = union(enum) {
             .missing_function_param => |e| writer.print("missing argument '{s}'", .{e.name}),
             .named_arg_in_bounded => writer.writeAll("named argument are not allowed with bounded functions"),
             .no_continuable_scope => writer.writeAll("no continuable block found in current scope"),
+            .no_breakable_scope => writer.writeAll("no breakable block found in current scope"),
             .no_main => writer.writeAll("no main function found"),
             .non_comptime_constant => writer.writeAll("constant can't be evaluated at compile time"),
             .non_comptime_default => |e| writer.print("only compilation time expressions are allowed for {s}", .{e.kind}),
@@ -299,6 +303,7 @@ pub const AnalyzerMsg = union(enum) {
             .assign_type => writer.writeAll("types aren't assignable to variables"),
             .big_self_outside_decl => writer.writeAll("'Self' can only be used in declarations like enums or structures to refer to the current type"),
             .block_all_path_dont_return => writer.writeAll("when using a block as an expression, all paths must return a value"),
+            .break_no_val_in_val_block => writer.writeAll("when breaking from a block in an expression context, a value is expected to be returned"),
             .break_val_in_non_val_block => writer.writeAll(
                 "you are either trying to return a value from a non expression block (like a 'while' body) or the block " ++
                     "isn't used in an expression",
@@ -314,6 +319,7 @@ pub const AnalyzerMsg = union(enum) {
             ),
             .cant_build_native_struct => writer.writeAll("only native Zig structures that define an 'init' function can use structure literal syntax"),
             .cant_continue_scope, .no_continuable_scope => writer.writeAll("'continue' can only be used with 'for' and 'while' statements"),
+            .no_breakable_scope => writer.writeAll("'break' can only be used inside 'for' and 'while' statements or labelled block and 'if'"),
             .cant_infer_array_type => writer.writeAll(
                 \\can't extract any type information from an empty array '[]'. you must either declare a type in variable's
                 \\signature like: 'var arr: []int = []' or initialize the array with at least one value (not possible every time).

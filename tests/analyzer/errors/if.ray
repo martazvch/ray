@@ -1,10 +1,10 @@
 fn main() {
-    _ = if {
+    _ = if b: {
         tmp := 62
-        break tmp
+        break :b tmp
     } do 1.5 else 4.
 
-    res := if true {break 1}
+    res := b: if true { break :b 1 }
     res2 := if true do -5.5
     res3 := if true {1} else {"pipou"}
 }

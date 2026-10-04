@@ -8,7 +8,6 @@ pop
 get_local index 0
 ret
 pop
-
 push_false
 jump_false 16 -> 29
 pop
@@ -25,57 +24,52 @@ pop
 jump 36 -> 40
 pop
 load_blk_val
-
-get_local index 1
-pop
-
 push_false
-jump_false 45 -> 55
+jump_false 42 -> 52
 pop
 load_const index 8, value 8
 ret
-jump 52 -> 56
-pop
-
-push_true
-jump_false 57 -> 89
+jump 49 -> 53
 pop
 push_true
-jump_false 62 -> 78
+jump_false 54 -> 86
+pop
+push_true
+jump_false 59 -> 75
 pop
 load_const index 9, value 1
 store_blk_val
-jump 69 -> 72
+jump 66 -> 69
 load_blk_val
 ret
 pop
-jump 75 -> 81
+jump 72 -> 78
 pop
 load_const index 3, value 5
 store_blk_val
-jump 82 -> 85
+jump 79 -> 82
 load_blk_val
-jump 86 -> 123
+jump 83 -> 120
 pop
 push_false
-jump_false 91 -> 115
+jump_false 88 -> 112
 pop
 push_true
-jump_false 96 -> 107
+jump_false 93 -> 104
 pop
 load_const index 1, value 4
 ret
 pop
-jump 104 -> 110
+jump 101 -> 107
 pop
 load_const index 10, value 3
 ret
 pop
-jump 112 -> 118
+jump 109 -> 115
 pop
 load_const index 8, value 8
 store_blk_val
-jump 119 -> 122
+jump 116 -> 119
 load_blk_val
 ret
 
@@ -88,10 +82,8 @@ ret
 pop
 jump 9 -> 13
 pop
-
 load_const index 11, value should not be seen
 pop
-
 load_const index 12, value 4.5
 ret
 
@@ -104,11 +96,9 @@ pop
 get_local index 0
 ret
 pop
-
 load_const index 11, value should not be seen
 pop
-
-load_const index 14, value 0.01
+load_const index 13, value 0.01
 ret
 
 -- nested --
@@ -162,10 +152,8 @@ ret_naked
 jump 6 -> 12
 pop
 load_const index 1, value 4
-
 get_local index 0
 pop
-
 push_true
 jump_false 16 -> 25
 pop
@@ -173,25 +161,8 @@ load_const index 3, value 5
 jump 22 -> 27
 pop
 ret_naked
-
 get_local index 1
 pop
-
-load_const index 3, value 5
-call index 1, arity 1, func
-pop
-
-load_const index 13, value 8.5
-call index 2, arity 1, shortcut
-pop
-
-load_const index 15, value -18.5
-call index 3, arity 1, shortcut_bis
-pop
-
-call index 4, arity 0, nested
-pop
-
 ret_naked
 
 -- global scope --

@@ -9,6 +9,6 @@ fn main() {
             break :value trash
         }
         
-        break 5
+        break :value 5
     }
 }

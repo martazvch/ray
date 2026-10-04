@@ -6,7 +6,6 @@ fn main() {
         inner: {
             c := 3
             {
-                if true do break
                 if true do break :outer
                 if true do break :inner
             }
@@ -30,6 +29,6 @@ fn main() {
                 break :b 1
             }
         }
-        break 4
+        break :b 4
     } else 3
 }

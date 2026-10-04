@@ -1,5 +1,5 @@
 fn main() {
-    _ = {break 5}
+    _ = b: { break :b 5 }
     { a := 5 }
     { a: int }
 
@@ -9,16 +9,16 @@ fn main() {
         b := 5
     }
 
-    a: int = {
+    a: int = b: {
         nb := 7
-        break nb
+        break :b nb
     }
 
-    b: int = {
+    b: int = b: {
         space := 67
         other := "just chillin"
         nb := 7
         sneaky := 90
-        break nb
+        break :b nb
     }
 }

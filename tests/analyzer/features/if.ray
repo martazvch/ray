@@ -1,33 +1,33 @@
 fn main() {
     res := if true do 4 else 5.6
-    res2 := if true {
-        break 5.6
+    res2 := b: if true {
+        break :b 5.6
     } else 4
 
-    res3 := if true {
-        break 8.7
-    } else if true {
-        break 6
+    res3 := b: if true {
+        break :b 8.7
+    } else b: if true {
+        break :b 6
     } else 4
 
-    _ = if true { break "ok" } else "ko"
+    _ = b: if true { break :b "ok" } else "ko"
     _ = if true do "ok"  else "ko"
-    _ = if true do false  else { break true }
+    _ = b: if true do false  else { break :b true }
 
-    _ = if true {
+    _ = b: if true {
         tmp := 5.5
         adder := 8.7
-        break tmp + adder
+        break :b tmp + adder
     } else 4
 
-    _ = if {
+    _ = if b: {
         tmp := true
         noise := 1
-        break tmp
-    } do 1.5 else { break 4 }
+        break :b tmp
+    } do 1.5 else b: { break :b 4 }
 
-    _ = if {
-        break if true do true else false
+    _ = if b: {
+        break :b if true do true else false
     } do 1 else 4.5
 
     fn add() -> int {

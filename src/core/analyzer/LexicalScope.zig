@@ -111,8 +111,8 @@ pub const Scope = struct {
         barrier: bool = false,
         /// This scopes is expected to return a value
         exp_val: bool = false,
-        /// Can use `continue` statments inside this block
-        can_continue: bool = false,
+        /// Can use `continue` and `break` statments inside this block
+        loopable: bool = false,
     };
 };
 
@@ -393,35 +393,25 @@ pub fn getModule(self: *const Self, name: InternerIdx) ?*const Type {
 
 /// Searches a scope by its name or return the last one if `label` is null
 /// Returns the index (start from 0) and the depth (start from scopes.len) of the scope if found
-pub fn getScope(self: *const Self, label: ?InstrIndex) error{UnknownLabel}!struct { usize, usize } {
-    const lbl = label orelse return .{ self.scopes.items.len - 1, 0 };
-
-    var depth: usize = 0;
-    var it = self.iterator();
-    while (it.next()) |scope| : (depth += 1) {
-        // We hit a function or structure's declaration scope
-        if (scope.opts.barrier) break;
-
-        if (scope.name) |sn| {
-            if (sn != lbl) continue;
-            return .{ self.scopes.items.len - 1 - depth, depth };
-        }
-    }
-
-    return error.UnknownLabel;
-}
-
-/// Searches a scope by its name or return the last one if `label` is null
-/// Returns the index (start from 0) and the depth (start from scopes.len) of the scope if found
-pub const ContinueScopeErr = error{
+const ScopeErr = error{
     /// Didn't find any scope corresponding to provided label
     UnknownLabel,
     /// Found a labelled scope but it isn't continuable
     CantContinue,
     /// Didn't find any continuable scope
     NoContinueScope,
+    /// Didn't find any breakable scope
+    NoBreackableScope,
 };
-pub fn getScopeContinuable(self: *const Self, label: ?InstrIndex) ContinueScopeErr!struct { *const Scope, usize } {
+pub const ScopeRes = struct {
+    index: usize,
+    depth: usize,
+};
+pub const ScopeAction = enum {
+    @"break",
+    @"continue",
+};
+pub fn getScope(self: *const Self, label: ?InternerIdx, action: ScopeAction) ScopeErr!ScopeRes {
     var depth: usize = 0;
     var it = self.iterator();
     while (it.next()) |scope| : (depth += 1) {
@@ -431,18 +421,27 @@ pub fn getScopeContinuable(self: *const Self, label: ?InstrIndex) ContinueScopeE
         if (label) |lbl| {
             if (scope.name) |sn| {
                 if (sn != lbl) continue;
-                if (!scope.opts.can_continue) return error.CantContinue;
-                return .{ scope, depth };
+                if (action == .@"continue" and !scope.opts.loopable) return error.CantContinue;
+                return .{ .index = self.scopes.items.len - 1 - depth, .depth = depth };
             }
-        } else if (scope.opts.can_continue) {
-            return .{ scope, depth };
+        } else if (scope.opts.loopable) {
+            return .{ .index = self.scopes.items.len - 1 - depth, .depth = depth };
         }
     }
 
-    return if (label != null) error.UnknownLabel else error.NoContinueScope;
+    return if (label != null)
+        error.UnknownLabel
+    else switch (action) {
+        .@"break" => error.NoBreackableScope,
+        .@"continue" => error.NoContinueScope,
+    };
 }
 
-pub fn stackDiffWithCurrent(self: *const Self, other: *const Scope) usize {
+pub fn getScopeFromIndex(self: *const Self, index: usize) *Scope {
+    return &self.scopes.items[index];
+}
+
+pub fn stackSizeFrom(self: *const Self, other: *const Scope) usize {
     return self.current.offset + self.current.variables.count() - other.offset;
 }
 

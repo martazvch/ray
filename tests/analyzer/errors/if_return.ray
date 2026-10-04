@@ -11,32 +11,32 @@ fn main() {
         // Returns b, which is a float
         _ =  if true do "str" else return b
 
-        tmp: str = if true do return a + 2 else {
+        tmp: str = b: if true do return a + 2 else {
             local := 56.4
-            if false do break "champ"
+            if false do break :b "champ"
         }
 
         // Raises no error
-        return if true {
-            if true {
-                return { break 1 }
-            } else break 5
+        return b: if true {
+            break :b if true {
+                return c: { break :c 1 } // expect: 1
+            } else 5
         } else {
-            if false {
+            break :b if false {
                 return if true { return 4 } else 3
-            } else break 8
+            } else 8
         }
     }
 
     fn func2() -> int {
-        return if true {
-            if true {
-                return 1
-            } else break 5
+        return b: if false {
+            break :b if true {
+                return c: { break :c 1 }
+            } else 5
         } else {
-            if false {
-                return if true { return 4 } else 3.6
-            } else break 8
+            break :b if true {
+                return if false { return 4 } else 3.6
+            } else 8
         }
     }
 }

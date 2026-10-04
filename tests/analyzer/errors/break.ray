@@ -1,9 +1,13 @@
 fn main() {
-    {
-        break 4
+    a := b: {
+        break :b 
     }
 
     b: {
         break :b 5
+    }
+
+    {
+        break
     }
 }

@@ -263,29 +263,36 @@ fn assignment(self: *Self, node: *const Ast.Assignment, ctx: *Context) StmtResul
 
 fn continueStmt(self: *Self, node: Ast.Continue, ctx: *const Context) StmtResult {
     const span = self.ast.getSpan(node);
-
-    const scope, const depth = self.scope.getScopeContinuable(self.internLabel(node.label)) catch |e| {
-        return switch (e) {
-            error.CantContinue => self.err(
-                .{ .cant_continue_scope = .{ .name = self.ast.toSource(node.label.?) } },
-                self.ast.getSpan(node.label.?),
-            ),
-            error.NoContinueScope => self.err(.no_continuable_scope, span),
-            error.UnknownLabel => self.err(
-                .{ .undeclared_block_label = .{ .name = self.ast.toSource(node.label.?) } },
-                self.ast.getSpan(node.label.?),
-            ),
-        };
-    };
+    const scope_res = try self.getScope(node.label, .@"continue", span);
+    const scope = self.scope.getScopeFromIndex(scope_res.index);
 
     // If we are in a `for` loop, we don't discard the added iterator
     return self.irb.addInstr(
         .{ .@"continue" = .{
-            .depth = depth,
-            .pop_count = self.scope.stackDiffWithCurrent(scope) - @intFromBool(ctx.in_for),
+            .depth = scope_res.depth,
+            .pop_count = self.scope.stackSizeFrom(scope) - @intFromBool(ctx.in_for),
         } },
         span.start,
     );
+}
+
+fn getScope(self: *Self, label: ?usize, action: LexScope.ScopeAction, span: Span) Error!LexScope.ScopeRes {
+    const scope_res = self.scope.getScope(self.internLabel(label), action) catch |e| {
+        return switch (e) {
+            error.CantContinue => self.err(
+                .{ .cant_continue_scope = .{ .name = self.ast.toSource(label.?) } },
+                self.ast.getSpan(label.?),
+            ),
+            error.NoContinueScope => self.err(.no_continuable_scope, span),
+            error.NoBreackableScope => self.err(.no_breakable_scope, span),
+            error.UnknownLabel => self.err(
+                .{ .undeclared_block_label = .{ .name = self.ast.toSource(label.?) } },
+                self.ast.getSpan(label.?),
+            ),
+        };
+    };
+
+    return scope_res;
 }
 
 fn deferStmt(self: *Self, node: *Node, ctx: *Context) StmtResult {
@@ -470,7 +477,7 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
 
     const prev_in_for = ctx.setAndGetPrevious(.in_for, true);
     defer ctx.in_for = prev_in_for;
-    const body_res = try self.block(&node.body, 1, .{ .can_continue = true }, ctx);
+    const body_res = try self.block(&node.body, 1, .{ .loopable = true }, ctx);
 
     return self.irb.addInstr(
         .{ .for_loop = .{
@@ -1433,7 +1440,7 @@ fn whileStmt(self: *Self, node: *const Ast.While, ctx: *Context) StmtResult {
         .{ .non_bool_cond = .{ .what = "while", .found = self.typeName(cond_res.type) } },
         span,
     );
-    const body_res = try self.block(&node.body, 0, .{ .can_continue = true }, ctx);
+    const body_res = try self.block(&node.body, 0, .{ .loopable = true }, ctx);
 
     return self.irb.addInstr(.{ .@"while" = .{ .cond = cond_res.instr, .body = body_res.instr } }, span.start);
 }
@@ -2085,33 +2092,38 @@ fn getComparisonOp(op: TokenTag, ty: *const Type) Instr.Binop.Op {
 
 fn breakExpr(self: *Self, expr: *const Ast.Break, ctx: *Context) Result {
     const span = self.ast.getSpan(expr);
-
-    // We take scope's index because evaluating the possible `break` expression can invalidate a pointer to scope
-    const scope_index, const depth = self.scope.getScope(self.internLabel(expr.label)) catch return self.err(
-        .{ .undeclared_block_label = .{ .name = self.ast.toSource(expr.label.?) } },
-        self.ast.getSpan(expr.label.?),
-    );
-    const scope_exp_val = self.scope.scopes.items[scope_index].opts.exp_val;
+    const scope_res = try self.getScope(expr.label, .@"break", span);
+    var scope = self.scope.getScopeFromIndex(scope_res.index);
 
     const ty, const expr_instr = brk: {
-        const e = expr.expr orelse break :brk .{ self.ti.getCached(.void), null };
+        const e = expr.expr orelse {
+            if (scope.opts.exp_val) {
+                return self.err(.break_no_val_in_val_block, self.ast.getSpan(expr.kw));
+            }
 
-        if (!scope_exp_val) {
+            break :brk .{ self.ti.getCached(.void), null };
+        };
+
+        if (!scope.opts.exp_val) {
             return self.err(.break_val_in_non_val_block, self.ast.getSpan(e));
         }
 
-        const res = try self.analyzeExpr(e, if (scope_exp_val) .value else .none, ctx);
+        const res = try self.analyzeExpr(e, .maybe, ctx);
+
+        if (res.type.is(.void) and !res.cf.exitScope()) {
+            return self.err(.void_value, span);
+        }
 
         break :brk .{ res.type, res.instr };
     };
 
-    const scope = &self.scope.scopes.items[scope_index];
-
+    // Get the pointer again as it could be invalidate with expression analyzis
+    scope = self.scope.getScopeFromIndex(scope_res.index);
     const instr = self.irb.addInstr(
         .{ .@"break" = .{
             .instr = expr_instr,
-            .depth = depth,
-            .pop_count = self.scope.stackDiffWithCurrent(scope),
+            .depth = scope_res.depth,
+            .pop_count = self.scope.stackSizeFrom(scope),
         } },
         span.start,
     );

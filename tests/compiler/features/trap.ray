@@ -14,9 +14,9 @@ fn failable(val: int) -> bool!ValueErr {
 }
 
 fn main() {
-    _ = failable(15) trap e {
+    _ = failable(15) trap e b: {
         _ = e
-        break 88
+        break :b 88
     }
     _ = failable(15) trap match e {
         .tooSmall => 1

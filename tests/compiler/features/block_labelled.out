@@ -4,53 +4,41 @@
 push_true
 jump_false 1 -> 11
 pop
-jump 5 -> 36
+jump 5 -> 27
 jump 8 -> 12
 pop
-
 push_true
 jump_false 13 -> 23
 pop
-jump 17 -> 39
+jump 17 -> 27
 jump 20 -> 24
 pop
+jump 24 -> 27
 push_true
-jump_false 25 -> 35
-pop
-jump 29 -> 39
-jump 32 -> 36
-pop
-
-jump 36 -> 39
-
-push_true
-jump_false 40 -> 53
+jump_false 28 -> 41
 pop
 load_const index 1, value 4.5
 store_blk_val
-jump 47 -> 60
-jump 50 -> 54
+jump 35 -> 48
+jump 38 -> 42
 pop
-
 load_const index 1, value 4.5
 store_blk_val
-jump 57 -> 60
+jump 45 -> 48
 load_blk_val
-
 push_true
-jump_false 62 -> 82
+jump_false 50 -> 70
 pop
 load_const index 2, value 1
 store_blk_val
-jump 69 -> 78
+jump 57 -> 66
 load_const index 3, value 4
 store_blk_val
-jump 75 -> 78
+jump 63 -> 66
 load_blk_val
-jump 79 -> 85
+jump 67 -> 73
 pop
 load_const index 4, value 3
-
 ret_naked
 
 -- global scope --

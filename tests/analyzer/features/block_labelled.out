@@ -16,12 +16,6 @@
                     [Constant index 0]
                         [Bool true]
                 - then:
-                    [Break depth: 0, pop: 0]
-                [If]
-                - condition:
-                    [Constant index 0]
-                        [Bool true]
-                - then:
                     [Break depth: 2, pop: 3]
                 [If]
                 - condition:
