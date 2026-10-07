@@ -2,8 +2,8 @@ const TagLit = @import("ConstantInterner.zig").Constant.TagLit;
 const ConstIdx = @import("ConstantInterner.zig").ConstIdx;
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
 const CLayout = @import("../compiler/Artifacts.zig").CStructure.Layout;
-const cffi = @import("../ffi/cffi.zig");
 const Language = @import("types.zig").Language;
+const ffi = @import("ffi");
 
 pub const Scope = enum {
     global,
@@ -53,7 +53,7 @@ pub const Instruction = struct {
         load_symbol: LoadSymbol,
         match: Match,
         match_type: MatchType,
-        multiple_var_decl: MultiVarDecl,
+        multiple_decls: []const Index,
         obj_func: ObjFn,
         pat_nullable: Index,
         pointer: Pointer,
@@ -202,13 +202,12 @@ pub const Instruction = struct {
         pub const Capture = struct { index: usize, local: bool };
     };
     pub const CFnDecl = struct {
-        func: cffi.Fn,
+        func: ffi.Fn,
         sym_index: SymbolIndex,
         type_id: TypeId,
         name: usize,
-        returns: bool,
-
-        pub const Capture = struct { index: usize, local: bool };
+        param_types: ffi.Params,
+        return_type: ffi.Type,
     };
     pub const For = struct {
         expr: Index,
@@ -258,9 +257,6 @@ pub const Instruction = struct {
 
             pub const Kind = enum { int, float, bool, str, obj };
         };
-    };
-    pub const MultiVarDecl = struct {
-        decls: []const Index,
     };
     pub const ObjFn = struct {
         obj: Index,

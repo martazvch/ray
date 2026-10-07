@@ -32,6 +32,7 @@ const Context = struct {
     in_group: bool,
     in_trait: bool,
     label: ?TokenIndex,
+    extern_label: ?TokenIndex,
 
     pub const empty: Context = .{
         .panic_mode = false,
@@ -39,6 +40,7 @@ const Context = struct {
         .in_group = false,
         .in_trait = false,
         .label = null,
+        .extern_label = null,
     };
 
     pub fn setAndGetPrevious(self: *Context, comptime f: FieldEnum(Context), value: @FieldType(Context, @tagName(f))) @TypeOf(value) {
@@ -47,7 +49,12 @@ const Context = struct {
 
         return val;
     }
+
+    pub fn isExtern(self: Context) bool {
+        return self.extern_label != null;
+    }
 };
+
 const Error = error{Err};
 
 pub fn init(allocator: Allocator) Self {
@@ -262,33 +269,83 @@ fn synchronize(self: *Self) void {
 }
 
 fn declaration(self: *Self) Error!Node {
+    const decl = try self.declarationNode();
+    return decl orelse self.statement();
+}
+
+fn declarationNode(self: *Self) Error!?Node {
     return if (self.isAtVarDecl(true))
-        self.varDecl()
+        try self.varDecl()
     else if (self.match(.@"fn"))
-        self.fnDecl(false)
+        try self.fnDecl()
     else if (self.match(.@"struct"))
-        self.structDecl(false)
+        try self.structDecl()
     else if (self.match(.trait))
-        self.traitDecl()
+        try self.traitDecl()
     else if (self.match(.@"enum"))
-        self.enumDecl(false)
+        try self.enumDecl()
     else if (self.match(.@"union"))
-        self.unionDecl(false)
+        try self.unionDecl(false)
     else if (self.match(.@"error"))
-        self.unionDecl(true)
+        try self.unionDecl(true)
     else if (self.match(.use))
-        self.use()
+        try self.use()
     else if (self.match(.@"extern")) {
-        if (self.match(.@"fn")) {
-            return self.fnDecl(true);
-        } else if (self.match(.@"struct")) {
-            return self.structDecl(true);
-        } else if (self.match(.@"enum")) {
-            return self.enumDecl(true);
-        } else {
+        if (self.ctx.extern_label != null) {
+            return self.errAtPrev(.already_in_extern);
+        }
+
+        if (self.match(.string)) {
+            const extern_label = self.token_idx - 1;
+            self.ctx.extern_label = extern_label;
+            defer self.ctx.extern_label = null;
+            self.skipNewLines();
+
+            if (self.match(.@"fn")) {
+                return try self.fnDecl();
+            }
+            if (self.matchAndSkip(.left_brace)) {
+                return try self.externBlockDecl(extern_label);
+            }
+
             return self.errAtPrev(.invalid_extern);
         }
-    } else self.statement();
+
+        // Placeholder to trigger `isExtern` method on context
+        self.ctx.extern_label = 0;
+        defer self.ctx.extern_label = null;
+        return try self.externDecl();
+    } else null;
+}
+
+fn externDecl(self: *Self) Error!Node {
+    if (self.match(.@"struct")) {
+        return self.structDecl();
+    }
+    if (self.match(.@"enum")) {
+        return self.enumDecl();
+    }
+
+    if (self.match(.@"fn") or self.match(.left_brace)) {
+        return self.errAtPrev(.expect_extern_lib_name);
+    }
+
+    return self.errAtPrev(.invalid_extern);
+}
+
+fn externBlockDecl(self: *Self, extern_label: TokenIndex) Error!Node {
+    var decls: ArrayList(Node) = .empty;
+
+    while (!self.match(.eof) and !self.match(.right_brace)) {
+        const decl = try self.declarationNode() orelse return self.errAtPrev(.invalid_extern);
+        decls.append(self.allocator, decl) catch oom();
+        self.skipNewLines();
+    }
+
+    return .{ .extern_block = .{
+        .name = extern_label,
+        .decls = decls.toOwnedSlice(self.allocator) catch oom(),
+    } };
 }
 
 /// Peeks past 'ident (',' ident)*' to see if a declaration colon follows
@@ -317,10 +374,11 @@ fn isLabelTarget(tag: Token.Tag) bool {
     };
 }
 
-fn enumDecl(self: *Self, is_extern: bool) Error!Node {
+fn enumDecl(self: *Self) Error!Node {
     const tk = self.token_idx - 1;
     try self.expect(.identifier, .expectName("enum"));
     const name = self.token_idx - 1;
+    const is_extern = self.ctx.setAndGetPrevious(.extern_label, null) != null;
 
     try self.expect(.left_brace, .expectBraceBefore("enum"));
     self.skipNewLines();
@@ -365,8 +423,9 @@ fn enumTag(self: *Self) Error!Ast.EnumDecl.Tag {
     return .{ .name = name, .value = value };
 }
 
-fn fnDecl(self: *Self, is_extern: bool) Error!Node {
+fn fnDecl(self: *Self) Error!Node {
     const name = try self.expectFnName();
+    const is_extern = self.ctx.isExtern();
 
     try self.expect(.left_paren, .expect_paren_after_fn_name);
     self.skipNewLines();
@@ -400,7 +459,7 @@ fn fnDecl(self: *Self, is_extern: bool) Error!Node {
         .return_type = return_type,
         .has_callable = has_callable,
         .is_closure = false,
-        .is_extern = is_extern,
+        .extern_lib = self.ctx.extern_label,
     } };
 }
 
@@ -514,9 +573,10 @@ fn fnReturnType(self: *Self) Error!?*Ast.Type {
         null;
 }
 
-fn structDecl(self: *Self, is_extern: bool) !Node {
+fn structDecl(self: *Self) !Node {
     try self.expect(.identifier, .expectName("structure"));
     const name = self.token_idx - 1;
+    const is_extern = self.ctx.setAndGetPrevious(.extern_label, null) != null;
     self.skipNewLines();
     try self.expectOrErrAtPrev(.left_brace, .expectBraceBefore("structure"));
     self.skipNewLines();
@@ -577,7 +637,7 @@ fn structDecl(self: *Self, is_extern: bool) !Node {
         .fields = fields.toOwnedSlice(self.allocator) catch oom(),
         .functions = functions,
         .traits = traits,
-        .is_extern = is_extern,
+        .is_extern = self.ctx.isExtern(),
     } };
 }
 
@@ -610,7 +670,7 @@ fn containerFnDecls(self: *Self, kind: []const u8) Error!struct { []Ast.FnDecl, 
 
     while (!self.check(.right_brace) and !self.check(.eof)) {
         if (self.match(.@"fn")) {
-            functions.append(self.allocator, (try self.fnDecl(false)).fn_decl) catch oom();
+            functions.append(self.allocator, (try self.fnDecl()).fn_decl) catch oom();
         } else if (self.match(.impl)) {
             traits.append(self.allocator, (try self.traitDecl()).trait_decl) catch oom();
         } else {
@@ -1178,7 +1238,7 @@ fn parsePrecedenceExpr(self: *Self, prec_min: i8) Error!*Expr {
 
     while (true) {
         // We check the current before consuming it
-        const next_rule = rules[@as(usize, @intFromEnum(self.token_tags[self.token_idx]))];
+        const next_rule = rules[@as(usize, @backingInt(self.token_tags[self.token_idx]))];
 
         if (next_rule.prec < prec_min) break;
 
@@ -1376,7 +1436,7 @@ fn closure(self: *Self) Error!*Expr {
         .return_type = return_type,
         .has_callable = false,
         .is_closure = true,
-        .is_extern = false,
+        .extern_lib = null,
     } };
 
     return expr;

@@ -4,7 +4,7 @@
 load_const index 0, value 2
 get_local index 0
 mul_float
-call_c index 1, arity 1, ret_arg
+call_ffi index 1, arity 1, ret_arg
 ret
 
 -- global scope --
@@ -14,7 +14,7 @@ exit_repl
 
 -- main --
 load_const index 1, value 4
-call_c index 1, arity 1, ret_arg
+call_ffi index 1, arity 1, ret_arg
 pop
 load_const index 2, value 8
 call index 0, arity 1, rayFunc

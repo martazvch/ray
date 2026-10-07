@@ -41,7 +41,7 @@ pub fn build(b: *std.Build) !void {
 
     const translate_c = b.dependency("translate_c", .{});
     const translator = Translator.init(translate_c, .{
-        .c_source_file = b.path("src/core/ffi/libffi.h"),
+        .c_source_file = ffi.getEmittedIncludeTree().path(b, "ffi.h"),
         .optimize = optimize,
         .target = target,
     });
@@ -52,31 +52,40 @@ pub fn build(b: *std.Build) !void {
     // ---------
     //  Modules
     // ---------
-    const ray_mod = b.addModule("ray", .{
-        .optimize = optimize,
-        .target = target,
-        .root_source_file = b.path("src/main.zig"),
-    });
-
     const misc_mod = b.createModule(.{
         .optimize = optimize,
         .target = target,
         .root_source_file = b.path("src/misc/misc.zig"),
     });
 
-    const libffi_mod = b.createModule(.{
+    const ffi_mod = b.createModule(.{
         .optimize = optimize,
         .target = target,
-        .root_source_file = b.path("src/core/libffi.zig"),
+        .root_source_file = b.path("src/core/ffi/ffi.zig"),
+        .imports = &.{
+            .{ .name = "libffi", .module = translator.mod },
+        },
     });
-    libffi_mod.addImport("ffi", translator.mod);
-    libffi_mod.linkLibrary(ffi);
+    ffi_mod.linkLibrary(ffi);
 
     const core_mod = b.createModule(.{
         .optimize = optimize,
         .target = target,
         .root_source_file = b.path("src/core/core.zig"),
         .imports = &.{
+            .{ .name = "misc", .module = misc_mod },
+            .{ .name = "ffi", .module = ffi_mod },
+            .{ .name = "options", .module = options.createModule() },
+        },
+    });
+
+    const ray_mod = b.addModule("ray", .{
+        .optimize = optimize,
+        .target = target,
+        .root_source_file = b.path("src/main.zig"),
+        .imports = &.{
+            .{ .name = "ffi", .module = ffi_mod },
+            .{ .name = "clarg", .module = clarg.module("clarg") },
             .{ .name = "misc", .module = misc_mod },
             .{ .name = "options", .module = options.createModule() },
         },
@@ -89,10 +98,6 @@ pub fn build(b: *std.Build) !void {
         .name = "ray",
         .root_module = ray_mod,
     });
-    exe.root_module.addImport("clarg", clarg.module("clarg"));
-    exe.root_module.addImport("misc", misc_mod);
-    exe.root_module.addImport("libffi", libffi_mod);
-    exe.root_module.addOptions("options", options);
 
     b.installArtifact(exe);
 
@@ -144,10 +149,6 @@ pub fn build(b: *std.Build) !void {
         .name = "foo",
         .root_module = ray_mod,
     });
-    exe_check.root_module.addImport("clarg", clarg.module("clarg"));
-    exe_check.root_module.addImport("misc", misc_mod);
-    exe_check.root_module.addImport("libffi", libffi_mod);
-    exe_check.root_module.addOptions("options", options);
 
     const check = b.step("check", "Check if foo compiles");
     check.dependOn(&exe_check.step);
@@ -185,9 +186,7 @@ pub fn build(b: *std.Build) !void {
     run_tester.step.dependOn(b.getInstallStep());
 
     // C module needs to build dynamic library
-    buildC(b, test_step, "cmodule", "module.c", target, optimize);
-    buildC(b, test_step, "not_cmodule", "not_module.c", target, optimize);
-    buildC(b, test_step, "invalid_cmodule", "invalid_module.c", target, optimize);
+    buildC(b, test_step, "cmodule", "cmodule.c", target, optimize);
 
     run_tester.addPassthruArgs();
     test_step.dependOn(&run_tester.step);

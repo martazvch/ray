@@ -62,12 +62,12 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
     try self.lineHeader(writer, offset);
 
     self.wide = false;
-    var op: OpCode = @enumFromInt(self.chunk.code.items[offset]);
+    var op: OpCode = @fromBackingInt(@intCast(self.chunk.code.items[offset]));
 
     if (op == .wide) {
         self.wide = true;
         offset += 1;
-        op = @enumFromInt(self.chunk.code.items[offset]);
+        op = @fromBackingInt(@intCast(self.chunk.code.items[offset]));
         _ = writer.writeAll("wide\n") catch unreachable;
         try self.lineHeader(writer, offset);
     }
@@ -89,12 +89,13 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .bound_method => self.indexInstruction(writer, name, offset),
         .box => self.simpleInstruction(writer, name, offset),
 
-        .call => self.call(writer, name, false, offset),
+        .call => self.call(writer, name, .ray, offset),
         .call_dyn => self.indexInstruction(writer, name, offset),
         .call_array, .call_string => self.callIndexArity(writer, op, offset),
-        .call_c => self.callC(writer, name, offset),
+        .call_ffi => self.call(writer, name, .ffi, offset),
+        .call_c => self.call(writer, name, .c, offset),
         .call_virtual => self.callIndexArity(writer, op, offset),
-        .call_zig => self.call(writer, name, true, offset),
+        .call_zig => self.call(writer, name, .zig, offset),
 
         .closure => self.indexInstruction(writer, name, offset),
         .deref => self.simpleInstruction(writer, name, offset),
@@ -344,27 +345,15 @@ fn getMember(self: *Self, writer: *Writer, name: []const u8, offset: usize) Writ
     return offset + 2;
 }
 
-fn call(self: *Self, writer: *Writer, name: []const u8, native: bool, offset: usize) Writer.Error!usize {
+fn call(self: *Self, writer: *Writer, name: []const u8, kind: enum { ray, ffi, c, zig }, offset: usize) Writer.Error!usize {
     const index = self.chunk.code.items[offset + 1];
     const arity = self.chunk.code.items[offset + 2];
-    const fn_name = if (native)
-        self.artifacts.get(.zig_function, index).*.name
-    else
-        self.artifacts.get(.function, index).*.name;
-
-    if (self.render_mode == .@"test") {
-        try writer.print("{s} index {}, arity {}, {s}\n", .{ name, index, arity, fn_name });
-    } else {
-        try writer.print("{s:<20} index {:>4}, arity {:>4}, {s}\n", .{ name, index, arity, fn_name });
-    }
-
-    return offset + 3;
-}
-
-fn callC(self: *Self, writer: *Writer, name: []const u8, offset: usize) Writer.Error!usize {
-    const index = self.chunk.code.items[offset + 1];
-    const arity = self.chunk.code.items[offset + 2];
-    const fn_name = self.artifacts.get(.c_function, index).*.name;
+    const fn_name = switch (kind) {
+        .ray => self.artifacts.get(.function, index).*.name,
+        .ffi => self.artifacts.get(.ffi_function, index).*.name,
+        .c => self.artifacts.get(.c_function, index).*.name,
+        .zig => self.artifacts.get(.zig_function, index).*.name,
+    };
 
     if (self.render_mode == .@"test") {
         try writer.print("{s} index {}, arity {}, {s}\n", .{ name, index, arity, fn_name });

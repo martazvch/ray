@@ -25,9 +25,8 @@ const Pipeline = @import("../pipeline/pipeline.zig");
 const State = @import("../pipeline/State.zig");
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
 const CLayout = @import("../compiler/Artifacts.zig").CStructure.Layout;
-const cffi = @import("../ffi/cffi.zig");
-const Value = @import("../runtime/values.zig").Value;
-const CFn = @import("../runtime/Obj.zig").CFn;
+const ffi = @import("ffi");
+const NativeLib = @import("NativeLib.zig");
 
 const type_mod = @import("types.zig");
 const Type = type_mod.Type;
@@ -214,6 +213,7 @@ pub fn analyzeNode(self: *Self, node: *const Node, expect: ExprResKind, ctx: *Co
         .@"defer" => |n| try self.deferStmt(n, ctx),
         .discard => |n| try self.discard(n, ctx),
         .enum_decl => |*n| try self.enumDecl(n, ctx),
+        .extern_block => |n| try self.externBlock(n, ctx),
         .fn_decl => |*n| (try self.fnDeclaration(n, ctx)).instr,
         .for_loop => |*n| try self.forLoop(n, ctx),
         .multi_var_decl => |*n| try self.multiVarDecl(n, ctx),
@@ -604,6 +604,27 @@ fn enumDescriminant(self: *Self, tag: Ast.EnumDecl.Tag, ctx: *Context) Error!?Di
     };
 }
 
+fn externBlock(self: *Self, node: Ast.ExternBlock, ctx: *Context) Error!InstrIndex {
+    var instrs = ArrayList(InstrIndex).initCapacity(self.alloc, node.decls.len) catch oom();
+
+    for (node.decls) |*decl| {
+        switch (decl.*) {
+            .fn_decl => |*f| {
+                f.extern_lib = node.name;
+            },
+            else => {},
+        }
+
+        const res = try self.analyzeNode(decl, .none, ctx);
+        instrs.appendAssumeCapacity(res.instr);
+    }
+
+    return self.irb.addInstr(
+        .{ .multiple_decls = instrs.toOwnedSlice(self.alloc) catch oom() },
+        self.ast.getSpan(node.name).start,
+    );
+}
+
 const FnDeclRes = struct { instr: usize, sym: LexScope.Symbol };
 
 fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDeclRes {
@@ -617,24 +638,25 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
             break :name self.ast.toSource(node.name);
     };
     const name = self.interner.intern(name_text);
+    const is_extern = node.extern_lib != null;
 
     var buf: [1024]u8 = undefined;
     const container_name = self.interner.internKeepRef(self.alloc, self.containers.render(&buf, .{ .sep = "." }));
     const interned = self.ti.newFunction(
         .{ .name = name, .container = container_name },
-        if (node.is_extern) .c else .normal,
+        if (is_extern) .ffi else .normal,
     );
 
     // Forward declaration in outer scope for recursion
-    const sym_index = try self.declareSymbol(name, interned, node.is_extern, self.ast.getSpan(node.name));
+    const sym_index = try self.declareSymbol(name, interned, is_extern, self.ast.getSpan(node.name));
     self.scope.open(self.alloc, null, .{ .barrier = true });
 
     self.containers.append(self.alloc, name_text);
     defer _ = self.containers.pop();
 
-    if (node.is_extern) {
+    if (node.extern_lib) |lib| {
         defer _ = self.scope.close();
-        return self.endExternFnDecl(node, name, interned, sym_index, ctx);
+        return self.endExternFnDecl(node, name, lib, interned, sym_index, ctx);
     } else {
         return self.endRayFnDecl(node, name, interned, sym_index, ctx);
     }
@@ -728,12 +750,15 @@ fn endExternFnDecl(
     self: *Self,
     node: *const Ast.FnDecl,
     name: InternerIdx,
+    lib_name: usize,
     ty: *Type,
     sym_index: usize,
     ctx: *Context,
 ) Error!FnDeclRes {
     const span = self.ast.getSpan(node.name);
     const name_text = self.ast.toSource(node.name);
+    const lib_name_text_quotes = self.ast.toSource(lib_name);
+    const lib_name_text = lib_name_text_quotes[1 .. lib_name_text_quotes.len - 1];
 
     const params = try self.fnParams(node.params, ctx);
 
@@ -742,14 +767,34 @@ fn endExternFnDecl(
     fn_type.params = params.decls;
     fn_type.return_type = return_ty;
 
-    const lib = self.state.dynlib orelse return self.err(
-        .{ .extern_fn_not_in_rayn = .{ .name = name_text } },
-        span,
-    );
+    var lib = lib: {
+        const gop = self.state.dynlibs.getOrPut(self.alloc, self.interner.intern(lib_name_text)) catch oom();
+        if (gop.found_existing) {
+            break :lib gop.value_ptr.*;
+        }
+
+        const lib = NativeLib.open(
+            self.alloc,
+            self.state.path_builder.renderAlloc(self.alloc, .{ .sep = std.Io.Dir.path.sep_str }),
+            lib_name_text,
+        ) catch |e| switch (e) {
+            error.UnsupportedOS => return self.err(
+                .{ .dynlib_unsupported_os = .{ .name = @tagName(builtin.os.tag) } },
+                self.ast.getSpan(lib_name),
+            ),
+            error.LoadFailed => return self.err(
+                .{ .dynlib_missing_lib = .{ .name = lib_name_text } },
+                self.ast.getSpan(lib_name),
+            ),
+        };
+
+        gop.value_ptr.* = lib;
+        break :lib lib;
+    };
 
     const name_sentinel = self.alloc.dupeSentinel(u8, name_text, 0) catch oom();
     defer self.alloc.free(name_sentinel);
-    const func = lib.lookup(cffi.Fn, name_sentinel) orelse return self.err(
+    const func = lib.lookup(ffi.Fn, name_sentinel) orelse return self.err(
         .{ .extern_fn_not_in_lib = .{ .name = name_text } },
         span,
     );
@@ -761,11 +806,33 @@ fn endExternFnDecl(
                 .sym_index = sym_index,
                 .type_id = self.ti.typeId(ty),
                 .name = name,
-                .returns = !return_ty.is(.void),
+                .param_types = self.paramTypesToFfi(&params),
+                .return_type = rayTypeToFfi(return_ty),
             } },
             span.start,
         ),
         .sym = self.scope.getSymbol(name).?.*,
+    };
+}
+
+fn paramTypesToFfi(self: *Self, params: *const Params) ffi.Params {
+    var ffi_types = ArrayList(ffi.Type).initCapacity(self.alloc, params.decls.count()) catch oom();
+
+    for (params.decls.values()) |param| {
+        ffi_types.appendAssumeCapacity(rayTypeToFfi(param.type));
+    }
+
+    return ffi_types.toOwnedSlice(self.alloc) catch oom();
+}
+
+// TODO: error
+fn rayTypeToFfi(ty: *const Type) ffi.Type {
+    return switch (ty.*) {
+        .bool => ffi.Int32,
+        .int => ffi.Int32,
+        .void => ffi.Void,
+        .float => ffi.Float,
+        else => @panic("type not yet implemented"),
     };
 }
 
@@ -1025,7 +1092,7 @@ fn multiVarDecl(self: *Self, node: *const Ast.MultiVarDecl, ctx: *Context) StmtR
     }
 
     return self.irb.addInstr(
-        .{ .multiple_var_decl = .{ .decls = decls.toOwnedSlice(self.alloc) catch oom() } },
+        .{ .multiple_decls = decls.toOwnedSlice(self.alloc) catch oom() },
         self.ast.getSpan(node).start,
     );
 }
@@ -1341,7 +1408,7 @@ fn use(self: *Self, node: *const Ast.Use) StmtResult {
         self.state.path_builder = old_path_builder;
     }
 
-    var result = Importer.fetchImportedFile(
+    const result = Importer.fetchImportedFile(
         self.io,
         self.alloc,
         self.ast,
@@ -1349,24 +1416,6 @@ fn use(self: *Self, node: *const Ast.Use) StmtResult {
         self.state,
     );
     const path = path: switch (result) {
-        .dynlib => |*dynlib| {
-            const interned = self.interner.intern(dynlib.path);
-            const handcheck = dynlib.lib.lookup(cffi.Handcheck, "handcheck") orelse return self.err(
-                .{ .dynlib_not_module = .{ .name = self.ast.toSource(dynlib.token) } },
-                self.ast.getSpan(dynlib.token),
-            );
-            handcheck(&cffi.api);
-
-            const prev_dynlib = self.state.dynlib;
-            self.state.dynlib = &dynlib.lib;
-            defer self.state.dynlib = prev_dynlib;
-
-            if (!self.state.modules.has(interned)) {
-                Pipeline.runSubPipeline(self.io, self.alloc, self.state, dynlib.name, dynlib.path, dynlib.rayn_content);
-            }
-
-            break :path interned;
-        },
         .rayfile => |f| {
             const interned = self.interner.intern(f.path);
 
@@ -1380,17 +1429,9 @@ fn use(self: *Self, node: *const Ast.Use) StmtResult {
             .{ .missing_file_in_module = .{ .file = self.ast.toSource(e) } },
             self.ast.getSpan(e),
         ),
-        .missing_dynlib_file => |e| return self.err(
-            .{ .dynlib_missing_lib = .{ .name = self.ast.toSource(e) } },
-            self.ast.getSpan(e),
-        ),
         .unknown_mod => |e| return self.err(
             .{ .unknown_module = .{ .name = self.ast.toSource(e) } },
             self.ast.getSpan(e),
-        ),
-        .unsupported_os => return self.err(
-            .{ .dynlib_unsupported_os = .{ .name = @tagName(builtin.os.tag) } },
-            self.ast.getSpan(node.names[0]),
         ),
     };
 

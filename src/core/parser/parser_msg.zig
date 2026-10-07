@@ -1,6 +1,7 @@
 const Writer = @import("std").Io.Writer;
 
 pub const ParserMsg = union(enum) {
+    already_in_extern,
     cant_chain_op,
     default_value_self,
     empty_error_set,
@@ -19,6 +20,7 @@ pub const ParserMsg = union(enum) {
     expect_equal_struct_lit,
     expect_equal_enum_discr,
     expect_expr: struct { found: []const u8 },
+    expect_extern_lib_name,
     expect_field_type_or_default,
     expect_fn_end_container: struct { kind: []const u8 },
     expect_fn_name,
@@ -73,6 +75,7 @@ pub const ParserMsg = union(enum) {
 
     pub fn getMsg(self: Self, writer: *Writer) !void {
         try switch (self) {
+            .already_in_extern => writer.writeAll("already in an 'extern' context"),
             .cant_chain_op => writer.writeAll("can't chain this operator"),
             .default_value_self => writer.writeAll("can't assign a default value to 'self'"),
             .empty_error_set => writer.writeAll("error set can't be empty"),
@@ -91,6 +94,7 @@ pub const ParserMsg = union(enum) {
             .expect_equal_struct_lit => writer.writeAll("expect either '=' or '}' in structure literal field value"),
             .expect_equal_enum_discr => writer.writeAll("expect '=' before tag's value or nothing"),
             .expect_expr => |e| writer.print("expected expression, found \"{s}\"", .{e.found}),
+            .expect_extern_lib_name => writer.writeAll("expect external library's name"),
             .expect_field_type_or_default => writer.writeAll("structure fileds must be typed or have a default value"),
             .expect_fn_end_container => writer.writeAll("expect functions declaration or nothing"),
             .expect_fn_name => writer.writeAll("expect function's name"),
@@ -144,6 +148,7 @@ pub const ParserMsg = union(enum) {
 
     pub fn getHelp(self: Self, writer: *Writer) !void {
         try switch (self) {
+            .already_in_extern => writer.writeAll("keyword 'extern' is redundant in this scope"),
             .cant_chain_op => writer.writeAll("if using comparisons, split them with 'and' and 'or' operators"),
             .default_value_self => writer.writeAll(
                 "'self' is the only parameter than can't have a default value, as it's value is infered by the compiler",
@@ -177,6 +182,12 @@ pub const ParserMsg = union(enum) {
                 \\    <name>,           // no explicit value
                 \\    <name> = <value>, // explicit value
                 \\}
+            ),
+            .expect_extern_lib_name => writer.writeAll(
+                \\when using 'extern' for a function or a block, a library name must be given
+                \\  if it is used with a function, the function will be fetched in the library
+                \\  if it is used with a block, all the function declarations within the block will be fetched in the library
+                ,
             ),
             .expect_paren_after_fn_args => writer.writeAll("add an closing parenthesis ')' after function call"),
             .expect_paren_after_fn_name => writer.writeAll("add an opening parenthesis '(' between function's name and arguments list"),

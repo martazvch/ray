@@ -1,4 +1,5 @@
 extern fn foo() {}
+extern "abc" fn foo() {}
 
 extern struct Foo {
     fn foo() {}
@@ -15,3 +16,18 @@ extern enum Foo {
 }
 
 extern 5
+
+extern "lib" struct Foo {}
+extern "lib" enum Foo {}
+extern "lib" union Foo {}
+
+extern { }
+
+extern "lib" {
+    extern struct Foo {}
+}
+
+extern "foo" {
+    fn add()
+    1+1
+}

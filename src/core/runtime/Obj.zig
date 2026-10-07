@@ -14,11 +14,12 @@ const ObjFns = type_mod.ObjFns;
 
 const Chunk = @import("../compiler/Chunk.zig");
 const Artifacts = @import("../compiler/Artifacts.zig");
-const zffi = @import("../ffi/zffi.zig");
-const cffi = @import("../ffi/cffi.zig");
 const oom = @import("misc").oom;
 const Value = @import("values.zig").Value;
 const Vm = @import("Vm.zig");
+const ffi = @import("ffi");
+const cffi = @import("../ffi/cffi.zig");
+const zffi = @import("../ffi/zffi.zig");
 
 kind: Kind,
 next: ?*Obj,
@@ -34,7 +35,8 @@ const Kind = enum {
     @"enum",
     @"error",
     function,
-    cfunction,
+    ffi_function,
+    c_function,
     zig_function,
     iterator,
     pointer,
@@ -52,7 +54,8 @@ const Kind = enum {
             Closure => .closure,
             Enum => .@"enum",
             Function => .function,
-            CFn => .cfunction,
+            FfiFn => .ffi_function,
+            CFn => .c_function,
             ZigFn => .zig_function,
             Iterator => .iterator,
             Pointer => .pointer,
@@ -453,19 +456,116 @@ pub const Box = struct {
     }
 };
 
-pub const ZigFn = struct {
+pub const FfiFn = struct {
     obj: Obj,
     name: []const u8,
-    function: zffi.Fn,
+    function: ffi.Fn,
+    cif: ffi.Cif,
+    bytes: []u8,
+    avalues: [][*c]u8,
+    rvalue: []u8,
 
     const Self = @This();
 
-    pub fn create(allocator: Allocator, name: []const u8, function: zffi.Fn) *Self {
+    pub fn create(
+        allocator: Allocator,
+        name: []const u8,
+        function: ffi.Fn,
+        param_types: ffi.Params,
+        return_type: ffi.Type,
+    ) *Self {
         const obj = Obj.allocateComptime(allocator, Self, undefined);
         obj.name = name;
         obj.function = function;
 
+        obj.avalues = allocator.alloc([*c]u8, param_types.len) catch oom();
+        obj.rvalue = allocator.alloc(u8, @sizeOf(i32)) catch oom();
+
+        const cif_res = ffi.prepCif(
+            &obj.cif,
+            ffi.getDefaultAbi(),
+            @intCast(param_types.len),
+            return_type,
+            @ptrCast(param_types),
+        );
+
+        if (cif_res != 0) {
+            @panic("unable to prepare cif for libffi function");
+        }
+
+        obj.bytes = allocator.alloc(u8, obj.cif.bytes) catch oom();
+
         return obj;
+    }
+
+    pub fn createFromProto(allocator: Allocator, proto: *const ffi.FnProto) *Self {
+        const obj = Obj.allocateComptime(allocator, Self, undefined);
+        obj.name = std.mem.span(proto.name);
+        obj.function = proto.function;
+
+        obj.avalues = allocator.alloc([*c]u8, proto.arity) catch oom();
+        obj.rvalue = allocator.alloc(u8, @sizeOf(i32)) catch oom();
+
+        const cif_res = ffi.prepCif(
+            &obj.cif,
+            ffi.getDefaultAbi(),
+            @intCast(proto.arity),
+            proto.return_type,
+            @ptrCast(proto.param_types),
+        );
+
+        if (cif_res != 0) {
+            @panic("unable to prepare cif for libffi function");
+        }
+
+        obj.bytes = allocator.alloc(u8, obj.cif.bytes) catch oom();
+
+        return obj;
+    }
+
+    pub fn call(self: *Self, values: []Value) ?Value {
+        var offset: usize = 0;
+
+        for (values, 0..) |val, i| {
+            var size: usize = 0;
+
+            switch (val) {
+                .bool => |v| {
+                    size = @sizeOf(bool);
+                    self.writeValue(offset, size, v);
+                },
+                .int => |v| {
+                    size = @sizeOf(i32);
+                    self.writeValue(offset, size, @as(i32, @intCast(v)));
+                },
+                .float => |v| {
+                    size = @sizeOf(f32);
+                    self.writeValue(offset, size, @as(f32, @floatCast(v)));
+                },
+                else => @panic("not yet implemented"),
+            }
+
+            self.avalues[i] = &self.bytes[offset];
+            offset += size;
+        }
+
+        ffi.call(&self.cif, self.function, @ptrCast(self.rvalue), @ptrCast(self.avalues));
+
+        if (ffi.eqType(self.cif.rtype, ffi.Void)) {
+            return null;
+        } else if (ffi.eqType(self.cif.rtype, ffi.Int32)) {
+            return .makeInt(@as(*i32, @ptrCast(@alignCast(self.rvalue))).*);
+        } else if (ffi.eqType(self.cif.rtype, ffi.Bool)) {
+            return .makeInt(@as(*i32, @ptrCast(@alignCast(self.rvalue))).*);
+        } else if (ffi.eqType(self.cif.rtype, ffi.Float)) {
+            return .makeFloat(@as(*f32, @ptrCast(@alignCast(self.rvalue))).*);
+        } else {
+            @panic("not yet implemented");
+        }
+    }
+
+    inline fn writeValue(self: *Self, offset: usize, size: usize, value: anytype) void {
+        @memcpy(self.bytes[offset..][0..size], std.mem.asBytes(&value));
     }
 
     pub fn asObj(self: *Self) *Obj {
@@ -490,6 +590,30 @@ pub const CFn = struct {
         obj.name = name;
         obj.function = function;
         obj.returns = returns;
+
+        return obj;
+    }
+
+    pub fn asObj(self: *Self) *Obj {
+        return &self.obj;
+    }
+
+    pub fn deinit(self: *Self, allocator: Allocator) void {
+        allocator.destroy(self);
+    }
+};
+
+pub const ZigFn = struct {
+    obj: Obj,
+    name: []const u8,
+    function: zffi.Fn,
+
+    const Self = @This();
+
+    pub fn create(allocator: Allocator, name: []const u8, function: zffi.Fn) *Self {
+        const obj = Obj.allocateComptime(allocator, Self, undefined);
+        obj.name = name;
+        obj.function = function;
 
         return obj;
     }
@@ -1011,7 +1135,7 @@ pub fn deepCopy(self: *Obj, vm: *Vm) *Obj {
         .structure => self.as(Structure).deepCopy(vm).asObj(),
         .c_structure => self.as(CStructure).deepCopy(vm).asObj(),
         // Immutable, shallow copy ok
-        .box, .closure, .@"enum", .function, .iterator, .cfunction, .zig_function, .zig_structure, .string, .trait_obj, .pointer => self,
+        .box, .closure, .@"enum", .function, .iterator, .ffi_function, .c_function, .zig_function, .zig_structure, .string, .trait_obj, .pointer => self,
     };
 }
 
@@ -1025,7 +1149,11 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
             const function = self.as(Function);
             function.deinit(vm);
         },
-        .cfunction => {
+        .ffi_function => {
+            const function = self.as(FfiFn);
+            function.deinit(vm.gc_alloc);
+        },
+        .c_function => {
             const function = self.as(CFn);
             function.deinit(vm.gc_alloc);
         },
@@ -1094,7 +1222,8 @@ pub fn print(self: *Obj, artifacts: *const Artifacts, writer: *Writer) Writer.Er
             const function = self.as(Function);
             try writer.print("<function {s}>", .{function.name});
         },
-        .cfunction => try writer.print("<c function {s}>", .{self.as(CFn).name}),
+        .ffi_function => try writer.print("<ffi function {s}>", .{self.as(FfiFn).name}),
+        .c_function => try writer.print("<c function {s}>", .{self.as(CFn).name}),
         .zig_function => try writer.print("<zig function {s}>", .{self.as(ZigFn).name}),
         .iterator => try writer.writeAll("<iterator>"),
         .pointer => try writer.print("<pointer 0x{x}>", .{@intFromPtr(self.as(Pointer).child)}),
@@ -1140,7 +1269,7 @@ pub fn log(self: *Obj) void {
         .function => std.debug.print("<function {s}>", .{self.as(Function).name}),
         .structure => std.debug.print("<structure {s}>", .{self.as(Structure).parent_index.name}),
         .iterator => std.debug.print("<iterator>", .{}),
-        .cfunction => std.debug.print("<c function {s}>", .{self.as(CFn).name}),
+        .ffi_function => std.debug.print("<c function {s}>", .{self.as(FfiFn).name}),
         .zig_function => std.debug.print("<zig function {s}>", .{self.as(ZigFn).name}),
         .zig_structure => std.debug.print("<zig structure {s}>", .{self.as(ZigStructure).name}),
         .pointer => std.debug.print("<pointer 0x{x}>", .{@intFromPtr(self.as(Pointer).child)}),

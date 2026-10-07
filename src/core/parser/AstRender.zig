@@ -84,6 +84,16 @@ fn renderNode(self: *Self, node: *const Ast.Node, comma: bool) Error!void {
             try self.renderTraitImpls(n.traits);
             try self.closeKey(.block, comma);
         },
+        .extern_block => |n| {
+            try self.openKey(@tagName(node.*), .block);
+            try self.pushKeyValue("name", self.ast.toSource(n.name), true);
+            try self.openKey("decls", .list);
+            for (n.decls, 0..) |*decl, i| {
+                const last = i < n.decls.len - 1;
+                try self.renderNode(decl, last);
+            }
+            try self.closeKey(.list, comma);
+        },
         .fn_decl => |*n| try self.renderFnDecl(self.ast.toSource(n.name), n, comma),
         .for_loop => |n| {
             try self.openKey(@tagName(node.*), .block);
@@ -223,10 +233,7 @@ fn renderSingleNode(self: *Self, name: ?[]const u8, node: *const Ast.Node, tag: 
 }
 
 fn renderFnDecl(self: *Self, name: []const u8, decl: *const Ast.FnDecl, comma: bool) !void {
-    try self.openKey(
-        if (decl.is_closure) "closure_decl" else if (decl.is_extern) "extern_fn_decl" else "fn_decl",
-        .block,
-    );
+    try self.openKey(if (decl.is_closure) "closure_decl" else "fn_decl", .block);
     try self.pushKeyValue("name", name, true);
 
     if (decl.params.len == 0) {
@@ -249,6 +256,10 @@ fn renderFnDecl(self: *Self, name: []const u8, decl: *const Ast.FnDecl, comma: b
     }
 
     try self.pushKeyValue("return_type", if (decl.return_type) |ret| try self.renderType(ret) else "void", true);
+    if (decl.extern_lib) |lib| {
+        const lib_name = self.ast.toSource(lib);
+        try self.pushKeyValue("extern_lib", lib_name[1 .. lib_name.len - 1], true);
+    }
     if (decl.body) |*b| {
         try self.renderAnonBlock(b, "body", false);
     } else {

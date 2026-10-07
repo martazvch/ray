@@ -361,7 +361,7 @@ const Compiler = struct {
 
             .match => |*data| self.match(data),
             .match_type => |data| self.matchType(data),
-            .multiple_var_decl => |*data| self.multipleVarDecl(data),
+            .multiple_decls => |data| self.multipleDecl(data),
 
             // Used in `call`, not meant to be accessed directly
             .obj_func => unreachable,
@@ -634,11 +634,13 @@ const Compiler = struct {
 
         const index = switch (data.kind) {
             .normal, .method, .bound => self.artifacts.getIndex(.function, mod_index, sym_index),
+            .ffi => self.artifacts.getIndex(.ffi_function, mod_index, sym_index),
             .c => self.artifacts.getIndex(.c_function, mod_index, sym_index),
             .zig, .zig_method => self.artifacts.getIndex(.zig_function, mod_index, sym_index),
             .intrinsic => unreachable,
         };
         const op: OpCode = switch (data.kind) {
+            .ffi => .call_ffi,
             .c => .call_c,
             .zig, .zig_method => .call_zig,
             .normal, .method, .bound => .call,
@@ -710,8 +712,8 @@ const Compiler = struct {
 
     fn cFnDecl(self: *Self, data: *const Instruction.CFnDecl) Error!void {
         const fn_name = self.interner.getKey(data.name).?;
-        const func = Obj.CFn.create(self.alloc, fn_name, data.func, data.returns);
-        self.artifacts.add(self.alloc, .c_function, self.module, data.sym_index, func);
+        const func = Obj.FfiFn.create(self.alloc, fn_name, data.func, data.param_types, data.return_type);
+        self.artifacts.add(self.alloc, .ffi_function, self.module, data.sym_index, func);
     }
 
     fn containerFnDecls(self: *Self, decls: []const ir.Index) Error!void {
@@ -1153,8 +1155,8 @@ const Compiler = struct {
         }
     }
 
-    fn multipleVarDecl(self: *Self, data: *const Instruction.MultiVarDecl) Error!void {
-        for (data.decls) |decl| {
+    fn multipleDecl(self: *Self, decls: []const ir.Index) Error!void {
+        for (decls) |decl| {
             try self.compileInstr(decl);
         }
     }

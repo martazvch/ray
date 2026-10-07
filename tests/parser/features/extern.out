@@ -1,5 +1,6 @@
+
 {
-    "extern_fn_decl": {
+    "fn_decl": {
         "name": "add",
         "params": [
             {
@@ -14,9 +15,10 @@
             }
         ],
         "return_type": "bool",
+        "extern_lib": "foo",
         "body": []
     },
-    "extern_struct_decl": {
+    "struct_decl": {
         "name": "Foo",
         "fields": [
             {
@@ -49,6 +51,22 @@
         ]
         "functions": [],
         "traits": []
-    }
+    },
+    "extern_block": {
+        "name": ""lib"",
+        "decls": [
+            "fn_decl": {
+                "name": "a",
+                "params": [],
+                "return_type": "void",
+                "extern_lib": "lib",
+                "body": []
+            },
+            "struct_decl": {
+                "name": "B",
+                "fields": [],
+                "functions": [],
+                "traits": []
+            }
+        ]
 }
-

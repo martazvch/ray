@@ -43,9 +43,8 @@ string_fns: ObjFns,
 
 artifacts: Artifacts,
 
-/// Associated dynamic library to this module. When importing a native module, we open
-/// a subpipeline with the associated library to fetch symbols
-dynlib: ?*NativeLib,
+/// Opened dynamic libraries
+dynlibs: std.AutoHashMapUnmanaged(usize, NativeLib),
 
 const Self = @This();
 
@@ -111,8 +110,7 @@ pub fn new(io: Io, allocator: Allocator, cwd: Io.Dir, config: Config) Self {
         .string_fns = Obj.String.getFns(),
 
         .artifacts = .{},
-
-        .dynlib = null,
+        .dynlibs = .empty,
     };
 
     ctx.native_reg.init(allocator, &ctx.interner);

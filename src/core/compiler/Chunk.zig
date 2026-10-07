@@ -16,7 +16,7 @@ pub fn deinit(self: *Self, allocator: Allocator) void {
 
 pub fn writeOp(self: *Self, allocator: Allocator, op: OpCode, offset: usize) void {
     errdefer oom();
-    try self.code.append(allocator, @intFromEnum(op));
+    try self.code.append(allocator, @backingInt(op));
     try self.offsets.append(allocator, offset);
 }
 
@@ -42,16 +42,18 @@ pub const OpCode = enum(u8) {
     bound_method,
     box,
 
-    /// Calls a ray function within current module
+    /// Calls a ray function
     call,
-    /// Calls a c function within current module
+    /// Calls a libffi function
+    call_ffi,
+    /// Calls an embedded c function
     call_c,
+    /// Calls an embedded Zig function
+    call_zig,
     /// Runtime calling convention dispatch
     call_dyn,
     /// Calling a virtual function on a trait object
     call_virtual,
-    /// Calls a non-compiled Zig function
-    call_zig,
     /// Calls a method on a string
     call_string,
     /// Calls a method on an array

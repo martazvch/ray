@@ -167,12 +167,12 @@ fn execute(self: *Self) !void {
         }
 
         const instruction = self.frame.readByte();
-        var op: OpCode = @enumFromInt(instruction);
+        var op: OpCode = @fromBackingInt(@intCast(instruction));
         var wide = false;
 
         if (op == .wide) {
             wide = true;
-            op = @enumFromInt(self.frame.readByte());
+            op = @fromBackingInt(@intCast(self.frame.readByte()));
         }
 
         switch (op) {
@@ -244,11 +244,49 @@ fn execute(self: *Self) !void {
                 self.frame = try self.frame_stack.newKeepMod();
                 self.frame.call(self.state.artifacts.funcs.items[index], &self.stack, arity);
             },
+            .call_ffi => {
+                const index = self.frame.readByte();
+                const arity = self.frame.readByte();
+                const obj = self.state.artifacts.ffi_funcs.items[index];
+
+                const base = self.stack.top - arity;
+                const prev_slot = self.frame.slots;
+                defer self.frame.slots = prev_slot;
+
+                self.frame.slots = base;
+                const ret_val = obj.call(self.frame.slots[0..arity]);
+                self.stack.top = base;
+
+                if (ret_val) |val| {
+                    self.stack.push(val);
+                }
+            },
             .call_c => {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
                 const obj = self.state.artifacts.c_funcs.items[index];
-                self.callC(obj, arity);
+
+                const base = self.stack.top - arity;
+                const prev_slot = self.frame.slots;
+                defer self.frame.slots = prev_slot;
+
+                self.frame.slots = base;
+                obj.function(@ptrCast(self));
+
+                if (obj.returns) {
+                    self.stack.top = base + 1;
+                } else {
+                    self.stack.top = base;
+                }
+            },
+            .call_zig => {
+                const index = self.frame.readByte();
+                const arity = self.frame.readByte();
+                const f = self.state.artifacts.zig_funcs.items[index].function;
+                const result = f(self, (self.stack.top - arity)[0..arity]);
+
+                self.stack.top -= arity;
+                if (result) |res| self.stack.push(res);
             },
             .call_virtual => {
                 const index = self.frame.readByte();
@@ -260,15 +298,6 @@ fn execute(self: *Self) !void {
                 self.stack.peekRef(first_arg_index).obj = trait_obj.data;
                 self.frame = try self.frame_stack.newKeepMod();
                 self.frame.call(trait_obj.vtable.functions[index], &self.stack, arity);
-            },
-            .call_zig => {
-                const index = self.frame.readByte();
-                const arity = self.frame.readByte();
-                const f = self.state.artifacts.zig_funcs.items[index].function;
-                const result = f(self, (self.stack.top - arity)[0..arity]);
-
-                self.stack.top -= arity;
-                if (result) |res| self.stack.push(res);
             },
             .call_dyn => {
                 const args_count = self.frame.readByte();
@@ -796,21 +825,6 @@ fn execute(self: *Self) !void {
             },
             .wide => unreachable,
         }
-    }
-}
-
-fn callC(self: *Self, obj: *Obj.CFn, arity: usize) void {
-    const base = self.stack.top - arity;
-    const prev_slot = self.frame.slots;
-    defer self.frame.slots = prev_slot;
-
-    self.frame.slots = base;
-    obj.function(@ptrCast(self));
-
-    if (obj.returns) {
-        self.stack.top = base + 1;
-    } else {
-        self.stack.top = base;
     }
 }
 

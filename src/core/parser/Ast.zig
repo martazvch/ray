@@ -18,6 +18,7 @@ pub const Node = union(enum) {
     @"defer": *Node,
     discard: *Expr,
     enum_decl: EnumDecl,
+    extern_block: ExternBlock,
     fn_decl: FnDecl,
     for_loop: For,
     multi_var_decl: MultiVarDecl,
@@ -54,6 +55,11 @@ pub const EnumDecl = struct {
     };
 };
 
+pub const ExternBlock = struct {
+    name: TokenIndex,
+    decls: []Node,
+};
+
 pub const FnDecl = struct {
     name: TokenIndex,
     params: []VarDecl,
@@ -61,7 +67,7 @@ pub const FnDecl = struct {
     return_type: ?*Type,
     has_callable: bool,
     is_closure: bool,
-    is_extern: bool,
+    extern_lib: ?TokenIndex,
 
     /// Meta data gathered by the Ast walker
     meta: Meta = .empty,
@@ -420,6 +426,7 @@ pub fn getSpan(self: *const @This(), anynode: anytype) Span {
         else
             self.token_spans[node.tk],
         EnumDecl.Tag => self.getSpan(node.name),
+        ExternBlock => self.token_spans[node.name],
         For => .{
             .start = self.token_spans[node.for_tk].start,
             .end = self.getSpan(node.body).end,

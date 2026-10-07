@@ -1,8 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
-const NativeLib = @import("NativeLib.zig");
-const NativeModule = @import("../pipeline/NativesRegister.zig").NativeModule;
 const State = @import("../pipeline/State.zig");
 
 const Ast = @import("../parser/Ast.zig");
@@ -19,22 +17,12 @@ pub const Result = union(enum) {
         path: []const u8,
         content: [:0]const u8,
     },
-    dynlib: struct {
-        name: []const u8,
-        path: []const u8,
-        rayn_content: [:0]const u8,
-        lib: NativeLib,
-        token: usize,
-    },
     module: struct {
         path: InternerIdx,
     },
     missing_file: usize,
-    missing_dynlib_file: usize,
     unknown_mod: usize,
-    unsupported_os,
 };
-const Error = error{UnsupportedOS};
 
 /// Import rules and order
 /// - If path starts with a '.', consider it as a relative path and fails if not found
@@ -108,47 +96,17 @@ fn fetchFrom(
         const name = ast.toSource(part);
 
         if (i == path_chunks.len - 1) {
-            // Ray module
-            {
-                path.append(alloc, name);
-                defer _ = path.pop();
-                const file_name = std.fmt.allocPrint(alloc, "{s}.{s}", .{ name, "ray" }) catch oom();
+            path.append(alloc, name);
+            defer _ = path.pop();
+            const file_name = std.fmt.allocPrint(alloc, "{s}.{s}", .{ name, "ray" }) catch oom();
 
-                if (cwd.access(io, file_name, .{})) {
-                    return .{ .rayfile = .{
-                        .name = file_name,
-                        .path = path.renderAlloc(alloc, .{ .sep = std.fs.path.sep_str }),
-                        .content = readFile(io, alloc, cwd, file_name),
-                    } };
-                } else |_| {}
-            }
-
-            // Native module
-            {
-                const file_name = std.fmt.allocPrint(alloc, "{s}.{s}", .{ name, "rayn" }) catch oom();
-
-                if (cwd.access(io, file_name, .{})) {
-                    const lib = NativeLib.open(
-                        alloc,
-                        path.renderAlloc(alloc, .{ .sep = std.Io.Dir.path.sep_str }),
-                        name,
-                    ) catch |e| switch (e) {
-                        error.UnsupportedOS => return .unsupported_os,
-                        error.LoadFailed => return .{ .missing_dynlib_file = part },
-                    };
-
-                    // We add the name after fetching the lib to avoid duplicate name
-                    path.append(alloc, name);
-
-                    return .{ .dynlib = .{
-                        .name = file_name,
-                        .path = path.renderAlloc(alloc, .{ .sep = std.fs.path.sep_str }),
-                        .rayn_content = readFile(io, alloc, cwd, file_name),
-                        .lib = lib,
-                        .token = part,
-                    } };
-                } else |_| {}
-            }
+            if (cwd.access(io, file_name, .{})) {
+                return .{ .rayfile = .{
+                    .name = file_name,
+                    .path = path.renderAlloc(alloc, .{ .sep = std.fs.path.sep_str }),
+                    .content = readFile(io, alloc, cwd, file_name),
+                } };
+            } else |_| {}
         } else {
             cwd.* = cwd.openDir(io, name, .{}) catch return .{ .unknown_mod = part };
             path.append(alloc, name);

@@ -1,6 +1,6 @@
 #include "tester.h"
+#include "../../../src/embed/ray.h"
 #include "dynarray.h"
-#include "ray.h"
 #include "reader.h"
 #include "tinydir.h"
 #include <stdarg.h>
@@ -17,6 +17,10 @@ void printCases(Cases *cases) {
     }
 }
 
+static const RayParam isLess_params[] = {
+    {.name = "a", .type = TYPE_INT},
+    {.name = "b", .type = TYPE_INT},
+};
 void isLess(RayVm *vm) {
     int a = rayGetInt(vm, 0);
     int b = rayGetInt(vm, 1);
@@ -143,12 +147,8 @@ bool testDir(const char *path) {
                 vm,
                 (RayFnProto){
                     .name = "isLess",
-                    .arity = 2,
-                    .params =
-                        {
-                            {.name = "a", .type = TYPE_INT},
-                            {.name = "b", .type = TYPE_INT},
-                        },
+                    .arity = ARITY(isLess_params),
+                    .params = (RayParam *)isLess_params,
                     .return_type = TYPE_BOOL,
                     .func = isLess,
                 });

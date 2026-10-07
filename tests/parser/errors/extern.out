@@ -1,6 +1,14 @@
+expect_extern_lib_name
 extern_fn_has_body
 extern_sym_has_decl, Foo, structure, functions
 extern_sym_has_decl, Foo, structure, traits
 extern_sym_has_decl, Foo, enum, functions
 extern_sym_has_decl, Foo, enum, traits
+invalid_extern
+invalid_extern
+invalid_extern
+invalid_extern
+expect_extern_lib_name
+already_in_extern
+expect_expr, }
 invalid_extern

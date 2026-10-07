@@ -1,4 +1,4 @@
-extern fn add(a: int, b: str) -> bool
+extern "foo" fn add(a: int, b: str) -> bool
 
 extern struct Foo {
     a: int,
@@ -10,3 +10,7 @@ extern enum Foo {
     b = 4,
 }
 
+extern "lib" {
+    fn a()
+    struct B {}
+}

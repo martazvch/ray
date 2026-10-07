@@ -45,14 +45,15 @@ typedef struct {
     RayType type;
 } RayParam;
 
-#define MAX_PARAM 256
 typedef struct {
     char *name;
     int arity;
-    RayParam params[MAX_PARAM];
+    RayParam *params;
     RayType return_type;
     RayFn func;
 } RayFnProto;
+
+#define ARITY(arr) (int)(sizeof((arr)) / sizeof(*(arr)))
 
 // -----------
 //  Functions

@@ -9,7 +9,6 @@ const Pipeline = core.Pipeline;
 pub const Vm = core.Vm;
 const cffi = core.cffi;
 const cVm = cffi.cVm;
-const Fn = cffi.Fn;
 
 const oom = @import("misc").oom;
 
@@ -93,6 +92,7 @@ pub export fn rayRun(opaque_vm: *cVm, code: [*c]const u8) c_int {
     return 0;
 }
 
+// Vm manipulation
 const Index = usize;
 
 pub export fn raySetInt(opaque_vm: *cVm, index: Index, value: i64) void {

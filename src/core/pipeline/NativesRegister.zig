@@ -404,19 +404,15 @@ fn registerCFn(
 
 pub fn cFnToRay(alloc: Allocator, proto: *const cffi.FnProto, interner: *Interner, ti: *TypeInterner) *const Type {
     var params: Type.Function.ParamsMap = .empty;
-    params.ensureTotalCapacity(alloc, proto.params.len - 1) catch oom();
+    const arity: usize = @intCast(proto.arity);
+    params.ensureTotalCapacity(alloc, arity - 1) catch oom();
 
-    for (proto.params[0..@as(usize, @intCast(proto.arity))]) |*p| {
+    for (proto.params[0..arity]) |p| {
         const param_ty = cTypeToRay(p.ty, ti);
-        const param_name = interner.intern(std.mem.span(p.name));
 
         params.putAssumeCapacity(
-            param_name,
-            .{
-                .type = param_ty,
-                .default = null,
-                .captured = false,
-            },
+            interner.intern(std.mem.span(p.name)),
+            .{ .type = param_ty, .default = null, .captured = false },
         );
     }
 

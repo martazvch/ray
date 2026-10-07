@@ -102,7 +102,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .load_symbol => |data| self.loadSymbol(data),
         .match => |*data| self.match(data),
         .match_type => |data| self.matchType(data),
-        .multiple_var_decl => |*data| self.multipleVarDecl(data),
+        .multiple_decls => |data| self.multipleDecl(data),
         // Accessed only via `call`
         .obj_func => unreachable,
         .pat_nullable => |index| self.indexInstr("Nullable pattern", index),
@@ -301,11 +301,13 @@ fn call(self: *Self, data: *const Instruction.Call) void {
 fn callSymbol(self: *Self, data: *const Instruction.Call, index: usize, module: ModIndex) void {
     if (module != self.module) {
         switch (data.kind) {
+            .ffi => self.indentAndPrintSlice("[Call ffi symbol {} module {}]", .{ index, module.toInt() }),
             .c => self.indentAndPrintSlice("[Call c symbol {} module {}]", .{ index, module.toInt() }),
             .zig, .zig_method => self.indentAndPrintSlice("[Call Zig symbol {} module {}]", .{ index, module.toInt() }),
             else => self.indentAndPrintSlice("[Call symbol {} module {}]", .{ index, module.toInt() }),
         }
     } else switch (data.kind) {
+        .ffi => self.indentAndPrintSlice("[Call ffi symbol {}]", .{index}),
         .c => self.indentAndPrintSlice("[Call c symbol {}]", .{index}),
         .zig, .zig_method => self.indentAndPrintSlice("[Call Zig symbol {}]", .{index}),
         else => self.indentAndPrintSlice("[Call symbol {}]", .{index}),
@@ -423,10 +425,7 @@ fn fnDeclaration(self: *Self, data: *const Instruction.FnDecl) void {
 }
 
 fn cFnDeclaration(self: *Self, data: *const Instruction.CFnDecl) void {
-    self.indentAndPrintSlice("[C function declaration {s}{s}]", .{
-        self.interner.getKey(data.name).?,
-        if (data.returns) ", returns" else "",
-    });
+    self.indentAndPrintSlice("[C function declaration {s}]", .{self.interner.getKey(data.name).?});
 }
 
 fn forLoop(self: *Self, data: Instruction.For) void {
@@ -554,8 +553,8 @@ fn matchType(self: *Self, data: Instruction.MatchType) void {
     }
 }
 
-fn multipleVarDecl(self: *Self, data: *const Instruction.MultiVarDecl) void {
-    for (data.decls) |decl| {
+fn multipleDecl(self: *Self, decls: []const ir.Index) void {
+    for (decls) |decl| {
         self.parseInstr(decl);
     }
 }

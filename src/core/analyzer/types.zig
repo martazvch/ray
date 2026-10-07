@@ -129,7 +129,7 @@ pub const Type = union(enum) {
         return_type: *const Type,
         kind: Kind,
 
-        pub const Kind = enum { normal, method, bound, c, intrinsic, zig, zig_method };
+        pub const Kind = enum { normal, method, bound, ffi, c, intrinsic, zig, zig_method };
         pub const Parameter = struct {
             type: *const Type,
             default: ?ConstIdx,
@@ -354,7 +354,7 @@ pub const Type = union(enum) {
             @compileError("Hasher must have an 'update' method");
         }
 
-        hasher.update(asBytes(&@intFromEnum(self)));
+        hasher.update(asBytes(&@backingInt(self)));
 
         switch (self) {
             .any, .void, .int, .float, .bool, .str, .null => {},

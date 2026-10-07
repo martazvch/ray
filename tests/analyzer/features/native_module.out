@@ -1,13 +1,13 @@
 //-- cmodule.rayn --
-[C function declaration ret_no_arg, returns]
-[C function declaration ret_arg, returns]
-[C function declaration ret_args, returns]
+[C function declaration ret_no_arg]
+[C function declaration ret_arg]
+[C function declaration ret_args]
 [C function declaration void_no_arg]
 [C function declaration void_arg]
 [C function declaration void_args]
 [Function declaration rayFunc, returns]
     [Return]
-        [Call c symbol 1]
+        [Call ffi symbol 1]
             - args
             [Binop type: mul_float]
                 [Constant index 3]
@@ -17,7 +17,7 @@
 //-- test.ray --
 [Function declaration main]
     [Pop]
-        [Call c symbol 1 module 3]
+        [Call ffi symbol 1 module 3]
             - args
             [Constant index 3]
                 [Float 4]

@@ -1,4 +1,0 @@
-use data.cmodule.not_cmodule
-use data.cmodule.missing
-
-fn main() { }

@@ -29,7 +29,6 @@ pub const AnalyzerMsg = union(enum) {
     duplicate_tag: struct { kind: []const u8, name: []const u8 },
     duplicate_field: struct { name: []const u8 },
     duplicate_param: struct { name: []const u8 },
-    dynlib_not_module: struct { name: []const u8 },
     dynlib_unsupported_os: struct { name: []const u8 },
     dynlib_missing_lib: struct { name: []const u8 },
     container_unknown_decl: struct { kind: []const u8, ty: []const u8, field: []const u8 },
@@ -42,7 +41,6 @@ pub const AnalyzerMsg = union(enum) {
     error_with_return: struct { found: []const u8 },
     expect_statement,
     expect_value_found_type: struct { found: []const u8 },
-    extern_fn_not_in_rayn: struct { name: []const u8 },
     extern_fn_not_in_lib: struct { name: []const u8 },
     fallback_err_on_non_err: struct { found: []const u8 },
     fallback_opt_on_non_opt: struct { found: []const u8 },
@@ -177,7 +175,6 @@ pub const AnalyzerMsg = union(enum) {
             .duplicate_param => |e| writer.print("parameter '{s}' is already present in function call", .{e.name}),
             .duplicate_tag => |e| writer.print("tag '{s}' already declared in {s}", .{ e.name, e.kind }),
             .dynlib_missing_lib => |e| writer.print("missing dynamic library for module '{s}'", .{e.name}),
-            .dynlib_not_module => |e| writer.print("module '{s}' is not a native Ray module", .{e.name}),
             .dynlib_unsupported_os => |e| writer.print("Unsupported plateform '{s}' for native modules", .{e.name}),
             .implicit_select_no_type => writer.writeAll("can't infer type"),
             .implicit_select_invalid_type => |e| writer.print("expect an enum or an union but found '{s}'", .{e.found}),
@@ -194,7 +191,6 @@ pub const AnalyzerMsg = union(enum) {
             .expect_statement => writer.writeAll("did not expect an expression in this context"),
             .expect_value_found_type => |e| writer.print("expect a value found type '{s}'", .{e.found}),
             .extern_fn_not_in_lib => |e| writer.print("function '{s}' not found in dynamic library", .{e.name}),
-            .extern_fn_not_in_rayn => |e| writer.print("can't declare '{s}' as 'extern' function outside of a 'rayn' interface file", .{e.name}),
             .fallback_err_on_non_err => |e| writer.print("expect an error union, found '{s}", .{e.found}),
             .fallback_opt_on_non_opt => |e| writer.print("expect an optional type, found '{s}", .{e.found}),
             .fail_no_err => |e| writer.print("'fail' is used to return errors from functions, found '{s}'", .{e.found}),
@@ -334,7 +330,6 @@ pub const AnalyzerMsg = union(enum) {
             .duplicate_param => writer.writeAll("parameters can be defined only once in function calls"),
             .duplicate_tag => writer.writeAll("use another name or introduce numbers, underscore, ..."),
             .dynlib_missing_lib => writer.writeAll("to load a native module, the dynamic library must be next to the '.rayn' file"),
-            .dynlib_not_module => writer.writeAll("a valid native Ray module has to define 'handcheck' function (see ray_ext.h)"),
             .dynlib_unsupported_os => writer.writeAll("Only Windows, Linux and MacOS are supported for native module dynamic loading"),
             .enum_discr_duplicate => writer.writeAll("discriminant values must be unique"),
             .enum_discr_not_comptime => writer.writeAll("all discriminant values must be known at compile time"),
@@ -348,9 +343,6 @@ pub const AnalyzerMsg = union(enum) {
             ),
             .expect_value_found_type => writer.writeAll("types can't be used as a runtime value"),
             .extern_fn_not_in_lib => writer.writeAll("incoherence between function's name declared in '.rayn' file and the dynamic library"),
-            .extern_fn_not_in_rayn => writer.writeAll(
-                "'extern' function can only be used in interface '.rayn' file to expose functions prototypes that we'll be dynamically loaded",
-            ),
             .fallback_err_on_non_err => writer.writeAll(
                 \\fallback operator '!!' is meant to provide a value in case of an error union value is an error
                 \\It can't be used with any other type

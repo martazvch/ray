@@ -1,1 +1,1 @@
-extern_fn_not_in_rayn, foo
+extern_fn_not_in_lib, nonExisting
