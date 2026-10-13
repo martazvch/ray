@@ -1213,9 +1213,6 @@ fn endCStructDecl(
     ty: *const Type,
     fields: []const Type.Structure.Field,
 ) StmtResult {
-    if (node.functions.len > 0) @panic("");
-    if (node.traits.len > 0) @panic("");
-
     return self.irb.addInstr(
         .{ .cstruct_decl = .{
             .name = name,

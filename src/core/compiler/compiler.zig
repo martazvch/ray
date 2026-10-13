@@ -846,7 +846,7 @@ const Compiler = struct {
                     Obj.CStructure.createComptime(
                         self.alloc,
                         self.artifacts.getFromKey(.c_structure, s.symbol.module, s.symbol.symbol),
-                        vals.toOwnedSlice(self.alloc) catch oom(),
+                        vals.items,
                     ).asObj();
 
                 break :s Value.makeObj(obj);

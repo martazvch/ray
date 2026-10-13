@@ -68,7 +68,6 @@ pub const CStructure = struct {
         };
 
         const struct_ffi_type: ffi.Type = .{ .structure = field_types };
-        // TODO: could be one-liner?
         self.ffi_type = struct_ffi_type.ffi(alloc);
         const res = ffi.getStructOffsets(ffi.getDefaultAbi(), self.ffi_type, @ptrCast(self.offsets));
 

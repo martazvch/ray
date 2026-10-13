@@ -680,11 +680,12 @@ pub const Structure = struct {
         return obj;
     }
 
-    pub fn createComptime(alloc: Allocator, artifacts: *const Artifacts, parent_index: usize, fields: []const Value) *Self {
+    pub fn createComptime(alloc: Allocator, artifacts: *const Artifacts, parent_index: usize, fields: []Value) *Self {
         const parent = artifacts.get(.structure, parent_index);
         const obj = Obj.allocateComptime(alloc, Self, parent.type_id);
         obj.parent_index = parent_index;
-        obj.fields = alloc.dupe(Value, fields) catch oom();
+        // obj.fields = alloc.dupe(Value, fields) catch oom();
+        obj.fields = fields;
 
         return obj;
     }
