@@ -486,6 +486,7 @@ pub const FfiFn = struct {
         obj.name = name;
         obj.function = function;
         obj.param_types = param_types;
+        obj.return_type = return_type;
         obj.return_struct = return_struct;
         obj.avalues = alloc.alloc([*c]u8, param_types.len) catch oom();
         obj.param_ffi_types = ffi.sliceToFfi(alloc, param_types);
