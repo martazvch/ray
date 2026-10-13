@@ -16,14 +16,15 @@ constants: ArrayList(Constant),
 const Self = @This();
 
 pub const Constant = union(enum) {
+    null,
+    bool: bool,
     int: i64,
     float: f64,
-    bool: bool,
+    raw_ptr: usize,
     array: struct { type_id: TypeId, values: []const ConstIdx },
     enum_lit: TagLit,
     struct_lit: StructLit,
     union_lit: TagLit,
-    null,
     string: misc.Interner.Index,
 
     pub const StructLit = struct {
@@ -46,11 +47,11 @@ pub const ConstIdx = enum(u16) {
     _,
 
     pub fn toInt(self: ConstIdx) usize {
-        return @intFromEnum(self);
+        return @backingInt(self);
     }
 
     pub fn fromInt(i: usize) ConstIdx {
-        return @enumFromInt(i);
+        return @fromBackingInt(@intCast(i));
     }
 };
 
@@ -89,20 +90,21 @@ fn hash(data: Constant) u64 {
     var hasher = std.hash.Wyhash.init(0);
     const asBytes = std.mem.asBytes;
 
-    hasher.update(asBytes(&@intFromEnum(data)));
+    hasher.update(asBytes(&@backingInt(data)));
 
     switch (data) {
+        .null => {},
+        .bool => |*i| hasher.update(asBytes(i)),
+        .int => |*i| hasher.update(asBytes(i)),
+        .float => |*f| hasher.update(asBytes(f)),
+        .raw_ptr => |*addr| hasher.update(asBytes(addr)),
+        .string => |*s| hasher.update(asBytes(s)),
         .array => |arr| {
             hasher.update(asBytes(&arr.type_id));
             for (arr.values) |v| {
                 hasher.update(asBytes(&v));
             }
         },
-        .bool => |*i| hasher.update(asBytes(i)),
-        .int => |*i| hasher.update(asBytes(i)),
-        .float => |*f| hasher.update(asBytes(f)),
-        .string => |*s| hasher.update(asBytes(s)),
-        .null => {},
         .enum_lit, .union_lit => |e| {
             hasher.update(asBytes(&e.symbol.module.toInt()));
             hasher.update(@tagName(data));

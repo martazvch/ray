@@ -190,6 +190,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .push_true => self.simpleInstruction(writer, name, offset),
         .range_new_float => self.simpleInstruction(writer, name, offset),
         .range_new_int => self.simpleInstruction(writer, name, offset),
+        .raw_ptr => self.indexInstruction(writer, name, offset),
         .ret => self.simpleInstruction(writer, name, offset),
         .ret_naked => self.simpleInstruction(writer, name, offset),
         .set_field => self.indexInstruction(writer, name, offset),

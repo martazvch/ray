@@ -13,6 +13,7 @@ const Gc = @import("Gc.zig");
 const Obj = @import("Obj.zig");
 const Value = @import("values.zig").Value;
 const State = @import("../pipeline/State.zig");
+const Artifacts = @import("../compiler/Artifacts.zig");
 
 io: Io,
 gc: Gc,
@@ -149,7 +150,7 @@ fn execute(self: *Self) !void {
             const stdout = &stdout_writer.interface;
             defer stdout.flush() catch oom();
 
-            self.stack.print(stdout, self.frame) catch oom();
+            self.stack.print(stdout, self.frame, &self.state.artifacts) catch oom();
         }
 
         if (comptime options.print_instr) {
@@ -254,7 +255,7 @@ fn execute(self: *Self) !void {
                 defer self.frame.slots = prev_slot;
 
                 self.frame.slots = base;
-                const ret_val = obj.call(self.frame.slots[0..arity]);
+                const ret_val = obj.call(self, self.frame.slots[0..arity]);
                 self.stack.top = base;
 
                 if (ret_val) |val| {
@@ -653,6 +654,10 @@ fn execute(self: *Self) !void {
             .push_true => self.stack.push(Value.true_),
             .range_new_float => self.stack.push(.makeRangeFloat(self.stack.pop().float, self.stack.pop().float)),
             .range_new_int => self.stack.push(.makeRangeInt(self.stack.pop().int, self.stack.pop().int)),
+            .raw_ptr => {
+                const child = self.stack.pop();
+                self.stack.push(.makeObj(Obj.RawPointer.create(self, child.obj.as(Obj.Pointer).child).asObj()));
+            },
             .ret => {
                 const result = self.stack.pop();
                 self.frame_stack.count -= 1;
@@ -777,9 +782,14 @@ fn execute(self: *Self) !void {
             .struct_lit_c => {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
-                const layout = self.state.artifacts.c_structs.items[index].layout;
-                const cstruct = Obj.CStructure.create(self, layout);
-                cstructLit(cstruct, arity, &self.stack);
+                const cstruct = Obj.CStructure.create(
+                    self,
+                    self.state.artifacts.get(.c_structure, index),
+                    (self.stack.top - arity)[0..arity],
+                );
+
+                self.stack.top -= arity;
+                self.stack.push(Value.makeObj(cstruct.asObj()));
             },
 
             .sub_float => {
@@ -834,14 +844,6 @@ fn structLit(instance: *Obj.Structure, arity: usize, stack: *Stack) void {
     }
     stack.top -= arity;
     stack.push(Value.makeObj(instance.asObj()));
-}
-
-fn cstructLit(cstruct: *Obj.CStructure, arity: usize, stack: *Stack) void {
-    for (0..arity) |i| {
-        cstruct.setField(i, stack.peek(arity - i - 1));
-    }
-    stack.top -= arity;
-    stack.push(Value.makeObj(cstruct.asObj()));
 }
 
 // PERF: check if a length is 0 and just return the string?
@@ -929,7 +931,12 @@ const Stack = struct {
         return &(self.top - 1 - distance)[0];
     }
 
-    pub fn print(self: *const Stack, writer: *Writer, frame: *CallFrame) Writer.Error!void {
+    pub fn print(
+        self: *const Stack,
+        writer: *Writer,
+        frame: *CallFrame,
+        artifacts: *const Artifacts,
+    ) Writer.Error!void {
         try writer.writeAll("          ");
         var value = self.values[0..].ptr;
 
@@ -938,7 +945,7 @@ const Stack = struct {
             if (value == frame.slots) try writer.writeAll(">");
 
             try writer.writeAll("[");
-            value[0].print(writer);
+            value[0].print(artifacts, writer);
             try writer.writeAll("] ");
         }
         try writer.writeAll("\n");

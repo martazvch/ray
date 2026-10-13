@@ -374,6 +374,7 @@ const Compiler = struct {
             .pointer => |index| self.pointer(index),
             .pop => |index| self.wrappedInstrNoDup(.pop, index),
             .range => |data| self.range(data),
+            .raw_ptr => |index| self.wrappedInstrNoDup(.raw_ptr, index),
             .@"return" => |data| self.returnInstr(data),
             .string_interp => |data| self.stringInterp(data),
             .struct_decl => |*data| self.structDecl(data),
@@ -712,7 +713,18 @@ const Compiler = struct {
 
     fn cFnDecl(self: *Self, data: *const Instruction.CFnDecl) Error!void {
         const fn_name = self.interner.getKey(data.name).?;
-        const func = Obj.FfiFn.create(self.alloc, fn_name, data.func, data.param_types, data.return_type);
+        const return_struct = s: {
+            const sym = data.return_struct orelse break :s null;
+            break :s self.artifacts.getFromKey(.c_structure, sym.module, sym.symbol);
+        };
+        const func = Obj.FfiFn.create(
+            self.alloc,
+            fn_name,
+            data.func,
+            data.param_types,
+            data.return_type,
+            return_struct,
+        );
         self.artifacts.add(self.alloc, .ffi_function, self.module, data.sym_index, func);
     }
 
@@ -813,6 +825,7 @@ const Compiler = struct {
                 @intCast(u.tag_index),
                 .null_,
             ).asObj()),
+            .raw_ptr => |addr| Value.makeObj(Obj.RawPointer.createComptime(self.alloc, @ptrFromInt(addr)).asObj()),
             .struct_lit => |s| s: {
                 var vals = ArrayList(Value).initCapacity(self.alloc, s.values.len) catch oom();
                 for (s.values) |val| {
@@ -1218,11 +1231,12 @@ const Compiler = struct {
     }
 
     fn cStructDecl(self: *Self, data: *const Instruction.CStructDecl) Error!void {
-        self.artifacts.add(self.alloc, .c_structure, self.module, data.sym_index, .{
-            .name = self.alloc.dupe(u8, self.interner.getKey(data.name).?) catch oom(),
-            .type_id = data.type_id,
-            .layout = data.layout,
-        });
+        self.artifacts.add(self.alloc, .c_structure, self.module, data.sym_index, .init(
+            self.alloc,
+            self.alloc.dupe(u8, self.interner.getKey(data.name).?) catch oom(),
+            data.type_id,
+            data.field_types,
+        ));
     }
 
     // TODO: protect cast

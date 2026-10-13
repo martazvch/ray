@@ -40,6 +40,7 @@ const Kind = enum {
     zig_function,
     iterator,
     pointer,
+    raw_pointer,
     string,
     structure,
     c_structure,
@@ -59,6 +60,7 @@ const Kind = enum {
             ZigFn => .zig_function,
             Iterator => .iterator,
             Pointer => .pointer,
+            RawPointer => .raw_pointer,
             String => .string,
             Structure => .structure,
             CStructure => .c_structure,
@@ -464,108 +466,136 @@ pub const FfiFn = struct {
     bytes: []u8,
     avalues: [][*c]u8,
     rvalue: []u8,
+    offsets: []usize,
+    param_types: []const ffi.Type,
+    param_ffi_types: []ffi.FfiType,
+    return_type: ffi.Type,
+    return_struct: ?*const Artifacts.CStructure,
 
     const Self = @This();
 
     pub fn create(
-        allocator: Allocator,
+        alloc: Allocator,
         name: []const u8,
         function: ffi.Fn,
-        param_types: ffi.Params,
+        param_types: []const ffi.Type,
         return_type: ffi.Type,
+        return_struct: ?*const Artifacts.CStructure,
     ) *Self {
-        const obj = Obj.allocateComptime(allocator, Self, undefined);
+        const obj = Obj.allocateComptime(alloc, Self, undefined);
         obj.name = name;
         obj.function = function;
-
-        obj.avalues = allocator.alloc([*c]u8, param_types.len) catch oom();
-        obj.rvalue = allocator.alloc(u8, @sizeOf(i32)) catch oom();
+        obj.param_types = param_types;
+        obj.return_struct = return_struct;
+        obj.avalues = alloc.alloc([*c]u8, param_types.len) catch oom();
+        obj.param_ffi_types = ffi.sliceToFfi(alloc, param_types);
 
         const cif_res = ffi.prepCif(
             &obj.cif,
             ffi.getDefaultAbi(),
             @intCast(param_types.len),
-            return_type,
-            @ptrCast(param_types),
+            return_type.ffi(alloc),
+            @ptrCast(obj.param_ffi_types),
         );
 
         if (cif_res != 0) {
             @panic("unable to prepare cif for libffi function");
         }
 
-        obj.bytes = allocator.alloc(u8, obj.cif.bytes) catch oom();
+        obj.rvalue = alloc.alloc(u8, return_type.returnSize(alloc)) catch oom();
+        obj.offsets = alloc.alloc(usize, param_types.len) catch oom();
 
-        return obj;
-    }
-
-    pub fn createFromProto(allocator: Allocator, proto: *const ffi.FnProto) *Self {
-        const obj = Obj.allocateComptime(allocator, Self, undefined);
-        obj.name = std.mem.span(proto.name);
-        obj.function = proto.function;
-
-        obj.avalues = allocator.alloc([*c]u8, proto.arity) catch oom();
-        obj.rvalue = allocator.alloc(u8, @sizeOf(i32)) catch oom();
-
-        const cif_res = ffi.prepCif(
-            &obj.cif,
-            ffi.getDefaultAbi(),
-            @intCast(proto.arity),
-            proto.return_type,
-            @ptrCast(proto.param_types),
-        );
-
-        if (cif_res != 0) {
-            @panic("unable to prepare cif for libffi function");
-        }
-
-        obj.bytes = allocator.alloc(u8, obj.cif.bytes) catch oom();
-
-        return obj;
-    }
-
-    pub fn call(self: *Self, values: []Value) ?Value {
         var offset: usize = 0;
+        for (obj.param_ffi_types, obj.offsets) |ty, *off| {
+            offset = std.mem.alignForward(usize, offset, ty.*.alignment);
+            off.* = offset;
+            offset += ty.*.size;
+        }
 
-        for (values, 0..) |val, i| {
-            var size: usize = 0;
+        obj.bytes = alloc.alloc(u8, offset) catch oom();
 
-            switch (val) {
-                .bool => |v| {
-                    size = @sizeOf(bool);
-                    self.writeValue(offset, size, v);
+        return obj;
+    }
+
+    pub fn call(self: *Self, vm: *Vm, values: []Value) ?Value {
+        var arena = std.heap.ArenaAllocator.init(vm.gc_alloc);
+        defer arena.deinit();
+        const alloc = arena.allocator();
+
+        for (self.param_types, self.offsets, values) |ty, off, val| {
+            switch (ty) {
+                .void => unreachable,
+                .bool => self.writeValue(off, u8, @as(u8, @intFromBool(val.bool))),
+                .u8 => self.writeValue(off, u8, @as(u8, @intCast(val.int))),
+                .int => self.writeValue(off, c_int, @as(c_int, @intCast(val.int))),
+                .uint => self.writeValue(off, c_uint, @as(c_uint, @intCast(val.int))),
+                .f32 => self.writeValue(off, f32, @as(f32, @floatCast(val.float))),
+                .f64 => self.writeValue(off, f64, val.float),
+                .enum_tag => self.writeValue(off, c_int, @as(c_int, @intCast(val.obj.as(Enum).payload))),
+                .string => {
+                    const cstr = alloc.dupeSentinel(u8, val.obj.as(String).chars, 0) catch oom();
+                    // bytes[0..@sizeOf(...)]: u8 -> *[N]u8
+                    // @ptrCast(...): *[*]u8
+                    const slot: *[*:0]u8 = @ptrCast(@alignCast(self.bytes[off..][0..@sizeOf(*[*:0]u8)]));
+                    slot.* = cstr.ptr;
                 },
-                .int => |v| {
-                    size = @sizeOf(i32);
-                    self.writeValue(offset, size, @as(i32, @intCast(v)));
+                .structure => {
+                    const raw = val.obj.as(CStructure).bytes;
+                    @memcpy(self.bytes[off..][0..raw.len], raw);
                 },
-                .float => |v| {
-                    size = @sizeOf(f32);
-                    self.writeValue(offset, size, @as(f32, @floatCast(v)));
+                .pointer => {
+                    const obj = val.obj;
+                    const addr = switch (obj.kind) {
+                        .pointer => switch (obj.as(Pointer).child.*) {
+                            .int => |*i| @intFromPtr(i),
+                            else => @panic("addressing anything else than an 'int' not yet implemented"),
+                        },
+                        .raw_pointer => @intFromPtr(obj.as(RawPointer).child),
+                        else => unreachable,
+                    };
+                    self.writeValue(off, usize, addr);
                 },
-                else => @panic("not yet implemented"),
             }
+        }
 
-            self.avalues[i] = &self.bytes[offset];
-            offset += size;
+        // ffi_call can mutate 'avalue' on certain plateforms in case we pass
+        // large structure arguments. It makes an internal copy of the structure
+        // and makes 'avalue' slot points to the copy
+        // We have to reset pointers ourselves
+        for (self.offsets, 0..) |off, i| {
+            self.avalues[i] = &self.bytes[off];
         }
 
         ffi.call(&self.cif, self.function, @ptrCast(self.rvalue), @ptrCast(self.avalues));
 
-        if (ffi.eqType(self.cif.rtype, ffi.Void)) {
-            return null;
-        } else if (ffi.eqType(self.cif.rtype, ffi.Int32)) {
-            return .makeInt(@as(*i32, @ptrCast(@alignCast(self.rvalue))).*);
-        } else if (ffi.eqType(self.cif.rtype, ffi.Bool)) {
-            return .makeInt(@as(*i32, @ptrCast(@alignCast(self.rvalue))).*);
-        } else if (ffi.eqType(self.cif.rtype, ffi.Float)) {
-            return .makeFloat(@as(*f32, @ptrCast(@alignCast(self.rvalue))).*);
-        } else {
-            @panic("not yet implemented");
-        }
+        return switch (self.return_type) {
+            .void => null,
+            .bool => .makeBool(self.readValue(u8) == @intFromBool(true)),
+            .u8 => .makeInt(self.readValue(u8)),
+            .int => .makeInt(self.readValue(c_int)),
+            .uint => .makeInt(self.readValue(c_int)),
+            .f32 => .makeFloat(self.readValue(f32)),
+            .f64 => .makeFloat(self.readValue(f64)),
+            .structure => {
+                const return_struct = self.return_struct.?;
+                var cstruct = Obj.allocate(vm, CStructure, return_struct.type_id);
+                cstruct.parent = return_struct;
+                const return_size = return_struct.ffi_type.*.size;
+                cstruct.bytes = vm.gc_alloc.alloc(u8, return_size) catch oom();
+                @memcpy(cstruct.bytes, self.rvalue[0..return_size]);
+
+                return .makeObj(cstruct.asObj());
+            },
+            .string, .enum_tag, .pointer => @panic("can't return those type from C function yet"),
+        };
     }
 
-    inline fn writeValue(self: *Self, offset: usize, size: usize, value: anytype) void {
-        @memcpy(self.bytes[offset..][0..size], std.mem.asBytes(&value));
+    inline fn writeValue(self: *Self, offset: usize, T: type, value: T) void {
+        @memcpy(self.bytes[offset..][0..@sizeOf(T)], std.mem.asBytes(&value));
+    }
+
+    inline fn readValue(self: *const Self, T: type) T {
+        return @as(*T, @ptrCast(@alignCast(self.rvalue))).*;
     }
 
     pub fn asObj(self: *Self) *Obj {
@@ -686,26 +716,27 @@ pub const Structure = struct {
 
 pub const CStructure = struct {
     obj: Obj,
-    name: []const u8,
     bytes: []u8,
-    layout: Artifacts.CStructure.Layout,
+    parent: *const Artifacts.CStructure,
 
     const Self = @This();
 
-    pub fn create(vm: *Vm, layout: Artifacts.CStructure.Layout) *Self {
-        const obj = Obj.allocate(vm, Self, undefined);
-        obj.name = undefined;
-        obj.layout = layout;
-        obj.bytes = vm.gc_alloc.alloc(u8, layout.size) catch oom();
+    pub fn create(vm: *Vm, parent: *const Artifacts.CStructure, fields: []const Value) *Self {
+        const obj = Obj.allocate(vm, Self, parent.type_id);
+        obj.parent = parent;
+        obj.bytes = vm.gc_alloc.alloc(u8, parent.ffi_type.*.size) catch oom();
+
+        for (fields, 0..) |field, i| {
+            obj.setField(i, field);
+        }
 
         return obj;
     }
 
     pub fn createComptime(alloc: Allocator, parent: *const Artifacts.CStructure, fields: []const Value) *Self {
         const obj = Obj.allocateComptime(alloc, Self, parent.type_id);
-        obj.name = parent.name;
-        obj.layout = parent.layout;
-        obj.bytes = alloc.alloc(u8, parent.layout.size) catch oom();
+        obj.parent = parent;
+        obj.bytes = alloc.alloc(u8, parent.ffi_type.*.size) catch oom();
 
         for (fields, 0..) |field, i| {
             obj.setField(i, field);
@@ -715,27 +746,48 @@ pub const CStructure = struct {
     }
 
     pub fn getField(self: *const Self, index: usize) Value {
-        const f = self.layout.fields[index];
-        const p = self.bytes.ptr + f.offset;
+        const off = self.parent.offsets[index];
+        const ty = self.parent.field_types[index];
+        const ptr = self.bytes.ptr + off;
 
-        return switch (f.kind) {
-            .u8 => .makeInt(@as(*const u8, @ptrCast(p)).*),
-            // .i32 => .makeInt(@as(*const i32, @ptrCast(@alignCast(p))).*),
-            // .f32 => .makeFloat(@as(*const f32, @ptrCast(@alignCast(p))).*),
-            // .ptr => .makeInt(@intFromPtr(@as(*const *anyopaque, @ptrCast(@alignCast(p))).*)),
+        return switch (ty) {
+            .bool => .makeBool(readValue(ptr, u8) == @intFromBool(true)),
+            .u8 => .makeInt(readValue(ptr, u8)),
+            .int => .makeInt(readValue(ptr, c_int)),
+            .uint => .makeInt(readValue(ptr, c_uint)),
+            .f32 => .makeFloat(readValue(ptr, f32)),
+            else => @panic("type not yet supported in extern structure"),
         };
     }
 
-    pub fn setField(self: *Self, index: usize, value: Value) void {
-        const f = self.layout.fields[index];
-        const p = self.bytes.ptr + f.offset;
+    inline fn readValue(ptr: [*]u8, T: type) T {
+        return @as(*const T, @ptrCast(@alignCast(ptr))).*;
+    }
 
-        switch (f.kind) {
-            .u8 => @as(*u8, @ptrCast(p)).* = @intCast(value.int),
-            // .i32 => @as(*i32, @ptrCast(@alignCast(p))).* = @intCast(value.int),
-            // .f32 => @as(*f32, @ptrCast(@alignCast(p))).* = @floatCast(value.float),
-            // .ptr => @as(**anyopaque, @ptrCast(@alignCast(p))).* = @ptrFromInt(@as(usize, @intCast(value.int))),
+    pub fn setField(self: *Self, index: usize, value: Value) void {
+        const off = self.parent.offsets[index];
+        const ty = self.parent.field_types[index];
+        const ptr = self.bytes.ptr + off;
+
+        switch (ty) {
+            .bool => writeValue(ptr, u8, @intCast(@intFromBool(value.bool))),
+            .u8 => writeValue(ptr, u8, @intCast(value.int)),
+            .int => writeValue(ptr, c_int, @intCast(value.int)),
+            .uint => writeValue(ptr, c_uint, @intCast(value.int)),
+            .f32 => writeValue(ptr, f32, @floatCast(value.float)),
+            .pointer => {
+                if (value == .null) {
+                    writeValue(ptr, usize, 0);
+                } else {
+                    writeValue(ptr, usize, @intFromPtr(value.obj.as(RawPointer).child));
+                }
+            },
+            else => @panic("type not yet supported in extern structure"),
         }
+    }
+
+    inline fn writeValue(ptr: [*]u8, T: type, value: T) void {
+        @as(*T, @ptrCast(@alignCast(ptr))).* = value;
     }
 
     pub fn asObj(self: *Self) *Obj {
@@ -743,9 +795,10 @@ pub const CStructure = struct {
     }
 
     pub fn deepCopy(self: *Self, vm: *Vm) *Self {
-        var obj = Self.create(vm, self.layout);
-        vm.gc.pushTmpRoot(obj.asObj());
-        defer vm.gc.popTmpRoot();
+        const bytes = vm.gc_alloc.alloc(u8, self.parent.ffi_type.*.size) catch oom();
+        var obj = Obj.allocate(vm, Self, self.obj.type_id);
+        obj.parent = self.parent;
+        obj.bytes = bytes;
         @memcpy(obj.bytes, self.bytes);
 
         return obj;
@@ -1128,6 +1181,35 @@ pub const Pointer = struct {
     }
 };
 
+pub const RawPointer = struct {
+    obj: Obj,
+    child: ?*anyopaque,
+
+    const Self = @This();
+
+    pub fn create(vm: *Vm, child: ?*anyopaque) *Self {
+        const obj = Obj.allocate(vm, Self, undefined);
+        obj.child = child;
+
+        return obj;
+    }
+
+    pub fn createComptime(alloc: Allocator, child: ?*anyopaque) *Self {
+        const obj = Obj.allocateComptime(alloc, Self, undefined);
+        obj.child = child;
+
+        return obj;
+    }
+
+    pub fn asObj(self: *Self) *Obj {
+        return &self.obj;
+    }
+
+    pub fn deinit(self: *Self, vm: *Vm) void {
+        vm.gc_alloc.destroy(self);
+    }
+};
+
 pub fn deepCopy(self: *Obj, vm: *Vm) *Obj {
     return switch (self.kind) {
         .array => self.as(Array).deepCopy(vm).asObj(),
@@ -1135,7 +1217,20 @@ pub fn deepCopy(self: *Obj, vm: *Vm) *Obj {
         .structure => self.as(Structure).deepCopy(vm).asObj(),
         .c_structure => self.as(CStructure).deepCopy(vm).asObj(),
         // Immutable, shallow copy ok
-        .box, .closure, .@"enum", .function, .iterator, .ffi_function, .c_function, .zig_function, .zig_structure, .string, .trait_obj, .pointer => self,
+        .box,
+        .closure,
+        .@"enum",
+        .function,
+        .iterator,
+        .ffi_function,
+        .c_function,
+        .zig_function,
+        .zig_structure,
+        .string,
+        .trait_obj,
+        .pointer,
+        .raw_pointer,
+        => self,
     };
 }
 
@@ -1166,6 +1261,7 @@ pub fn destroy(self: *Obj, vm: *Vm) void {
             iterator.deinit(vm.gc_alloc);
         },
         .pointer => self.as(Pointer).deinit(vm),
+        .raw_pointer => self.as(RawPointer).deinit(vm),
         .string => self.as(String).deinit(vm.gc_alloc),
         .structure => {
             const instance = self.as(Structure);
@@ -1227,6 +1323,7 @@ pub fn print(self: *Obj, artifacts: *const Artifacts, writer: *Writer) Writer.Er
         .zig_function => try writer.print("<zig function {s}>", .{self.as(ZigFn).name}),
         .iterator => try writer.writeAll("<iterator>"),
         .pointer => try writer.print("<pointer 0x{x}>", .{@intFromPtr(self.as(Pointer).child)}),
+        .raw_pointer => try writer.print("<raw pointer 0x{x}>", .{@intFromPtr(self.as(RawPointer).child)}),
         .string => try writer.print("{s}", .{self.as(String).chars}),
         .structure => {
             const structure = self.as(Structure);
@@ -1244,7 +1341,23 @@ pub fn print(self: *Obj, artifacts: *const Artifacts, writer: *Writer) Writer.Er
                 try writer.writeAll(" }");
             }
         },
-        .c_structure => try writer.print("<c structure {s}>", .{self.as(CStructure).name}),
+        .c_structure => {
+            const cstruct = self.as(CStructure);
+            const parent = cstruct.parent;
+
+            if (parent.field_types.len == 0) {
+                try writer.print("{s}{{}}", .{parent.name});
+            } else {
+                try writer.print("{s}{{ ", .{parent.name});
+                for (0..parent.field_types.len) |i| {
+                    // TODO: real field names
+                    try writer.print("field {} = ", .{i});
+                    cstruct.getField(i).print(artifacts, writer);
+                    if (i < parent.field_types.len - 1) try writer.writeAll(", ");
+                }
+                try writer.writeAll(" }");
+            }
+        },
         .zig_structure => try writer.print("<zig structure {s}>", .{self.as(ZigStructure).name}),
         .trait_obj => try writer.print("<trait obj {s}>", .{self.as(TraitObj).vtable.name}),
         .@"union", .@"error" => {

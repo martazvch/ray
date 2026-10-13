@@ -152,6 +152,7 @@ pub const OpCode = enum(u8) {
     push_true,
     range_new_float,
     range_new_int,
+    raw_ptr,
     ret,
     ret_naked,
     set_field,

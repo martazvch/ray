@@ -107,8 +107,9 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .obj_func => unreachable,
         .pat_nullable => |index| self.indexInstr("Nullable pattern", index),
         .pop => |index| self.indexInstr("Pop", index),
-        .range => |data| self.range(data),
         .pointer => |data| self.pointer(data),
+        .range => |data| self.range(data),
+        .raw_ptr => |index| self.indexInstr("Raw pointer", index),
         .@"return" => |data| self.returnInstr("Return", data),
         .string_interp => |data| self.stringInterp(data),
         .struct_decl => |*data| self.structDecl(data),
@@ -357,6 +358,7 @@ fn constantValue(self: *Self, cte: Constant) void {
         .int => |c| self.indentAndPrintSlice("[Int {}]", .{c}),
         .float => |c| self.indentAndPrintSlice("[Float {}]", .{c}),
         .null => self.indentAndAppendSlice("[Null]"),
+        .raw_ptr => |addr| self.indentAndPrintSlice("[Raw ptr {}]", .{addr}),
         .string => |c| self.indentAndPrintSlice("[String {s}]", .{self.interner.getKey(c).?}),
         .enum_lit => |c| self.tagLiteral(c, .@"enum"),
         .union_lit => |c| self.tagLiteral(c, .@"union"),
@@ -643,9 +645,7 @@ fn structDecl(self: *Self, data: *const Instruction.StructDecl) void {
 }
 
 fn cStructDecl(self: *Self, data: *const Instruction.CStructDecl) void {
-    self.indentAndPrintSlice("[C structure declaration {s}, size {}, alignment {}]", .{
-        self.interner.getKey(data.name).?, data.layout.size, data.layout.alignment,
-    });
+    self.indentAndPrintSlice("[C structure declaration {s}]", .{self.interner.getKey(data.name).?});
 }
 
 fn structLiteral(self: *Self, data: *const Instruction.StructLiteral) void {

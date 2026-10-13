@@ -7,6 +7,7 @@ const Value = @import("../runtime/values.zig").Value;
 const TypeId = @import("../analyzer/types.zig").TypeId;
 const Linker = @import("Linker.zig");
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
+const ffi = @import("ffi");
 
 /// Compiled values used at runtime
 globals: ArrayList(Value) = .empty,
@@ -48,20 +49,35 @@ pub const Structure = struct {
 pub const CStructure = struct {
     name: []const u8,
     type_id: TypeId,
-    layout: Layout,
+    offsets: []usize,
+    field_types: []const ffi.Type,
+    ffi_type: ffi.FfiType,
 
-    pub const Layout = struct {
-        size: usize,
-        alignment: usize,
-        fields: []const Field,
-
-        pub const Field = struct {
-            offset: usize,
-            kind: Kind,
-
-            pub const Kind = enum { u8 };
+    pub fn init(
+        alloc: Allocator,
+        name: []const u8,
+        type_id: TypeId,
+        field_types: []ffi.Type,
+    ) CStructure {
+        var self: CStructure = .{
+            .name = name,
+            .type_id = type_id,
+            .offsets = alloc.alloc(usize, field_types.len) catch oom(),
+            .ffi_type = undefined,
+            .field_types = field_types,
         };
-    };
+
+        const struct_ffi_type: ffi.Type = .{ .structure = field_types };
+        // TODO: could be one-liner?
+        self.ffi_type = struct_ffi_type.ffi(alloc);
+        const res = ffi.getStructOffsets(ffi.getDefaultAbi(), self.ffi_type, @ptrCast(self.offsets));
+
+        if (res != ffi.ok) {
+            @panic("failed to compute libffi structure offsets");
+        }
+
+        return self;
+    }
 };
 
 pub const VTable = struct {

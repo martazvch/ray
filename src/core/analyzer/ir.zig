@@ -1,7 +1,6 @@
 const TagLit = @import("ConstantInterner.zig").Constant.TagLit;
 const ConstIdx = @import("ConstantInterner.zig").ConstIdx;
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
-const CLayout = @import("../compiler/Artifacts.zig").CStructure.Layout;
 const Language = @import("types.zig").Language;
 const ffi = @import("ffi");
 
@@ -59,6 +58,7 @@ pub const Instruction = struct {
         pointer: Pointer,
         pop: Index,
         range: Range,
+        raw_ptr: Index,
         @"return": Return,
         string_interp: StringInterp,
         struct_decl: StructDecl,
@@ -206,8 +206,11 @@ pub const Instruction = struct {
         sym_index: SymbolIndex,
         type_id: TypeId,
         name: usize,
-        param_types: ffi.Params,
+        param_types: []const ffi.Type,
         return_type: ffi.Type,
+        /// In case the function returns a structure, we need information
+        /// about it to be able to assign layout when on stack
+        return_struct: ?LoadSymbol,
     };
     pub const For = struct {
         expr: Index,
@@ -300,7 +303,7 @@ pub const Instruction = struct {
         name: usize,
         sym_index: SymbolIndex,
         type_id: TypeId,
-        layout: CLayout,
+        field_types: []ffi.Type,
     };
     pub const StructLiteral = struct {
         structure: LoadSymbol,

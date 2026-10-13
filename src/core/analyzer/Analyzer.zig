@@ -656,7 +656,7 @@ fn fnDeclaration(self: *Self, node: *const Ast.FnDecl, ctx: *Context) Error!FnDe
 
     if (node.extern_lib) |lib| {
         defer _ = self.scope.close();
-        return self.endExternFnDecl(node, name, lib, interned, sym_index, ctx);
+        return self.endCFnDecl(node, name, lib, interned, sym_index, ctx);
     } else {
         return self.endRayFnDecl(node, name, interned, sym_index, ctx);
     }
@@ -746,7 +746,7 @@ fn validateOverloadedOperatorFn(self: *Self, ty: *const Type, name: InternerIdx,
     );
 }
 
-fn endExternFnDecl(
+fn endCFnDecl(
     self: *Self,
     node: *const Ast.FnDecl,
     name: InternerIdx,
@@ -799,6 +799,11 @@ fn endExternFnDecl(
         span,
     );
 
+    const struct_symbol: ?Instr.LoadSymbol = if (return_ty.is(.structure)) b: {
+        const sym = self.scope.getSymbolFromType(return_ty).?;
+        break :b .{ .symbol = @intCast(sym.index), .module = sym.module, .lang = .c };
+    } else null;
+
     return .{
         .instr = self.irb.addInstr(
             .{ .cfn_decl = .{
@@ -807,7 +812,8 @@ fn endExternFnDecl(
                 .type_id = self.ti.typeId(ty),
                 .name = name,
                 .param_types = self.paramTypesToFfi(&params),
-                .return_type = rayTypeToFfi(return_ty),
+                .return_type = self.rayTypeToFfi(return_ty),
+                .return_struct = struct_symbol,
             } },
             span.start,
         ),
@@ -815,23 +821,37 @@ fn endExternFnDecl(
     };
 }
 
-fn paramTypesToFfi(self: *Self, params: *const Params) ffi.Params {
+fn paramTypesToFfi(self: *Self, params: *const Params) []const ffi.Type {
     var ffi_types = ArrayList(ffi.Type).initCapacity(self.alloc, params.decls.count()) catch oom();
 
     for (params.decls.values()) |param| {
-        ffi_types.appendAssumeCapacity(rayTypeToFfi(param.type));
+        ffi_types.appendAssumeCapacity(self.rayTypeToFfi(param.type));
     }
 
     return ffi_types.toOwnedSlice(self.alloc) catch oom();
 }
 
 // TODO: error
-fn rayTypeToFfi(ty: *const Type) ffi.Type {
+fn rayTypeToFfi(self: *const Self, ty: *const Type) ffi.Type {
     return switch (ty.*) {
-        .bool => ffi.Int32,
-        .int => ffi.Int32,
-        .void => ffi.Void,
-        .float => ffi.Float,
+        .void => .void,
+        .bool => .bool,
+        .u8 => .u8,
+        .uint => .uint,
+        .int => .int,
+        .float => .f32,
+        .@"enum" => .enum_tag,
+        .pointer => .pointer,
+        .rawptr => .pointer,
+        .str => .string,
+        .structure => |*s| {
+            var fields = ArrayList(ffi.Type).initCapacity(self.alloc, s.fields.count()) catch oom();
+            for (s.fields.values()) |f| {
+                fields.appendAssumeCapacity(self.rayTypeToFfi(f.type));
+            }
+
+            return .{ .structure = fields.toOwnedSlice(self.alloc) catch oom() };
+        },
         else => @panic("type not yet implemented"),
     };
 }
@@ -1118,11 +1138,12 @@ fn structDecl(self: *Self, node: *const Ast.StructDecl, ctx: *Context) StmtResul
     try self.openContainer(node.name);
     defer self.closeContainer();
 
+    const fields_res = try self.structureFields(node.fields, ty, ctx);
+
     if (node.is_extern) {
-        return self.endCStructDecl(node, name, sym_index, interned, ty, ctx);
+        return self.endCStructDecl(node, name, sym_index, interned, ty.fields.values());
     }
 
-    const fields_res = try self.structureFields(node.fields, ty, ctx);
     const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
     const traits = try self.containerTraitImpls(interned, node.traits, &ty.traits, ctx);
 
@@ -1190,8 +1211,7 @@ fn endCStructDecl(
     name: InternerIdx,
     sym_index: usize,
     ty: *const Type,
-    struct_type: *Type.Structure,
-    ctx: *Context,
+    fields: []const Type.Structure.Field,
 ) StmtResult {
     if (node.functions.len > 0) @panic("");
     if (node.traits.len > 0) @panic("");
@@ -1201,51 +1221,19 @@ fn endCStructDecl(
             .name = name,
             .sym_index = sym_index,
             .type_id = self.ti.typeId(ty),
-            .layout = try self.cStructFields(node.fields, struct_type, ctx),
+            .field_types = self.fieldTypesToFfi(fields),
         } },
         self.ast.getSpan(node).start,
     );
 }
 
-fn cStructFields(self: *Self, fields: []const Ast.VarDecl, ty: *Type.Structure, ctx: *Context) Error!CLayout {
-    ty.fields.ensureUnusedCapacity(self.alloc, fields.len) catch oom();
-    var offset: usize = 0;
-    var max_align: usize = 1;
-    var cfields = ArrayList(CLayout.Field).initCapacity(self.alloc, fields.len) catch oom();
-
+fn fieldTypesToFfi(self: *const Self, fields: []const Type.Structure.Field) []ffi.Type {
+    var ffi_types = ArrayList(ffi.Type).initCapacity(self.alloc, fields.len) catch oom();
     for (fields) |f| {
-        if (f.value != null) @panic("");
-
-        const field_name = self.internToken(f.name);
-        const gop = ty.fields.getOrPutAssumeCapacity(field_name);
-        if (gop.found_existing) return self.err(
-            .{ .already_declared_field = .{ .name = self.ast.toSource(f.name) } },
-            self.ast.getSpan(f.name),
-        );
-
-        const field_type = try self.checkAndGetType(f.typ, ctx);
-        gop.value_ptr.* = .{ .type = field_type, .default = null };
-        const cfield = try self.cField(field_type);
-
-        offset = std.mem.alignForward(usize, offset, cfield.size);
-        cfields.appendAssumeCapacity(.{ .offset = offset, .kind = cfield.tag });
-        offset += cfield.size;
-        max_align = @max(max_align, cfield.size);
+        ffi_types.appendAssumeCapacity(self.rayTypeToFfi(f.type));
     }
 
-    return .{
-        .alignment = max_align,
-        .size = std.mem.alignForward(usize, offset, max_align),
-        .fields = cfields.toOwnedSlice(self.alloc) catch oom(),
-    };
-}
-
-fn cField(self: *Self, ty: *const Type) Error!struct { size: usize, tag: CLayout.Field.Kind } {
-    _ = self; // autofix
-    return switch (ty.*) {
-        .u8 => .{ .size = @sizeOf(u8), .tag = .u8 },
-        else => @panic("not C-ABI compatible type in c structure"),
-    };
+    return ffi_types.toOwnedSlice(self.alloc) catch oom();
 }
 
 fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult {
@@ -3279,6 +3267,12 @@ pub fn intLit(self: *Self, expr: Ast.Int, negate: bool, ctx: *const Context) Res
                 }
                 ty = self.ti.getCached(.u8);
             },
+            .uint => {
+                if (value > std.math.maxInt(c_uint)) {
+                    @panic("");
+                }
+                ty = self.ti.getCached(.uint);
+            },
             else => {},
         }
     }
@@ -4419,6 +4413,14 @@ fn checkTypeCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, de
     if (decl.is(.float) and value.is(.int)) {
         value_info.instr = self.castIntToFloat(value_info.*);
         return self.ti.getCached(.float);
+    }
+
+    if (decl.is(.rawptr)) {
+        if (value.is(.null)) {
+            value_info.instr = self.addConstantInstr(.{ .raw_ptr = 0 }, span.start);
+        }
+
+        return decl;
     }
 
     check: {

@@ -53,6 +53,8 @@ pub const Type = union(enum) {
 
     // C types
     u8,
+    uint,
+    rawptr,
 
     pub const Array = struct {
         child: *const Type,
@@ -358,7 +360,7 @@ pub const Type = union(enum) {
 
         switch (self) {
             .any, .void, .int, .float, .bool, .str, .null => {},
-            .u8 => {},
+            .u8, .uint, .rawptr => {},
             .array => |ty| ty.child.hash(allocator, hasher),
             .@"enum" => |*ty| {
                 if (ty.loc) |loc| {
@@ -424,7 +426,7 @@ pub const Type = union(enum) {
 
         switch (self.*) {
             .any, .int, .float, .bool, .str, .null, .void, .range => return @tagName(self.*),
-            .u8 => return @tagName(self.*),
+            .u8, .uint, .rawptr => return @tagName(self.*),
             .array => |ty| {
                 errdefer oom();
 
@@ -510,8 +512,8 @@ pub const TypeInterner = struct {
     cache: Cache,
 
     const scalar_list: []const Type = &.{
-        .any, .float, .int, .bool, .str, .null, .void,
-        .u8,
+        .any, .float, .int,    .bool, .str, .null, .void,
+        .u8,  .uint,  .rawptr,
     };
     const trait_list: []const []const u8 = &.{"IsEnum"};
 
