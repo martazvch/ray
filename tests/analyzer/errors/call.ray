@@ -10,5 +10,5 @@ struct Foo {
     }
 }
 
-fn main() { }
+fn main() {}
 

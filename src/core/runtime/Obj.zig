@@ -684,7 +684,6 @@ pub const Structure = struct {
         const parent = artifacts.get(.structure, parent_index);
         const obj = Obj.allocateComptime(alloc, Self, parent.type_id);
         obj.parent_index = parent_index;
-        // obj.fields = alloc.dupe(Value, fields) catch oom();
         obj.fields = fields;
 
         return obj;
