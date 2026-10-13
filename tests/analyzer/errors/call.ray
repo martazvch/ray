@@ -1,0 +1,14 @@
+struct Foo {
+    x: int,
+
+    fn speak(self) {
+        print(self.x)
+    }
+
+    fn speak2(self) {
+        speak()
+    }
+}
+
+fn main() { }
+

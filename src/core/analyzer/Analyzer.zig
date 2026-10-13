@@ -2760,6 +2760,12 @@ fn call(self: *Self, expr: *const Ast.FnCall, ctx: *Context) Result {
     };
 
     const fn_type = callee.type.as(.function) orelse return self.err(.invalid_call_target, span);
+
+    if (fn_type.kind == .method and expr.callee.* == .identifier) return self.err(
+        .{ .call_method_on_non_instance = .{ .name = self.ast.toSource(expr.callee.identifier) } },
+        self.ast.getSpan(expr.callee.identifier),
+    );
+
     const args_res = try self.fnArgsList(expr.args, &fn_type, callee.ti.ext_mod, span, ctx);
 
     if (fn_type.kind == .intrinsic) {

@@ -16,6 +16,7 @@ pub const AnalyzerMsg = union(enum) {
     break_val_in_non_val_block,
     call_method_on_constant: struct { name: []const u8 },
     call_method_on_type: struct { name: []const u8 },
+    call_method_on_non_instance: struct { name: []const u8 },
     call_static_on_instance: struct { name: []const u8 },
     call_fn_on_trait: struct { name: []const u8 },
     call_static_fn_on_trait_obj: struct { fn_name: []const u8 },
@@ -163,6 +164,7 @@ pub const AnalyzerMsg = union(enum) {
             .call_static_fn_on_trait_obj => |e| writer.print("can't call static function '{s}' on an instance", .{e.fn_name}),
             .call_method_on_constant => |e| writer.print("structure '{s}' is declared as a constant", .{e.name}),
             .call_method_on_type => |e| writer.print("method '{s}' called on a type", .{e.name}),
+            .call_method_on_non_instance => |e| writer.print("method '{s}' not called on an instance", .{e.name}),
             .call_static_on_instance => |e| writer.print("static function '{s}' called on an instance", .{e.name}),
             .cant_build_native_struct => |e| writer.print("can't use structure literal syntax on native structure '{s}'", .{e.name}),
             .cant_continue_scope => |e| writer.print("block '{s}' isn't continuable", .{e.name}),
@@ -310,6 +312,10 @@ pub const AnalyzerMsg = union(enum) {
                     "if it has a default implementation",
             ),
             .call_method_on_constant => writer.writeAll("can't call methods on constants as they could mutate the value"),
+            .call_method_on_non_instance => writer.writeAll(
+                \\methods are function declared with 'self' as first parameter.
+                \\you have to invoke thos functions on instances like 'foo.method(...)'
+            ),
             .call_method_on_type, .call_static_on_instance => writer.writeAll(
                 "static functions can only be called on types and methods can only be called on instances",
             ),
