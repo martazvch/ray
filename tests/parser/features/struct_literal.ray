@@ -10,3 +10,5 @@ math.Vec2{ x = 1, y }
 for i in arr {
     foo := Foo{}
 }
+
+Foo{}.x

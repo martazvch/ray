@@ -45,5 +45,7 @@ fn main() {
     addr := Local{answer}
     print(addr)
     print(addr.answer)
+
+    print(Local{ answer }.answer + 3)
 }
 

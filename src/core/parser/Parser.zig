@@ -1798,10 +1798,9 @@ fn postfix(self: *Self, prefixExpr: *Expr) Error!*Expr {
             if (self.ctx.in_cond and !self.ctx.in_group) {
                 return expr;
             }
-            self.token_idx += 1;
 
-            // Can't chain them, break the loop
-            return self.structLiteral(.{ .expr = expr });
+            self.token_idx += 1;
+            expr = try self.structLiteral(.{ .expr = expr });
         }
         // Deref
         else if (self.match(.dot_star)) {
