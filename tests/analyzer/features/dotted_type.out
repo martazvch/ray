@@ -59,7 +59,7 @@
             [Variable index: 0, scope: local]
 [Function declaration main]
     [Variable declaration index: 0, scope: local]
-        [Constant index 5]
+        [Constant index 6]
             [Structure]
                 [Int 1]
                 [Int 2]

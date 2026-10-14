@@ -175,18 +175,14 @@ pub fn parse(io: Io, alloc: Allocator, state: *State, file_name: []const u8, sou
 /// Runs another pipeline to compile another module. they don't share lexical scope and constants
 pub fn runSubPipeline(io: Io, alloc: Allocator, state: *State, file_name: []const u8, path: []const u8, source: [:0]const u8) void {
     const prev_scope = state.lex_scope;
+    defer state.lex_scope = prev_scope;
+
     state.lex_scope = .empty;
     state.lex_scope.initGlobalScope(alloc, state);
-
-    const prev_constants = state.const_interner;
-    state.const_interner = .init(alloc);
 
     _ = run(io, alloc, state, true, file_name, path, source) catch {
         std.process.exit(1);
     };
-
-    state.lex_scope = prev_scope;
-    state.const_interner = prev_constants;
 }
 
 fn printAst(alloc: Allocator, io: Io, ast: *const Ast) !void {

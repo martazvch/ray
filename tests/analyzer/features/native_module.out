@@ -19,10 +19,10 @@
     [Pop]
         [Call ffi symbol 1 module 3]
             - args
-            [Constant index 3]
+            [Constant index 4]
                 [Float 4]
     [Pop]
         [Call symbol 0 module 3]
             - args
-            [Constant index 4]
+            [Constant index 5]
                 [Float 8]

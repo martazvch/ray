@@ -49,9 +49,9 @@
     [Variable declaration index: 0, scope: local]
         [Call symbol 2 module 3]
             - args
-            [Constant index 3]
+            [Constant index 8]
                 [Int 1]
-            [Constant index 4]
+            [Constant index 9]
                 [Int 2]
     [Variable declaration index: 1, scope: local]
         [Load symbol 1 module 3]
@@ -63,9 +63,9 @@
         [Fn call]
             [Variable index: 2, scope: local]
             - args
-            [Constant index 5]
+            [Constant index 10]
                 [Int 6]
-            [Constant index 6]
+            [Constant index 11]
                 [Int 89]
     [Pop]
         [Field access 1]

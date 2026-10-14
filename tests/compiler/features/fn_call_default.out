@@ -250,26 +250,26 @@ call index 5, arity 5, method
 load_const index 4, value 56
 call index 2, arity 1, getInt
 pop
-load_const index 64, value imported static
+load_const index 65, value imported static
 load_const index 0, value 0
 push_false
 push_false
 call index 0, arity 4, staticFn
-load_const index 64, value imported static
-load_const index 65, value 90
+load_const index 65, value imported static
+load_const index 67, value 90
 push_true
 push_false
 call index 0, arity 4, staticFn
-load_const index 66, value Def{}
+load_const index 68, value Def{}
 get_local index 2
-load_const index 67, value imported method
+load_const index 69, value imported method
 load_const index 2, value 10
 push_true
 push_true
 call index 1, arity 5, method
 get_local index 2
-load_const index 67, value imported method
-load_const index 68, value 180
+load_const index 69, value imported method
+load_const index 70, value 180
 push_true
 push_false
 call index 1, arity 5, method

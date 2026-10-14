@@ -720,7 +720,7 @@ fn endRayFnDecl(
             } },
             span.start,
         ),
-        .sym = self.scope.getSymbol(name).?.*,
+        .sym = self.scope.getSymbol(name).?,
     };
 }
 
@@ -817,7 +817,7 @@ fn endCFnDecl(
             } },
             span.start,
         ),
-        .sym = self.scope.getSymbol(name).?.*,
+        .sym = self.scope.getSymbol(name).?,
     };
 }
 
@@ -918,6 +918,7 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
         _ = try self.declareVariable(
             param_name,
             param_res.type,
+            // .{ .captured = p.meta.captured, .is_fn_param = true, .constant = false, .ext_mod = param_res.mod },
             .{ .captured = p.meta.captured, .is_fn_param = true, .constant = false },
             span,
         );
@@ -925,6 +926,7 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
             .type = param_res.type,
             .default = const_index,
             .captured = p.meta.captured,
+            // .ext_mod = param_res.mod,
         });
     }
 
@@ -1009,7 +1011,7 @@ fn fnBody(
 }
 
 /// Kind has to be either `param` or `field`
-fn defaultValue(self: *Self, decl_type: *const Type, val: *const Expr, kind: anytype, ctx: *Context) Error!struct { InstrInfos, ?ConstIdx } {
+fn defaultValue(self: *Self, decl_type: *const Type, val: *const Expr, kind: anytype, ctx: *Context) Error!struct { InstrInfos, ConstIdx } {
     const prev_decl = ctx.setAndGetPrevious(.decl_type, decl_type);
     defer ctx.decl_type = prev_decl;
 
@@ -1021,8 +1023,7 @@ fn defaultValue(self: *Self, decl_type: *const Type, val: *const Expr, kind: any
     }
 
     // TODO: see if this is safe enough with comp_time check above
-    const const_index = self.irb.getInstr(value_res.instr).constant.index;
-    return .{ value_res, const_index };
+    return .{ value_res, self.irb.getInstr(value_res.instr).constant.index };
 }
 
 fn expectAssignableValue(self: *Self, expr: *const Ast.Expr, ctx: *Context) Result {
@@ -1438,7 +1439,12 @@ fn use(self: *Self, node: *const Ast.Use) StmtResult {
             }
             // Global variables
             else if (mod.globals_infos.get(item_name)) |cte| {
-                _ = try self.declareVariable(item_name, cte.type, .{ .ext_mod = mod.index }, span);
+                self.scope.declareImportVar(
+                    self.alloc,
+                    cte,
+                    mod.index,
+                ) catch |e| return self.handleVarDeclErr(cte.name, false, e, span);
+
                 continue;
             }
 
@@ -2857,7 +2863,7 @@ fn fnArgsList(
 
 const ParamRes = struct {
     index: usize,
-    info: *const Type.Function.Parameter,
+    info: Type.Function.Parameter,
 };
 fn getFnParamIndex(
     self: *Self,
@@ -2883,17 +2889,16 @@ fn getFnParamIndex(
         );
         gop.value_ptr.done = true;
 
-        const param_info = ty.params.getPtr(name) orelse return self.err(
+        const param_info = ty.params.get(name) orelse return self.err(
             .{ .unknown_param = .{ .name = self.ast.toSource(param_name) } },
             self.ast.getSpan(param_name),
         );
 
         return .{ .index = gop.index, .info = param_info };
     } else {
-        const param_info = &proto.values()[index];
-        param_info.done = true;
+        proto.values()[index].done = true;
 
-        return .{ .index = index, .info = &params[index] };
+        return .{ .index = index, .info = params[index] };
     }
 }
 
@@ -2978,10 +2983,6 @@ fn resolveSymbol(self: *Self, name_text: []const u8, span: Span, ctx: *const Con
         return .{ .type = res.sym.type, .kind = .symbol, .instr = res.instr, .module = res.sym.module };
     }
 
-    if (self.builtinSymbol(sym_name, span)) |res| {
-        return .{ .type = res.sym.type, .kind = .symbol, .instr = res.instr, .module = res.sym.module };
-    }
-
     if (self.scope.getModule(name)) |mod| {
         return .{ .type = mod, .kind = .symbol, .instr = 0 };
     }
@@ -3015,17 +3016,22 @@ fn expectVariableIdentifier(self: *Self, token_name: Ast.TokenIndex) Error!Varia
 fn variableIdentifier(self: *Self, name: InternerIdx, span: Span) ?VariableInstr {
     const variable, const scope_offset = self.scope.getVariable(name) orelse return null;
 
-    var instr = self.irb.addInstr(
-        .{ .identifier = .{
-            .index = variable.index + scope_offset,
-            .kind = switch (variable.kind) {
-                .global => .{ .global = .{ .module = variable.ext_mod } },
-                .local => .{ .local = .{ .duplicable = true } },
-                .param, .iter => .{ .local = .{ .duplicable = false } },
-            },
-        } },
-        span.start,
-    );
+    var instr = switch (variable.kind) {
+        .global => self.irb.addInstr(
+            .{ .identifier = .{
+                .index = variable.index,
+                .kind = .{ .global = .{ .module = if (variable.imported) variable.ext_mod else null } },
+            } },
+            span.start,
+        ),
+        .local, .iter, .param => self.irb.addInstr(
+            .{ .identifier = .{
+                .index = variable.index + scope_offset,
+                .kind = .{ .local = .{ .duplicable = variable.kind == .local } },
+            } },
+            span.start,
+        ),
+    };
 
     if (variable.captured) {
         instr = self.irb.wrapPreviousInstr(.unbox);
@@ -3035,31 +3041,17 @@ fn variableIdentifier(self: *Self, name: InternerIdx, span: Span) ?VariableInstr
 }
 
 /// Tries to find a symbol in scopes and returns it while emitting an instruction
-fn symbolIdentifier(self: *Self, name: InternerIdx, span: Span) ?struct { sym: *LexScope.Symbol, instr: InstrIndex } {
+fn symbolIdentifier(self: *Self, name: InternerIdx, span: Span) ?struct { sym: LexScope.Symbol, instr: InstrIndex } {
     const sym = self.scope.getSymbol(name) orelse return null;
 
     // TODO: protect cast
     return .{
         .sym = sym,
         .instr = self.irb.addInstr(
-            .{ .load_symbol = .{ .module = sym.module, .symbol = @intCast(sym.index) } },
-            span.start,
-        ),
-    };
-}
-
-/// Tries to find a symbol in scopes and returns it while emitting an instruction
-fn builtinSymbol(self: *Self, name: InternerIdx, span: Span) ?struct { sym: *LexScope.Symbol, instr: InstrIndex } {
-    const sym = self.scope.getBuiltinSymbol(name) orelse return null;
-
-    // TODO: protect cast
-    return .{
-        .sym = sym,
-        .instr = self.irb.addInstr(
             .{ .load_symbol = .{
-                .symbol = @intCast(sym.index),
                 .module = sym.module,
-                .lang = .zig,
+                .symbol = @intCast(sym.index),
+                .lang = sym.lang,
             } },
             span.start,
         ),
@@ -4189,12 +4181,10 @@ fn loadSymbolFromDot(self: *Self, span: Span, ctx: *Context) Result {
     };
 }
 
-/// Checks that the node is a declared type and return it's value. If node is `.empty`, returns `void`
 const TypeRes = struct {
     type: *const Type,
     mod: ?ModIndex = null,
 };
-
 pub fn checkAndGetTypeInfo(self: *Self, ty: ?*const Ast.Type, ctx: *const Context) Error!TypeRes {
     const t = ty orelse return .{ .type = self.ti.getCached(.void) };
 
@@ -4304,19 +4294,20 @@ pub fn checkAndGetTypeInfo(self: *Self, ty: ?*const Ast.Type, ctx: *const Contex
         .scalar => {
             const interned = self.interner.intern(self.ast.toSource(t));
 
-            const found_type = self.scope.getType(interned) orelse {
-                if (interned == self.cached_names.Self) {
-                    if (ctx.self_type) |struct_type| {
-                        return .{ .type = struct_type };
-                    } else {
-                        return self.err(.big_self_outside_decl, self.ast.getSpan(t));
-                    }
+            if (interned == self.cached_names.Self) {
+                if (ctx.self_type) |struct_type| {
+                    return .{ .type = struct_type };
                 } else {
-                    return self.err(.{ .undeclared_type = .{ .found = self.ast.toSource(t) } }, self.ast.getSpan(t));
+                    return self.err(.big_self_outside_decl, self.ast.getSpan(t));
                 }
-            };
+            }
 
-            return .{ .type = found_type };
+            const type_res = self.scope.getTypeAndModule(interned) orelse return self.err(
+                .{ .undeclared_type = .{ .found = self.ast.toSource(t) } },
+                self.ast.getSpan(t),
+            );
+
+            return .{ .type = type_res.type, .mod = type_res.module };
         },
         .@"union" => |u| {
             var types = ArrayList(*const Type).initCapacity(self.alloc, u.len) catch oom();
@@ -4673,6 +4664,7 @@ const VarConf = struct {
     comp_time: bool = false,
     ext_mod: ?ModIndex = null,
     is_fn_param: bool = false,
+    imported: bool = false,
 };
 fn declareVariable(self: *Self, name: InternerIdx, ty: *const Type, conf: VarConf, span: Span) Error!usize {
     return self.scope.declareVar(
@@ -4685,9 +4677,14 @@ fn declareVariable(self: *Self, name: InternerIdx, ty: *const Type, conf: VarCon
         conf.comp_time,
         conf.ext_mod,
         conf.is_fn_param,
-    ) catch |e| switch (e) {
+        conf.imported,
+    ) catch |e| self.handleVarDeclErr(name, conf.is_fn_param, e, span);
+}
+
+fn handleVarDeclErr(self: *Self, name: InternerIdx, is_param: bool, e: LexScope.Error, span: Span) Error {
+    return switch (e) {
         error.TooManyLocals => self.err(.too_many_locals, span),
-        error.AlreadyDeclared => switch (conf.is_fn_param) {
+        error.AlreadyDeclared => switch (is_param) {
             true => self.err(
                 .{ .already_declared_param = .{ .name = self.interner.getKey(name).? } },
                 span,

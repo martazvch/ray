@@ -1,5 +1,5 @@
 use math as m
-use math.{cos, sin, e}
+use math.{cos, sin, e, pi}
 
 fn main() {
     print(m.cos)
@@ -11,5 +11,6 @@ fn main() {
     print(sin(0))
 
     print(m.sign(-5))
+    print(pi)
 }
 

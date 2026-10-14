@@ -29,8 +29,13 @@ pub const Variable = struct {
     constant: bool,
     comp_time: bool,
     ext_mod: ?ModIndex,
+    imported: bool = false,
 
     pub const Index = usize;
+    pub const Import = struct {
+        index: usize,
+        module: ModIndex,
+    };
 };
 
 pub const Break = *const Type;
@@ -234,6 +239,7 @@ pub fn declareVar(
     comp_time: bool,
     ext_mode: ?ModIndex,
     is_param: bool,
+    imported: bool,
 ) Error!usize {
     const index = self.current.variables.count();
     if (index == 255 and !self.isGlobal()) {
@@ -250,6 +256,7 @@ pub fn declareVar(
         .constant = constant,
         .comp_time = comp_time,
         .ext_mod = ext_mode,
+        .imported = imported,
     };
 
     const gop = self.current.variables.getOrPut(allocator, name) catch oom();
@@ -259,6 +266,22 @@ pub fn declareVar(
     gop.value_ptr.* = variable;
 
     return index;
+}
+
+pub fn declareImportVar(self: *Self, allocator: Allocator, variable: Variable, mod: ModIndex) Error!void {
+    if (self.current.variables.count() == 255) {
+        return error.TooManyLocals;
+    }
+
+    const gop = self.current.variables.getOrPut(allocator, variable.name) catch oom();
+    if (gop.found_existing) {
+        return error.AlreadyDeclared;
+    }
+
+    var copy = variable;
+    copy.ext_mod = mod;
+    copy.imported = true;
+    gop.value_ptr.* = copy;
 }
 
 pub fn declareVarInFutureScope(
@@ -343,12 +366,41 @@ pub fn declareSymbol(
     return index.*;
 }
 
-pub fn getSymbol(self: *const Self, name: InternerIdx) ?*Symbol {
+pub fn getSymbol(self: *const Self, name: InternerIdx) ?Symbol {
     var it = self.iterator();
     while (it.next()) |scope| {
-        if (scope.symbols.getPtr(name)) |sym| {
+        if (scope.symbols.get(name)) |sym| {
             return sym;
         }
+    }
+
+    if (self.natives.get(name)) |sym| {
+        return sym;
+    }
+
+    return null;
+}
+
+pub const TypeAndMod = struct {
+    type: *const Type,
+    module: ?ModIndex,
+};
+pub fn getTypeAndModule(self: *const Self, name: InternerIdx) ?TypeAndMod {
+    var it = self.iterator();
+    while (it.next()) |scope| {
+        if (scope.symbols.get(name)) |sym| {
+            return .{ .type = sym.type, .module = sym.module };
+        }
+    }
+
+    // We check builtins first because if we look for 'int' for example,
+    // we're looking for the type, not the native 'int' function
+    if (self.builtins.get(name)) |builtin| {
+        return .{ .type = builtin, .module = null };
+    }
+
+    if (self.natives.get(name)) |sym| {
+        return .{ .type = sym.type, .module = sym.module };
     }
 
     return null;
@@ -370,10 +422,6 @@ pub fn getSymbolFromType(self: *const Self, ty: *const Type) ?Symbol {
 pub fn declareExternSymbol(self: *Self, allocator: Allocator, name: InternerIdx, symbol: Symbol) void {
     self.current.symbols.put(allocator, name, symbol) catch oom();
     self.current.symbols_type.put(allocator, symbol.type, symbol) catch oom();
-}
-
-pub fn getBuiltinSymbol(self: *const Self, name: InternerIdx) ?*Symbol {
-    return self.natives.getPtr(name);
 }
 
 pub fn declareModule(self: *Self, allocator: Allocator, name: InternerIdx, ty: *const Type) void {
@@ -443,19 +491,6 @@ pub fn getScopeFromIndex(self: *const Self, index: usize) *Scope {
 
 pub fn stackSizeFrom(self: *const Self, other: *const Scope) usize {
     return self.current.offset + self.current.variables.count() - other.offset;
-}
-
-// TODO: shouldn't it be in type interner?
-pub fn getType(self: *Self, name: InternerIdx) ?*const Type {
-    if (self.builtins.get(name)) |builtin| {
-        return builtin;
-    } else if (self.getSymbol(name)) |sym| {
-        return sym.type;
-    } else if (self.getBuiltinSymbol(name)) |sym| {
-        return sym.type;
-    }
-
-    return null;
 }
 
 pub fn isModuleImported(self: *const Self, name: InternerIdx) bool {

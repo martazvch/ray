@@ -136,6 +136,7 @@ pub const Type = union(enum) {
             type: *const Type,
             default: ?ConstIdx,
             captured: bool,
+            ext_mod: ?ModIndex = null,
         };
         pub const ParamsMap = ArrayMap(InternerIdx, Parameter);
         pub const Proto = ArrayMap(InternerIdx, struct { done: bool = false, default: ?ConstIdx = null });
