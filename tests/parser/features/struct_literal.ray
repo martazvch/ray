@@ -5,3 +5,8 @@ B {}
 C { x = x, y, z = 12 + add() }
 
 math.Vec2{ x = 1, y }
+
+// Inside for body (because forbidden in condition)
+for i in arr {
+    foo := Foo{}
+}

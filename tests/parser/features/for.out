@@ -28,5 +28,21 @@
         "body": {
             "label": "loop"
         }
+    },
+    "for_loop": {
+        "name": "i",
+        "index": "null",
+        "value": {
+            "binop": {
+                "lhs": {
+                    "int": "0"
+                },
+                "rhs": {
+                    "int": "3"
+                },
+                "op": ".."
+            }
+        },
+        "body": {}
     }
 }

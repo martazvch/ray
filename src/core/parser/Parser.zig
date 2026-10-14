@@ -1125,8 +1125,8 @@ fn forLoop(self: *Self) Error!Node {
 
     try self.expect(.in, .expect_in);
     const save_cond = self.ctx.setAndGetPrevious(.in_cond, true);
-    defer self.ctx.in_cond = save_cond;
     const expr = try self.parsePrecedenceExpr(0);
+    self.ctx.in_cond = save_cond;
 
     try self.expect(.left_brace, .expectBraceBefore("for"));
     const body = try self.blockExpr(label);

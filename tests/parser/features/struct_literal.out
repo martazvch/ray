@@ -81,5 +81,29 @@
                 "value": {}
             }
         ]
+    },
+    "for_loop": {
+        "name": "i",
+        "index": "null",
+        "value": {
+            "identifier": "arr"
+        },
+        "body": {
+            "exprs": [
+                "var_decl": {
+                    "name": "foo",
+                    "type": {},
+                    "value": {
+                        "struct_literal": {
+                            "structure": {
+                                "identifier": "Foo"
+                            },
+                            "fields_values": []
+                        }
+                    },
+                    "const": "false"
+                }
+            ]
+        }
     }
 }
