@@ -9,7 +9,7 @@ pub const ParserMsg = union(enum) {
     empty_string_interp,
     err_type_not_ident,
     expect_brace_end_container: struct { kind: []const u8 },
-    expect_brace_after: struct { what: []const u8 },
+    expect_brace_after: struct { what: []const u8, kind: []const u8 },
     expect_arrow_before_arm_body,
     expect_arrow_before_fn_type,
     expect_arrow_or_brace_before_arm_body,
@@ -87,7 +87,7 @@ pub const ParserMsg = union(enum) {
             .expect_arrow_or_brace_before_arm_body => writer.writeAll("expect arrow '=>' or '{' before pattern matching arm's body"),
             .expect_block_or_do => |e| writer.print("expect a block or 'do' after '{s}' condition", .{e.what}),
             .expect_brace_end_container => |e| writer.print("expect closing brace after {s}'s body", .{e.kind}),
-            .expect_brace_after => |e| writer.print("expect opening brace after {s}", .{e.what}),
+            .expect_brace_after => |e| writer.print("expect {s} brace after {s}", .{ e.kind, e.what }),
             .expect_brace_before => |e| writer.print("expect opening brace before {s}'s body", .{e.what}),
             .expect_closing_pipe => writer.writeAll("expect closing '|' after closure's parameters list"),
             .expect_comma_array_values => writer.writeAll("expect a ',' between array values"),
@@ -169,7 +169,7 @@ pub const ParserMsg = union(enum) {
             ),
             .expect_brace_before => writer.writeAll("add an opening brace '{'"),
             .expect_brace_end_container => writer.writeAll("add an closing brace '}'"),
-            .expect_brace_after => writer.writeAll("add an openning brace '{'"),
+            .expect_brace_after => |e| writer.print("add a {s} brace", .{e.kind}),
             .expect_block_or_do => writer.writeAll("open a block (labelled or not) with ':label {' or use 'do' keyword before statement"),
             .expect_closing_pipe => writer.writeAll("add a closing '|' to end closure's parameters list"),
             .expect_comma_array_values => writer.writeAll(
@@ -258,8 +258,8 @@ pub const ParserMsg = union(enum) {
         };
     }
 
-    pub fn expectBraceAfter(name: []const u8) Self {
-        return .{ .expect_brace_after = .{ .what = name } };
+    pub fn expectBraceAfter(name: []const u8, kind: enum { openning, closing }) Self {
+        return .{ .expect_brace_after = .{ .what = name, .kind = @tagName(kind) } };
     }
 
     pub fn expectBraceBefore(name: []const u8) Self {

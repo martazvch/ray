@@ -14,4 +14,4 @@ match_duplicate_wildcard
 
 expect_name, type
 
-expect_brace_after, arm's body
+expect_brace_after, arm's body, closing

@@ -1153,7 +1153,7 @@ fn whileStmt(self: *Self) Error!Node {
     const body = if (self.match(.left_brace))
         try self.blockExpr(label)
     else
-        return self.errAtCurrent(.expectBraceAfter("while's condition"));
+        return self.errAtCurrent(.expectBraceAfter("while's condition", .openning));
 
     return .{ .@"while" = .{
         .pattern = cond,
@@ -1745,7 +1745,7 @@ fn matchTypeSubMatch(self: *Self) Error!Ast.Match.TypeArm.BodyKind {
     self.skipNewLines();
 
     const arms = try self.matchValue();
-    try self.expect(.right_brace, .expectBraceAfter("arm's body"));
+    try self.expect(.right_brace, .expectBraceAfter("arm's body", .closing));
 
     return .{ .patmat = arms.value };
 }
@@ -1927,7 +1927,7 @@ fn structLiteral(self: *Self, expr: Ast.StructLiteral.Kind) Error!*Expr {
         if (!self.match(.comma)) break;
         self.skipNewLines();
     }
-    try self.expect(.right_brace, .expectBraceAfter("structure literal values"));
+    try self.expect(.right_brace, .expectBraceAfter("structure literal values", .closing));
 
     struct_lit.* = .{ .struct_literal = .{
         .structure = expr,
