@@ -4,10 +4,7 @@ struct Foo {
     fn f(self, a: int) {}
 }
 
-fn add(a: int) {
-    // Can't assign to function parameter
-    a = 4
-}
+fn add(a: int) {}
 
 fn main() {
     add = 1

@@ -1,7 +1,7 @@
 -- main --
 load_const index 0, value 0
 
-get_local_dup index 0
+get_local index 0
 load_const index 1, value 4
 lt_int
 jump_false 7 -> 24
@@ -10,7 +10,7 @@ pop
 get_local index 0
 pop
 
-get_local_dup index 0
+get_local index 0
 load_const index 2, value 1
 add_int
 set_local index 0

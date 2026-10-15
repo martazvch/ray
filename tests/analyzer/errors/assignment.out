@@ -1,4 +1,3 @@
-assign_to_constant, a
 invalid_assign_target
 invalid_assign_target
 type_mismatch, int, float

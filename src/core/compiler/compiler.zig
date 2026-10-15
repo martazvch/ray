@@ -454,7 +454,7 @@ const Compiler = struct {
 
             .global => |glob| self.writeOpAndByte(
                 .set_global,
-                @intCast(self.artifacts.getIndex(.global, glob.module orelse self.module, variable_data.index)),
+                @intCast(self.artifacts.getIndex(.global, glob.module, variable_data.index)),
             ),
         }
     }
@@ -969,12 +969,12 @@ const Compiler = struct {
         // BUG: Protect the cast, we can't have more than 256 variable to lookup for now
         switch (data.kind) {
             .local => |d| self.writeOpAndByte(
-                if (d.duplicable and self.state.dup) .get_local_dup else .get_local,
+                if (d.duplicate and self.state.dup) .get_local_dup else .get_local,
                 @intCast(data.index),
             ),
             .global => |d| self.writeOpAndByte(
                 if (self.state.dup) .get_global_dup else .get_global,
-                @intCast(self.artifacts.getIndex(.global, d.module orelse self.module, data.index)),
+                @intCast(self.artifacts.getIndex(.global, d.module, data.index)),
             ),
         }
     }

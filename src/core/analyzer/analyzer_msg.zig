@@ -295,9 +295,7 @@ pub const AnalyzerMsg = union(enum) {
             .already_declared_in_trait,
             => writer.writeAll("you can use another name, use symbol like _ or open a local scope with '{}'"),
             .already_impl_trait => writer.writeAll("a type can only implement a trait once"),
-            .assign_to_constant => writer.writeAll(
-                \\variables declared with '::', function parameters and iterators are constant, their value can't be modified
-            ),
+            .assign_to_constant => writer.writeAll("variables declared with '::' are constant, their value can't be modified"),
             .assign_type => writer.writeAll("types aren't assignable to variables"),
             .big_self_outside_decl => writer.writeAll("'Self' can only be used in declarations like enums or structures to refer to the current type"),
             .block_all_path_dont_return => writer.writeAll("when using a block as an expression, all paths must return a value"),

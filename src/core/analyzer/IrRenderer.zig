@@ -448,9 +448,9 @@ fn identifier(self: *Self, data: Instruction.Variable) void {
             self.indentAndPrintSlice("[Variable index: {}, scope: local]", .{data.index});
         },
         .global => |d| {
-            if (d.module) |mod| {
+            if (d.module != self.module) {
                 self.indentAndPrintSlice("[Variable index: {}, scope: global, module {}]", .{
-                    data.index, mod.toInt(),
+                    data.index, d.module.toInt(),
                 });
             } else {
                 self.indentAndPrintSlice("[Variable index: {}, scope: global]", .{data.index});

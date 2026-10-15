@@ -377,10 +377,9 @@ pub const Instruction = struct {
         kind: Kind,
 
         pub const Kind = union(enum) {
-            /// Locals like iterators, function params are not duplicable because they
-            /// are already duplicated on stack. Used for optimization
-            local: struct { duplicable: bool },
-            global: struct { module: ?ModIndex },
+            /// Duplicate variables that aren't constant and whose type is heap
+            local: struct { duplicate: bool },
+            global: struct { module: ModIndex },
         };
     };
     pub const While = struct { cond: Index, body: Index };

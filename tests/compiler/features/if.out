@@ -56,10 +56,10 @@ get_local index 2
 pop
 load_const index 7, value 5
 set_local index 2
-get_local_dup index 0
-get_local_dup index 1
+get_local index 0
+get_local index 1
 add_int
-get_local_dup index 2
+get_local index 2
 add_int
 store_blk_val
 pop

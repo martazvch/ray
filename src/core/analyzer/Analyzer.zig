@@ -441,13 +441,7 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
     const res = try self.analyzeExpr(node.expr, .value, ctx);
 
     // Placeholder variable that holds the iterator
-    _ = try self.forwardDeclareVariable(
-        self.interner.intern("@iter"),
-        undefined,
-        false,
-        false,
-        undefined,
-    );
+    _ = try self.forwardDeclareVariable(self.interner.intern("@iter"), undefined, undefined);
 
     const kind: Instr.For.Kind, const elem_type = switch (res.type.*) {
         .array => |t| .{ .array, t.child },
@@ -471,9 +465,9 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
     };
 
     if (index_interned) |interned| {
-        try self.forwardDeclareVariable(interned, self.ti.getCached(.int), false, false, self.ast.getSpan(node.index_binding.?));
+        try self.forwardDeclareVariable(interned, self.ti.getCached(.int), self.ast.getSpan(node.index_binding.?));
     }
-    try self.forwardDeclareVariable(binding, elem_type, false, true, self.ast.getSpan(node.binding));
+    try self.forwardDeclareVariable(binding, elem_type, self.ast.getSpan(node.binding));
 
     const prev_in_for = ctx.setAndGetPrevious(.in_for, true);
     defer ctx.in_for = prev_in_for;
@@ -918,8 +912,7 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
         _ = try self.declareVariable(
             param_name,
             param_res.type,
-            // .{ .captured = p.meta.captured, .is_fn_param = true, .constant = false, .ext_mod = param_res.mod },
-            .{ .captured = p.meta.captured, .is_fn_param = true, .constant = false },
+            .{ .captured = p.meta.captured, .is_fn_param = true },
             span,
         );
         decls.putAssumeCapacity(param_name, .{
@@ -949,7 +942,7 @@ fn selfParam(
     _ = try self.declareVariable(
         self.cached_names.self,
         self_type,
-        .{ .captured = param.meta.captured, .constant = false },
+        .{ .captured = param.meta.captured },
         .zero,
     );
     decls.putAssumeCapacity(self.cached_names.self, .{
@@ -1083,7 +1076,7 @@ fn varDecl(self: *Self, node: *const Ast.VarDecl, ctx: *Context) StmtResult {
             .initialized = value_res != null,
             .constant = node.is_const,
             .comp_time = if (value_res) |v| v.ti.comp_time else false,
-            .ext_mod = if (value_res) |v| v.ti.ext_mod else null,
+            .sym_ext_mod = if (value_res) |v| v.ti.ext_mod else null,
         },
         span,
     );
@@ -1095,9 +1088,9 @@ fn varDecl(self: *Self, node: *const Ast.VarDecl, ctx: *Context) StmtResult {
             .variable = .{
                 .index = decl_index,
                 .kind = if (self.scope.isGlobal())
-                    .{ .global = .{ .module = null } }
+                    .{ .global = .{ .module = self.mod_index } }
                 else
-                    .{ .local = .{ .duplicable = true } },
+                    .{ .local = .{ .duplicate = true } },
             },
         } },
         span.start,
@@ -1439,11 +1432,9 @@ fn use(self: *Self, node: *const Ast.Use) StmtResult {
             }
             // Global variables
             else if (mod.globals_infos.get(item_name)) |cte| {
-                self.scope.declareImportVar(
-                    self.alloc,
-                    cte,
-                    mod.index,
-                ) catch |e| return self.handleVarDeclErr(cte.name, false, e, span);
+                self.scope.declareImportVar(self.alloc, cte) catch |e| {
+                    return self.handleVarDeclErr(cte.name, false, e, span);
+                };
 
                 continue;
             }
@@ -2934,15 +2925,11 @@ fn resolveIdentifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool,
         res.variable.used = true;
         res.variable.initialized = true;
 
-        if (ctx.in_assign) {
-            if (res.variable.constant or
-                ((res.variable.kind == .param or res.variable.kind == .iter) and !res.variable.type.is(.pointer)))
-            {
-                return self.err(
-                    .{ .assign_to_constant = .{ .name = text } },
-                    span,
-                );
-            }
+        if (ctx.in_assign and res.variable.constant and !res.variable.type.is(.pointer)) {
+            return self.err(
+                .{ .assign_to_constant = .{ .name = text } },
+                span,
+            );
         }
 
         if (ctx.in_call and res.variable.constant) return self.err(
@@ -2955,7 +2942,7 @@ fn resolveIdentifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool,
             .kind = .variable,
             .comp_time = false,
             .instr = res.instr,
-            .module = res.variable.ext_mod,
+            .module = res.variable.sym_ext_mod,
         };
     }
 
@@ -3017,18 +3004,20 @@ fn variableIdentifier(self: *Self, name: InternerIdx, span: Span) ?VariableInstr
     const variable, const scope_offset = self.scope.getVariable(name) orelse return null;
 
     var instr = switch (variable.kind) {
-        .global => self.irb.addInstr(
+        .global => |glob| self.irb.addInstr(
             .{ .identifier = .{
                 .index = variable.index,
-                .kind = .{ .global = .{ .module = if (variable.imported) variable.ext_mod else null } },
+                .kind = .{ .global = .{ .module = glob.module } },
             } },
             span.start,
         ),
-        .local, .iter, .param => self.irb.addInstr(
-            .{ .identifier = .{
-                .index = variable.index + scope_offset,
-                .kind = .{ .local = .{ .duplicable = variable.kind == .local } },
-            } },
+        .local => self.irb.addInstr(
+            .{
+                .identifier = .{
+                    .index = variable.index + scope_offset,
+                    .kind = .{ .local = .{ .duplicate = !variable.constant and variable.type.isHeap() } },
+                },
+            },
             span.start,
         ),
     };
@@ -3602,7 +3591,7 @@ fn pattern(self: *Self, pat: Ast.Pattern, ctx: *Context) Result {
             const value_res = try self.analyzeExpr(v.expr, .value, ctx);
             if (v.alias) |alias| {
                 const binding = self.internToken(alias);
-                _ = try self.forwardDeclareVariable(binding, value_res.type, false, false, self.ast.getSpan(alias));
+                _ = try self.forwardDeclareVariable(binding, value_res.type, self.ast.getSpan(alias));
             }
 
             return value_res;
@@ -3624,7 +3613,7 @@ fn nullablePattern(self: *Self, pat: Ast.Pattern.Nullable, ctx: *Context) Result
 
     // TODO: be sure that it's in the correct scope
     const binding = self.internToken(pat.binding);
-    _ = try self.forwardDeclareVariable(binding, ty, false, false, self.ast.getSpan(pat.binding));
+    _ = try self.forwardDeclareVariable(binding, ty, self.ast.getSpan(pat.binding));
 
     return .{
         .type = self.ti.cache.bool,
@@ -3942,7 +3931,7 @@ fn trapIdent(self: *Self, binding: Ast.Trap.Binding, err_type: Type.ErrorUnion, 
     if (binding.token) |token| {
         const err_name = self.internToken(token);
         const binding_span = self.ast.getSpan(token);
-        _ = try self.forwardDeclareVariable(err_name, err_type.err, false, false, binding_span);
+        _ = try self.forwardDeclareVariable(err_name, err_type.err, binding_span);
     }
     return self.analyzeExpr(binding.body, expect, ctx);
 }
@@ -4657,28 +4646,8 @@ pub fn typeName(self: *const Self, ty: *const Type) []const u8 {
     return ty.toString(self.alloc, self.interner, self.mod_name, true);
 }
 
-const VarConf = struct {
-    captured: bool = false,
-    initialized: bool = true,
-    constant: bool = false,
-    comp_time: bool = false,
-    ext_mod: ?ModIndex = null,
-    is_fn_param: bool = false,
-    imported: bool = false,
-};
-fn declareVariable(self: *Self, name: InternerIdx, ty: *const Type, conf: VarConf, span: Span) Error!usize {
-    return self.scope.declareVar(
-        self.alloc,
-        name,
-        ty,
-        conf.captured,
-        conf.initialized,
-        conf.constant,
-        conf.comp_time,
-        conf.ext_mod,
-        conf.is_fn_param,
-        conf.imported,
-    ) catch |e| self.handleVarDeclErr(name, conf.is_fn_param, e, span);
+fn declareVariable(self: *Self, name: InternerIdx, ty: *const Type, conf: LexScope.VarConf, span: Span) Error!usize {
+    return self.scope.declareVar(self.alloc, name, ty, self.mod_index, conf) catch |e| self.handleVarDeclErr(name, conf.is_fn_param, e, span);
 }
 
 fn handleVarDeclErr(self: *Self, name: InternerIdx, is_param: bool, e: LexScope.Error, span: Span) Error {
@@ -4697,8 +4666,8 @@ fn handleVarDeclErr(self: *Self, name: InternerIdx, is_param: bool, e: LexScope.
     };
 }
 
-fn forwardDeclareVariable(self: *Self, name: InternerIdx, ty: *const Type, captured: bool, is_iter: bool, span: Span) Error!void {
-    return self.scope.declareVarInFutureScope(self.alloc, name, ty, captured, is_iter) catch self.err(.too_many_locals, span);
+fn forwardDeclareVariable(self: *Self, name: InternerIdx, ty: *const Type, span: Span) Error!void {
+    return self.scope.declareVarInFutureScope(self.alloc, name, ty) catch self.err(.too_many_locals, span);
 }
 
 fn openContainer(self: *Self, name: Ast.TokenIndex) Error!void {

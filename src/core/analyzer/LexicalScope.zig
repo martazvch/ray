@@ -21,20 +21,21 @@ const Self = @This();
 pub const Variable = struct {
     name: InternerIdx,
     type: *const Type,
-    kind: enum { local, global, param, iter },
+    kind: Kind,
     initialized: bool,
     used: bool = false,
     index: Index,
     captured: bool,
     constant: bool,
     comp_time: bool,
-    ext_mod: ?ModIndex,
-    imported: bool = false,
+    /// If type is an external symbol, keep track of module index
+    sym_ext_mod: ?ModIndex,
 
     pub const Index = usize;
-    pub const Import = struct {
-        index: usize,
-        module: ModIndex,
+    pub const Kind = union(enum) {
+        local,
+        /// Globals might be imported from another module
+        global: struct { module: ModIndex },
     };
 };
 
@@ -228,18 +229,21 @@ pub fn newVTable(self: *Self) usize {
     return self.vtable_count;
 }
 
+pub const VarConf = struct {
+    captured: bool = false,
+    initialized: bool = true,
+    constant: bool = false,
+    comp_time: bool = false,
+    sym_ext_mod: ?ModIndex = null,
+    is_fn_param: bool = false,
+};
 pub fn declareVar(
     self: *Self,
     allocator: Allocator,
     name: InternerIdx,
     ty: *const Type,
-    captured: bool,
-    initialized: bool,
-    constant: bool,
-    comp_time: bool,
-    ext_mode: ?ModIndex,
-    is_param: bool,
-    imported: bool,
+    mod: ModIndex,
+    conf: VarConf,
 ) Error!usize {
     const index = self.current.variables.count();
     if (index == 255 and !self.isGlobal()) {
@@ -249,14 +253,13 @@ pub fn declareVar(
     const variable: Variable = .{
         .name = name,
         .type = ty,
-        .kind = if (is_param) .param else if (self.isGlobal()) .global else .local,
-        .initialized = initialized,
+        .kind = if (self.isGlobal()) .{ .global = .{ .module = mod } } else .local,
+        .initialized = conf.initialized,
         .index = index,
-        .captured = captured,
-        .constant = constant,
-        .comp_time = comp_time,
-        .ext_mod = ext_mode,
-        .imported = imported,
+        .captured = conf.captured,
+        .constant = conf.constant,
+        .comp_time = conf.comp_time,
+        .sym_ext_mod = conf.sym_ext_mod,
     };
 
     const gop = self.current.variables.getOrPut(allocator, name) catch oom();
@@ -268,7 +271,7 @@ pub fn declareVar(
     return index;
 }
 
-pub fn declareImportVar(self: *Self, allocator: Allocator, variable: Variable, mod: ModIndex) Error!void {
+pub fn declareImportVar(self: *Self, allocator: Allocator, variable: Variable) Error!void {
     if (self.current.variables.count() == 255) {
         return error.TooManyLocals;
     }
@@ -278,10 +281,7 @@ pub fn declareImportVar(self: *Self, allocator: Allocator, variable: Variable, m
         return error.AlreadyDeclared;
     }
 
-    var copy = variable;
-    copy.ext_mod = mod;
-    copy.imported = true;
-    gop.value_ptr.* = copy;
+    gop.value_ptr.* = variable;
 }
 
 pub fn declareVarInFutureScope(
@@ -289,8 +289,6 @@ pub fn declareVarInFutureScope(
     allocator: Allocator,
     name: InternerIdx,
     ty: *const Type,
-    captured: bool,
-    is_iter: bool,
 ) error{TooManyLocals}!void {
     const index = self.current.forwarded.count();
     if (index == 255) return error.TooManyLocals;
@@ -298,13 +296,13 @@ pub fn declareVarInFutureScope(
     self.current.forwarded.put(allocator, name, .{
         .name = name,
         .type = ty,
-        .kind = if (is_iter) .iter else .local,
+        .kind = .local,
         .initialized = true,
         .index = index,
-        .captured = captured,
+        .captured = false,
         .constant = false,
         .comp_time = false,
-        .ext_mod = null,
+        .sym_ext_mod = null,
     }) catch oom();
 }
 

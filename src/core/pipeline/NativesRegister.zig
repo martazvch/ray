@@ -466,9 +466,9 @@ fn registerGlobal(
         .comp_time = true,
         .constant = true,
         .initialized = true,
-        .kind = .global,
+        .kind = .{ .global = .{ .module = .toIndex(self.current.index) } },
         .captured = false,
-        .ext_mod = .toIndex(self.current.index),
+        .sym_ext_mod = .toIndex(self.current.index),
     };
 
     artifacts.add(alloc, .global, .toIndex(self.current.index), index, global.value);

@@ -5,24 +5,24 @@ load_const index 2, value Human{ age = 5, name = Tom }
 set_local index 0
 
 load_const index 3, value 95
-get_local_dup index 1
+get_local index 1
 load_const index 1, value Tom
 struct_lit index 3, arity 2, Human
 
 set_local index 0
 load_const index 1, value Tom
 load_const index 4, value 6
-get_local_dup index 2
+get_local index 2
 struct_lit index 3, arity 2, Human
 
 set_local index 0
-get_local_dup index 1
-get_local_dup index 2
+get_local index 1
+get_local index 2
 struct_lit index 3, arity 2, Human
 
 set_local index 0
-get_local_dup index 1
-get_local_dup index 2
+get_local index 1
+get_local index 2
 struct_lit index 3, arity 2, Human
 set_local index 0
 
