@@ -1,0 +1,14 @@
+-- main --
+load_const index 2, value Foo{ a = 1, b = 4.5 }
+load_const index 3, value 2
+get_local index 0
+set_field_c index 0
+
+get_local index 0
+get_field_c index 1
+pop
+
+ret_naked
+
+-- global scope --
+call index 0, arity 0, main

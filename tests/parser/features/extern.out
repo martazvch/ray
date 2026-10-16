@@ -18,7 +18,7 @@
         "extern_lib": "foo",
         "body": []
     },
-    "struct_decl": {
+    "extern_struct_decl": {
         "name": "Foo",
         "fields": [
             {
@@ -62,7 +62,7 @@
                 "extern_lib": "lib",
                 "body": []
             },
-            "struct_decl": {
+            "extern_struct_decl": {
                 "name": "B",
                 "fields": [],
                 "functions": [],

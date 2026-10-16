@@ -303,6 +303,7 @@ pub const Instruction = struct {
         name: usize,
         sym_index: SymbolIndex,
         type_id: TypeId,
+        field_names: []const []const u8,
         field_types: []ffi.Type,
     };
     pub const StructLiteral = struct {

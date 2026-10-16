@@ -1351,8 +1351,7 @@ pub fn print(self: *Obj, artifacts: *const Artifacts, writer: *Writer) Writer.Er
             } else {
                 try writer.print("{s}{{ ", .{parent.name});
                 for (0..parent.field_types.len) |i| {
-                    // TODO: real field names
-                    try writer.print("field {} = ", .{i});
+                    try writer.print("{s} = ", .{parent.field_names[i]});
                     cstruct.getField(i).print(artifacts, writer);
                     if (i < parent.field_types.len - 1) try writer.writeAll(", ");
                 }

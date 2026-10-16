@@ -50,6 +50,7 @@ pub const CStructure = struct {
     name: []const u8,
     type_id: TypeId,
     offsets: []usize,
+    field_names: []const []const u8,
     field_types: []const ffi.Type,
     ffi_type: ffi.FfiType,
 
@@ -57,6 +58,7 @@ pub const CStructure = struct {
         alloc: Allocator,
         name: []const u8,
         type_id: TypeId,
+        field_names: []const []const u8,
         field_types: []ffi.Type,
     ) CStructure {
         var self: CStructure = .{
@@ -64,6 +66,7 @@ pub const CStructure = struct {
             .type_id = type_id,
             .offsets = alloc.alloc(usize, field_types.len) catch oom(),
             .ffi_type = undefined,
+            .field_names = field_names,
             .field_types = field_types,
         };
 

@@ -637,7 +637,7 @@ fn structDecl(self: *Self) !Node {
         .fields = fields.toOwnedSlice(self.allocator) catch oom(),
         .functions = functions,
         .traits = traits,
-        .is_extern = self.ctx.isExtern(),
+        .is_extern = is_extern,
     } };
 }
 

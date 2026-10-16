@@ -1135,7 +1135,7 @@ fn structDecl(self: *Self, node: *const Ast.StructDecl, ctx: *Context) StmtResul
     const fields_res = try self.structureFields(node.fields, ty, ctx);
 
     if (node.is_extern) {
-        return self.endCStructDecl(node, name, sym_index, interned, ty.fields.values());
+        return self.endCStructDecl(node, name, sym_index, interned, ty.fields.values(), fields_res.names);
     }
 
     const funcs = try self.containerFnDecls(node.functions, &ty.functions, ctx);
@@ -1206,12 +1206,14 @@ fn endCStructDecl(
     sym_index: usize,
     ty: *const Type,
     fields: []const Type.Structure.Field,
+    field_names: []const []const u8,
 ) StmtResult {
     return self.irb.addInstr(
         .{ .cstruct_decl = .{
             .name = name,
             .sym_index = sym_index,
             .type_id = self.ti.typeId(ty),
+            .field_names = field_names,
             .field_types = self.fieldTypesToFfi(fields),
         } },
         self.ast.getSpan(node).start,

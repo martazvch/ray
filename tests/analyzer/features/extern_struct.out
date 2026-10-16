@@ -1,0 +1,7 @@
+[C structure declaration Foo]
+[Function declaration main]
+    [Variable declaration index: 0, scope: local]
+        [Constant index 5]
+            [Structure]
+                [Int 1]
+                [Float 4.5]

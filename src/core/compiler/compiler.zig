@@ -1235,6 +1235,7 @@ const Compiler = struct {
             self.alloc,
             self.alloc.dupe(u8, self.interner.getKey(data.name).?) catch oom(),
             data.type_id,
+            data.field_names,
             data.field_types,
         ));
     }

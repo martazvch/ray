@@ -1,0 +1,12 @@
+extern struct Foo {
+    a: int,
+    b: float,
+}
+
+fn main() {
+    foo := Foo{ a = 1, b = 4.5 }
+    print(foo)
+    print(foo.b)
+    foo.b = 6.
+    print(foo.b)
+}
