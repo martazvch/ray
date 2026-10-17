@@ -119,6 +119,7 @@ pub fn disInstruction(self: *Self, writer: *Writer, base_offset: usize) usize {
         .get_field_dup => self.getMember(writer, name, offset),
         .get_field_zig => self.getMember(writer, name, offset),
         .get_field_c => self.getMember(writer, name, offset),
+        .get_field_c_dup => self.getMember(writer, name, offset),
         .get_global => self.getGlobal(writer, name, offset),
         .get_global_dup => self.getGlobal(writer, name, offset),
         .get_local => self.indexInstruction(writer, name, offset),

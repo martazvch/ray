@@ -1,13 +1,20 @@
 World{ age = 1, pos = Vec2{ x = 4.5, y = 6.8 }, count = -1 }
+
 --- World
 age: 1
 pos.x: 4.500000, pos.y: 6.800000
 count: -1
+
 --- World
 age: 65
 pos.x: 5.200000, pos.y: 10.000000
 count: 99
+
 --- World
 age: 65
 pos.x: 5.200000, pos.y: 10.000000
 count: 99
+
+Vec2{ x = 5.2, y = 10 }
+Vec2{ x = 5.2, y = 999 }
+Vec2{ x = 5.2, y = 10 }

@@ -904,7 +904,7 @@ const Compiler = struct {
             switch (data.kind) {
                 .ray => if (self.state.dup) .get_field_dup else .get_field,
                 .zig => .get_field_zig,
-                .c => .get_field_c,
+                .c => if (self.state.dup) .get_field_c_dup else .get_field_c,
                 else => unreachable,
             },
             @intCast(data.index),

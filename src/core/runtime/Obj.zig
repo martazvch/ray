@@ -581,6 +581,7 @@ pub const FfiFn = struct {
                 const return_struct = self.return_struct.?;
                 var cstruct = Obj.allocate(vm, CStructure, return_struct.type_id);
                 cstruct.parent = return_struct;
+                cstruct.owned = true;
                 const return_size = return_struct.ffi_type.*.size;
                 cstruct.bytes = vm.gc_alloc.alloc(u8, return_size) catch oom();
                 @memcpy(cstruct.bytes, self.rvalue[0..return_size]);
@@ -749,7 +750,7 @@ pub const CStructure = struct {
         return obj;
     }
 
-    pub fn getField(self: *const Self, vm: *Vm, index: usize) Value {
+    pub fn getField(self: *const Self, vm: *Vm, index: usize, dup: bool) Value {
         const off = self.parent.offsets[index];
         const ty = self.parent.field_types[index];
         const ptr = self.bytes.ptr + off;
@@ -763,10 +764,17 @@ pub const CStructure = struct {
             .structure => {
                 const sym_index = self.parent.field_structs.get(index).?;
                 const sym_type = vm.state.artifacts.get(.c_structure, sym_index);
+
+                // Avoid pushing to tmp root
+                const bytes = if (dup)
+                    vm.gc_alloc.dupe(u8, ptr[0..sym_type.ffi_type.*.size]) catch oom()
+                else
+                    ptr[0..sym_type.ffi_type.*.size];
+
                 var cstruct = Obj.allocate(vm, Self, undefined);
                 cstruct.parent = sym_type;
-                cstruct.bytes = ptr[0..sym_type.ffi_type.*.size];
-                cstruct.owned = false;
+                cstruct.bytes = bytes;
+                cstruct.owned = dup;
 
                 return .makeObj(cstruct.asObj());
             },

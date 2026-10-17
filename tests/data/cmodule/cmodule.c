@@ -39,4 +39,5 @@ typedef struct {
 void printWorld(World w) {
     printf("--- World\nage: %d\npos.x: %f, pos.y: %f\ncount: %d\n",
            w.age, w.pos.x, w.pos.y, w.count);
+    fflush(stdout);
 }

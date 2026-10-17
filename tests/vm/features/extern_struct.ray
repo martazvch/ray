@@ -21,4 +21,10 @@ fn main() {
 
     mutateWorld(w)
     c.printWorld(w)
+
+    v := w.pos
+    print(v)
+    v.y = 999
+    print(v)
+    print(w.pos)
 }
