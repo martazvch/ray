@@ -1,3 +1,4 @@
+const std = @import("std");
 const TagLit = @import("ConstantInterner.zig").Constant.TagLit;
 const ConstIdx = @import("ConstantInterner.zig").ConstIdx;
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
@@ -305,6 +306,11 @@ pub const Instruction = struct {
         type_id: TypeId,
         field_names: []const []const u8,
         field_types: []ffi.Type,
+        /// Map of all fields that are an extern structure
+        field_structs: FieldStructs,
+
+        /// Key is field index
+        pub const FieldStructs = std.AutoHashMapUnmanaged(usize, LoadSymbol);
     };
     pub const StructLiteral = struct {
         structure: LoadSymbol,

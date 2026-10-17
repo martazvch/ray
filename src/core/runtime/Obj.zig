@@ -719,6 +719,7 @@ pub const CStructure = struct {
     obj: Obj,
     bytes: []u8,
     parent: *const Artifacts.CStructure,
+    owned: bool,
 
     const Self = @This();
 
@@ -726,6 +727,7 @@ pub const CStructure = struct {
         const obj = Obj.allocate(vm, Self, parent.type_id);
         obj.parent = parent;
         obj.bytes = vm.gc_alloc.alloc(u8, parent.ffi_type.*.size) catch oom();
+        obj.owned = true;
 
         for (fields, 0..) |field, i| {
             obj.setField(i, field);
@@ -738,6 +740,7 @@ pub const CStructure = struct {
         const obj = Obj.allocateComptime(alloc, Self, parent.type_id);
         obj.parent = parent;
         obj.bytes = alloc.alloc(u8, parent.ffi_type.*.size) catch oom();
+        obj.owned = true;
 
         for (fields, 0..) |field, i| {
             obj.setField(i, field);
@@ -746,7 +749,7 @@ pub const CStructure = struct {
         return obj;
     }
 
-    pub fn getField(self: *const Self, index: usize) Value {
+    pub fn getField(self: *const Self, vm: *Vm, index: usize) Value {
         const off = self.parent.offsets[index];
         const ty = self.parent.field_types[index];
         const ptr = self.bytes.ptr + off;
@@ -757,6 +760,44 @@ pub const CStructure = struct {
             .int => .makeInt(readValue(ptr, c_int)),
             .uint => .makeInt(readValue(ptr, c_uint)),
             .f32 => .makeFloat(readValue(ptr, f32)),
+            .structure => {
+                const sym_index = self.parent.field_structs.get(index).?;
+                const sym_type = vm.state.artifacts.get(.c_structure, sym_index);
+                var cstruct = Obj.allocate(vm, Self, undefined);
+                cstruct.parent = sym_type;
+                cstruct.bytes = ptr[0..sym_type.ffi_type.*.size];
+                cstruct.owned = false;
+
+                return .makeObj(cstruct.asObj());
+            },
+            else => @panic("type not yet supported in extern structure"),
+        };
+    }
+
+    pub fn logField(self: *const Self, index: usize, artifacts: *const Artifacts, writer: *Writer) void {
+        const off = self.parent.offsets[index];
+        const ty = self.parent.field_types[index];
+        const ptr = self.bytes.ptr + off;
+
+        errdefer oom();
+        try switch (ty) {
+            .bool => writer.print("{}", .{readValue(ptr, u8) == @intFromBool(true)}),
+            .u8 => writer.print("{}", .{readValue(ptr, u8)}),
+            .int => writer.print("{}", .{readValue(ptr, c_int)}),
+            .uint => writer.print("{}", .{readValue(ptr, c_uint)}),
+            .f32 => writer.print("{}", .{readValue(ptr, f32)}),
+            .structure => {
+                const sym_index = self.parent.field_structs.get(index).?;
+                const sym_type = artifacts.get(.c_structure, sym_index);
+                var cstruct = Self{
+                    .obj = .{ .kind = .fromType(Self), .next = null, .type_id = undefined },
+                    .parent = sym_type,
+                    .bytes = ptr[0..sym_type.ffi_type.*.size],
+                    .owned = false,
+                };
+
+                try cstruct.asObj().print(artifacts, writer);
+            },
             else => @panic("type not yet supported in extern structure"),
         };
     }
@@ -783,6 +824,7 @@ pub const CStructure = struct {
                     writeValue(ptr, usize, @intFromPtr(value.obj.as(RawPointer).child));
                 }
             },
+            .structure => @memcpy(ptr, value.obj.as(CStructure).bytes),
             else => @panic("type not yet supported in extern structure"),
         }
     }
@@ -800,13 +842,17 @@ pub const CStructure = struct {
         var obj = Obj.allocate(vm, Self, self.obj.type_id);
         obj.parent = self.parent;
         obj.bytes = bytes;
+        obj.owned = true;
         @memcpy(obj.bytes, self.bytes);
 
         return obj;
     }
 
     pub fn deinit(self: *Self, allocator: Allocator) void {
-        allocator.free(self.bytes);
+        if (self.owned) {
+            allocator.free(self.bytes);
+        }
+
         allocator.destroy(self);
     }
 };
@@ -1352,7 +1398,7 @@ pub fn print(self: *Obj, artifacts: *const Artifacts, writer: *Writer) Writer.Er
                 try writer.print("{s}{{ ", .{parent.name});
                 for (0..parent.field_types.len) |i| {
                     try writer.print("{s} = ", .{parent.field_names[i]});
-                    cstruct.getField(i).print(artifacts, writer);
+                    cstruct.logField(i, artifacts, writer);
                     if (i < parent.field_types.len - 1) try writer.writeAll(", ");
                 }
                 try writer.writeAll(" }");

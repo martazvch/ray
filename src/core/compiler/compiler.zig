@@ -1231,12 +1231,33 @@ const Compiler = struct {
     }
 
     fn cStructDecl(self: *Self, data: *const Instruction.CStructDecl) Error!void {
+        var field_structs: Artifacts.CStructure.FieldStructMap = .empty;
+        const field_struct_count = data.field_structs.count();
+
+        // Converts external structure fields to linker index to access them at runtime
+        if (field_struct_count > 0) {
+            field_structs.ensureTotalCapacity(self.alloc, field_struct_count) catch oom();
+
+            var it = data.field_structs.iterator();
+            while (it.next()) |entry| {
+                field_structs.putAssumeCapacity(
+                    entry.key_ptr.*,
+                    self.artifacts.linker.get(.{
+                        .tag = .c_structure,
+                        .module = entry.value_ptr.module.toInt(),
+                        .symbol = entry.value_ptr.symbol,
+                    }),
+                );
+            }
+        }
+
         self.artifacts.add(self.alloc, .c_structure, self.module, data.sym_index, .init(
             self.alloc,
             self.alloc.dupe(u8, self.interner.getKey(data.name).?) catch oom(),
             data.type_id,
             data.field_names,
             data.field_types,
+            field_structs,
         ));
     }
 

@@ -5,6 +5,9 @@
 [C function declaration void_no_arg]
 [C function declaration void_arg]
 [C function declaration void_args]
+[C structure declaration Vec2]
+[C structure declaration World]
+[C function declaration printWorld]
 [Function declaration rayFunc, returns]
     [Return]
         [Call ffi symbol 1]
@@ -13,8 +16,6 @@
                 [Constant index 3]
                     [Float 2]
                 [Variable index: 0, scope: local]
-
-//-- test.ray --
 [Function declaration main]
     [Pop]
         [Call ffi symbol 1 module 3]

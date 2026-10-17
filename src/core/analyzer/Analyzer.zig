@@ -1208,25 +1208,42 @@ fn endCStructDecl(
     fields: []const Type.Structure.Field,
     field_names: []const []const u8,
 ) StmtResult {
+    const field_types, const field_structs = self.fieldTypesToFfi(fields);
+
     return self.irb.addInstr(
         .{ .cstruct_decl = .{
             .name = name,
             .sym_index = sym_index,
             .type_id = self.ti.typeId(ty),
             .field_names = field_names,
-            .field_types = self.fieldTypesToFfi(fields),
+            .field_types = field_types,
+            .field_structs = field_structs,
         } },
         self.ast.getSpan(node).start,
     );
 }
 
-fn fieldTypesToFfi(self: *const Self, fields: []const Type.Structure.Field) []ffi.Type {
+fn fieldTypesToFfi(
+    self: *const Self,
+    fields: []const Type.Structure.Field,
+) struct { []ffi.Type, Instr.CStructDecl.FieldStructs } {
     var ffi_types = ArrayList(ffi.Type).initCapacity(self.alloc, fields.len) catch oom();
-    for (fields) |f| {
+    var field_structs: Instr.CStructDecl.FieldStructs = .empty;
+
+    for (fields, 0..) |f, i| {
         ffi_types.appendAssumeCapacity(self.rayTypeToFfi(f.type));
+
+        if (f.type.is(.structure)) {
+            const sym = self.scope.getSymbolFromType(f.type).?;
+            field_structs.put(
+                self.alloc,
+                i,
+                .{ .symbol = @intCast(sym.index), .module = sym.module },
+            ) catch oom();
+        }
     }
 
-    return ffi_types.toOwnedSlice(self.alloc) catch oom();
+    return .{ ffi_types.toOwnedSlice(self.alloc) catch oom(), field_structs };
 }
 
 fn traitDecl(self: *Self, node: *const Ast.TraitDecl, ctx: *Context) StmtResult {

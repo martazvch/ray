@@ -8,6 +8,21 @@ extern "cmodule" {
     fn void_args(a, b: float)
 }
 
+// Nested structures
+extern struct Vec2 {
+    x, y: float,
+}
+
+extern struct World {
+    age: int,
+    pos: Vec2,
+    count: int,
+}
+
+extern "cmodule" fn printWorld(w: World)
+
+
+// Regular ray function
 fn rayFunc(a: float) -> float {
     return ret_arg(2. * a)
 }

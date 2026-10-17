@@ -420,7 +420,7 @@ fn execute(self: *Self) !void {
             },
             .get_field_c => {
                 const field_idx = self.frame.readByte();
-                self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.CStructure).getField(field_idx);
+                self.stack.peekRef(0).* = self.stack.peekRef(0).obj.as(Obj.CStructure).getField(self, field_idx);
             },
             .get_global => {
                 const idx = self.frame.readByte();

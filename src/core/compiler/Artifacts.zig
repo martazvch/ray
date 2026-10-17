@@ -53,6 +53,10 @@ pub const CStructure = struct {
     field_names: []const []const u8,
     field_types: []const ffi.Type,
     ffi_type: ffi.FfiType,
+    /// Map all fields that are an extern structure to symbol index in linker
+    field_structs: FieldStructMap,
+
+    pub const FieldStructMap = std.AutoHashMapUnmanaged(usize, usize);
 
     pub fn init(
         alloc: Allocator,
@@ -60,6 +64,7 @@ pub const CStructure = struct {
         type_id: TypeId,
         field_names: []const []const u8,
         field_types: []ffi.Type,
+        field_structs: FieldStructMap,
     ) CStructure {
         var self: CStructure = .{
             .name = name,
@@ -68,6 +73,7 @@ pub const CStructure = struct {
             .ffi_type = undefined,
             .field_names = field_names,
             .field_types = field_types,
+            .field_structs = field_structs,
         };
 
         const struct_ffi_type: ffi.Type = .{ .structure = field_types };

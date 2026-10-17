@@ -1,12 +1,24 @@
-extern struct Foo {
-    a: int,
-    b: float,
+use data.cmodule.cmodule as c
+
+fn mutateWorld(w: c.World) {
+    w.age = 111
 }
 
 fn main() {
-    foo := Foo{ a = 1, b = 4.5 }
-    print(foo)
-    print(foo.b)
-    foo.b = 6.
-    print(foo.b)
+    w := c.World{
+        age = 1,
+        pos = .{ x = 4.5, y = 6.8 },
+        count = -1,
+    }
+    print(w)
+
+    c.printWorld(w)
+    w.age += 64
+    w.pos.x = 5.2
+    w.pos.y += 3.2
+    w.count = 99
+    c.printWorld(w)
+
+    mutateWorld(w)
+    c.printWorld(w)
 }
