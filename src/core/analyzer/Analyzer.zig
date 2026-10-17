@@ -3180,9 +3180,8 @@ fn indexing(self: *Self, expr: *const Ast.Indexing, ctx: *Context) Result {
 
     const expr_res = try self.analyzeExpr(expr.expr, .value, ctx);
 
-    // NOTE: when implementing maps, disallow range for it
     const elem_type = switch (expr_res.type.*) {
-        .array => |t| t.child,
+        .array => |t| if (index_kind == .scalar) t.child else expr_res.type,
         .str => if (ctx.in_assign)
             return self.err(.index_assign_str, span)
         else
@@ -4075,11 +4074,8 @@ fn pointer(self: *Self, expr: *Expr, span: Span, ctx: *Context) Result {
             if (idx.kind == .str) {
                 return self.err(.invalid_pointer, span);
             }
-            if (idx.index_kind == .range) {
-                return self.err(.invalid_pointer, span);
-            }
 
-            break :idx .{ .array = .{ .expr = idx.expr, .index = idx.index } };
+            break :idx .{ .array = idx };
         },
         .field => |f| ref: {
             if (f.kind != .ray) {

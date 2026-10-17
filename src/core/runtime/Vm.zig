@@ -454,12 +454,12 @@ fn execute(self: *Self) !void {
                 self.stack.push(array.values.items[final].deepCopy(self));
             },
             .index_range_arr => {
-                const index = self.stack.pop().range_int;
+                const range = self.stack.pop().range_int;
                 const obj = self.stack.pop().obj;
                 const array = obj.as(Obj.Array);
                 self.gc.pushTmpRoot(obj);
                 defer self.gc.popTmpRoot();
-                const start, const end = try self.checkRangeIndex(array.values.items.len, index);
+                const start, const end = try self.checkRangeIndex(array.values.items.len, range);
                 self.stack.push(.makeObj(Obj.Array.create(self, array.obj.type_id, array.values.items[start..end]).asObj()));
             },
             .index_str => {
@@ -634,6 +634,19 @@ fn execute(self: *Self) !void {
                 defer self.gc.popTmpRoot();
                 const final = try self.normalizeIndex(array.values.items.len, index);
                 self.stack.push(.makeObj(Obj.Pointer.create(self, &array.values.items[final]).asObj()));
+            },
+            .ptr_array_range => {
+                const range = self.stack.pop().range_int;
+                const obj = self.stack.pop().obj;
+                const array = obj.as(Obj.Array);
+                const start, const end = try self.checkRangeIndex(array.values.items.len, range);
+
+                self.gc.pushTmpRoot(obj);
+                var slice = Value.makeObj(Obj.Array.create(self, array.obj.type_id, array.values.items[start..end]).asObj());
+                self.gc.pushTmpRoot(slice.obj);
+                defer self.gc.popTmpRootMany(2);
+
+                self.stack.push(.makeObj(Obj.Pointer.create(self, &slice).asObj()));
             },
             .ptr_local => {
                 const idx = self.frame.readByte();

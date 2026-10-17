@@ -1185,7 +1185,10 @@ const Compiler = struct {
             .array => |a| {
                 try self.compileInstrNoDup(a.expr);
                 try self.compileInstr(a.index);
-                self.writeOp(.ptr_array);
+                self.writeOp(switch (a.index_kind) {
+                    .scalar => .ptr_array,
+                    .range => .ptr_array_range,
+                });
             },
             .field => |f| {
                 try self.compileInstrNoDup(f.structure);

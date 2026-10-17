@@ -12,6 +12,5 @@ fn main() {
     ptr := *s[0]
 
     arr := [1, 2, 3]
-    ptr := *arr[0..1]
 }
 

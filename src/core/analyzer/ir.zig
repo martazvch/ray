@@ -279,10 +279,7 @@ pub const Instruction = struct {
     pub const Pointer = union(enum) {
         variable: Variable,
         field: Field,
-        array: struct {
-            expr: Index,
-            index: Index,
-        },
+        array: Indexing,
     };
     pub const Return = struct {
         value: ?Index,
