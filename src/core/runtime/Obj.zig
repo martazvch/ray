@@ -157,9 +157,9 @@ fn getDefApiFns(T: type) std.StaticStringMap(ObjFnInfos) {
 pub const Array = struct {
     obj: Obj,
     values: ArrayList(Value),
-    funcs: []const BuiltinFn(Self),
 
     const Self = @This();
+    const funcs = getApiFns(Self);
 
     pub fn create(vm: *Vm, type_id: TypeId, values: []Value) *Self {
         const obj = Obj.allocate(vm, Self, type_id);
@@ -171,7 +171,6 @@ pub const Array = struct {
         defer vm.gc.popTmpRoot();
 
         obj.values.ensureTotalCapacity(vm.gc_alloc, values.len) catch oom();
-        obj.funcs = getApiFns(Self);
 
         for (values) |val| {
             obj.values.appendAssumeCapacity(val);
@@ -183,7 +182,6 @@ pub const Array = struct {
     pub fn createComptime(allocator: Allocator, type_id: TypeId, values: []Value) *Self {
         const obj = Obj.allocateComptime(allocator, Self, type_id);
         obj.values = .fromOwnedSlice(values);
-        obj.funcs = getApiFns(Self);
 
         return obj;
     }
@@ -218,7 +216,7 @@ pub const Array = struct {
 
     // Api
     pub fn call(self: *Self, vm: *Vm, stack: []Value, fn_index: usize) ?Value {
-        return self.funcs[fn_index](self, vm, stack);
+        return funcs[fn_index](self, vm, stack);
     }
 
     pub fn getFns() ObjFns {
@@ -249,15 +247,14 @@ pub const String = struct {
     obj: Obj,
     chars: []const u8,
     hash: u32,
-    funcs: []const BuiltinFn(Self),
 
     const Self = @This();
+    const funcs = getApiFns(Self);
 
     fn create(vm: *Vm, str: []const u8, hash: u32) *String {
         var obj = Obj.allocate(vm, Self, undefined);
         obj.chars = str;
         obj.hash = hash;
-        obj.funcs = getApiFns(Self);
 
         // The set method can trigger a GC to grow hashmap before
         // inserting. We put the value on the stack so that it is marked
@@ -286,7 +283,6 @@ pub const String = struct {
         var obj = Obj.allocateComptime(allocator, Self, undefined);
         obj.chars = chars;
         obj.hash = hash;
-        obj.funcs = getApiFns(Self);
 
         // Comptime constants have maximum lifetime
         obj.obj.is_marked = true;
@@ -339,7 +335,7 @@ pub const String = struct {
 
     // Api
     pub fn call(self: *Self, vm: *Vm, stack: []Value, fn_index: usize) ?Value {
-        return self.funcs[fn_index](self, vm, stack);
+        return funcs[fn_index](self, vm, stack);
     }
 
     pub fn getFns() ObjFns {

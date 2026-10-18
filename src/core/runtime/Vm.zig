@@ -323,7 +323,7 @@ fn execute(self: *Self) !void {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
                 const array = self.stack.peekRef(arity).obj.as(Obj.Array);
-                const result = array.funcs[index](array, self, (self.stack.top - arity)[0..arity]);
+                const result = array.call(self, (self.stack.top - arity)[0..arity], index);
 
                 self.stack.top -= arity + 1;
                 if (result) |res| self.stack.push(res);
@@ -332,7 +332,7 @@ fn execute(self: *Self) !void {
                 const index = self.frame.readByte();
                 const arity = self.frame.readByte();
                 const string = self.stack.peekRef(arity).obj.as(Obj.String);
-                const result = string.funcs[index](string, self, (self.stack.top - arity)[0..arity]);
+                const result = string.call(self, (self.stack.top - arity)[0..arity], index);
 
                 self.stack.top -= arity + 1;
                 if (result) |res| self.stack.push(res);

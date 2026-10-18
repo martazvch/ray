@@ -35,5 +35,9 @@ fn main() {
     ptr.* = 99
     print(ptr.*)
     print(arr)
+
+    ptr2 := *arr
+    ptr2.*[1] = 56
+    print(arr)
 }
 
