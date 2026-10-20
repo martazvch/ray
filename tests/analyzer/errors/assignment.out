@@ -1,3 +1,4 @@
+assign_to_constant, foo
 invalid_assign_target
 invalid_assign_target
 type_mismatch, int, float

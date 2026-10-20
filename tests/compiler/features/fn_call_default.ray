@@ -15,7 +15,7 @@ struct Bar {
         _ = arg3
     }
 
-    fn method(self, noval: str, arg1, arg2 := false, arg3 := 88.55) {
+    fn method(*self, noval: str, arg1, arg2 := false, arg3 := 88.55) {
         _ = noval
         _ = arg1
         _ = arg2

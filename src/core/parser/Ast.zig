@@ -103,7 +103,11 @@ pub const Type = union(enum) {
     fields: []TokenIndex,
     error_union: struct { ok: *Type, errs: []const TokenIndex },
     optional: struct { token: TokenIndex, child: *Type },
-    pointer: struct { token: TokenIndex, child: *Type },
+    pointer: struct {
+        token: TokenIndex,
+        child: *Type,
+        is_const: bool,
+    },
     scalar: TokenIndex,
     @"union": []const *Type,
     self: TokenIndex,

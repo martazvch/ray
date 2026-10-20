@@ -46,7 +46,7 @@ pub const Type = union(enum) {
     inline_union: InlineUnion,
     module: InternerIdx,
     optional: *const Type,
-    pointer: *const Type,
+    pointer: Pointer,
     structure: Structure,
     trait: Trait,
     @"union": Union,
@@ -163,8 +163,14 @@ pub const Type = union(enum) {
             return self.params.values()[@intFromBool(self.kind == .method)..];
         }
 
-        pub fn toBoundMethod(self: *const Function, allocator: Allocator) Function {
+        pub const BoundMethodRes = struct {
+            func: Function,
+            /// Self parameter was a pointer
+            self_ptr: bool,
+        };
+        pub fn toBoundMethod(self: *const Function, allocator: Allocator) BoundMethodRes {
             var params = self.params.clone(allocator) catch oom();
+            const self_param = params.values()[0];
             params.orderedRemoveAt(0);
 
             for (params.values()) |*val| {
@@ -173,10 +179,13 @@ pub const Type = union(enum) {
             }
 
             return .{
-                .loc = null,
-                .params = params,
-                .return_type = self.return_type,
-                .kind = .bound,
+                .func = .{
+                    .loc = null,
+                    .params = params,
+                    .return_type = self.return_type,
+                    .kind = .bound,
+                },
+                .self_ptr = self_param.type.is(.pointer),
             };
         }
 
@@ -224,6 +233,11 @@ pub const Type = union(enum) {
             }
             return true;
         }
+    };
+
+    pub const Pointer = struct {
+        child: *const Type,
+        is_const: bool,
     };
 
     pub const Structure = struct {
@@ -393,7 +407,10 @@ pub const Type = union(enum) {
             .module => |interned| hasher.update(asBytes(&interned)),
             .optional => |child| child.hash(allocator, hasher),
             .range => |r| r.hash(allocator, hasher),
-            .pointer => |child| child.hash(allocator, hasher),
+            .pointer => |p| {
+                p.child.hash(allocator, hasher);
+                hasher.update(asBytes(&p.is_const));
+            },
             .structure => |ty| hashLoc(hasher, ty.loc),
             .trait => |ty| hashLoc(hasher, ty.loc),
             .@"union" => |*ty| {
@@ -475,8 +492,11 @@ pub const Type = union(enum) {
             .optional => |opt| {
                 w.print("?{s}", .{opt.toString(allocator, interner, mod_name, full)}) catch oom();
             },
-            .pointer => |child| {
-                w.print("*{s}", .{child.toString(allocator, interner, mod_name, full)}) catch oom();
+            .pointer => |p| {
+                w.print("{s}{s}", .{
+                    if (p.is_const) "&" else "*",
+                    p.child.toString(allocator, interner, mod_name, full),
+                }) catch oom();
             },
             .structure => |ty| locToString(w, ty.loc, interner, mod_name, full),
             .trait => |ty| locToString(w, ty.loc, interner, mod_name, full),

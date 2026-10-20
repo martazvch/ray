@@ -1,14 +1,19 @@
 struct Person {
     age: int,
 
-    fn speak(self) {
+    fn speak(*self) {
         self.age = self.age * 10
         print(self.age)
     }
 
-    fn getOld(self, amount: int) -> int {
+    fn getOld(*self, amount: int) -> int {
         self.age = self.age + amount
         return self.age
+    }
+
+    fn noPtr(self) {
+        self.age = 999
+        print(self.age)
     }
 }
 
@@ -34,5 +39,9 @@ fn main() {
     method2()
     _ = p.getOld(8)
     method3()
-}
 
+    // Bound method without a pointer to instance
+    noPtr := p.noPtr
+    noPtr()
+    print(p.age)
+}

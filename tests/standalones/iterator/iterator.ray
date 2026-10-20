@@ -2,7 +2,7 @@ struct Iterator {
     items: []int,
     count := 0,
 
-    fn next(self) -> ?int {
+    fn next(*self) -> ?int {
         if self.count == self.items.len() do return null
         self.count += 1
         return self.items[self.count - 1]
@@ -21,8 +21,8 @@ struct Data {
         return .{ first, second }
     }
 
-    fn iterator(self, cat: str) -> Iterator {
-        return .{ items=cat == "first" ? self.first : self.second }
+    fn iterator(&self, cat: str) -> Iterator {
+        return .{ items = (cat == "first") ? self.first : self.second }
     }
 }
 

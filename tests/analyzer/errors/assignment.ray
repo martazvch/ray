@@ -6,6 +6,10 @@ struct Foo {
 
 fn add(a: int) {}
 
+fn constPtr(foo: &Foo) {
+    foo.a = 1
+}
+
 fn main() {
     add = 1
     add(5) = 1
@@ -25,4 +29,6 @@ fn main() {
 
     constFoo :: Foo{ a=5 }
     constFoo.a = 1
+
+
 }

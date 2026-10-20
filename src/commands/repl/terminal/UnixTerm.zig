@@ -45,8 +45,8 @@ pub fn enableRawMode(ctx: *anyopaque) Terminal.Error!void {
     raw.cflag.CSIZE = .CS8;
 
     // Set read timeout
-    raw.cc[@intFromEnum(posix.V.TIME)] = 0;
-    raw.cc[@intFromEnum(posix.V.MIN)] = 1;
+    raw.cc[@backingInt(posix.V.TIME)] = 0;
+    raw.cc[@backingInt(posix.V.MIN)] = 1;
 
     posix.tcsetattr(self.stdin.handle, .FLUSH, raw) catch {
         return error.RawModeFail;

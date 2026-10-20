@@ -4,7 +4,7 @@ pop
 ret_naked
 
 -- other --
-get_local index 0
+ptr_local index 0
 call index 0, arity 1, speak
 ret_naked
 
@@ -14,21 +14,21 @@ pop
 ret_naked
 
 -- other --
-get_local index 0
+ptr_local index 0
 call index 2, arity 1, speak
 ret_naked
 
 -- main --
 load_const index 2, value Bar{}
-get_local index 0
+ptr_local index 0
 call index 0, arity 1, speak
-get_local index 0
+get_local_dup index 0
 call index 1, arity 1, other
 
 load_const index 3, value Baz{}
-get_local index 1
+ptr_local index 1
 call index 2, arity 1, speak
-get_local index 1
+get_local_dup index 1
 call index 3, arity 1, other
 
 ret_naked

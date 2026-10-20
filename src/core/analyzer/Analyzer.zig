@@ -24,7 +24,6 @@ const Constant = @import("ConstantInterner.zig").Constant;
 const Pipeline = @import("../pipeline/pipeline.zig");
 const State = @import("../pipeline/State.zig");
 const ModIndex = @import("../pipeline/ModuleManager.zig").Index;
-const CLayout = @import("../compiler/Artifacts.zig").CStructure.Layout;
 const ffi = @import("ffi");
 const NativeLib = @import("NativeLib.zig");
 
@@ -446,12 +445,15 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
     const kind: Instr.For.Kind, const elem_type = switch (res.type.*) {
         .array => |t| .{ .array, t.child },
         .pointer => |t| b: {
-            const array_type = t.as(.array) orelse return self.err(
-                .{ .for_iter_ptr_non_array = .{ .found = self.typeName(t) } },
+            const array_type = t.child.as(.array) orelse return self.err(
+                .{ .for_iter_ptr_non_array = .{ .found = self.typeName(t.child) } },
                 span,
             );
 
-            break :b .{ .array_ptr, self.ti.intern(.{ .pointer = array_type.child }) };
+            break :b .{
+                .array_ptr,
+                self.ti.intern(.{ .pointer = .{ .child = array_type.child, .is_const = t.is_const } }),
+            };
         },
         .range => |r| b: {
             if (r != self.ti.getCached(.int)) {
@@ -937,8 +939,17 @@ fn selfParam(
     span: Span,
     ctx: *Context,
 ) Error!void {
-    const self_type = ctx.self_type orelse return self.err(.self_outside_decl, span);
+    var self_type = ctx.self_type orelse return self.err(.self_outside_decl, span);
 
+    switch (param.typ.?.*) {
+        .pointer => |p| {
+            self_type = self.ti.intern(.{ .pointer = .{
+                .child = self_type,
+                .is_const = p.is_const,
+            } });
+        },
+        else => {},
+    }
     _ = try self.declareVariable(
         self.cached_names.self,
         self_type,
@@ -2321,7 +2332,7 @@ fn deref(self: *Self, expr: Ast.Deref, ctx: *Context) Result {
     );
 
     return .{
-        .type = ref,
+        .type = ref.child,
         .ti = res.ti,
         .instr = self.irb.addInstr(.{ .deref = res.instr }, span.start),
     };
@@ -2361,7 +2372,7 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
 
     // Auto-dereference
     if (struct_res.type.as(.pointer)) |ptr| {
-        struct_res.type = ptr;
+        struct_res.type = ptr.child;
         struct_res.instr = self.irb.wrapInstr(.deref, struct_res.instr);
     }
 
@@ -2431,12 +2442,19 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
 }
 
 fn boundMethod(self: *Self, func_type: *const Type, field_index: usize, structure: InstrIndex, span: Span) Result {
-    const bounded_type = func_type.function.toBoundMethod(self.alloc);
-    const ty = self.ti.intern(.{ .function = bounded_type });
+    const bounded_res = func_type.function.toBoundMethod(self.alloc);
+    const ty = self.ti.intern(.{ .function = bounded_res.func });
 
     return .{
         .type = ty,
-        .instr = self.irb.addInstr(.{ .bound_method = .{ .structure = structure, .index = field_index } }, span.start),
+        .instr = self.irb.addInstr(
+            .{ .bound_method = .{
+                .structure = structure,
+                .index = field_index,
+                .self_ptr = bounded_res.self_ptr,
+            } },
+            span.start,
+        ),
     };
 }
 
@@ -2642,41 +2660,40 @@ fn structureAccess(
             .index = struct_type.fields.getIndex(field_name).?,
         };
     }
+
     // Functions
-    else {
-        const func = func: {
-            // Own
-            if (struct_type.functions.get(field_name)) |f| {
+    const func = func: {
+        // Own
+        if (struct_type.functions.get(field_name)) |f| {
+            break :func f;
+        }
+
+        // Traits
+        for (struct_type.traits.values()) |trait| {
+            if (trait.funcs.get(field_name)) |f| {
                 break :func f;
-            }
-
-            // Traits
-            for (struct_type.traits.values()) |trait| {
-                if (trait.funcs.get(field_name)) |f| {
-                    break :func f;
-                }
-            }
-
-            return self.err(
-                .{ .undeclared_field = .{ .structure = self.typeName(ty), .field = text } },
-                self.ast.getSpan(field_tk),
-            );
-        };
-
-        if (ctx.in_call) {
-            const fn_type = &func.type.function;
-            // Call method on type
-            if (is_symbol and fn_type.kind == .method) {
-                return self.err(.{ .call_method_on_type = .{ .name = text } }, self.ast.getSpan(field_tk));
-            }
-            // Call static on instance
-            else if (!is_symbol and fn_type.kind != .method and fn_type.kind != .zig_method) {
-                return self.err(.{ .call_static_on_instance = .{ .name = text } }, self.ast.getSpan(field_tk));
             }
         }
 
-        return .{ .type = func.type, .kind = .function, .index = func.index };
+        return self.err(
+            .{ .undeclared_field = .{ .structure = self.typeName(ty), .field = text } },
+            self.ast.getSpan(field_tk),
+        );
+    };
+
+    if (ctx.in_call) {
+        const fn_type = &func.type.function;
+        // Call method on type
+        if (is_symbol and fn_type.kind == .method) {
+            return self.err(.{ .call_method_on_type = .{ .name = text } }, self.ast.getSpan(field_tk));
+        }
+        // Call static on instance
+        else if (!is_symbol and fn_type.kind != .method and fn_type.kind != .zig_method) {
+            return self.err(.{ .call_static_on_instance = .{ .name = text } }, self.ast.getSpan(field_tk));
+        }
     }
+
+    return .{ .type = func.type, .kind = .function, .index = func.index };
 }
 
 fn traitAccess(self: *Self, expr: *const Ast.Field, ty: *const Type, is_sym: bool) Error!AccessResult {
@@ -2760,7 +2777,7 @@ fn moduleAccess(self: *Self, field_tk: Ast.TokenIndex, module_name: InternerIdx)
 fn call(self: *Self, expr: *const Ast.FnCall, ctx: *Context) Result {
     const span = self.ast.getSpan(expr);
 
-    const callee = callee: {
+    var callee = callee: {
         const ctx_call = ctx.setAndGetPrevious(.in_call, true);
         defer ctx.in_call = ctx_call;
         const callee = try self.analyzeExpr(expr.callee, .any, ctx);
@@ -2774,10 +2791,18 @@ fn call(self: *Self, expr: *const Ast.FnCall, ctx: *Context) Result {
 
     const fn_type = callee.type.as(.function) orelse return self.err(.invalid_call_target, span);
 
-    if (fn_type.kind == .method and expr.callee.* == .identifier) return self.err(
-        .{ .call_method_on_non_instance = .{ .name = self.ast.toSource(expr.callee.identifier) } },
-        self.ast.getSpan(expr.callee.identifier),
-    );
+    if (fn_type.kind == .method) {
+        if (expr.callee.* == .identifier) return self.err(
+            .{ .call_method_on_non_instance = .{ .name = self.ast.toSource(expr.callee.identifier) } },
+            self.ast.getSpan(expr.callee.identifier),
+        );
+
+        if (fn_type.params.values()[0].type.* == .pointer) {
+            var field_callee = self.irb.data(callee.instr).field;
+            field_callee.structure = self.irb.wrapInstr(.pointer, field_callee.structure);
+            callee.instr = self.irb.addInstr(.{ .field = field_callee }, span.start);
+        }
+    }
 
     const args_res = try self.fnArgsList(expr.args, &fn_type, callee.ti.ext_mod, span, ctx);
 
@@ -2944,11 +2969,19 @@ fn resolveIdentifier(self: *Self, token_name: Ast.TokenIndex, initialized: bool,
         res.variable.used = true;
         res.variable.initialized = true;
 
-        if (ctx.in_assign and res.variable.constant and !res.variable.type.is(.pointer)) {
-            return self.err(
-                .{ .assign_to_constant = .{ .name = text } },
-                span,
-            );
+        if (ctx.in_assign) {
+            if (res.variable.constant) {
+                return self.err(
+                    .{ .assign_to_constant = .{ .name = text } },
+                    span,
+                );
+            }
+            if (res.variable.type.as(.pointer)) |ptr| {
+                if (ptr.is_const) return self.err(
+                    .{ .assign_to_constant = .{ .name = text } },
+                    span,
+                );
+            }
         }
 
         if (ctx.in_call and res.variable.constant) return self.err(
@@ -3976,8 +4009,8 @@ fn unary(self: *Self, expr: *const Ast.Unary, ctx: *Context) Result {
     const span = self.ast.getSpan(expr);
     const op = self.ast.token_tags[expr.op];
 
-    if (op == .star) {
-        return self.pointer(expr.expr, span, ctx);
+    if (op == .star or op == .ampersand) {
+        return self.pointer(expr.expr, op == .ampersand, span, ctx);
     } else if (op == .tilde) {
         return self.binaryNot(expr.expr, span, ctx);
     }
@@ -4060,7 +4093,7 @@ fn overloadedUnary(self: *Self, rhs: InstrInfos, rhs_span: Span) ?Result {
     };
 }
 
-fn pointer(self: *Self, expr: *Expr, span: Span, ctx: *Context) Result {
+fn pointer(self: *Self, expr: *Expr, is_const: bool, span: Span, ctx: *Context) Result {
     const res = try self.analyzeExpr(expr, .value, ctx);
 
     // Values can hold functions so we check for that case
@@ -4068,29 +4101,25 @@ fn pointer(self: *Self, expr: *Expr, span: Span, ctx: *Context) Result {
         return self.err(.invalid_pointer, span);
     }
 
-    const ref: Instr.Pointer = switch (self.irb.data(res.instr)) {
-        .identifier => |ident| .{ .variable = ident },
-        .indexing => |idx| idx: {
+    switch (self.irb.data(res.instr)) {
+        .identifier => {},
+        .indexing => |idx| {
             if (idx.kind == .str) {
                 return self.err(.invalid_pointer, span);
             }
-
-            break :idx .{ .array = idx };
         },
-        .field => |f| ref: {
+        .field => |f| {
             if (f.kind != .ray) {
                 return self.err(.invalid_pointer, span);
             }
-
-            break :ref .{ .field = f };
         },
         else => return self.err(.invalid_pointer, span),
-    };
+    }
 
     return .{
-        .type = self.ti.intern(.{ .pointer = res.type }),
+        .type = self.ti.intern(.{ .pointer = .{ .child = res.type, .is_const = is_const } }),
         .ti = res.ti,
-        .instr = self.irb.addInstr(.{ .pointer = ref }, span.start),
+        .instr = self.irb.addInstr(.{ .pointer = res.instr }, span.start),
     };
 }
 
@@ -4291,9 +4320,9 @@ pub fn checkAndGetTypeInfo(self: *Self, ty: ?*const Ast.Type, ctx: *const Contex
             const child = try self.checkAndGetType(opt.child, ctx);
             return .{ .type = self.ti.intern(.{ .optional = child }) };
         },
-        .pointer => |ref| {
-            const child = try self.checkAndGetType(ref.child, ctx);
-            return .{ .type = self.ti.intern(.{ .pointer = child }) };
+        .pointer => |p| {
+            const child = try self.checkAndGetType(p.child, ctx);
+            return .{ .type = self.ti.intern(.{ .pointer = .{ .child = child, .is_const = p.is_const } }) };
         },
         .scalar => {
             const interned = self.interner.intern(self.ast.toSource(t));
@@ -4411,6 +4440,15 @@ fn checkTypeCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, de
     if (decl.is(.float) and value.is(.int)) {
         value_info.instr = self.castIntToFloat(value_info.*);
         return self.ti.getCached(.float);
+    }
+
+    if (decl.as(.pointer)) |decl_ptr| {
+        if (value.as(.pointer)) |val_ptr| {
+            // Coerce &T -> *T
+            if (decl_ptr.child == val_ptr.child and decl_ptr.is_const) {
+                return decl;
+            }
+        }
     }
 
     if (decl.is(.rawptr)) {

@@ -1,5 +1,5 @@
 trait Foo {
-    fn speak(self)
+    fn speak(*self)
     fn other(self) {
         self.speak()
     }
@@ -7,14 +7,14 @@ trait Foo {
 
 struct Bar {
     impl Foo {
-        fn speak(self) {
+        fn speak(*self) {
             _ = "I'm Bar"
         }
     }
 }
 struct Baz {
     impl Foo {
-        fn speak(self) {
+        fn speak(*self) {
             _ = "I'm Baz"
         }
     }

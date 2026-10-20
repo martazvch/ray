@@ -571,14 +571,9 @@ fn range(self: *Self, data: Instruction.Range) void {
 
 fn pointer(self: *Self, data: Instruction.Pointer) void {
     self.indentAndAppendSlice("[Pointer]");
-
     self.indent_level += 1;
     defer self.indent_level -= 1;
-    switch (data) {
-        .array => |a| self.indexing(a, false),
-        .field => |f| self.getField(f),
-        .variable => |v| self.identifier(v),
-    }
+    self.parseInstr(data);
 }
 
 fn returnInstr(self: *Self, text: []const u8, data: Instruction.Return) void {

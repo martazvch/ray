@@ -156,92 +156,92 @@ call index 6, arity 4, staticFn
 load_const index 45, value Bar{}
 get_local_dup index 0
 struct_lit index 5, arity 1, Foo
-get_local index 1
+get_local_dup index 1
 load_const index 15, value first
 load_const index 46, value -1
 load_const index 47, value -2
 load_const index 48, value -24.5
 call index 7, arity 5, method
-get_local index 1
+get_local_dup index 1
 load_const index 18, value second
 load_const index 13, value 2
 load_const index 13, value 2
 load_const index 14, value 8.5
 call index 7, arity 5, method
-get_local index 1
+get_local_dup index 1
 load_const index 19, value third
 load_const index 49, value -8
 load_const index 13, value 2
 load_const index 14, value 8.5
 call index 7, arity 5, method
-get_local index 1
+get_local_dup index 1
 load_const index 21, value fourth
 load_const index 13, value 2
 load_const index 13, value 2
 load_const index 50, value -123.456
 call index 7, arity 5, method
-get_local index 1
+get_local_dup index 1
 load_const index 23, value fifth
 load_const index 51, value -80
 load_const index 13, value 2
 load_const index 52, value -12.34
 call index 7, arity 5, method
-get_local index 1
+get_local_dup index 1
 load_const index 26, value sixth
 load_const index 53, value -65
 load_const index 54, value -54
 load_const index 55, value -3.14
 call index 7, arity 5, method
-get_local index 1
+get_local_dup index 1
 load_const index 30, value seventh
 load_const index 56, value -111
 load_const index 57, value -11
 load_const index 58, value -1.1
 call index 7, arity 5, method
 get_local index 1
-get_field index 0
+ptr_field index 0
 load_const index 15, value first
 push_true
 push_false
 load_const index 59, value -98.2
 call index 5, arity 5, method
 get_local index 1
-get_field index 0
+ptr_field index 0
 load_const index 18, value second
 push_false
 push_false
 load_const index 10, value 88.55
 call index 5, arity 5, method
 get_local index 1
-get_field index 0
+ptr_field index 0
 load_const index 19, value third
 push_true
 push_false
 load_const index 10, value 88.55
 call index 5, arity 5, method
 get_local index 1
-get_field index 0
+ptr_field index 0
 load_const index 21, value fourth
 push_false
 push_false
 load_const index 60, value -27.3
 call index 5, arity 5, method
 get_local index 1
-get_field index 0
+ptr_field index 0
 load_const index 23, value fifth
 push_true
 push_false
 load_const index 61, value 30.4
 call index 5, arity 5, method
 get_local index 1
-get_field index 0
+ptr_field index 0
 load_const index 26, value sixth
 push_true
 push_false
 load_const index 62, value 6540.6
 call index 5, arity 5, method
 get_local index 1
-get_field index 0
+ptr_field index 0
 load_const index 30, value seventh
 push_false
 push_true
@@ -261,13 +261,13 @@ push_true
 push_false
 call index 0, arity 4, staticFn
 load_const index 68, value Def{}
-get_local index 2
+get_local_dup index 2
 load_const index 69, value imported method
 load_const index 2, value 10
 push_true
 push_true
 call index 1, arity 5, method
-get_local index 2
+get_local_dup index 2
 load_const index 69, value imported method
 load_const index 70, value 180
 push_true

@@ -565,7 +565,12 @@ const Compiler = struct {
 
     // TODO: protect cast
     fn boundMethod(self: *Self, data: Instruction.BoundMethod) Error!void {
-        try self.compileInstrNoDup(data.structure);
+        // If 'self' was a pointer, we don't duplicate it
+        if (data.self_ptr) {
+            try self.pointer(data.structure);
+        } else {
+            try self.compileInstr(data.structure);
+        }
 
         const index = self.artifacts.getIndex(.function, self.module, data.index);
         self.writeOpAndByte(.bound_method, @intCast(index));
@@ -610,7 +615,7 @@ const Compiler = struct {
     }
 
     fn invoke(self: *Self, data: *const Instruction.Call, callee: Instruction.Field) Error!void {
-        try self.compileInstrNoDup(callee.structure);
+        try self.compileInstr(callee.structure);
         try self.callSymbol(data, 1, data.module, callee.index);
     }
 
@@ -1181,8 +1186,8 @@ const Compiler = struct {
     }
 
     fn pointer(self: *Self, instr: Instruction.Pointer) Error!void {
-        switch (instr) {
-            .array => |a| {
+        switch (self.at(instr)) {
+            .indexing => |a| {
                 try self.compileInstrNoDup(a.expr);
                 try self.compileInstr(a.index);
                 self.writeOp(switch (a.index_kind) {
@@ -1194,9 +1199,17 @@ const Compiler = struct {
                 try self.compileInstrNoDup(f.structure);
                 self.writeOpAndByte(.ptr_field, @intCast(f.index));
             },
-            .variable => |v| switch (v.kind) {
+            .identifier => |v| switch (v.kind) {
                 .local => self.writeOpAndByte(.ptr_local, @intCast(v.index)),
                 .global => self.writeOpAndByte(.ptr_global, @intCast(v.index)),
+            },
+            .deref => |d| {
+                // Transforms: *foo.* -> foo
+                try self.compileInstrNoDup(d);
+            },
+            else => |aa| {
+                std.log.debug("got: {any}", .{aa});
+                unreachable;
             },
         }
     }

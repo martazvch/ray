@@ -153,7 +153,12 @@ pub const Instruction = struct {
         pop_count: u8,
         is_expr: bool,
     };
-    pub const BoundMethod = struct { structure: Index, index: usize };
+    pub const BoundMethod = struct {
+        structure: Index,
+        index: usize,
+        /// Self parameter was a pointer
+        self_ptr: bool,
+    };
     pub const Break = struct { instr: ?Index, depth: usize, pop_count: usize };
     pub const Call = struct {
         callee: Index,
@@ -276,11 +281,7 @@ pub const Instruction = struct {
 
         pub const Kind = enum { int, float };
     };
-    pub const Pointer = union(enum) {
-        variable: Variable,
-        field: Field,
-        array: Indexing,
-    };
+    pub const Pointer = Index;
     pub const Return = struct {
         value: ?Index,
     };

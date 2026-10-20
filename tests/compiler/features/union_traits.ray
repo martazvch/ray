@@ -2,7 +2,7 @@ trait Foo {
     fn speak() { _ = "oui" }
     fn speakNoDef()
 
-    fn method(self) { _ = "method" }
+    fn method(*self) { _ = "method" }
     fn methodNoDef(self)
 }
 

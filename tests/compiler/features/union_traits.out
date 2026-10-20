@@ -40,9 +40,9 @@ call index 2, arity 0, speak
 call index 0, arity 0, speakNoDef
 load_const index 6, value 1
 union_constr index 0, tag 0, Bar
-get_local index 0
+ptr_local index 0
 call index 3, arity 1, method
-get_local index 0
+get_local_dup index 0
 call index 1, arity 1, methodNoDef
 ret_naked
 

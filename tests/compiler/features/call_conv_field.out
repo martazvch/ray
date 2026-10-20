@@ -68,7 +68,7 @@ get_field index 0
 call_dyn index 0
 pop
 
-get_local index 0
+get_local_dup index 0
 bound_method index 7
 get_local index 1
 set_field index 0

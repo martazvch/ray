@@ -68,17 +68,6 @@ pub fn wrapInstr(self: *Self, comptime instr: std.meta.FieldEnum(Instruction.Dat
     return self.instructions.len - 1;
 }
 
-pub fn wrapInstrInplace(self: *Self, comptime instr: std.meta.FieldEnum(Instruction.Data), index: usize) void {
-    if (@FieldType(Instruction.Data, @tagName(instr)) != ir.Index) {
-        @compileError("Can only wrap instructions that have a single instruction as a payload");
-    }
-
-    const prev_offset = self.instructions.items(.offset)[index];
-
-    const wrap = @unionInit(Instruction.Data, @tagName(instr), index);
-    self.instructions.set(index, .{ .data = wrap, .offset = prev_offset });
-}
-
 pub fn instrOffset(self: *const Self, instr: usize) usize {
     return self.instructions.items(.offset)[instr];
 }

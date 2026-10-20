@@ -6,13 +6,16 @@ ret_naked
 
 -- getOld --
 get_local index 0
+deref
 get_field_dup index 0
 get_local index 1
 add_int
 get_local index 0
+deref
 set_field index 0
 
 get_local index 0
+deref
 get_field_dup index 0
 ret
 
@@ -20,11 +23,11 @@ ret
 load_const index 2, value Human{ age = 5, name = Tom }
 
 push_null
-get_local index 0
+get_local_dup index 0
 bound_method index 0
 
 push_null
-get_local index 0
+ptr_local index 0
 bound_method index 1
 
 get_local index 2

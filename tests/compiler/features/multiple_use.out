@@ -122,7 +122,7 @@ exit_repl
 -- main --
 load_const index 9, value Point{ x = 1, y = 90 }
 
-get_local index 0
+get_local_dup index 0
 call index 7, arity 1, display
 
 load_const index 10, value 10
@@ -161,7 +161,7 @@ load_const index 11, value local import
 call index 11, arity 1, quote
 pop
 
-get_local index 0
+get_local_dup index 0
 call index 7, arity 1, display
 
 load_const index 12, value just 
@@ -169,11 +169,11 @@ load_const index 13, value concaneted
 call index 10, arity 2, concat
 pop
 
-get_local index 1
+get_local_dup index 1
 get_local_dup index 0
 call index 9, arity 2, moveCenter
 
-get_local index 3
+get_local_dup index 3
 call index 7, arity 1, display
 
 get_local index 1

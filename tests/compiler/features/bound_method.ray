@@ -6,7 +6,7 @@ struct Human {
         print(self.name)
     }
 
-    fn getOld(self, amount: int) -> int {
+    fn getOld(*self, amount: int) -> int {
         self.age = self.age + amount
         return self.age
     }

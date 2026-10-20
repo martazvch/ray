@@ -493,12 +493,35 @@ fn fnParams(self: *Self, is_closure: bool) Error![]Ast.VarDecl {
             .{ .too_many_fn_args = .{ .what = "parameter" } },
         );
 
-        // self managment
-        if (!is_closure and self.match(.self)) {
-            const name_idx = self.token_idx - 1;
-
+        self: {
             if (params.items.len > 0) {
-                return self.errAtPrev(.self_as_non_first_param);
+                if (self.match(.self)) {
+                    return self.errAtPrev(.self_as_non_first_param);
+                }
+                break :self;
+            }
+            if (is_closure) break :self;
+
+            var name_idx = self.token_idx;
+            const ty = self.allocator.create(Ast.Type) catch oom();
+
+            // Copy self
+            if (self.match(.self)) {
+                ty.* = .{ .self = name_idx };
+            }
+            // Mutable pointer *self
+            else if (self.match(.star)) {
+                try self.selfPointer(ty, false);
+                name_idx += 1;
+            }
+            // Constant pointer &self
+            else if (self.match(.ampersand)) {
+                try self.selfPointer(ty, true);
+                name_idx += 1;
+            }
+            // No self parameter
+            else {
+                break :self;
             }
 
             if (self.match(.colon)) {
@@ -512,8 +535,6 @@ fn fnParams(self: *Self, is_closure: bool) Error![]Ast.VarDecl {
             // Potential other argument following self
             _ = self.match(.comma);
 
-            const ty = self.allocator.create(Ast.Type) catch oom();
-            ty.* = .{ .self = name_idx };
             params.append(self.allocator, .{
                 .name = name_idx,
                 .typ = ty,
@@ -562,6 +583,17 @@ fn fnParams(self: *Self, is_closure: bool) Error![]Ast.VarDecl {
     }
 
     return params.toOwnedSlice(self.allocator) catch oom();
+}
+
+fn selfPointer(self: *Self, ty: *Ast.Type, is_const: bool) Error!void {
+    try self.expect(.self, undefined);
+    const child = self.allocator.create(Ast.Type) catch oom();
+    child.* = .{ .self = self.token_idx - 1 };
+    ty.* = .{ .pointer = .{
+        .token = self.token_idx - 2,
+        .child = child,
+        .is_const = is_const,
+    } };
 }
 
 fn fnReturnType(self: *Self) Error!?*Ast.Type {
@@ -927,7 +959,19 @@ fn parseScalarType(self: *Self) Error!*Ast.Type {
     }
     // Pointer
     else if (self.match(.star)) {
-        ty.* = .{ .pointer = .{ .token = self.token_idx - 1, .child = try self.parseType() } };
+        ty.* = .{ .pointer = .{
+            .token = self.token_idx - 1,
+            .child = try self.parseType(),
+            .is_const = false,
+        } };
+    }
+    // Const pointer
+    else if (self.match(.ampersand)) {
+        ty.* = .{ .pointer = .{
+            .token = self.token_idx - 1,
+            .child = try self.parseType(),
+            .is_const = true,
+        } };
     }
     // Unknown
     else {
@@ -1286,7 +1330,7 @@ fn parseExpr(self: *Self) Error!*Expr {
         .left_bracket => self.array(),
         .left_paren => self.leftParenExprStart(),
         .match => self.matchExpr(),
-        .star, .minus, .not, .tilde => self.unary(),
+        .ampersand, .star, .minus, .not, .tilde => self.unary(),
         .null => self.literal(.null),
         .pipe => self.closure(),
         .@"return" => self.returnExpr(),

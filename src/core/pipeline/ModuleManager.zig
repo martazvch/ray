@@ -32,11 +32,11 @@ pub const Index = enum(usize) {
     _,
 
     pub fn toIndex(i: usize) Index {
-        return @enumFromInt(i);
+        return @fromBackingInt(@intCast(i));
     }
 
     pub fn toInt(index: Index) usize {
-        return @intFromEnum(index);
+        return @backingInt(index);
     }
 };
 

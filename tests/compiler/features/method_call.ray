@@ -6,8 +6,12 @@ struct Human {
         _ = self.name
     }
 
-    fn getOld(self, amount: int) -> int {
+    fn getOld(*self, amount: int) -> int {
         self.age = self.age + amount
+        return self.age
+    }
+
+    fn getOld2(&self, amount: int) -> int {
         return self.age
     }
 }
@@ -17,5 +21,6 @@ fn main() {
     trash: int
     human.speak()
     _ = human.getOld(10)
+    _ = human.getOld2(10)
 }
 

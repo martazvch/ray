@@ -90,5 +90,17 @@
         "expr": {
             "identifier": "a"
         }
+    },
+    "unary": {
+        "op": "*",
+        "expr": {
+            "identifier": "a"
+        }
+    },
+    "unary": {
+        "op": "&",
+        "expr": {
+            "identifier": "a"
+        }
     }
 }

@@ -26,7 +26,7 @@ pop
 ret_naked
 
 -- method1 --
-get_local index 0
+get_local_dup index 0
 call index 4, arity 1, method0
 ret_naked
 
@@ -58,7 +58,7 @@ pop
 ret_naked
 
 -- method1 --
-get_local index 0
+get_local_dup index 0
 call index 10, arity 1, method0
 ret_naked
 
@@ -80,7 +80,7 @@ load_const index 5, value 5
 call index 7, arity 1, withDefaultNoBody
 pop
 load_const index 8, value Bar{}
-get_local index 0
+get_local_dup index 0
 call index 5, arity 1, method1
 ret_naked
 
