@@ -132,7 +132,11 @@ fn blackenObject(self: *Self, obj: *Obj) Allocator.Error!void {
     switch (obj.kind) {
         .array => {
             const array = obj.as(Obj.Array);
-            try self.markArray(array.values.items);
+            try self.markArray(array.values);
+            switch (array.storage) {
+                .borrowed => |b| try self.markObject(b.asObj()),
+                else => {},
+            }
         },
         .box => {
             @branchHint(.cold);

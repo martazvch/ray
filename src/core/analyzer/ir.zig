@@ -49,6 +49,7 @@ pub const Instruction = struct {
         @"if": If,
         in: In,
         indexing: Indexing,
+        arr_to_slice: Index,
         int_to_float: Index,
         load_symbol: LoadSymbol,
         match: Match,
@@ -81,15 +82,6 @@ pub const Instruction = struct {
         noop,
     };
 
-    pub const Indexing = struct {
-        expr: Index,
-        index: Index,
-        kind: Kind,
-        index_kind: IndexKind,
-
-        pub const Kind = enum { array, str };
-        pub const IndexKind = enum { scalar, range };
-    };
     pub const Binop = struct {
         lhs: Index,
         rhs: Index,
@@ -226,6 +218,15 @@ pub const Instruction = struct {
 
         pub const Kind = enum { array, array_ptr, str, range };
     };
+    pub const Indexing = struct {
+        expr: Index,
+        index: Index,
+        kind: Kind,
+        index_kind: IndexKind,
+
+        pub const Kind = enum { array, str };
+        pub const IndexKind = enum { scalar, range };
+    };
     pub const If = struct {
         cond: Index,
         then: Index,
@@ -272,7 +273,7 @@ pub const Instruction = struct {
         fn_index: usize,
         kind: Kind,
 
-        pub const Kind = enum { array, string };
+        pub const Kind = enum { array, slice, string };
     };
     pub const Range = struct {
         start: Index,

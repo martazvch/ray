@@ -1,0 +1,10 @@
+fn foo(s: [*]int) { }
+
+fn foo1(s: [&]int) { }
+
+fn main() {
+    arr := [1, 2, 3]
+    foo(arr)
+    foo1(arr)
+}
+

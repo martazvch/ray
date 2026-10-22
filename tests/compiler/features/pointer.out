@@ -8,9 +8,32 @@ get_local index 2
 ptr_field index 1
 
 load_const index 5, value [1, 2, 3]
+
+get_local index 5
+load_const index 1, value 2
+load_const index 0, value 1
+range_new_int
+slice_arr
+
 get_local index 5
 load_const index 0, value 1
-ptr_array
+ptr_array_item
+
+get_local index 6
+load_const index 6, value 0
+ptr_array_item
+
+get_local index 5
+load_const index 1, value 2
+load_const index 0, value 1
+range_new_int
+ptr_array_range
+
+get_local index 6
+load_const index 1, value 2
+load_const index 0, value 1
+range_new_int
+ptr_array_range
 
 ret_naked
 

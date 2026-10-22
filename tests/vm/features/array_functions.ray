@@ -9,5 +9,8 @@ fn main() {
 
     print(arr.pop())
     print(arr.len())
+
+    // Slice
+    print(arr[0..1].len())
 }
 

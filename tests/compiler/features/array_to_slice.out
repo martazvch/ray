@@ -1,0 +1,21 @@
+-- foo --
+ret_naked
+
+-- foo1 --
+ret_naked
+
+-- main --
+load_const index 3, value [1, 2, 3]
+
+get_local_dup index 0
+arr_to_slice
+call index 0, arity 1, foo
+
+get_local_dup index 0
+arr_to_slice
+call index 1, arity 1, foo1
+
+ret_naked
+
+-- global scope --
+call index 2, arity 0, main

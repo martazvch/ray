@@ -12,6 +12,10 @@ fn main() {
     ref2 := *foo.b
 
     arr := [1, 2, 3]
+    slice := arr[1..2]
     arrPtr := *arr[1]
+    slicePtr := *slice[0]
+    slicePtr2 := *arr[1..2]
+    slicePtr3 := *slice[1..2]
 }
 

@@ -47,6 +47,7 @@ pub const Type = union(enum) {
     module: InternerIdx,
     optional: *const Type,
     pointer: Pointer,
+    slice: Slice,
     structure: Structure,
     trait: Trait,
     @"union": Union,
@@ -240,6 +241,11 @@ pub const Type = union(enum) {
         is_const: bool,
     };
 
+    pub const Slice = struct {
+        child: *const Type,
+        is_const: bool,
+    };
+
     pub const Structure = struct {
         loc: Loc,
         fields: FieldsMap,
@@ -411,6 +417,10 @@ pub const Type = union(enum) {
                 p.child.hash(allocator, hasher);
                 hasher.update(asBytes(&p.is_const));
             },
+            .slice => |s| {
+                s.child.hash(allocator, hasher);
+                hasher.update(asBytes(&s.is_const));
+            },
             .structure => |ty| hashLoc(hasher, ty.loc),
             .trait => |ty| hashLoc(hasher, ty.loc),
             .@"union" => |*ty| {
@@ -496,6 +506,12 @@ pub const Type = union(enum) {
                 w.print("{s}{s}", .{
                     if (p.is_const) "&" else "*",
                     p.child.toString(allocator, interner, mod_name, full),
+                }) catch oom();
+            },
+            .slice => |s| {
+                w.print("[{s}]{s}", .{
+                    if (s.is_const) "&" else "*",
+                    s.child.toString(allocator, interner, mod_name, full),
                 }) catch oom();
             },
             .structure => |ty| locToString(w, ty.loc, interner, mod_name, full),
@@ -663,6 +679,10 @@ pub const ObjFnTypeInfo = struct {
     params: []const Param,
     return_type: FnType,
 
+    /// Attribute that can be used by any type for registration logic
+    ///  Array: if set to 'true', the method can be used by slices
+    attr1: bool = false,
+
     pub const Param = struct {
         name: []const u8,
         ty: FnType,
@@ -679,6 +699,30 @@ pub const ObjFnTypeInfo = struct {
         array_str,
     };
 };
+
+pub fn getRuntimeObjFuncsApi(T: type) ObjFns {
+    const KV = struct { []const u8, ObjFnInfos };
+
+    const info = @typeInfo(T).@"struct";
+    comptime var i: usize = 0;
+    comptime var kvs: []const KV = &.{};
+
+    inline for (info.decl_names) |name| {
+        if (comptime std.mem.startsWith(u8, name, "_api_")) {
+            const fn_name = name[5..];
+            const def_name = "_defapi_" ++ fn_name;
+
+            if (!@hasDecl(T, def_name)) {
+                @compileError("Missing API type definition for function: " ++ fn_name);
+            }
+
+            kvs = kvs ++ .{KV{ fn_name, .{ .index = i, .type_info = @field(T, def_name) } }};
+            i += 1;
+        }
+    }
+
+    return .initComptime(kvs);
+}
 
 test "inline union" {
     const expect = std.testing.expect;

@@ -350,6 +350,8 @@ const Compiler = struct {
             .@"if" => |*data| self.ifInstr(data),
             .in => |data| self.in(data),
             .indexing => |data| self.indexing(data),
+
+            .arr_to_slice => |index| self.wrappedInstr(.arr_to_slice, index),
             .int_to_float => |index| self.wrappedInstr(.int_to_float, index),
 
             // Standalone 'load_symbol' can only mean that we're loading a function to bind it to a runtime value
@@ -663,7 +665,13 @@ const Compiler = struct {
 
         try self.compileInstr(data.obj);
         try self.compileArgs(args);
-        self.writeOpAndByte(if (data.kind == .array) .call_array else .call_string, @intCast(data.fn_index));
+        self.writeOpAndByte(
+            switch (data.kind) {
+                .array, .slice => .call_array,
+                .string => .call_string,
+            },
+            @intCast(data.fn_index),
+        );
         self.writeByte(@intCast(args.len));
     }
 
@@ -1035,8 +1043,8 @@ const Compiler = struct {
                 .str => .index_str,
             },
             .range => switch (data.kind) {
-                .array => .index_range_arr,
-                .str => .index_range_str,
+                .array => .slice_arr,
+                .str => .slice_str,
             },
         };
         self.writeOp(op);
@@ -1191,7 +1199,7 @@ const Compiler = struct {
                 try self.compileInstrNoDup(a.expr);
                 try self.compileInstr(a.index);
                 self.writeOp(switch (a.index_kind) {
-                    .scalar => .ptr_array,
+                    .scalar => .ptr_array_item,
                     .range => .ptr_array_range,
                 });
             },

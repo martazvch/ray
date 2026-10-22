@@ -128,62 +128,56 @@ fn getApiFns(T: type) []const BuiltinFn(T) {
     return fns;
 }
 
-const KV = struct { []const u8, ObjFnInfos };
-
-fn getDefApiFns(T: type) std.StaticStringMap(ObjFnInfos) {
-    const info = @typeInfo(T).@"struct";
-    comptime var i: usize = 0;
-    comptime var kvs: []const KV = &.{};
-
-    inline for (info.decl_names) |name| {
-        if (comptime std.mem.startsWith(u8, name, "_api_")) {
-            const fn_name = name[5..];
-            const def_name = "_defapi_" ++ fn_name;
-
-            if (!@hasDecl(T, def_name)) {
-                @compileError("Missing API type definition for function: " ++ fn_name);
-            }
-
-            kvs = kvs ++ .{KV{ fn_name, .{ .index = i, .type_info = @field(T, def_name) } }};
-            i += 1;
-        }
-    }
-
-    return .initComptime(kvs);
-}
-
 // ---------
 //  Objects
 pub const Array = struct {
     obj: Obj,
-    values: ArrayList(Value),
+    values: []Value,
+    storage: Storage,
 
     const Self = @This();
+    pub const Storage = union(enum) {
+        owned: std.ArrayList(Value),
+        borrowed: *Self,
+    };
     const funcs = getApiFns(Self);
 
     pub fn create(vm: *Vm, type_id: TypeId, values: []Value) *Self {
+        var storage: Storage = .{ .owned = .empty };
+        storage.owned.appendSlice(vm.gc_alloc, values) catch oom();
+
         const obj = Obj.allocate(vm, Self, type_id);
-        obj.values = .empty;
+        obj.storage = storage;
+        obj.sync();
 
         if (options.log_gc) std.debug.print("<array>\n", .{});
-
-        vm.gc.pushTmpRoot(obj.asObj());
-        defer vm.gc.popTmpRoot();
-
-        obj.values.ensureTotalCapacity(vm.gc_alloc, values.len) catch oom();
-
-        for (values) |val| {
-            obj.values.appendAssumeCapacity(val);
-        }
 
         return obj;
     }
 
     pub fn createComptime(allocator: Allocator, type_id: TypeId, values: []Value) *Self {
         const obj = Obj.allocateComptime(allocator, Self, type_id);
-        obj.values = .fromOwnedSlice(values);
+        obj.storage = .{ .owned = .fromOwnedSlice(values) };
+        obj.sync();
 
         return obj;
+    }
+
+    pub fn slice(self: *Self, vm: *Vm, start: usize, end: usize) *Self {
+        const root = switch (self.storage) {
+            .owned => self,
+            .borrowed => |r| r,
+        };
+
+        const obj = Obj.allocate(vm, Self, self.obj.type_id);
+        obj.storage = .{ .borrowed = root };
+        obj.values = self.values[start..end];
+
+        return obj;
+    }
+
+    fn sync(self: *Self) void {
+        self.values = self.storage.owned.items;
     }
 
     pub fn asObj(self: *Self) *Obj {
@@ -192,14 +186,14 @@ pub const Array = struct {
 
     pub fn deepCopy(self: *const Self, vm: *Vm) *Self {
         var values: ArrayList(Value) = .empty;
-        values.ensureTotalCapacity(vm.allocator, self.values.items.len) catch oom();
+        values.ensureTotalCapacity(vm.allocator, self.values.len) catch oom();
 
         const index = vm.gc.tmp_roots.items.len;
         defer vm.gc.tmp_roots.shrinkRetainingCapacity(index);
 
-        vm.gc.tmp_roots.ensureUnusedCapacity(vm.allocator, self.values.items.len) catch oom();
+        vm.gc.tmp_roots.ensureUnusedCapacity(vm.allocator, self.values.len) catch oom();
 
-        for (self.values.items) |val| {
+        for (self.values) |val| {
             const value = val.deepCopy(vm);
             values.appendAssumeCapacity(value);
             if (value.asObj()) |obj| vm.gc.tmp_roots.appendAssumeCapacity(obj);
@@ -209,8 +203,10 @@ pub const Array = struct {
     }
 
     pub fn deinit(self: *Self, vm: *Vm) void {
-        // We don't own the values, just the array
-        self.values.deinit(vm.gc_alloc);
+        switch (self.storage) {
+            .owned => |*l| l.deinit(vm.gc_alloc),
+            .borrowed => {},
+        }
         vm.gc_alloc.destroy(self);
     }
 
@@ -219,27 +215,25 @@ pub const Array = struct {
         return funcs[fn_index](self, vm, stack);
     }
 
-    pub fn getFns() ObjFns {
-        return getDefApiFns(Self);
-    }
-
     pub const _defapi_push: ObjFnTypeInfo = .{
         .params = &.{.{ .name = "value", .ty = .generic }},
         .return_type = .void,
     };
     pub fn _api_push(self: *Self, vm: *Vm, stack: []Value) ?Value {
-        self.values.append(vm.gc_alloc, stack[0]) catch oom();
+        self.storage.owned.append(vm.gc_alloc, stack[0]) catch oom();
+        self.sync();
         return null;
     }
 
     pub const _defapi_pop: ObjFnTypeInfo = .{ .params = &.{}, .return_type = .generic };
     pub fn _api_pop(self: *Self, _: *Vm, _: []Value) ?Value {
-        return self.values.pop();
+        defer self.sync();
+        return self.storage.owned.pop();
     }
 
-    pub const _defapi_len: ObjFnTypeInfo = .{ .params = &.{}, .return_type = .int };
+    pub const _defapi_len: ObjFnTypeInfo = .{ .params = &.{}, .return_type = .int, .attr1 = true };
     pub fn _api_len(self: *Self, _: *Vm, _: []Value) ?Value {
-        return .makeInt(@intCast(self.values.items.len));
+        return .makeInt(@intCast(self.values.len));
     }
 };
 
@@ -336,10 +330,6 @@ pub const String = struct {
     // Api
     pub fn call(self: *Self, vm: *Vm, stack: []Value, fn_index: usize) ?Value {
         return funcs[fn_index](self, vm, stack);
-    }
-
-    pub fn getFns() ObjFns {
-        return getDefApiFns(Self);
     }
 
     pub const _defapi_len: ObjFnTypeInfo = .{ .params = &.{}, .return_type = .int };
@@ -989,7 +979,7 @@ pub const ArrIterator = struct {
 
     pub fn create(vm: *Vm, parent: Value) *Obj {
         var self: *Self = vm.gc_alloc.create(Self) catch oom();
-        self.values = parent.obj.as(Array).values.items;
+        self.values = parent.obj.as(Array).values;
         self.index = 0;
 
         return self.iterator(vm, parent).asObj();
@@ -1028,13 +1018,13 @@ pub const ArrPtrIterator = struct {
 
     const Self = @This();
 
-    // When creating a pointer iteraor 'for x in *arr {}', it gets a pointer
-    // to 'arr' onto the stack (avoiding a ccopy btw), so we have to access
+    // When creating a pointer iterator 'for x in *arr {}', it gets a pointer
+    // to 'arr' onto the stack (avoiding a copy btw), so we have to access
     // pointer's child
     pub fn create(vm: *Vm, parent: Value) *Obj {
         var self: *Self = vm.gc_alloc.create(Self) catch oom();
         const ptr = parent.obj.as(Pointer).child;
-        self.values = ptr.obj.as(Array).values.items;
+        self.values = ptr.obj.as(Array).values;
         self.index = 0;
 
         return self.iterator(vm, parent).asObj();
@@ -1336,9 +1326,9 @@ pub fn print(self: *Obj, artifacts: *const Artifacts, writer: *Writer) Writer.Er
         .array => {
             const array = self.as(Array);
             try writer.writeAll("[");
-            for (array.values.items, 0..) |val, i| {
+            for (array.values, 0..) |val, i| {
                 val.print(artifacts, writer);
-                if (i < array.values.items.len - 1) try writer.writeAll(", ");
+                if (i < array.values.len - 1) try writer.writeAll(", ");
             }
             try writer.writeAll("]");
         },

@@ -98,6 +98,7 @@ pub const Type = union(enum) {
     array: struct {
         openning: TokenIndex,
         child: *Type,
+        kind: ArrayKind,
     },
     function: Fn,
     fields: []TokenIndex,
@@ -112,6 +113,7 @@ pub const Type = union(enum) {
     @"union": []const *Type,
     self: TokenIndex,
 
+    pub const ArrayKind = enum { array, slice, const_slice };
     pub const Fn = struct {
         params: []*Type,
         return_type: ?*Type,

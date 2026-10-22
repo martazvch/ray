@@ -98,6 +98,7 @@ fn parseInstr(self: *Self, instr: ir.Index) void {
         .@"if" => |*data| self.ifInstr(data),
         .in => |data| self.in(data),
         .indexing => |data| self.indexing(data, false),
+        .arr_to_slice => |index| self.indexInstr("Array to slice", index),
         .int_to_float => |index| self.indexInstr("Int to float", index),
         .load_symbol => |data| self.loadSymbol(data),
         .match => |*data| self.match(data),

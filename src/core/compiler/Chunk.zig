@@ -31,6 +31,7 @@ pub const OpCode = enum(u8) {
     add_float,
     array_new,
     array_set,
+    arr_to_slice,
 
     binary_and,
     binary_or,
@@ -54,10 +55,10 @@ pub const OpCode = enum(u8) {
     call_dyn,
     /// Calling a virtual function on a trait object
     call_virtual,
-    /// Calls a method on a string
-    call_string,
     /// Calls a method on an array
     call_array,
+    /// Calls a method on a string
+    call_string,
 
     closure,
     deref,
@@ -90,11 +91,13 @@ pub const OpCode = enum(u8) {
     get_union_tag,
     gt_float,
     gt_int,
+
     index_arr,
     index_arr_dup,
-    index_range_arr,
-    index_range_str,
     index_str,
+    slice_arr,
+    slice_str,
+
     in_array,
     in_range_float,
     in_range_int,
@@ -105,12 +108,14 @@ pub const OpCode = enum(u8) {
     is_int,
     is_str,
     is_type,
+
     iter_new_arr,
     iter_new_arr_ptr,
     iter_new_range,
     iter_new_str,
     iter_next,
     iter_next_index,
+
     jump,
     jump_false,
     jump_true,
@@ -143,7 +148,7 @@ pub const OpCode = enum(u8) {
     pop2,
     pop3,
     popn,
-    ptr_array,
+    ptr_array_item,
     ptr_array_range,
     ptr_local,
     ptr_global,

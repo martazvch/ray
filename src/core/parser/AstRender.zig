@@ -311,7 +311,11 @@ fn renderType(self: *Self, typ: ?*Ast.Type) Error![]const u8 {
 
     switch (ty.*) {
         .array => |t| {
-            try w.writeAll("[]");
+            switch (t.kind) {
+                .array => try w.writeAll("[]"),
+                .slice => try w.writeAll("[*]"),
+                .const_slice => try w.writeAll("[&]"),
+            }
             try w.writeAll(try self.renderType(t.child));
         },
         .error_union => |t| {

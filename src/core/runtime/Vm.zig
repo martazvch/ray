@@ -197,8 +197,12 @@ fn execute(self: *Self) !void {
                 const array = self.stack.pop().obj.as(Obj.Array);
                 const value = self.stack.pop();
 
-                const final = try self.normalizeIndex(array.values.items.len, index);
-                array.values.items[final] = value;
+                const final = try self.normalizeIndex(array.values.len, index);
+                array.values[final] = value;
+            },
+            .arr_to_slice => {
+                const array = self.stack.peek(0).obj.as(Obj.Array);
+                self.stack.peekRef(0).* = .makeObj(array.slice(self, 0, array.values.len).asObj());
             },
 
             .binary_and => {
@@ -444,23 +448,23 @@ fn execute(self: *Self) !void {
             .index_arr => {
                 const index = self.stack.pop().int;
                 const array = self.stack.pop().obj.as(Obj.Array);
-                const final = try self.normalizeIndex(array.values.items.len, index);
-                self.stack.push(array.values.items[final]);
+                const final = try self.normalizeIndex(array.values.len, index);
+                self.stack.push(array.values[final]);
             },
             .index_arr_dup => {
                 const index = self.stack.pop().int;
                 const array = self.stack.pop().obj.as(Obj.Array);
-                const final = try self.normalizeIndex(array.values.items.len, index);
-                self.stack.push(array.values.items[final].deepCopy(self));
+                const final = try self.normalizeIndex(array.values.len, index);
+                self.stack.push(array.values[final].deepCopy(self));
             },
-            .index_range_arr => {
+            .slice_arr => {
                 const range = self.stack.pop().range_int;
                 const obj = self.stack.pop().obj;
                 const array = obj.as(Obj.Array);
                 self.gc.pushTmpRoot(obj);
                 defer self.gc.popTmpRoot();
-                const start, const end = try self.checkRangeIndex(array.values.items.len, range);
-                self.stack.push(.makeObj(Obj.Array.create(self, array.obj.type_id, array.values.items[start..end]).asObj()));
+                const start, const end = try self.checkRangeIndex(array.values.len, range);
+                self.stack.push(.makeObj(array.slice(self, start, end).asObj()));
             },
             .index_str => {
                 const index = self.stack.pop().int;
@@ -468,7 +472,7 @@ fn execute(self: *Self) !void {
                 const final = try self.normalizeIndex(string.chars.len, index);
                 self.stack.push(.makeObj(Obj.String.takeCopy(self, &.{string.chars[final]}).asObj()));
             },
-            .index_range_str => {
+            .slice_str => {
                 const index = self.stack.pop().range_int;
                 const string = self.stack.pop().obj.as(Obj.String);
                 const start, const end = try self.checkRangeIndex(string.chars.len, index);
@@ -478,7 +482,7 @@ fn execute(self: *Self) !void {
                 const array = self.stack.pop();
                 const value = self.stack.pop();
                 check: {
-                    for (array.obj.as(Obj.Array).values.items) |v| {
+                    for (array.obj.as(Obj.Array).values) |v| {
                         if (value.eq(v)) {
                             self.stack.push(.true_);
                             break :check;
@@ -520,6 +524,7 @@ fn execute(self: *Self) !void {
                 }
             },
             .int_to_float => self.stack.peekRef(0).* = .makeFloat(@floatFromInt(self.stack.peek(0).int)),
+
             .iter_new_arr => self.stack.peekRef(0).* = .makeObj(Obj.ArrIterator.create(self, self.stack.peek(0))),
             .iter_new_arr_ptr => self.stack.peekRef(0).* = .makeObj(Obj.ArrPtrIterator.create(self, self.stack.peek(0))),
             .iter_new_range => self.stack.peekRef(0).* = .makeObj(Obj.RangeIterator.create(self, self.stack.peek(0).range_int)),
@@ -530,6 +535,7 @@ fn execute(self: *Self) !void {
                 self.stack.push(.makeInt(index));
                 self.stack.push(value);
             },
+
             .jump => {
                 const jump = self.frame.readShort();
                 self.frame.ip += jump;
@@ -626,23 +632,23 @@ fn execute(self: *Self) !void {
                 const count = self.frame.readByte();
                 self.stack.top -= count;
             },
-            .ptr_array => {
+            .ptr_array_item => {
                 const index = self.stack.pop().int;
                 const obj = self.stack.pop().obj;
                 const array = obj.as(Obj.Array);
                 self.gc.pushTmpRoot(obj);
                 defer self.gc.popTmpRoot();
-                const final = try self.normalizeIndex(array.values.items.len, index);
-                self.stack.push(.makeObj(Obj.Pointer.create(self, &array.values.items[final]).asObj()));
+                const final = try self.normalizeIndex(array.values.len, index);
+                self.stack.push(.makeObj(Obj.Pointer.create(self, &array.values[final]).asObj()));
             },
             .ptr_array_range => {
                 const range = self.stack.pop().range_int;
                 const obj = self.stack.pop().obj;
                 const array = obj.as(Obj.Array);
-                const start, const end = try self.checkRangeIndex(array.values.items.len, range);
+                const start, const end = try self.checkRangeIndex(array.values.len, range);
 
                 self.gc.pushTmpRoot(obj);
-                var slice = Value.makeObj(Obj.Array.create(self, array.obj.type_id, array.values.items[start..end]).asObj());
+                var slice = Value.makeObj(array.slice(self, start, end).asObj());
                 self.gc.pushTmpRoot(slice.obj);
                 defer self.gc.popTmpRootMany(2);
 

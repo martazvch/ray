@@ -14,7 +14,7 @@ get_local index 0
 load_const index 0, value 1
 load_const index 5, value 0
 range_new_int
-index_range_arr
+slice_arr
 pop
 
 load_const index 10, value [[1, 2, 3], [4, 5, 6]]
@@ -34,7 +34,7 @@ get_local index 1
 load_const index 0, value 1
 load_const index 5, value 0
 range_new_int
-index_range_arr
+slice_arr
 pop
 
 get_local index 1
@@ -43,7 +43,7 @@ index_arr
 load_const index 1, value 2
 load_const index 0, value 1
 range_new_int
-index_range_arr
+slice_arr
 pop
 
 load_const index 11, value Tom
@@ -56,7 +56,7 @@ get_local index 2
 load_const index 1, value 2
 load_const index 0, value 1
 range_new_int
-index_range_str
+slice_str
 pop
 
 ret_naked

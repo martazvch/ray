@@ -1,0 +1,18 @@
+fn foo(s: [*]int) {
+    for v in s {
+        print(v)
+    }
+}
+
+fn foo1(s: [&]int) {
+    for v in s {
+        print(v)
+    }
+}
+
+fn main() {
+    arr := [1, 2, 3]
+    foo(arr)
+    print("----")
+    foo1(arr)
+}

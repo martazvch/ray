@@ -1,0 +1,77 @@
+-- main --
+load_const index 3, value [1, 2, 3]
+
+get_local index 0
+load_const index 1, value 2
+load_const index 4, value 0
+range_new_int
+slice_arr
+
+get_local index 1
+iter_new_arr
+iter_next
+jump_null 14 -> 21
+pop
+loop 18 -> 13
+pop2
+
+ptr_local index 1
+iter_new_arr_ptr
+iter_next
+jump_null 26 -> 33
+pop
+loop 30 -> 25
+pop2
+
+get_local index 0
+load_const index 0, value 1
+load_const index 4, value 0
+range_new_int
+slice_arr
+iter_new_arr
+iter_next
+jump_null 44 -> 51
+pop
+loop 48 -> 43
+pop2
+
+get_local index 0
+load_const index 0, value 1
+load_const index 4, value 0
+range_new_int
+ptr_array_range
+iter_new_arr_ptr
+iter_next
+jump_null 62 -> 69
+pop
+loop 66 -> 61
+pop2
+
+get_local index 1
+load_const index 1, value 2
+load_const index 4, value 0
+range_new_int
+slice_arr
+iter_new_arr
+iter_next
+jump_null 80 -> 87
+pop
+loop 84 -> 79
+pop2
+
+get_local index 1
+load_const index 1, value 2
+load_const index 4, value 0
+range_new_int
+ptr_array_range
+iter_new_arr_ptr
+iter_next
+jump_null 98 -> 105
+pop
+loop 102 -> 97
+pop2
+
+ret_naked
+
+-- global scope --
+call index 0, arity 0, main

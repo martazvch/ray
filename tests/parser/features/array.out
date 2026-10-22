@@ -48,5 +48,17 @@
             ]
         },
         "const": "false"
+    },
+    "var_decl": {
+        "name": "slice",
+        "type": "[*]bool",
+        "value": {},
+        "const": "false"
+    },
+    "var_decl": {
+        "name": "slice",
+        "type": "[&]bool",
+        "value": {},
+        "const": "false"
     }
 }

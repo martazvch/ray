@@ -444,15 +444,21 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
 
     const kind: Instr.For.Kind, const elem_type = switch (res.type.*) {
         .array => |t| .{ .array, t.child },
+        .slice => |t| .{ .array, t.child },
         .pointer => |t| b: {
-            const array_type = t.child.as(.array) orelse return self.err(
-                .{ .for_iter_ptr_non_array = .{ .found = self.typeName(t.child) } },
-                span,
-            );
+            const child_type = child: {
+                if (t.child.as(.array)) |arr| break :child arr.child;
+                if (t.child.as(.slice)) |arr| break :child arr.child;
+
+                return self.err(
+                    .{ .for_iter_ptr_non_array = .{ .found = self.typeName(t.child) } },
+                    span,
+                );
+            };
 
             break :b .{
                 .array_ptr,
-                self.ti.intern(.{ .pointer = .{ .child = array_type.child, .is_const = t.is_const } }),
+                self.ti.intern(.{ .pointer = .{ .child = child_type, .is_const = t.is_const } }),
             };
         },
         .range => |r| b: {
@@ -2375,7 +2381,6 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
     }
 
     const field_res = switch (struct_res.type.*) {
-        .array => return self.runtimeObjFnAccess(.array, struct_res.instr, expr.field, struct_res.type),
         .@"enum" => |ty| b: {
             const res = try self.enumAccess(struct_res, ty, expr.field);
 
@@ -2385,7 +2390,6 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
             }
         },
         .module => |ty| return self.moduleAccess(expr.field, ty),
-        .str => return self.runtimeObjFnAccess(.string, struct_res.instr, expr.field, struct_res.type),
         .structure => |*ty| try self.structureAccess(expr.field, struct_res.type, ty, struct_res.ti.is_sym, ctx),
         .trait => try self.traitAccess(expr, struct_res.type, struct_res.ti.is_sym),
         .@"union" => |ty| b: {
@@ -2396,6 +2400,11 @@ pub fn field(self: *Self, expr: *const Ast.Field, ctx: *Context) Result {
                 .decl => |decl| break :b decl,
             }
         },
+
+        .array => return self.runtimeObjFnAccess(.array, struct_res.instr, expr.field, struct_res.type),
+        .slice => return self.runtimeObjFnAccess(.slice, struct_res.instr, expr.field, struct_res.type),
+        .str => return self.runtimeObjFnAccess(.string, struct_res.instr, expr.field, struct_res.type),
+
         else => return self.err(
             .{ .non_struct_field_access = .{ .found = self.typeName(struct_res.type) } },
             span,
@@ -2503,14 +2512,24 @@ fn enumAccess(self: *Self, enum_info: InstrInfos, ty: Type.Enum, tag_tk: Ast.Tok
 
 fn runtimeObjFnAccess(self: *Self, kind: Instr.ObjFn.Kind, instr: InstrIndex, fn_tk: Ast.TokenIndex, ty: *const Type) Result {
     const func_name = self.ast.toSource(fn_tk);
-    const map, const generic = switch (kind) {
-        .array => .{ &self.state.array_fns, ty.array.child },
-        .string => .{ &self.state.string_fns, self.ti.getCached(.void) },
+    const map, const generic, const check_attr1 = switch (kind) {
+        .array => .{ &self.state.array_fns, ty.array.child, false },
+        .slice => .{ &self.state.array_fns, ty.slice.child, true },
+        .string => .{ &self.state.string_fns, self.ti.getCached(.void), false },
     };
-    const func = map.get(func_name) orelse return self.err(
-        .{ .undeclared_field = .{ .structure = @tagName(kind), .field = func_name } },
-        self.ast.getSpan(fn_tk),
-    );
+
+    const func = f: {
+        if (map.get(func_name)) |func| {
+            if (!check_attr1 or func.type_info.attr1) {
+                break :f func;
+            }
+        }
+
+        return self.err(
+            .{ .undeclared_field = .{ .structure = @tagName(kind), .field = func_name } },
+            self.ast.getSpan(fn_tk),
+        );
+    };
 
     return .{
         .type = self.runtimeFnToType(func.type_info, generic),
@@ -3212,7 +3231,14 @@ fn indexing(self: *Self, expr: *const Ast.Indexing, ctx: *Context) Result {
     const expr_res = try self.analyzeExpr(expr.expr, .value, ctx);
 
     const elem_type = switch (expr_res.type.*) {
-        .array => |t| if (index_kind == .scalar) t.child else expr_res.type,
+        .array => |t| switch (index_kind) {
+            .scalar => t.child,
+            .range => self.ti.intern(.{ .slice = .{ .child = t.child, .is_const = false } }),
+        },
+        .slice => |t| switch (index_kind) {
+            .scalar => t.child,
+            .range => self.ti.intern(.{ .slice = .{ .child = t.child, .is_const = false } }),
+        },
         .str => if (ctx.in_assign)
             return self.err(.index_assign_str, span)
         else
@@ -3231,7 +3257,11 @@ fn indexing(self: *Self, expr: *const Ast.Indexing, ctx: *Context) Result {
                 .expr = expr_res.instr,
                 .index = index,
                 .index_kind = index_kind,
-                .kind = if (expr_res.type.* == .array) .array else .str,
+                .kind = switch (expr_res.type.*) {
+                    .array, .slice => .array,
+                    .str => .str,
+                    else => unreachable,
+                },
             } },
             self.ast.getSpan(expr).start,
         ),
@@ -4227,7 +4257,11 @@ pub fn checkAndGetTypeInfo(self: *Self, ty: ?*const Ast.Type, ctx: *const Contex
                 return self.err(.void_array, self.ast.getSpan(arr_type.child));
             }
 
-            return .{ .type = self.ti.intern(.{ .array = .{ .child = child } }) };
+            return switch (arr_type.kind) {
+                .array => .{ .type = self.ti.intern(.{ .array = .{ .child = child } }) },
+                .slice => .{ .type = self.ti.intern(.{ .slice = .{ .child = child, .is_const = false } }) },
+                .const_slice => .{ .type = self.ti.intern(.{ .slice = .{ .child = child, .is_const = true } }) },
+            };
         },
         .error_union => |err_union| {
             const ok = try self.checkAndGetType(err_union.ok, ctx);
@@ -4446,6 +4480,23 @@ fn checkTypeCoercion(self: *Self, decl: *const Type, value_info: *InstrInfos, de
             if (decl_ptr.child == val_ptr.child and decl_ptr.is_const) {
                 return decl;
             }
+        }
+    }
+
+    slice: {
+        const decl_slc = decl.as(.slice) orelse break :slice;
+
+        if (value.as(.slice)) |val_slc| {
+            // Coerce [*]T -> [&]T
+            if (decl_slc.child != val_slc.child) break :slice;
+            return decl;
+        }
+
+        if (value.as(.array)) |val_arr| {
+            // Coerce []T -> [*]T, []T -> [&]T
+            if (decl_slc.child != val_arr.child) break :slice;
+            value_info.instr = self.irb.addInstr(.{ .arr_to_slice = value_info.instr }, span.start);
+            return decl;
         }
     }
 

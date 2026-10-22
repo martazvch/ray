@@ -8,3 +8,6 @@ arr4: []bool = [
     ,
     true
 ]
+
+slice: [*]bool
+slice: [&]bool

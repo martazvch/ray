@@ -406,7 +406,7 @@ pub const AnalyzerMsg = union(enum) {
             // TODO: when there will be Range, modify
             .invalid_index => writer.writeAll("can only use integer or ranges as index"),
             .invalid_unary => |e| writer.print("can only negate boolean type, found '{s}'", .{e.found}),
-            .invalid_pointer => writer.writeAll("can only create a pointer from a variable or a field"),
+            .invalid_pointer => writer.writeAll("can only create a pointer from a variable, a field, an array or a slice"),
             .iter_non_iterable => writer.writeAll(
                 \\it is only possible to iterate over builtin types array, string, range and maps and over types
                 \\that implement the Iterator trait

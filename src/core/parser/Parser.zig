@@ -915,13 +915,30 @@ fn parseScalarType(self: *Self) Error!*Ast.Type {
     // Array
     else if (self.match(.left_bracket)) {
         const openning = self.token_idx - 1;
+
+        var kind: Ast.Type.ArrayKind = .array;
+
+        if (self.match(.star)) {
+            kind = .slice;
+        } else if (self.match(.ampersand)) {
+            kind = .const_slice;
+        }
+
         try self.expect(.right_bracket, .missing_bracket_array_type);
 
         if (self.match(.left_paren)) {
-            ty.* = .{ .array = .{ .openning = openning, .child = try self.parseType() } };
+            ty.* = .{ .array = .{
+                .openning = openning,
+                .child = try self.parseType(),
+                .kind = kind,
+            } };
             try self.expect(.right_paren, .missing_paren_array_type);
         } else {
-            ty.* = .{ .array = .{ .openning = openning, .child = try self.parseScalarType() } };
+            ty.* = .{ .array = .{
+                .openning = openning,
+                .child = try self.parseScalarType(),
+                .kind = kind,
+            } };
         }
     }
     // Function
