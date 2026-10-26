@@ -8,3 +8,4 @@ f: <function f>
 e: E.up
 u: U.u2
 s: S{ a = 1.2, b = -8.5 }
+more complex: 48

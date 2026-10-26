@@ -148,6 +148,7 @@ pub const Token = struct {
         star,
         star_equal,
         string,
+        string_start,
         string_part,
         string_end,
         @"struct",
@@ -822,7 +823,7 @@ pub fn next(self: *Self) Token {
                     // Early return because we want to exclude '{' from string part
                     return .{
                         .span = .{ .start = res.span.start, .end = self.index - 1 },
-                        .tag = .string_part,
+                        .tag = .string_start,
                     };
                 },
                 else => continue :state .string,

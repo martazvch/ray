@@ -1368,7 +1368,7 @@ fn parseExpr(self: *Self) Error!*Expr {
         .@"return" => self.returnExpr(),
         .self => self.literal(.self),
         .string => self.string(),
-        .string_part => self.stringInterp(),
+        .string_start => self.stringInterp(),
         .true => self.literal(.bool),
         else => return self.errAtPrev(.{ .expect_expr = .{ .found = self.toSource(self.token_idx - 1) } }),
     };
@@ -1680,14 +1680,13 @@ fn stringInterp(self: *Self) Error!*Expr {
     // We expect: (string_part, expr)* string_end
     literals.append(self.allocator, try self.resolveStringEscape(self.token_idx - 1, .start)) catch oom();
     var interp_start = self.token_spans[self.token_idx - 1].end;
-    self.advance();
 
     while (!self.check(.eof)) {
-        if (self.prev(.tag) == .string_end or self.prev(.tag) == .string_part) {
+        if (self.match(.string_end)) {
             return self.errAtSpan(.{ .start = interp_start, .end = interp_start + 1 }, .empty_string_interp);
         }
 
-        exprs.append(self.allocator, try self.parseExpr()) catch oom();
+        exprs.append(self.allocator, try self.parsePrecedenceExpr(0)) catch oom();
 
         if (self.match(.string_end)) {
             literals.append(self.allocator, try self.resolveStringEscape(self.token_idx - 1, .end)) catch oom();
@@ -1697,7 +1696,6 @@ fn stringInterp(self: *Self) Error!*Expr {
         self.advance();
         literals.append(self.allocator, try self.resolveStringEscape(self.token_idx - 1, .none)) catch oom();
         interp_start = self.token_spans[self.token_idx - 1].end;
-        self.advance();
     }
 
     // We should always have [literal, expr, literal, *] even if literals are empty string

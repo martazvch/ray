@@ -22,5 +22,7 @@ fn main() {
     u := U.u2
     s := S{ a=1.2, b=-8.5 }
     print("e: {e}\nu: {u}\ns: {s}")
+
+    print("more complex: {10 * v1 +f (1, true)}")
 }
 
