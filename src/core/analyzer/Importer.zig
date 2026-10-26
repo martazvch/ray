@@ -107,6 +107,24 @@ fn fetchFrom(
                     .content = readFile(io, alloc, cwd, file_name),
                 } };
             } else |_| {}
+
+            // Try to look for file like "raylib/raylib.ray" when importing "use .raylib"
+            const file_in_dir = std.fmt.allocPrint(
+                alloc,
+                "{s}{s}{s}.{s}",
+                .{ name, std.Io.Dir.path.sep_str, name, "ray" },
+            ) catch oom();
+
+            if (cwd.access(io, file_in_dir, .{})) {
+                cwd.* = cwd.openDir(io, name, .{}) catch unreachable;
+                path.append(alloc, name);
+
+                return .{ .rayfile = .{
+                    .name = file_name,
+                    .path = path.renderAlloc(alloc, .{ .sep = std.fs.path.sep_str }),
+                    .content = readFile(io, alloc, cwd, file_name),
+                } };
+            } else |_| {}
         } else {
             cwd.* = cwd.openDir(io, name, .{}) catch return .{ .unknown_mod = part };
             path.append(alloc, name);
