@@ -1,0 +1,22 @@
+{
+    "range": {
+        "start": {
+            "int": "1"
+        },
+        "end": {
+            "int": "2"
+        }
+    },
+    "range": {
+        "start": "null",
+        "end": {
+            "int": "2"
+        }
+    },
+    "range": {
+        "start": {
+            "int": "5"
+        },
+        "end": "null"
+    }
+}

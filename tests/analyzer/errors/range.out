@@ -1,3 +1,3 @@
-range_mix_int_float
-range_mix_int_float
-range_non_num, bool
+range_non_int, bool
+range_open_non_index
+range_open_non_index

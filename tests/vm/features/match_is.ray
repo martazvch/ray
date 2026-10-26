@@ -17,15 +17,6 @@ fn main() {
     print(b)
 
     trash := true
-    match a is {
-        float {
-            1.2 => print("first")
-            4.5..10.0 => print("second")
-            else => print("non")
-        }
-        int => print("int")
-    }
-
     match getValue() @v is {
         float => print(v + 8.5)
         int => print(1 + v)

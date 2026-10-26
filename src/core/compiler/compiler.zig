@@ -1027,8 +1027,7 @@ const Compiler = struct {
 
         self.writeOp(switch (data.kind) {
             .array => .in_array,
-            .range_int => .in_range_int,
-            .range_float => .in_range_float,
+            .range => .in_range,
             .string => .in_str,
         });
     }
@@ -1075,16 +1074,12 @@ const Compiler = struct {
                 },
                 .float => {
                     try self.compileInstr(arm.expr);
-                    if (self.at(arm.expr) == .range) {
-                        self.writeOp(.in_range_float);
-                    } else {
-                        self.writeOp(.eq_float);
-                    }
+                    self.writeOp(.eq_float);
                 },
                 .int => {
                     try self.compileInstr(arm.expr);
                     if (self.at(arm.expr) == .range) {
-                        self.writeOp(.in_range_int);
+                        self.writeOp(.in_range);
                     } else {
                         self.writeOp(.eq_int);
                     }
@@ -1188,9 +1183,23 @@ const Compiler = struct {
     }
 
     fn range(self: *Self, data: Instruction.Range) Error!void {
-        try self.compileInstr(data.end);
-        try self.compileInstr(data.start);
-        self.writeOp(if (data.kind == .int) .range_new_int else .range_new_float);
+        if (data.end) |end_instr| {
+            try self.compileInstr(end_instr);
+
+            if (data.start) |start| {
+                try self.compileInstr(start);
+                self.writeOp(.range_new);
+            }
+            // No start
+            else {
+                self.writeOp(.range_new_no_start);
+            }
+        }
+        // No end
+        else {
+            try self.compileInstr(data.start.?);
+            self.writeOp(.range_new_no_end);
+        }
     }
 
     fn pointer(self: *Self, instr: Instruction.Pointer) Error!void {

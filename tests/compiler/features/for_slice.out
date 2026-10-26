@@ -4,7 +4,7 @@ load_const index 3, value [1, 2, 3]
 get_local index 0
 load_const index 1, value 2
 load_const index 4, value 0
-range_new_int
+range_new
 slice_arr
 
 get_local index 1
@@ -26,7 +26,7 @@ pop2
 get_local index 0
 load_const index 0, value 1
 load_const index 4, value 0
-range_new_int
+range_new
 slice_arr
 iter_new_arr
 iter_next
@@ -38,7 +38,7 @@ pop2
 get_local index 0
 load_const index 0, value 1
 load_const index 4, value 0
-range_new_int
+range_new
 ptr_array_range
 iter_new_arr_ptr
 iter_next
@@ -50,7 +50,7 @@ pop2
 get_local index 1
 load_const index 1, value 2
 load_const index 4, value 0
-range_new_int
+range_new
 slice_arr
 iter_new_arr
 iter_next
@@ -62,7 +62,7 @@ pop2
 get_local index 1
 load_const index 1, value 2
 load_const index 4, value 0
-range_new_int
+range_new
 ptr_array_range
 iter_new_arr_ptr
 iter_next

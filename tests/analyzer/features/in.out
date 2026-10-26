@@ -8,7 +8,7 @@
             [Constant index 4]
                 [String string]
     [Pop]
-        [In range_int]
+        [In range]
             - needle:
             [Constant index 5]
                 [Int 1]
@@ -21,25 +21,12 @@
             [Constant index 7]
                 [Int 6]
     [Pop]
-        [In range_float]
-            - needle:
-            [Constant index 8]
-                [Float 1.2]
-            - haystack:
-            [Range]
-            - start:
-            [Constant index 9]
-                [Float 4.1]
-            - end:
-            [Constant index 10]
-                [Float 6.9]
-    [Pop]
         [In array]
             - needle:
-            [Constant index 11]
+            [Constant index 8]
                 [Int 45]
             - haystack:
-            [Constant index 13]
+            [Constant index 10]
                 [Array]
                     [Int 43]
                     [Int 45]

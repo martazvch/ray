@@ -486,6 +486,20 @@ fn renderExpr(self: *Self, expr: *const Ast.Expr, comma: bool) Error!void {
         .null => try self.pushKeyValue(name, "{}", comma),
         .match => |n| try self.match(n, comma),
         .pattern => |n| try self.pattern(n, comma),
+        .range => |e| {
+            try self.openKey(name, .block);
+            if (e.start) |start| {
+                try self.renderSingleExpr("start", start, .block, true);
+            } else {
+                try self.pushKeyValue("start", "null", true);
+            }
+            if (e.end) |end| {
+                try self.renderSingleExpr("end", end, .block, false);
+            } else {
+                try self.pushKeyValue("end", "null", false);
+            }
+            try self.closeKey(.block, comma);
+        },
         .@"return" => |e| {
             if (e.expr) |data| {
                 try self.renderSingleExpr(name, data, .block, comma);

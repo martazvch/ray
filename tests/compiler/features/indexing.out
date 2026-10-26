@@ -13,7 +13,19 @@ pop
 get_local index 0
 load_const index 0, value 1
 load_const index 5, value 0
-range_new_int
+range_new
+slice_arr
+pop
+
+get_local index 0
+load_const index 0, value 1
+range_new_no_end
+slice_arr
+pop
+
+get_local index 0
+load_const index 1, value 2
+range_new_no_start
 slice_arr
 pop
 
@@ -33,7 +45,7 @@ pop
 get_local index 1
 load_const index 0, value 1
 load_const index 5, value 0
-range_new_int
+range_new
 slice_arr
 pop
 
@@ -42,7 +54,7 @@ load_const index 5, value 0
 index_arr
 load_const index 1, value 2
 load_const index 0, value 1
-range_new_int
+range_new
 slice_arr
 pop
 
@@ -55,7 +67,7 @@ pop
 get_local index 2
 load_const index 1, value 2
 load_const index 0, value 1
-range_new_int
+range_new
 slice_str
 pop
 

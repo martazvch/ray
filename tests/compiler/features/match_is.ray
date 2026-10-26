@@ -10,14 +10,4 @@ fn main() {
         int => 1
         else => 5
     }
-
-    trash := true
-    match a is {
-        float {
-            1.2 => _ = "first"
-            4.5..10.0 => _ = "second"
-            else => _ = "non"
-        }
-        int => _ = "int"
-    }
 }

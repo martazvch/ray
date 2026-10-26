@@ -38,7 +38,7 @@ pub const Type = union(enum) {
     bool,
     str,
     null,
-    range: *const Type,
+    range,
     array: Array,
     @"enum": Enum,
     error_union: ErrorUnion,
@@ -412,7 +412,7 @@ pub const Type = union(enum) {
             },
             .module => |interned| hasher.update(asBytes(&interned)),
             .optional => |child| child.hash(allocator, hasher),
-            .range => |r| r.hash(allocator, hasher),
+            .range => {},
             .pointer => |p| {
                 p.child.hash(allocator, hasher);
                 hasher.update(asBytes(&p.is_const));

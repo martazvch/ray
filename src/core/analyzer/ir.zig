@@ -237,7 +237,7 @@ pub const Instruction = struct {
         haystack: Index,
         kind: Kind,
 
-        pub const Kind = enum { array, range_int, range_float, string };
+        pub const Kind = enum { array, range, string };
     };
     pub const LoadSymbol = struct {
         symbol: u8,
@@ -276,11 +276,8 @@ pub const Instruction = struct {
         pub const Kind = enum { array, slice, string };
     };
     pub const Range = struct {
-        start: Index,
-        end: Index,
-        kind: Kind,
-
-        pub const Kind = enum { int, float };
+        start: ?Index,
+        end: ?Index,
     };
     pub const Pointer = Index;
     pub const Return = struct {

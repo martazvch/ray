@@ -145,23 +145,21 @@ pub fn Num(T: type) type {
                         const res = try ana.intLit(e, false, ctx);
                         break :b .{ res, .unit(constantValue(ana, res.instr)) };
                     },
-                    .binop => |e| {
-                        if (e.op == .dot_dot) {
-                            var res = try ana.range(e, ctx);
-                            res.type = res.type.range;
+                    .range => |e| {
+                        var res = try ana.range(e, ctx);
+                        res.type = ana.ti.getCached(.int);
 
-                            // If range is made of comptime known literals, we check the range
-                            if (res.ti.comp_time) {
-                                const instr = ana.irb.getInstr(res.instr).range;
+                        // If range is made of comptime known literals, we check the range
+                        if (res.ti.comp_time) {
+                            const instr = ana.irb.getInstr(res.instr).range;
 
-                                if (ana.irb.getInstr(instr.start) == .constant and ana.irb.getInstr(instr.end) == .constant) {
-                                    const range: RangeType = .{
-                                        .low = constantValue(ana, instr.start),
-                                        .high = constantValue(ana, instr.end),
-                                    };
+                            if (ana.irb.getInstr(instr.start.?) == .constant and ana.irb.getInstr(instr.end.?) == .constant) {
+                                const range: RangeType = .{
+                                    .low = constantValue(ana, instr.start.?),
+                                    .high = constantValue(ana, instr.end.?),
+                                };
 
-                                    break :b .{ res, range };
-                                }
+                                break :b .{ res, range };
                             }
                         }
                     },

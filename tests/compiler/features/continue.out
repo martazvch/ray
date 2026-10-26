@@ -1,7 +1,7 @@
 -- main --
 load_const index 0, value 3
 load_const index 1, value 0
-range_new_int
+range_new
 iter_new_range
 iter_next
 jump_null 7 -> 18
@@ -13,7 +13,7 @@ pop2
 
 load_const index 2, value 5
 load_const index 1, value 0
-range_new_int
+range_new
 iter_new_range
 iter_next
 jump_null 26 -> 37
@@ -25,14 +25,14 @@ pop2
 
 load_const index 0, value 3
 load_const index 1, value 0
-range_new_int
+range_new
 iter_new_range
 iter_next
 jump_null 45 -> 73
 
 load_const index 3, value 6
 load_const index 0, value 3
-range_new_int
+range_new
 iter_new_range
 iter_next
 jump_null 55 -> 68
@@ -48,14 +48,14 @@ pop2
 
 load_const index 0, value 3
 load_const index 1, value 0
-range_new_int
+range_new
 iter_new_range
 iter_next
 jump_null 81 -> 112
 load_const index 4, value 1
 load_const index 3, value 6
 load_const index 0, value 3
-range_new_int
+range_new
 iter_new_range
 iter_next
 jump_null 93 -> 107

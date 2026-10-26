@@ -564,10 +564,14 @@ fn multipleDecl(self: *Self, decls: []const ir.Index) void {
 
 fn range(self: *Self, data: Instruction.Range) void {
     self.indentAndAppendSlice("[Range]");
-    self.indentAndAppendSlice("- start:");
-    self.parseInstr(data.start);
-    self.indentAndAppendSlice("- end:");
-    self.parseInstr(data.end);
+    if (data.start) |start| {
+        self.indentAndAppendSlice("- start:");
+        self.parseInstr(start);
+    }
+    if (data.end) |end| {
+        self.indentAndAppendSlice("- end:");
+        self.parseInstr(end);
+    }
 }
 
 fn pointer(self: *Self, data: Instruction.Pointer) void {

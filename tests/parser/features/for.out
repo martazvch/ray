@@ -33,14 +33,13 @@
         "name": "i",
         "index": "null",
         "value": {
-            "binop": {
-                "lhs": {
+            "range": {
+                "start": {
                     "int": "0"
                 },
-                "rhs": {
+                "end": {
                     "int": "3"
-                },
-                "op": ".."
+                }
             }
         },
         "body": {}

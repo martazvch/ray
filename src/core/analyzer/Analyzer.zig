@@ -54,6 +54,7 @@ pub const Context = struct {
     in_trait: bool,
     /// To know if we're in an equality, used for implicit selector on unions
     in_eq: bool,
+    in_indexing: bool,
 
     pub const empty: Context = .{
         .decl_type = null,
@@ -65,6 +66,7 @@ pub const Context = struct {
         .in_trap = false,
         .in_trait = false,
         .in_eq = false,
+        .in_indexing = false,
     };
 
     pub fn setAndGetPrevious(self: *Context, comptime f: FieldEnum(Context), value: @FieldType(Context, @tagName(f))) @TypeOf(value) {
@@ -461,13 +463,7 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
                 self.ti.intern(.{ .pointer = .{ .child = child_type, .is_const = t.is_const } }),
             };
         },
-        .range => |r| b: {
-            if (r != self.ti.getCached(.int)) {
-                return self.err(.for_iter_non_int_range, span);
-            }
-
-            break :b .{ .range, self.ti.getCached(.int) };
-        },
+        .range => .{ .range, self.ti.getCached(.int) },
         .str => .{ .str, res.type },
         else => |*t| return self.err(.{ .iter_non_iterable = .{ .found = self.typeName(t) } }, span),
     };
@@ -1538,6 +1534,7 @@ pub fn analyzeExpr(self: *Self, expr: *const Expr, expect: ExprResKind, ctx: *Co
         .match => |e| self.match(e, expect, ctx),
         .null => |e| self.nullLit(e),
         .pattern => |e| self.pattern(e, ctx),
+        .range => |e| self.range(e, ctx),
         .@"return" => |*e| self.returnExpr(e, ctx),
         .self => |e| self.identifier(e, ctx),
         .string => |e| self.string(e),
@@ -1723,9 +1720,7 @@ fn internLabel(self: *Self, label: ?Ast.TokenIndex) ?InternerIdx {
 }
 
 fn binop(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
-    if (expr.op == .dot_dot) {
-        return self.range(expr, ctx);
-    } else if (expr.op == .in) {
+    if (expr.op == .in) {
         return self.in(expr, ctx);
     }
 
@@ -3191,7 +3186,7 @@ fn in(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
 
     const exp_type, const kind: Instr.In.Kind = switch (haystack_res.type.*) {
         .array => |t| .{ t.child, .array },
-        .range => |t| .{ t, if (t == self.ti.getCached(.int)) .range_int else .range_float },
+        .range => .{ self.ti.getCached(.int), .range },
         .str => .{ self.ti.getCached(.str), .string },
         else => |*t| return self.err(
             .{ .invalid_in_type = .{ .found = self.typeName(t) } },
@@ -3270,6 +3265,9 @@ fn indexing(self: *Self, expr: *const Ast.Indexing, ctx: *Context) Result {
 
 /// Analyze the expression and return an error if the type isn't an integer
 fn expectIndex(self: *Self, expr: *const Expr, ctx: *Context) Error!struct { InstrIndex, Instr.Indexing.IndexKind } {
+    const prev_indexing = ctx.setAndGetPrevious(.in_indexing, true);
+    defer ctx.in_indexing = prev_indexing;
+
     const res = try self.analyzeExpr(expr, .value, ctx);
 
     return switch (res.type.*) {
@@ -3700,36 +3698,39 @@ fn nullablePattern(self: *Self, pat: Ast.Pattern.Nullable, ctx: *Context) Result
     };
 }
 
-pub fn range(self: *Self, expr: Ast.Binop, ctx: *Context) Result {
-    const start = try self.analyzeExpr(expr.lhs, .value, ctx);
-    const end = try self.analyzeExpr(expr.rhs, .value, ctx);
-
-    try self.validateRange(start.type, end.type, self.ast.getSpan(expr.lhs));
+pub fn range(self: *Self, expr: Ast.Range, ctx: *Context) Result {
+    const start_instr, const start_comptime = try self.rangeBound(expr.start, expr.token, ctx);
+    const end_instr, const end_comptime = try self.rangeBound(expr.end, expr.token, ctx);
 
     return .{
-        .type = self.ti.intern(.{ .range = start.type }),
-        .ti = .{ .comp_time = start.ti.comp_time and end.ti.comp_time },
+        .type = self.ti.intern(.range),
+        .ti = .{ .comp_time = start_comptime and end_comptime },
         .instr = self.irb.addInstr(
             .{ .range = .{
-                .start = start.instr,
-                .end = end.instr,
-                .kind = if (start.type.is(.int)) .int else .float,
+                .start = start_instr,
+                .end = end_instr,
             } },
             self.ast.getSpan(expr).start,
         ),
     };
 }
 
-fn validateRange(self: *Self, low: *const Type, high: *const Type, span: Span) Error!void {
-    if (!low.is(.int) and !low.is(.float)) {
-        return self.err(.{ .range_non_num = .{ .found = self.typeName(low) } }, span);
-    }
-    if (!high.is(.int) and !high.is(.float)) {
-        return self.err(.{ .range_non_num = .{ .found = self.typeName(high) } }, span);
-    }
-    if (low != high) {
-        return self.err(.range_mix_int_float, span);
-    }
+fn rangeBound(self: *Self, expr: ?*Expr, token: Ast.TokenIndex, ctx: *Context) Error!struct { ?InstrIndex, bool } {
+    const e = expr orelse {
+        if (!ctx.in_indexing) {
+            return self.err(.range_open_non_index, self.ast.getSpan(token));
+        }
+
+        return .{ null, false };
+    };
+    const bound = try self.analyzeExpr(e, .value, ctx);
+
+    if (!bound.type.is(.int)) return self.err(
+        .{ .range_non_int = .{ .found = self.typeName(bound.type) } },
+        self.ast.getSpan(e),
+    );
+
+    return .{ bound.instr, bound.ti.comp_time };
 }
 
 fn returnExpr(self: *Self, expr: *const Ast.Return, ctx: *Context) Result {

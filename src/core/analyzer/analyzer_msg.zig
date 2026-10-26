@@ -50,7 +50,6 @@ pub const AnalyzerMsg = union(enum) {
     fail_outside_fn,
     float_equal,
     fn_expect_value: struct { expect: []const u8 },
-    for_iter_non_int_range,
     for_iter_ptr_non_array: struct { found: []const u8 },
     implicit_select_no_type,
     implicit_select_invalid_type: struct { found: []const u8 },
@@ -114,8 +113,8 @@ pub const AnalyzerMsg = union(enum) {
     op_overload_arg_count: struct { expect: usize, found: usize },
     op_overload_void_return,
     pat_null_non_optional: struct { found: []const u8 },
-    range_non_num: struct { found: []const u8 },
-    range_mix_int_float,
+    range_open_non_index,
+    range_non_int: struct { found: []const u8 },
     return_outside_fn,
     self_outside_decl,
     shift_overflow: struct { max: usize, found: i64 },
@@ -200,7 +199,6 @@ pub const AnalyzerMsg = union(enum) {
             .fail_outside_fn => writer.writeAll("fail outside of a function"),
             .float_equal => writer.writeAll("floating-point values equality is unsafe"),
             .fn_expect_value => |e| writer.print("no value returned from function expecting '{s}'", .{e.expect}),
-            .for_iter_non_int_range => writer.writeAll("can't iterate a non-int range"),
             .for_iter_ptr_non_array => |e| writer.print("can't take pointer of a non-array value, found: {s}", .{e.found}),
             .index_assign_str => writer.writeAll("string type does not support indexing assignment"),
             .int_overflow => |e| writer.print("literal value is too big to fit inside an integer '{s}'", .{e.value}),
@@ -254,8 +252,8 @@ pub const AnalyzerMsg = union(enum) {
             .op_overload_arg_count => |e| writer.print("expect {} arguments to overload operator, found {}", .{ e.expect, e.found }),
             .op_overload_void_return => writer.writeAll("operator overload has to retrun a non-void type"),
             .pat_null_non_optional => |e| writer.print("can't use the 'if let' / 'if var' pattern on a non nullable type, found: '{s}", .{e.found}),
-            .range_mix_int_float => writer.writeAll("found a mix of 'int' and 'float' types in range"),
-            .range_non_num => |e| writer.print("range values must be 'int' or float, found '{s}'", .{e.found}),
+            .range_open_non_index => writer.writeAll("open ranges are only allowed in indexing context"),
+            .range_non_int => |e| writer.print("range values must be 'int', found: '{s}'", .{e.found}),
             .return_outside_fn => writer.writeAll("return outside of a function"),
             .self_outside_decl => writer.writeAll("can't use 'self' reserved parameter outside a declaration"),
             .shift_overflow => |e| writer.print("shift overflow, max possible shift is {}, found {}", .{ e.max, e.found }),
@@ -370,13 +368,6 @@ pub const AnalyzerMsg = union(enum) {
                 \\   value - other < 1e-6  instead of  value < other
             ),
             .fn_expect_value => writer.writeAll("refer to function's declaration to return the correct type with 'return'"),
-            .for_iter_non_int_range => writer.writeAll(
-                \\only integer ranges can be used as a for-loop iterator. Ranges made of floats can be used in:
-                \\  if:      if value in 1.2..5.6 {}
-                \\  pattern: match value {
-                \\              1.2..5.6 => ...
-                \\           }
-            ),
             .for_iter_ptr_non_array => writer.writeAll("only arrays can be iterated over while taking a pointer to the element"),
             .implicit_select_no_type => writer.writeAll(
                 \\to use implicit selector syntax, you must provide a type so that the compiler can infer it.
@@ -472,10 +463,8 @@ pub const AnalyzerMsg = union(enum) {
             .op_overload_arg_count => writer.writeAll("expect 2 arguments when overloading binary operators and only 1 for unary"),
             .op_overload_void_return => writer.writeAll("overloaded operators are called in expressions, they have to produce a value"),
             .pat_null_non_optional => writer.writeAll("refer to value's defnintion to see its type or use a regular control flow"),
-            .range_mix_int_float => writer.writeAll("a range must be made of 'int' or 'float' and both bounds must share the same type"),
-            .range_non_num => writer.writeAll(
-                \\ranges can only be constructed with numeric values and float ranges can only be used in pattern matching
-            ),
+            .range_open_non_index => writer.writeAll("declare explicit bounds"),
+            .range_non_int => writer.writeAll("ranges can only be constructed with integer values"),
             .return_outside_fn => writer.writeAll(
                 "return statements are only allow to exit a function's body. In loops, use 'break' otherwise remove the return",
             ),

@@ -48,20 +48,9 @@
                     - body:
                         [Constant index 8]
                             [String first]
-                    - expr:
-                        [Range]
-                        - start:
-                        [Constant index 9]
-                            [Float 4.5]
-                        - end:
-                        [Constant index 10]
-                            [Float 10]
-                    - body:
-                        [Constant index 11]
-                            [String second]
                     - wildcard:
-                        [Constant index 12]
+                        [Constant index 9]
                             [String non]
             [Type id]
-                [Constant index 13]
+                [Constant index 10]
                     [String int]

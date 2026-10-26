@@ -458,7 +458,7 @@ fn execute(self: *Self) !void {
                 self.stack.push(array.values[final].deepCopy(self));
             },
             .slice_arr => {
-                const range = self.stack.pop().range_int;
+                const range = self.stack.pop().range;
                 const obj = self.stack.pop().obj;
                 const array = obj.as(Obj.Array);
                 self.gc.pushTmpRoot(obj);
@@ -473,7 +473,7 @@ fn execute(self: *Self) !void {
                 self.stack.push(.makeObj(Obj.String.takeCopy(self, &.{string.chars[final]}).asObj()));
             },
             .slice_str => {
-                const index = self.stack.pop().range_int;
+                const index = self.stack.pop().range;
                 const string = self.stack.pop().obj.as(Obj.String);
                 const start, const end = try self.checkRangeIndex(string.chars.len, index);
                 self.stack.push(.makeObj(Obj.String.takeCopy(self, string.chars[start..end]).asObj()));
@@ -491,13 +491,8 @@ fn execute(self: *Self) !void {
                     self.stack.push(.false_);
                 }
             },
-            .in_range_float => {
-                const range = self.stack.pop().range_float;
-                const value = self.stack.pop().float;
-                self.stack.push(.makeBool(value >= range.start and value <= range.end));
-            },
-            .in_range_int => {
-                const range = self.stack.pop().range_int;
+            .in_range => {
+                const range = self.stack.pop().range;
                 const value = self.stack.pop().int;
                 self.stack.push(.makeBool(value >= range.start and value <= range.end));
             },
@@ -527,7 +522,7 @@ fn execute(self: *Self) !void {
 
             .iter_new_arr => self.stack.peekRef(0).* = .makeObj(Obj.ArrIterator.create(self, self.stack.peek(0))),
             .iter_new_arr_ptr => self.stack.peekRef(0).* = .makeObj(Obj.ArrPtrIterator.create(self, self.stack.peek(0))),
-            .iter_new_range => self.stack.peekRef(0).* = .makeObj(Obj.RangeIterator.create(self, self.stack.peek(0).range_int)),
+            .iter_new_range => self.stack.peekRef(0).* = .makeObj(Obj.RangeIterator.create(self, self.stack.peek(0).range)),
             .iter_new_str => self.stack.peekRef(0).* = .makeObj(Obj.StrIterator.create(self, self.stack.peek(0).obj.as(Obj.String))),
             .iter_next => self.stack.push(self.stack.peekRef(0).obj.as(Obj.Iterator).next(self)),
             .iter_next_index => {
@@ -642,7 +637,7 @@ fn execute(self: *Self) !void {
                 self.stack.push(.makeObj(Obj.Pointer.create(self, &array.values[final]).asObj()));
             },
             .ptr_array_range => {
-                const range = self.stack.pop().range_int;
+                const range = self.stack.pop().range;
                 const obj = self.stack.pop().obj;
                 const array = obj.as(Obj.Array);
                 const start, const end = try self.checkRangeIndex(array.values.len, range);
@@ -675,8 +670,12 @@ fn execute(self: *Self) !void {
             .push_false => self.stack.push(Value.false_),
             .push_null => self.stack.push(Value.null_),
             .push_true => self.stack.push(Value.true_),
-            .range_new_float => self.stack.push(.makeRangeFloat(self.stack.pop().float, self.stack.pop().float)),
-            .range_new_int => self.stack.push(.makeRangeInt(self.stack.pop().int, self.stack.pop().int)),
+            .range_new => self.stack.push(.makeRange(self.stack.pop().int, self.stack.pop().int)),
+            .range_new_no_start => self.stack.push(.makeRange(0, self.stack.pop().int)),
+            .range_new_no_end => {
+                const end = self.stack.peek(1).obj.as(Obj.Array).values.len;
+                self.stack.push(.makeRange(self.stack.pop().int, @intCast(end)));
+            },
             .raw_ptr => {
                 const child = self.stack.pop();
                 self.stack.push(.makeObj(Obj.RawPointer.create(self, child.obj.as(Obj.Pointer).child).asObj()));
@@ -913,7 +912,7 @@ fn normalizeIndex(self: *Self, len: usize, index: i64) Error!usize {
 }
 
 // TODO: runtime error desactivable with release fast mode
-fn checkRangeIndex(self: *Self, len: usize, range: Value.RangeInt) Error!struct { usize, usize } {
+fn checkRangeIndex(self: *Self, len: usize, range: Value.Range) Error!struct { usize, usize } {
     const s = try self.normalizeIndex(len, range.start);
     const e = try self.normalizeIndex(len, range.end);
 

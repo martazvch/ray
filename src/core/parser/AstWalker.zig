@@ -272,6 +272,14 @@ fn captureFromExpr(self: *Self, expr: *Ast.Expr, ctx: *CaptureCtx) void {
             }
         },
         .pattern => |e| self.captureFromPattern(e, ctx),
+        .range => |e| {
+            if (e.start) |start| {
+                self.captureFromExpr(start, ctx);
+            }
+            if (e.end) |end| {
+                self.captureFromExpr(end, ctx);
+            }
+        },
         .@"return" => |e| if (e.expr) |val| self.captureFromExpr(val, ctx),
         .string_interp => |e| {
             for (e.exprs) |ex| {

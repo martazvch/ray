@@ -15,7 +15,6 @@ fn main() {
     match a is {
         float {
             1.2 => "first"
-            4.5..10.0 => "second"
             else => "non"
         }
         int => "int"

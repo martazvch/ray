@@ -1252,6 +1252,7 @@ fn nullablePattern(self: *Self, binding: TokenIndex) Error!Ast.Pattern {
 const Assoc = enum { left, none };
 const Rule = struct { prec: i8, assoc: Assoc = .left };
 
+const dot_dot_prec = 50;
 const rules = std.enums.directEnumArrayDefault(Token.Tag, Rule, .{ .prec = -1 }, 0, .{
     .question_mark = .{ .prec = 10 },
 
@@ -1275,7 +1276,7 @@ const rules = std.enums.directEnumArrayDefault(Token.Tag, Rule, .{ .prec = -1 },
     .less = .{ .prec = 40, .assoc = .none },
     .less_equal = .{ .prec = 40, .assoc = .none },
 
-    .dot_dot = .{ .prec = 50, .assoc = .none },
+    .dot_dot = .{ .prec = dot_dot_prec },
     .less_less = .{ .prec = 50 },
     .greater_greater = .{ .prec = 50 },
 
@@ -1293,9 +1294,13 @@ fn parsePrecedenceExpr(self: *Self, prec_min: i8) Error!*Expr {
     }
 
     self.advance();
-    var left = try self.parseExpr();
-
     var banned_prec: i8 = -1;
+
+    // for '..end' and '..'
+    var left = if (self.prev(.tag) == .dot_dot) b: {
+        banned_prec = dot_dot_prec;
+        break :b try self.endRange(null);
+    } else try self.parseExpr();
 
     while (true) {
         // We check the current before consuming it
@@ -1309,20 +1314,22 @@ fn parsePrecedenceExpr(self: *Self, prec_min: i8) Error!*Expr {
 
         self.advance();
         const op = self.prev(.tag);
-        var expr: *Expr = undefined;
 
-        switch (op) {
+        const expr = switch (op) {
             // TODO: handle question mark on next line
-            .question_mark => expr = try self.ternary(left),
-            else => {
-                expr = self.allocator.create(Expr) catch oom();
+            .question_mark => try self.ternary(left),
+            .dot_dot => try self.endRange(left),
+            else => b: {
+                const expr = self.allocator.create(Expr) catch oom();
                 expr.* = .{ .binop = .{
                     .lhs = left,
                     .rhs = try self.parsePrecedenceExpr(next_rule.prec + 1),
                     .op = op,
                 } };
+
+                break :b expr;
             },
-        }
+        };
 
         left = expr;
 
@@ -1876,6 +1883,56 @@ fn postfix(self: *Self, prefixExpr: *Expr) Error!*Expr {
     }
 
     return expr;
+}
+
+fn endRange(self: *Self, start: ?*Expr) Error!*Expr {
+    const token = self.token_idx - 1;
+
+    const end = if (self.startsExpr())
+        try self.parsePrecedenceExpr(dot_dot_prec + 1)
+    else
+        null;
+
+    if (start == null and end == null) {
+        return self.errAtPrev(.range_both_null);
+    }
+
+    const range = self.allocator.create(Expr) catch oom();
+    range.* = .{ .range = .{
+        .start = start,
+        .end = end,
+        .token = token,
+    } };
+
+    return range;
+}
+
+fn startsExpr(self: *const Self) bool {
+    return switch (self.current(.tag)) {
+        // `for i in 0.. {`
+        .left_brace => !self.ctx.in_cond or self.ctx.in_group,
+        .int,
+        .float,
+        .identifier,
+        .self,
+        .string,
+        .string_part,
+        .true,
+        .false,
+        .null,
+        .left_paren,
+        .left_bracket,
+        .minus,
+        .star,
+        .ampersand,
+        .not,
+        .tilde,
+        .dot,
+        .@"if",
+        .match,
+        => true,
+        else => false,
+    };
 }
 
 fn field(self: *Self, expr: *Expr) Error!*Expr {

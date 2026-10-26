@@ -59,6 +59,7 @@ pub const ParserMsg = union(enum) {
     non_ident_alias,
     non_ident_label,
     positional_after_default_param,
+    range_both_null,
     self_as_non_first_param,
     struct_lit_non_ident_field,
     too_many_fn_args: struct { what: []const u8 },
@@ -129,6 +130,7 @@ pub const ParserMsg = union(enum) {
             .non_ident_alias => writer.writeAll("alias must be an identifier"),
             .non_ident_label => writer.writeAll("labels of blocks must be identifiers"),
             .positional_after_default_param => writer.writeAll("non default parameter after default ones"),
+            .range_both_null => writer.writeAll("both range bounds are missing"),
             .self_as_non_first_param => writer.writeAll("'self' parameter not in first position"),
             .struct_lit_non_ident_field => writer.writeAll("trying to assign to a non-field in structure literal"),
             .too_many_fn_args => |e| writer.print("functions can't have more than 255 {s}", .{e.what}),
@@ -232,6 +234,7 @@ pub const ParserMsg = union(enum) {
             .non_ident_alias => writer.writeAll("change alias name to a valid identifier"),
             .non_ident_label => writer.writeAll("change block's label to an identifier like ':b {}'"),
             .positional_after_default_param => writer.writeAll("positional parameters must be declared before default value ones"),
+            .range_both_null => writer.writeAll("ranges can have either missing start or end bound but not both"),
             .self_as_non_first_param => writer.writeAll("'self' parameter must always be in first place. Change function's declaration"),
             .struct_lit_non_ident_field => writer.writeAll("structure literal must define a value for all fields that doesn't have a default one"),
             .too_many_fn_args => |e| writer.print(

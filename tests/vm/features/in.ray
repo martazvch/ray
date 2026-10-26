@@ -15,9 +15,6 @@ fn main() {
     print(1 in 4..6)
     print(1 in -4..6)
 
-    print(1.2 in 4.1..6.9)
-    print(1.2 in -4.1..6.9)
-
     print(45 in [43, 44, 47])
     print(45 in [43, 45])
 

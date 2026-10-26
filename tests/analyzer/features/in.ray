@@ -1,6 +1,5 @@
 fn main() {
     "c" in "string"
     1 in 4..6
-    1.2 in 4.1..6.9
     45 in [43, 45]
 }

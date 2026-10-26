@@ -198,6 +198,7 @@ pub const Expr = union(enum) {
     null: Null,
     match: Match,
     pattern: Pattern,
+    range: Range,
     @"return": Return,
     self: Self,
     string: String,
@@ -364,6 +365,12 @@ pub const Pattern = union(enum) {
         binding: TokenIndex,
         expr: *Expr,
     };
+};
+
+pub const Range = struct {
+    start: ?*Expr,
+    end: ?*Expr,
+    token: TokenIndex,
 };
 
 pub const Ternary = struct {
@@ -533,6 +540,23 @@ pub fn getSpan(self: *const @This(), anynode: anytype) Span {
                 .start = self.token_spans[e.binding].start,
                 .end = self.getSpan(e.expr).end,
             },
+        },
+        Range => if (node.start) |start| {
+            if (node.end) |end| {
+                return .{
+                    .start = self.getSpan(start).start,
+                    .end = self.getSpan(end).end,
+                };
+            }
+            return .{
+                .start = self.getSpan(start).start,
+                .end = self.token_spans[node.token].end,
+            };
+        } else {
+            return .{
+                .start = self.token_spans[node.token].start,
+                .end = self.getSpan(node.end.?).end,
+            };
         },
         Return => self.token_spans[node.kw],
         String, StringInterp => node.span,
