@@ -336,7 +336,7 @@ const Compiler = struct {
 
             .constant => |data| self.constant(data.index, self.module, true),
             .@"continue" => |data| self.continueInstr(data),
-            .deref => |index| self.wrappedInstr(.deref, index),
+            .deref => |index| self.wrappedInstrNoDup(.deref, index),
             .discard => |index| self.wrappedInstrNoDup(.pop, index),
 
             .enum_decl => |*data| self.enumDecl(data),
@@ -351,8 +351,8 @@ const Compiler = struct {
             .in => |data| self.in(data),
             .indexing => |data| self.indexing(data),
 
-            .arr_to_slice => |index| self.wrappedInstr(.arr_to_slice, index),
-            .int_to_float => |index| self.wrappedInstr(.int_to_float, index),
+            .arr_to_slice => |index| self.wrappedInstrNoDup(.arr_to_slice, index),
+            .int_to_float => |index| self.wrappedInstrNoDup(.int_to_float, index),
 
             // Standalone 'load_symbol' can only mean that we're loading a function to bind it to a runtime value
             .load_symbol => |data| switch (data.lang) {
@@ -1038,12 +1038,13 @@ const Compiler = struct {
 
         const op: OpCode = switch (data.index_kind) {
             .scalar => switch (data.kind) {
-                .array => if (self.state.dup) .index_arr_dup else .index_arr,
+                .array, .slice => if (self.state.dup) .index_arr_dup else .index_arr,
                 .str => .index_str,
             },
             .range => switch (data.kind) {
-                .array => .slice_arr,
-                .str => .slice_str,
+                .array => .index_range_arr,
+                .slice => .slice_arr,
+                .str => .index_range_str,
             },
         };
         self.writeOp(op);
@@ -1207,10 +1208,15 @@ const Compiler = struct {
             .indexing => |a| {
                 try self.compileInstrNoDup(a.expr);
                 try self.compileInstr(a.index);
-                self.writeOp(switch (a.index_kind) {
+
+                const op: OpCode = switch (a.index_kind) {
                     .scalar => .ptr_array_item,
-                    .range => .ptr_array_range,
-                });
+                    .range => switch (a.kind) {
+                        .array, .slice => .slice_arr,
+                        .str => @panic("not yet implemented"),
+                    },
+                };
+                self.writeOp(op);
             },
             .field => |f| {
                 try self.compileInstrNoDup(f.structure);

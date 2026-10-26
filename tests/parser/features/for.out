@@ -1,6 +1,7 @@
 {
     "for_loop": {
         "name": "v",
+        "kind": "normal",
         "index": "null",
         "value": {
             "identifier": "arr"
@@ -13,6 +14,7 @@
     },
     "for_loop": {
         "name": "v",
+        "kind": "normal",
         "index": "i",
         "value": {
             "identifier": "arr"
@@ -21,6 +23,7 @@
     },
     "for_loop": {
         "name": "v",
+        "kind": "normal",
         "index": "null",
         "value": {
             "identifier": "arr"
@@ -31,6 +34,23 @@
     },
     "for_loop": {
         "name": "i",
+        "kind": "normal",
+        "index": "null",
+        "value": {
+            "range": {
+                "start": {
+                    "int": "0"
+                },
+                "end": {
+                    "int": "3"
+                }
+            }
+        },
+        "body": {}
+    },
+    "for_loop": {
+        "name": "i",
+        "kind": "ptr",
         "index": "null",
         "value": {
             "range": {

@@ -224,7 +224,7 @@ pub const Instruction = struct {
         kind: Kind,
         index_kind: IndexKind,
 
-        pub const Kind = enum { array, str };
+        pub const Kind = enum { array, slice, str };
         pub const IndexKind = enum { scalar, range };
     };
     pub const If = struct {

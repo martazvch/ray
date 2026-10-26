@@ -1175,6 +1175,13 @@ fn forLoop(self: *Self) Error!Node {
     const for_tk = self.token_idx - 1;
     const label = self.ctx.setAndGetPrevious(.label, null);
 
+    const binding_kind: Ast.For.BindingKind = if (self.match(.star))
+        .ptr
+    else if (self.match(.ampersand))
+        .ptr_const
+    else
+        .normal;
+
     try self.expect(.identifier, .expect_identifier_for_binding);
     const binding_token = self.token_idx - 1;
     var index_token: ?TokenIndex = null;
@@ -1195,6 +1202,7 @@ fn forLoop(self: *Self) Error!Node {
     return .{ .for_loop = .{
         .for_tk = for_tk,
         .binding = binding_token,
+        .binding_kind = binding_kind,
         .index_binding = index_token,
         .expr = expr,
         .body = body.block,

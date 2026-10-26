@@ -439,34 +439,44 @@ fn forLoop(self: *Self, node: *const Ast.For, ctx: *Context) StmtResult {
     else
         null;
 
-    const res = try self.analyzeExpr(node.expr, .value, ctx);
+    var res = try self.analyzeExpr(node.expr, .value, ctx);
 
     // Placeholder variable that holds the iterator
     _ = try self.forwardDeclareVariable(self.interner.intern("@iter"), undefined, undefined);
 
-    const kind: Instr.For.Kind, const elem_type = switch (res.type.*) {
-        .array => |t| .{ .array, t.child },
-        .slice => |t| .{ .array, t.child },
-        .pointer => |t| b: {
-            const child_type = child: {
-                if (t.child.as(.array)) |arr| break :child arr.child;
-                if (t.child.as(.slice)) |arr| break :child arr.child;
-
-                return self.err(
-                    .{ .for_iter_ptr_non_array = .{ .found = self.typeName(t.child) } },
-                    span,
-                );
-            };
-
-            break :b .{
-                .array_ptr,
-                self.ti.intern(.{ .pointer = .{ .child = child_type, .is_const = t.is_const } }),
-            };
+    // Cases:
+    //  1 - for v in arr {}: iterate over array copy
+    //  2 - for *v in arr {}: iterate over array by pointer
+    //  3 - for v in arr[0..] {}: iterate over array by copy
+    //  4 - for *v in arr[0..] {}: iterate over slice by pointer
+    //  5 - for v in *arr[0..] {}: iterate over slice by copy
+    //  6 - for *v in *arr[0..] {}: iterate over slice by pointer
+    var kind: Instr.For.Kind, var elem_type = switch (res.type.*) {
+        .array => |t| b: {
+            // Cases 3 & 4
+            switch (self.irb.data(res.instr)) {
+                .indexing => |i| {
+                    if (i.index_kind == .range) {
+                        res.instr = self.irb.addInstr(.{ .pointer = res.instr }, span.start);
+                    }
+                },
+                else => {},
+            }
+            break :b .{ .array, t.child };
         },
+        .slice => |t| .{ .array, t.child },
         .range => .{ .range, self.ti.getCached(.int) },
         .str => .{ .str, res.type },
         else => |*t| return self.err(.{ .iter_non_iterable = .{ .found = self.typeName(t) } }, span),
     };
+
+    if (node.binding_kind != .normal) {
+        kind = .array_ptr;
+        elem_type = self.ti.intern(.{ .pointer = .{
+            .child = elem_type,
+            .is_const = node.binding_kind == .ptr_const,
+        } });
+    }
 
     if (index_interned) |interned| {
         try self.forwardDeclareVariable(interned, self.ti.getCached(.int), self.ast.getSpan(node.index_binding.?));
@@ -3228,11 +3238,11 @@ fn indexing(self: *Self, expr: *const Ast.Indexing, ctx: *Context) Result {
     const elem_type = switch (expr_res.type.*) {
         .array => |t| switch (index_kind) {
             .scalar => t.child,
-            .range => self.ti.intern(.{ .slice = .{ .child = t.child, .is_const = false } }),
+            .range => expr_res.type,
         },
         .slice => |t| switch (index_kind) {
             .scalar => t.child,
-            .range => self.ti.intern(.{ .slice = .{ .child = t.child, .is_const = false } }),
+            .range => expr_res.type,
         },
         .str => if (ctx.in_assign)
             return self.err(.index_assign_str, span)
@@ -3253,7 +3263,8 @@ fn indexing(self: *Self, expr: *const Ast.Indexing, ctx: *Context) Result {
                 .index = index,
                 .index_kind = index_kind,
                 .kind = switch (expr_res.type.*) {
-                    .array, .slice => .array,
+                    .array => .array,
+                    .slice => .slice,
                     .str => .str,
                     else => unreachable,
                 },
@@ -4130,12 +4141,15 @@ fn pointer(self: *Self, expr: *Expr, is_const: bool, span: Span, ctx: *Context) 
         return self.err(.invalid_pointer, span);
     }
 
+    var is_slice = false;
     switch (self.irb.data(res.instr)) {
         .identifier => {},
         .indexing => |idx| {
             if (idx.kind == .str) {
                 return self.err(.invalid_pointer, span);
             }
+
+            is_slice = idx.index_kind == .range;
         },
         .field => |f| {
             if (f.kind != .ray) {
@@ -4146,7 +4160,14 @@ fn pointer(self: *Self, expr: *Expr, is_const: bool, span: Span, ctx: *Context) 
     }
 
     return .{
-        .type = self.ti.intern(.{ .pointer = .{ .child = res.type, .is_const = is_const } }),
+        .type = if (is_slice)
+            self.ti.intern(.{ .slice = .{ .child = switch (res.type.*) {
+                .array => |t| t.child,
+                .slice => |t| t.child,
+                else => unreachable,
+            }, .is_const = is_const } })
+        else
+            self.ti.intern(.{ .pointer = .{ .child = res.type, .is_const = is_const } }),
         .ti = res.ti,
         .instr = self.irb.addInstr(.{ .pointer = res.instr }, span.start),
     };

@@ -457,14 +457,11 @@ fn execute(self: *Self) !void {
                 const final = try self.normalizeIndex(array.values.len, index);
                 self.stack.push(array.values[final].deepCopy(self));
             },
-            .slice_arr => {
+            .index_range_arr => {
                 const range = self.stack.pop().range;
-                const obj = self.stack.pop().obj;
-                const array = obj.as(Obj.Array);
-                self.gc.pushTmpRoot(obj);
-                defer self.gc.popTmpRoot();
+                const array = self.stack.pop().obj.as(Obj.Array);
                 const start, const end = try self.checkRangeIndex(array.values.len, range);
-                self.stack.push(.makeObj(array.slice(self, start, end).asObj()));
+                self.stack.push(Value.makeObj(Obj.Array.create(self, array.obj.type_id, array.values[start..end]).asObj()));
             },
             .index_str => {
                 const index = self.stack.pop().int;
@@ -472,7 +469,7 @@ fn execute(self: *Self) !void {
                 const final = try self.normalizeIndex(string.chars.len, index);
                 self.stack.push(.makeObj(Obj.String.takeCopy(self, &.{string.chars[final]}).asObj()));
             },
-            .slice_str => {
+            .index_range_str => {
                 const index = self.stack.pop().range;
                 const string = self.stack.pop().obj.as(Obj.String);
                 const start, const end = try self.checkRangeIndex(string.chars.len, index);
@@ -636,19 +633,6 @@ fn execute(self: *Self) !void {
                 const final = try self.normalizeIndex(array.values.len, index);
                 self.stack.push(.makeObj(Obj.Pointer.create(self, &array.values[final]).asObj()));
             },
-            .ptr_array_range => {
-                const range = self.stack.pop().range;
-                const obj = self.stack.pop().obj;
-                const array = obj.as(Obj.Array);
-                const start, const end = try self.checkRangeIndex(array.values.len, range);
-
-                self.gc.pushTmpRoot(obj);
-                var slice = Value.makeObj(array.slice(self, start, end).asObj());
-                self.gc.pushTmpRoot(slice.obj);
-                defer self.gc.popTmpRootMany(2);
-
-                self.stack.push(.makeObj(Obj.Pointer.create(self, &slice).asObj()));
-            },
             .ptr_local => {
                 const idx = self.frame.readByte();
                 self.stack.push(.makeObj(Obj.Pointer.create(self, &self.frame.slots[idx]).asObj()));
@@ -731,6 +715,16 @@ fn execute(self: *Self) !void {
             .set_local_box => {
                 const index = self.frame.readByte();
                 self.frame.slots[index].obj.as(Obj.Box).value = self.stack.pop();
+            },
+
+            .slice_arr => {
+                const range = self.stack.pop().range;
+                const obj = self.stack.pop().obj;
+                const array = obj.as(Obj.Array);
+                self.gc.pushTmpRoot(obj);
+                defer self.gc.popTmpRoot();
+                const start, const end = try self.checkRangeIndex(array.values.len, range);
+                self.stack.push(.makeObj(array.slice(self, start, end).asObj()));
             },
 
             .shift_left => {

@@ -1023,8 +1023,7 @@ pub const ArrPtrIterator = struct {
     // pointer's child
     pub fn create(vm: *Vm, parent: Value) *Obj {
         var self: *Self = vm.gc_alloc.create(Self) catch oom();
-        const ptr = parent.obj.as(Pointer).child;
-        self.values = ptr.obj.as(Array).values;
+        self.values = parent.obj.as(Array).values;
         self.index = 0;
 
         return self.iterator(vm, parent).asObj();

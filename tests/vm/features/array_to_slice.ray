@@ -2,6 +2,7 @@ fn foo(s: [*]int) {
     for v in s {
         print(v)
     }
+    s[0] = 777
 }
 
 fn foo1(s: [&]int) {

@@ -13,7 +13,7 @@ get_local index 5
 load_const index 1, value 2
 load_const index 0, value 1
 range_new
-slice_arr
+index_range_arr
 
 get_local index 5
 load_const index 0, value 1
@@ -27,13 +27,13 @@ get_local index 5
 load_const index 1, value 2
 load_const index 0, value 1
 range_new
-ptr_array_range
+slice_arr
 
 get_local index 6
 load_const index 1, value 2
 load_const index 0, value 1
 range_new
-ptr_array_range
+slice_arr
 
 ret_naked
 

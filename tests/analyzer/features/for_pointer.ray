@@ -6,7 +6,7 @@ fn main() {
         .{ x=2 },
     ]
 
-    for f in *arr {
+    for *f in arr {
         f.x *= 10
     }
 }

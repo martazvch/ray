@@ -93,10 +93,10 @@ pub const OpCode = enum(u8) {
     gt_int,
 
     index_arr,
+    index_range_arr,
     index_arr_dup,
     index_str,
-    slice_arr,
-    slice_str,
+    index_range_str,
 
     in_array,
     in_range,
@@ -148,7 +148,6 @@ pub const OpCode = enum(u8) {
     pop3,
     popn,
     ptr_array_item,
-    ptr_array_range,
     ptr_local,
     ptr_global,
     ptr_field,
@@ -167,6 +166,7 @@ pub const OpCode = enum(u8) {
     set_global,
     set_local,
     set_local_box,
+    slice_arr,
     store_blk_val,
     str_cat,
     str_mul,

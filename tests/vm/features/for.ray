@@ -80,7 +80,7 @@ fn main() {
     }
     print("----")
 
-    for v in *arr[1..4] {
+    for *v in arr[1..4] {
         print(v.*)
     }
     print("----")

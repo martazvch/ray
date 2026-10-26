@@ -7,7 +7,7 @@ fn printTest(id: int, arr: []int, slice: [&]int) {
 
 fn main() {
     arr := [1, 2, 3]
-    slice := arr[0..2]
+    slice := *arr[0..2]
     printTest(1, arr, slice)
 
     slice[1] = 999
@@ -19,7 +19,7 @@ fn main() {
     }
     printTest(3, arr, slice)
 
-    for v in *slice {
+    for *v in slice {
         v.* = 56
     }
     printTest(4, arr, slice)
@@ -30,7 +30,7 @@ fn main() {
     }
     printTest(5, arr, slice)
 
-    for v in *arr[0..1] {
+    for *v in *arr[0..1] {
         print(v.*)
         v.* = 7
     }
@@ -42,7 +42,7 @@ fn main() {
     }
     printTest(7, arr, slice)
 
-    for v in *slice[0..2] {
+    for *v in slice[0..2] {
         print(v.*)
         v.* *= 20
     }

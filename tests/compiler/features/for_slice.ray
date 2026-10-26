@@ -1,11 +1,13 @@
 fn main() {
     arr := [1, 2, 3]
-    slice := arr[0..2]
+    slice := *arr[0..2]
 
     for v in slice { }
-    for v in *slice { }
+    for *v in slice { }
     for v in arr[0..1] { }
+    for *v in arr[0..1] { }
     for v in *arr[0..1] { }
+    for *v in *arr[0..1] { }
     for v in slice[0..2] { }
-    for v in *slice[0..2] { }
+    for *v in slice[0..2] { }
 }

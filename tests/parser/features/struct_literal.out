@@ -84,6 +84,7 @@
     },
     "for_loop": {
         "name": "i",
+        "kind": "normal",
         "index": "null",
         "value": {
             "identifier": "arr"

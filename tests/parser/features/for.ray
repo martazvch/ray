@@ -7,3 +7,4 @@ for v, i in arr {}
 loop: for v in arr {}
 
 for i in 0..3 {}
+for *i in 0..3 {}

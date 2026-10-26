@@ -86,8 +86,11 @@ pub const For = struct {
     for_tk: TokenIndex,
     index_binding: ?TokenIndex,
     binding: TokenIndex,
+    binding_kind: BindingKind,
     expr: *Expr,
     body: Block,
+
+    pub const BindingKind = enum { normal, ptr, ptr_const };
 };
 
 pub const MultiVarDecl = struct {

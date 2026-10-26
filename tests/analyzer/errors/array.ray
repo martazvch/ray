@@ -11,7 +11,7 @@ fn main() {
     voidValueInArray := [1, {}]
 
     valid := [1, 2, 3, 4]
-    slice := valid[1..3]
+    slice := *valid[1..3]
     slice.pop()
     slice.push(4)
 }
