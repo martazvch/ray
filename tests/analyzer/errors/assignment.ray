@@ -30,5 +30,6 @@ fn main() {
     constFoo :: Foo{ a=5 }
     constFoo.a = 1
 
-
+    a := &[1, 2, 3][0..]
+    a[1] = 5
 }

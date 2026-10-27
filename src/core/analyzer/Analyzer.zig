@@ -3240,9 +3240,16 @@ fn indexing(self: *Self, expr: *const Ast.Indexing, ctx: *Context) Result {
             .scalar => t.child,
             .range => expr_res.type,
         },
-        .slice => |t| switch (index_kind) {
-            .scalar => t.child,
-            .range => expr_res.type,
+        .slice => |t| b: {
+            if (ctx.in_assign and t.is_const) return self.err(
+                .{ .assign_to_constant = .{ .name = self.typeName(expr_res.type) } },
+                span,
+            );
+
+            break :b switch (index_kind) {
+                .scalar => t.child,
+                .range => expr_res.type,
+            };
         },
         .str => if (ctx.in_assign)
             return self.err(.index_assign_str, span)
