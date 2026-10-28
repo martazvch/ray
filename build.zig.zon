@@ -4,8 +4,8 @@
     .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .clarg = .{
-            .url = "https://github.com/martazvch/clarg/archive/refs/tags/0.3.0.tar.gz",
-            .hash = "clarg-0.0.0-g4b0ST5_AADb11MopaHLlZHXzNsdCLsVmZmWiiNZhpw9",
+            .url = "https://github.com/martazvch/clarg/archive/refs/tags/0.3.1.tar.gz",
+            .hash = "clarg-0.0.0-g4b0SbyBAAC9TkLVG33zDs8xT9EElEwRFiw9DngLtcrY",
         },
         .libffi = .{
             .url = "git+https://github.com/allyourcodebase/libffi.git#d2a5c0e58c031153e86470e1e272a328016eb535",
