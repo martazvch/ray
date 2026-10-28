@@ -923,17 +923,16 @@ fn fnParams(self: *Self, params: []Ast.VarDecl, ctx: *Context) Error!Params {
             return self.err(.void_param, span);
         }
 
-        _ = try self.declareVariable(
+        _ = try self.declareParam(
             param_name,
             param_res.type,
-            .{ .captured = p.meta.captured, .is_fn_param = true },
+            .{ .captured = p.meta.captured, .sym_ext_mod = param_res.mod },
             span,
         );
         decls.putAssumeCapacity(param_name, .{
             .type = param_res.type,
             .default = const_index,
             .captured = p.meta.captured,
-            // .ext_mod = param_res.mod,
         });
     }
 
@@ -2819,6 +2818,7 @@ fn call(self: *Self, expr: *const Ast.FnCall, ctx: *Context) Result {
             self.ast.getSpan(expr.callee.identifier),
         );
 
+        // Handle '*self' and '&self'
         if (fn_type.params.values()[0].type.* == .pointer) {
             var field_callee = self.irb.data(callee.instr).field;
             field_callee.structure = self.irb.wrapInstr(.pointer, field_callee.structure);
@@ -4778,7 +4778,11 @@ pub fn typeName(self: *const Self, ty: *const Type) []const u8 {
 }
 
 fn declareVariable(self: *Self, name: InternerIdx, ty: *const Type, conf: LexScope.VarConf, span: Span) Error!usize {
-    return self.scope.declareVar(self.alloc, name, ty, self.mod_index, conf) catch |e| self.handleVarDeclErr(name, conf.is_fn_param, e, span);
+    return self.scope.declareVar(self.alloc, name, ty, self.mod_index, conf) catch |e| self.handleVarDeclErr(name, false, e, span);
+}
+
+fn declareParam(self: *Self, name: InternerIdx, ty: *const Type, conf: LexScope.VarConf, span: Span) Error!usize {
+    return self.scope.declareVar(self.alloc, name, ty, self.mod_index, conf) catch |e| self.handleVarDeclErr(name, true, e, span);
 }
 
 fn handleVarDeclErr(self: *Self, name: InternerIdx, is_param: bool, e: LexScope.Error, span: Span) Error {

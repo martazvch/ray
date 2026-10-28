@@ -235,7 +235,6 @@ pub const VarConf = struct {
     constant: bool = false,
     comp_time: bool = false,
     sym_ext_mod: ?ModIndex = null,
-    is_fn_param: bool = false,
 };
 pub fn declareVar(
     self: *Self,

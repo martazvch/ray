@@ -1,0 +1,12 @@
+use data.geom{ Point }
+
+struct Foo {
+    fn foo(self, p: Point) {
+        p.display()
+    }
+}
+
+fn main() {
+    f := Foo{}
+    f.foo(.{ x = 4, y = 8 })
+}
